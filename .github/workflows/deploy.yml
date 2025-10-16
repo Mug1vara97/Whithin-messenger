@@ -38,8 +38,8 @@ jobs:
     - name: Build backend
       run: |
         cd WhithinMessenger.Backend
-        dotnet restore
-        dotnet build --configuration Release
+        dotnet restore WhithinMessenger.sln
+        dotnet build WhithinMessenger.sln --configuration Release
         
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
@@ -78,7 +78,7 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "."
         target: "/home/whithin-messenger"
-        strip_components: 1
+        strip_components: 0
         
     - name: Start services
       uses: appleboy/ssh-action@v1.0.0
