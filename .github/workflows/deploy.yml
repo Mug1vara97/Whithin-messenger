@@ -37,9 +37,8 @@ jobs:
         
     - name: Build backend
       run: |
-        cd WhithinMessenger.Backend
-        dotnet restore WhithinMessenger.sln
-        dotnet build WhithinMessenger.sln --configuration Release
+        dotnet restore WhithinMessenger.Backend/WhithinMessenger.sln
+        dotnet build WhithinMessenger.Backend/WhithinMessenger.sln --configuration Release
         
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
