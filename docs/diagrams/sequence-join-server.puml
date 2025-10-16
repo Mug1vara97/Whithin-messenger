@@ -1,0 +1,138 @@
+@startuml
+title Присоединение к серверу - Диаграмма последовательности
+
+actor "Пользователь" as User
+participant "Виджет\nServerDiscovery" as Discovery
+participant "serverApi" as API
+participant "API Контроллер" as Controller
+participant "MediatR" as Mediator
+participant "Обработчик\nJoinServer" as Handler
+participant "ServerRepository" as ServerRepo
+participant "MemberRepository" as MemberRepo
+database "PostgreSQL" as DB
+participant "SignalR Hub" as Hub
+participant "Участники сервера" as Members
+participant "Виджет\nServerPanel" as Panel
+
+== Поиск сервера ==
+
+User -> Discovery: Вводит поисковый запрос
+Discovery -> API: getPublicServers(searchTerm)
+activate API
+
+API -> Controller: GET /api/servers/public?search=...
+activate Controller
+
+Controller -> DB: SELECT FROM Servers WHERE IsPublic=true
+activate DB
+DB --> Controller: Список серверов
+deactivate DB
+
+Controller --> API: ServerDto[]
+deactivate Controller
+
+API --> Discovery: Список серверов
+deactivate API
+
+Discovery --> User: Показать результаты
+
+== Присоединение ==
+
+User -> Discovery: Нажимает "Присоединиться"
+
+Discovery -> API: joinServer(serverId)
+activate API
+
+API -> Controller: POST /api/servers/{id}/join
+activate Controller
+
+Controller -> Mediator: Send(JoinServerCommand)
+activate Mediator
+
+Mediator -> Handler: Handle(command)
+activate Handler
+
+Handler -> ServerRepo: GetServerAsync(serverId)
+activate ServerRepo
+ServerRepo -> DB: SELECT FROM Servers
+activate DB
+DB --> ServerRepo: Сервер найден
+deactivate DB
+ServerRepo --> Handler: Сущность Server
+deactivate ServerRepo
+
+Handler -> Handler: Валидация сервер публичный
+
+Handler -> MemberRepo: CheckMembershipAsync()
+MemberRepo -> DB: SELECT FROM ServerMembers
+DB --> MemberRepo: Не является участником
+
+Handler -> DB: BEGIN TRANSACTION
+activate DB
+
+Handler -> MemberRepo: AddMemberAsync(serverId, userId)
+MemberRepo -> DB: INSERT INTO ServerMembers
+
+DB --> Handler: COMMIT
+deactivate DB
+
+Handler --> Mediator: Успешно
+deactivate Handler
+
+Mediator --> Controller: Успешно
+deactivate Mediator
+
+Controller -> Hub: NotifyServerMembers(serverId, newMember)
+activate Hub
+Hub -> Members: Событие MemberJoined
+deactivate Hub
+
+Controller --> API: Успешно (200)
+deactivate Controller
+
+API -> API: Добавление сервера в список
+API --> Discovery: Успешно
+deactivate API
+
+Discovery -> Panel: Навигация к серверу(serverId)
+activate Panel
+
+Panel -> API: getServerInfo(serverId)
+activate API
+
+API -> Controller: GET /api/servers/{id}
+activate Controller
+
+Controller -> DB: SELECT сервер с категориями и каналами
+activate DB
+DB --> Controller: ServerDetail
+deactivate DB
+
+Controller --> API: ServerDetailDto
+deactivate Controller
+
+API --> Panel: Данные сервера
+deactivate API
+
+Panel -> Panel: Отрисовка категорий и каналов
+Panel --> User: Показать сервер
+deactivate Panel
+
+Members -> Members: Обновление списка участников
+Members --> Members: Показать уведомление
+
+note right of Handler
+  Проверяет:
+  - Сервер публичный
+  - Пользователь не является участником
+  
+  Действия:
+  - Добавляет в ServerMembers
+end note
+
+note right of Hub
+  Отправляет событие MemberJoined
+  всем участникам сервера
+end note
+
+@enduml

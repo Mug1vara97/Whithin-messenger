@@ -1,0 +1,281 @@
+@startuml Диаграмма классов
+
+title WhithinMessenger - Диаграмма классов домена
+
+' Перечисления
+enum СтатусПользователя {
+  Оффлайн = 0
+  Онлайн = 1
+  Отошёл = 2
+  НеБеспокоить = 3
+  Невидимый = 4
+}
+
+enum ТипЧата {
+  Приватный = 1
+  Групповой = 2
+  Серверный = 3
+}
+
+enum СтатусДружбы {
+  Ожидание = 0
+  Принята = 1
+  Отклонена = 2
+}
+
+' Основные классы
+
+class ApplicationUser {
+  + Id : Guid
+  + Username : string
+  + Email : string
+  + PasswordHash : string
+  + CreatedAt : DateTime
+  --
+  + Profile : UserProfile
+  + Messages : List<Message>
+  + Chats : List<ChatMember>
+  + OwnedServers : List<Server>
+}
+
+class UserProfile {
+  + Id : Guid
+  + UserId : Guid
+  + Bio : string
+  + AvatarUrl : string
+  + Status : СтатусПользователя
+  + LastSeen : DateTime?
+  + ShowLastSeen : bool
+  + ShowEmail : bool
+  --
+  + User : ApplicationUser
+}
+
+class Chat {
+  + Id : Guid
+  + Name : string
+  + Type : ТипЧата
+  + AvatarUrl : string
+  + CreatedAt : DateTime
+  + IsDeleted : bool
+  --
+  + Members : List<ChatMember>
+  + Messages : List<Message>
+  + Category : ChatCategory?
+  --
+  + ДобавитьУчастника(userId: Guid) : void
+  + УдалитьУчастника(userId: Guid) : void
+  + ЯвляетсяУчастником(userId: Guid) : bool
+}
+
+class ChatMember {
+  + ChatId : Guid
+  + UserId : Guid
+  + IsAdmin : bool
+  + JoinedAt : DateTime
+  --
+  + Chat : Chat
+  + User : ApplicationUser
+}
+
+class Message {
+  + Id : Guid
+  + ChatId : Guid
+  + SenderId : Guid
+  + Content : string
+  + Timestamp : DateTime
+  + IsEdited : bool
+  + IsDeleted : bool
+  + ReplyToMessageId : Guid?
+  --
+  + Chat : Chat
+  + Sender : ApplicationUser
+  + MediaFiles : List<MessageMedia>
+  + ReplyToMessage : Message?
+  + Replies : List<Message>
+  + ReadBy : List<MessageRead>
+  --
+  + Редактировать(newContent: string) : void
+  + Удалить() : void
+  + ПрикрепитьМедиа(mediaFiles: List<MediaFile>) : void
+}
+
+class MessageRead {
+  + MessageId : Guid
+  + UserId : Guid
+  + ReadAt : DateTime
+  --
+  + Message : Message
+  + User : ApplicationUser
+}
+
+class MediaFile {
+  + Id : Guid
+  + FileName : string
+  + FileUrl : string
+  + ThumbnailUrl : string
+  + FileType : string
+  + FileSize : long
+  + Width : int?
+  + Height : int?
+  + Duration : int?
+  + UploadedBy : Guid
+  + UploadedAt : DateTime
+  + IsDeleted : bool
+  --
+  + Uploader : ApplicationUser
+  + Messages : List<MessageMedia>
+  --
+  + Удалить() : void
+}
+
+class MessageMedia {
+  + MessageId : Guid
+  + MediaFileId : Guid
+  --
+  + Message : Message
+  + MediaFile : MediaFile
+}
+
+class Friendship {
+  + Id : Guid
+  + User1Id : Guid
+  + User2Id : Guid
+  + Status : СтатусДружбы
+  + CreatedAt : DateTime
+  --
+  + User1 : ApplicationUser
+  + User2 : ApplicationUser
+  --
+  + Принять() : void
+  + Отклонить() : void
+}
+
+class Server {
+  + Id : Guid
+  + Name : string
+  + Description : string
+  + OwnerId : Guid
+  + IsPublic : bool
+  + AvatarUrl : string
+  + CreatedAt : DateTime
+  + IsDeleted : bool
+  --
+  + Owner : ApplicationUser
+  + Members : List<ServerMember>
+  + Categories : List<ChatCategory>
+  + Roles : List<ServerRole>
+  --
+  + ДобавитьУчастника(userId: Guid) : void
+  + СоздатьКатегорию(name: string) : ChatCategory
+  + СоздатьРоль(name: string) : ServerRole
+}
+
+class ChatCategory {
+  + Id : Guid
+  + ServerId : Guid
+  + Name : string
+  + OrderIndex : int
+  + IsPrivate : bool
+  --
+  + Server : Server
+  + Chats : List<Chat>
+  --
+  + СоздатьКанал(name: string, type: ТипЧата) : Chat
+  + ПереместитьКанал(chatId: Guid, newOrder: int) : void
+}
+
+class ServerMember {
+  + ServerId : Guid
+  + UserId : Guid
+  + JoinedAt : DateTime
+  + IsBanned : bool
+  --
+  + Server : Server
+  + User : ApplicationUser
+  + Roles : List<UserServerRole>
+  --
+  + НазначитьРоль(roleId: Guid) : void
+  + УдалитьРоль(roleId: Guid) : void
+  + Забанить() : void
+  + Разбанить() : void
+}
+
+class ServerRole {
+  + Id : Guid
+  + ServerId : Guid
+  + Name : string
+  + Color : string
+  + Permissions : long
+  + Position : int
+  --
+  + Server : Server
+  + Members : List<UserServerRole>
+  --
+  + ИмеетРазрешение(permission: int) : bool
+  + ДобавитьРазрешение(permission: int) : void
+}
+
+class UserServerRole {
+  + UserId : Guid
+  + ServerId : Guid
+  + RoleId : Guid
+  --
+  + User : ApplicationUser
+  + Server : Server
+  + Role : ServerRole
+}
+
+' Связи
+
+ApplicationUser "1" -- "1" UserProfile : имеет
+ApplicationUser "1" -- "*" Message : отправляет
+ApplicationUser "1" -- "*" ChatMember : участник
+ApplicationUser "1" -- "*" MediaFile : загружает
+ApplicationUser "1" -- "*" Friendship : пользователь1/2
+ApplicationUser "1" -- "*" Server : владеет
+ApplicationUser "1" -- "*" ServerMember : участник
+
+Chat "1" -- "*" ChatMember : имеет
+Chat "1" -- "*" Message : содержит
+Chat "*" -- "0..1" ChatCategory : принадлежит
+
+Message "1" -- "*" MessageRead : прочитано
+Message "1" -- "*" MessageMedia : имеет медиа
+Message "0..1" -- "*" Message : ответы
+
+MediaFile "1" -- "*" MessageMedia : прикреплено
+
+Server "1" -- "*" ChatCategory : имеет
+Server "1" -- "*" ServerMember : имеет
+Server "1" -- "*" ServerRole : имеет
+
+ServerRole "1" -- "*" UserServerRole : назначена
+ServerMember "1" -- "*" UserServerRole : имеет
+
+UserProfile -- СтатусПользователя
+Chat -- ТипЧата
+Friendship -- СтатусДружбы
+
+note right of Message
+  Поддерживает:
+  - Редактирование
+  - Удаление (soft delete)
+  - Ответы (threading)
+  - Медиафайлы
+end note
+
+note right of Server
+  Владелец имеет
+  полные права на сервер
+  Может делегировать через роли
+end note
+
+note bottom of ServerRole
+  Permissions - битовые флаги:
+  ManageServer, ManageChannels,
+  ManageRoles, InviteMembers,
+  KickMembers, и др.
+end note
+
+@enduml

@@ -1,0 +1,40 @@
+.categories-list {
+  flex: 1;
+  padding: 8px 0;
+  min-height: 100%;
+  position: relative;
+}
+
+.categories-list.dragging-over {
+  background-color: var(--hover);
+  border-radius: 4px;
+}
+
+.no-channels {
+  padding: 10px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.no-categories {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+
+.uncategorized-channels {
+  padding: 8px 0;
+  /* border-bottom: 1px solid var(--border); */
+  margin-bottom: 8px;
+}
+
+.uncategorized-channels.dragging-over {
+  background-color: var(--hover);
+  border-radius: 4px;
+  border: 2px dashed var(--accent);
+}

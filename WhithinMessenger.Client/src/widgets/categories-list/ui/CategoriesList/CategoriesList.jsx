@@ -1,0 +1,363 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { DragDropContext, Droppable } from '@hello-pangea/dnd';
+import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
+import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
+import './CategoriesList.css';
+
+const CategoriesList = ({ 
+  categories = [],
+  selectedChat,
+  onChatClick,
+  onAddChannel,
+  onChannelContextMenu,
+  onCategoryContextMenu,
+  onChannelSettings,
+  onEmptySpaceContextMenu,
+  connection,
+  serverId
+}) => {
+  const [localCategories, setLocalCategories] = useState(categories);
+
+  // Обновляем локальное состояние при изменении пропсов
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  // Обработчики SignalR событий
+  useEffect(() => {
+    console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
+    if (!connection || connection.state !== 'Connected') return;
+
+    const handleCategoriesReordered = (updatedCategories) => {
+      console.log('CategoriesReordered received:', updatedCategories);
+      setLocalCategories(updatedCategories);
+      
+      // Уведомляем родительский компонент об обновлении
+      if (onCategoriesReordered) {
+        onCategoriesReordered(updatedCategories);
+      }
+    };
+
+    const handleChatsReordered = (updatedCategories) => {
+      console.log('ChatsReordered received:', updatedCategories);
+      setLocalCategories(updatedCategories);
+      
+      // Уведомляем родительский компонент об обновлении
+      if (onChatsReordered) {
+        onChatsReordered(updatedCategories);
+      }
+    };
+
+    const handleChatCreated = (newChat, categoryId) => {
+      setLocalCategories(prev => prev.map(cat => {
+        if ((cat.categoryId || cat.CategoryId) === categoryId) {
+          return {
+            ...cat,
+            chats: [...(cat.chats || cat.Chats || []), newChat]
+          };
+        }
+        return cat;
+      }));
+    };
+
+    const handleChatDeleted = (chatId) => {
+      setLocalCategories(prev => prev.map(cat => ({
+        ...cat,
+        chats: (cat.chats || cat.Chats || []).filter(chat => 
+          (chat.chatId || chat.ChatId) !== chatId
+        )
+      })));
+    };
+
+    const handleCategoryCreated = (newCategory) => {
+      setLocalCategories(prev => [...prev, newCategory]);
+    };
+
+    const handleCategoryDeleted = (categoryId) => {
+      setLocalCategories(prev => prev.filter(cat => 
+        (cat.categoryId || cat.CategoryId) !== categoryId
+      ));
+    };
+
+    // Регистрируем обработчики
+    connection.on("CategoriesReordered", handleCategoriesReordered);
+    connection.on("ChatsReordered", handleChatsReordered);
+    connection.on("ChatCreated", handleChatCreated);
+    connection.on("ChatDeleted", handleChatDeleted);
+    connection.on("CategoryCreated", handleCategoryCreated);
+    connection.on("CategoryDeleted", handleCategoryDeleted);
+
+    return () => {
+      connection.off("CategoriesReordered", handleCategoriesReordered);
+      connection.off("ChatsReordered", handleChatsReordered);
+      connection.off("ChatCreated", handleChatCreated);
+      connection.off("ChatDeleted", handleChatDeleted);
+      connection.off("CategoryCreated", handleCategoryCreated);
+      connection.off("CategoryDeleted", handleCategoryDeleted);
+    };
+  }, [connection?.state]);
+
+  const handleChatClick = (channel) => {
+    if (onChatClick) {
+      onChatClick(channel.chatId || channel.ChatId, channel.name || channel.Name || channel.groupName, channel.chatType || channel.typeId);
+    }
+  };
+
+  const handleAddChannel = (categoryId) => {
+    if (onAddChannel) {
+      onAddChannel(categoryId);
+    }
+  };
+
+  const handleChannelContextMenu = (e, channel, category) => {
+    if (onChannelContextMenu) {
+      onChannelContextMenu(e, channel, category);
+    }
+  };
+
+  const handleChannelSettings = (channel) => {
+    if (onChannelSettings) {
+      onChannelSettings(channel);
+    }
+  };
+
+  const handleCategoryContextMenu = (e, category) => {
+    if (onCategoryContextMenu) {
+      onCategoryContextMenu(e, category);
+    }
+  };
+
+  const isChannelActive = (channel) => {
+    return selectedChat?.chat_id === (channel.chatId || channel.ChatId);
+  };
+
+  const handleDragEnd = useCallback(async (result) => {
+    console.log('handleDragEnd called:', result);
+    
+    if (!result.destination || !connection || connection.state !== 'Connected') {
+      console.log('No destination or connection, returning. Connection state:', connection?.state);
+      return;
+    }
+
+    // Предотвращаем дублирование операций
+    if (result.reason !== 'DROP') {
+      console.log('Not a drop operation, ignoring');
+      return;
+    }
+
+    const { source, destination, type } = result;
+    console.log('Drag operation:', { source, destination, type });
+
+    try {
+      if (type === 'CATEGORY') {
+        console.log('Moving category');
+        
+        // Получаем категории (исключая null категории)
+        const regularCategories = localCategories.filter(cat => {
+          const id = cat.categoryId || cat.CategoryId;
+          return id !== null && id !== undefined;
+        });
+
+        console.log('Checking indices:', {
+          sourceIndex: source.index,
+          destinationIndex: destination.index,
+          regularCategoriesLength: regularCategories.length
+        });
+        
+        if (source.index >= regularCategories.length || destination.index >= regularCategories.length) {
+          console.log('Invalid indices, returning');
+          return;
+        }
+
+        console.log('Regular categories:', regularCategories.map(cat => ({ id: cat.categoryId || cat.CategoryId, name: cat.categoryName || cat.CategoryName })));
+        console.log('Source index:', source.index, 'Destination index:', destination.index);
+        console.log('Regular categories length:', regularCategories.length);
+        console.log('All localCategories:', localCategories.map(cat => ({ 
+          id: cat.categoryId || cat.CategoryId, 
+          name: cat.categoryName || cat.CategoryName,
+          isNull: (cat.categoryId || cat.CategoryId) === null || (cat.categoryId || cat.CategoryId) === undefined
+        })));
+
+        // Обновляем локальное состояние - используем только обычные категории
+        const newCategories = reorderCategories(
+          regularCategories,
+          source.index,
+          destination.index
+        );
+
+        // Добавляем обратно null категории
+        const nullCategories = localCategories.filter(cat => {
+          const id = cat.categoryId || cat.CategoryId;
+          return id === null || id === undefined;
+        });
+
+        const finalCategories = [...nullCategories, ...newCategories];
+
+        console.log('Setting local categories for category move:', finalCategories);
+        setLocalCategories(finalCategories);
+
+        // Отправляем на сервер
+        const movedCategory = regularCategories[source.index];
+        console.log('Invoking MoveCategory with:', { 
+          serverId, 
+          categoryId: movedCategory.categoryId || movedCategory.CategoryId, 
+          newPosition: destination.index 
+        });
+        
+        await connection.invoke("MoveCategory", 
+          serverId,
+          movedCategory.categoryId || movedCategory.CategoryId,
+          destination.index
+        );
+        
+        console.log('MoveCategory completed successfully');
+      }
+      else if (type === 'CHAT') {
+        console.log('Moving chat');
+        
+        const sourceId = source.droppableId === 'category-null' ? null : 
+          source.droppableId.replace('category-', '');
+        const targetId = destination.droppableId === 'category-null' ? null :
+          destination.droppableId.replace('category-', '');
+
+        // Обновляем локальное состояние
+        const updatedCategories = moveChatBetweenCategories(
+          localCategories,
+          source,
+          destination
+        );
+
+        console.log('Setting local categories for chat move:', updatedCategories);
+        setLocalCategories(updatedCategories);
+
+        // Отправляем на сервер
+        const chatId = result.draggableId.replace('chat-', '');
+        console.log('Invoking MoveChat with:', { 
+          serverId, 
+          chatId, 
+          sourceId, 
+          targetId, 
+          newPosition: destination.index 
+        });
+        
+        await connection.invoke("MoveChat",
+          serverId,
+          chatId,
+          sourceId === 'null' || sourceId === 'undefined' ? null : sourceId,
+          targetId === 'null' || targetId === 'undefined' ? null : targetId,
+          destination.index
+        );
+        
+        console.log('MoveChat completed successfully');
+      }
+    } catch (error) {
+      console.error('Move operation failed:', error);
+      alert(`Ошибка перемещения: ${error.message}`);
+    }
+  }, [localCategories, connection, serverId]);
+
+  // Получаем несортированные каналы
+  const uncategorizedChannels = localCategories.find(cat => 
+    cat.categoryId === null
+  )?.chats || [];
+
+  // Отладочная информация убрана - все работает корректно
+
+  // Сортируем категории
+  const sortedCategories = localCategories
+    .filter(cat => cat.categoryId !== null)
+    .sort((a, b) => (a.categoryOrder || a.CategoryOrder) - (b.categoryOrder || b.CategoryOrder));
+
+  return (
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <Droppable 
+        droppableId="categories"
+        direction="vertical"
+        type="CATEGORY"
+        isDropDisabled={false}
+      >
+        {(provided, snapshot) => (
+          <div 
+            {...provided.droppableProps}
+            ref={provided.innerRef}
+            className={`categories-list ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+            onContextMenu={(e) => {
+              if (!e.target.closest('.category-item') && !e.target.closest('.channel-item')) {
+                e.preventDefault();
+                if (onEmptySpaceContextMenu) {
+                  onEmptySpaceContextMenu(e);
+                }
+              }
+            }}
+          >
+            {/* Несортированные каналы */}
+            <Droppable
+              droppableId="category-null"
+              type="CHAT"
+            >
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                >
+                  {uncategorizedChannels.map((channel, index) => (
+                    <ChannelItem
+                      key={channel.chatId || channel.ChatId}
+                      channel={channel}
+                      index={index}
+                      isActive={isChannelActive(channel)}
+                      onClick={handleChatClick}
+                      onContextMenu={(e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })}
+                      onSettings={handleChannelSettings}
+                      isDragDisabled={false}
+                    />
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+
+            {/* Категории */}
+            {sortedCategories
+              .filter(category => category.categoryId !== null)
+              .map((category, index) => (
+              <CategoryItem
+                key={category.categoryId || category.CategoryId}
+                category={category}
+                index={index}
+                onAddChannel={handleAddChannel}
+                onCategoryContextMenu={handleCategoryContextMenu}
+                isDragDisabled={false}
+              >
+                {category.chats?.map((channel, channelIndex) => (
+                  <ChannelItem
+                    key={channel.chatId || channel.ChatId}
+                    channel={channel}
+                    index={channelIndex}
+                    isActive={isChannelActive(channel)}
+                    onClick={handleChatClick}
+                    onContextMenu={(e) => handleChannelContextMenu(e, channel, category)}
+                    onSettings={handleChannelSettings}
+                    isDragDisabled={false}
+                  />
+                )) || (
+                  <div className="no-channels">
+                    <p>Нет каналов в этой категории</p>
+                  </div>
+                )}
+              </CategoryItem>
+            )) || (
+              <div className="no-categories">
+                <p>Нет категорий</p>
+              </div>
+            )}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
+  );
+};
+
+export default CategoriesList;

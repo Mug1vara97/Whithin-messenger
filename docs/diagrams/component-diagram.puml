@@ -1,0 +1,171 @@
+@startuml Компонентная диаграмма
+
+title WhithinMessenger - Компонентная диаграмма
+
+!define RECTANGLE_STYLE rectangle
+
+skinparam component {
+  BackgroundColor<<frontend>> LightBlue
+  BackgroundColor<<backend>> LightGreen
+  BackgroundColor<<database>> LightYellow
+}
+
+' Слой Frontend
+package "Frontend (React SPA)" <<frontend>> {
+  component [Роутер приложения] as Router
+  component [Страницы] as Pages
+  
+  package "Виджеты" {
+    component [Список чатов] as ChatListW
+    component [Комната чата] as ChatRoomW
+    component [Панель сервера] as ServerPanelW
+    component [Панель друзей] as FriendsPanelW
+  }
+  
+  package "Сущности" {
+    component [chat] as ChatE
+    component [message] as MessageE
+    component [friend] as FriendE
+    component [server] as ServerE
+    component [user] as UserE
+  }
+  
+  package "Общее" {
+    component [UI Компоненты] as UIComponents
+    component [API Клиент] as APIClient
+    component [SignalR Клиент] as SignalRClient
+    component [Auth Context] as AuthContext
+  }
+}
+
+' Слой Backend
+package "Backend (ASP.NET Core)" <<backend>> {
+  
+  package "Слой API" {
+    component [Контроллеры] as Controllers
+    component [SignalR Хабы] as Hubs
+  }
+  
+  package "Слой приложения (CQRS)" {
+    component [MediatR] as MediatR
+    
+    package "Команды и запросы" {
+      component [Модуль Auth] as AuthModule
+      component [Модуль Chats] as ChatsModule
+      component [Модуль Friends] as FriendsModule
+      component [Модуль Messages] as MessagesModule
+      component [Модуль Servers] as ServersModule
+      component [Модуль Media] as MediaModule
+      component [Модуль Users] as UsersModule
+    }
+  }
+  
+  package "Слой домена" {
+    component [Сущности] as DomainEntities
+    component [Интерфейсы] as DomainInterfaces
+    component [Бизнес-логика] as BusinessLogic
+  }
+  
+  package "Слой инфраструктуры" {
+    component [EF Core Context] as EFContext
+    component [Репозитории] as Repositories
+    component [Миграции] as Migrations
+    component [Файловое хранилище] as FileStorage
+  }
+}
+
+' База данных
+database "PostgreSQL" as PostgreSQL <<database>> {
+  component [Таблицы] as Tables
+  component [Индексы] as Indexes
+  component [Ограничения] as Constraints
+}
+
+' Связи внутри Frontend
+Router --> Pages
+Pages --> ChatListW
+Pages --> ChatRoomW
+Pages --> ServerPanelW
+Pages --> FriendsPanelW
+
+ChatListW --> ChatE
+ChatRoomW --> MessageE
+ChatRoomW --> ChatE
+ServerPanelW --> ServerE
+FriendsPanelW --> FriendE
+
+ChatE --> APIClient
+MessageE --> APIClient
+MessageE --> SignalRClient
+FriendE --> APIClient
+ServerE --> APIClient
+UserE --> APIClient
+
+APIClient --> AuthContext
+SignalRClient --> AuthContext
+
+UIComponents ..> ChatListW : использует
+UIComponents ..> ChatRoomW : использует
+
+' Frontend к Backend
+APIClient --> Controllers : HTTP/REST
+SignalRClient --> Hubs : WebSocket
+
+' Связи внутри Backend
+Controllers --> MediatR
+Hubs --> MediatR
+
+MediatR --> AuthModule
+MediatR --> ChatsModule
+MediatR --> FriendsModule
+MediatR --> MessagesModule
+MediatR --> ServersModule
+MediatR --> MediaModule
+MediatR --> UsersModule
+
+AuthModule --> DomainEntities
+ChatsModule --> DomainEntities
+FriendsModule --> DomainEntities
+MessagesModule --> DomainEntities
+ServersModule --> DomainEntities
+MediaModule --> DomainEntities
+UsersModule --> DomainEntities
+
+DomainEntities --> DomainInterfaces
+BusinessLogic --> DomainEntities
+
+DomainInterfaces <.. Repositories : реализует
+
+Repositories --> EFContext
+Migrations --> EFContext
+EFContext --> PostgreSQL
+
+MediaModule --> FileStorage
+
+' Связи внутри БД
+Tables ..> Indexes
+Tables ..> Constraints
+
+note right of Router
+  React Router
+  для навигации
+end note
+
+note right of MediatR
+  CQRS паттерн
+  Команды/Запросы
+end note
+
+note right of Hubs
+  Real-time через
+  SignalR WebSockets
+end note
+
+note bottom of PostgreSQL
+  Основное хранилище:
+  - Пользователи, Чаты, Сообщения
+  - Серверы, Роли
+  - Дружба
+end note
+
+@enduml

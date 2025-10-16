@@ -1,0 +1,131 @@
+@startuml
+title Добавление в друзья - Диаграмма последовательности
+
+actor "Пользователь 1" as User1
+participant "Виджет\nFriends" as UI1
+participant "friendApi" as API1
+participant "API Контроллер" as Controller
+participant "MediatR" as Mediator
+participant "Обработчик\nSendFriendRequest" as SendHandler
+participant "Обработчик\nAcceptFriendRequest" as AcceptHandler
+participant "FriendshipRepository" as Repo
+database "PostgreSQL" as DB
+participant "SignalR Hub" as Hub
+participant "Виджет\nFriends" as UI2
+actor "Пользователь 2" as User2
+
+== Отправка заявки ==
+
+User1 -> UI1: Поиск пользователя
+User1 -> UI1: Нажимает "Добавить в друзья"
+
+UI1 -> API1: sendFriendRequest(userId2)
+activate API1
+
+API1 -> Controller: POST /api/friends/request
+activate Controller
+
+Controller -> Mediator: Send(SendFriendRequestCommand)
+activate Mediator
+
+Mediator -> SendHandler: Handle(command)
+activate SendHandler
+
+SendHandler -> Repo: CheckExistingRequest()
+Repo -> DB: SELECT FROM Friendships
+DB --> Repo: Заявки не существует
+
+SendHandler -> Repo: CreateRequestAsync()
+Repo -> DB: INSERT INTO Friendships\n(Status=Pending)
+DB --> Repo: Заявка создана
+
+SendHandler --> Mediator: FriendRequestDto
+deactivate SendHandler
+
+Mediator --> Controller: FriendRequestDto
+deactivate Mediator
+
+Controller -> Hub: NotifyUser(userId2, request)
+activate Hub
+Hub -> UI2: Событие FriendRequestReceived
+deactivate Hub
+
+Controller --> API1: Успешно (200)
+deactivate Controller
+
+API1 --> UI1: Заявка отправлена
+deactivate API1
+
+UI1 --> User1: "Заявка отправлена"
+
+UI2 -> UI2: Добавление в список заявок
+UI2 --> User2: Показать уведомление
+
+== Принятие заявки ==
+
+User2 -> UI2: Открывает заявки
+User2 -> UI2: Нажимает "Принять"
+
+UI2 -> API1: acceptFriendRequest(requestId)
+activate API1
+
+API1 -> Controller: POST /api/friends/accept/{id}
+activate Controller
+
+Controller -> Mediator: Send(AcceptFriendRequestCommand)
+activate Mediator
+
+Mediator -> AcceptHandler: Handle(command)
+activate AcceptHandler
+
+AcceptHandler -> DB: BEGIN TRANSACTION
+activate DB
+
+AcceptHandler -> Repo: GetRequestAsync(requestId)
+Repo -> DB: SELECT FROM Friendships
+DB --> Repo: Заявка найдена
+
+AcceptHandler -> Repo: UpdateStatus(Accepted)
+Repo -> DB: UPDATE Friendships\nSET Status=Accepted
+
+DB --> AcceptHandler: COMMIT
+deactivate DB
+
+AcceptHandler --> Mediator: Успешно
+deactivate AcceptHandler
+
+Mediator --> Controller: Успешно
+deactivate Mediator
+
+Controller -> Hub: NotifyBothUsers(user1, user2)
+activate Hub
+Hub -> UI1: Событие FriendRequestAccepted
+Hub -> UI2: Событие FriendAdded
+deactivate Hub
+
+Controller --> API1: Успешно (200)
+deactivate Controller
+
+API1 --> UI2: Друг добавлен
+deactivate API1
+
+UI2 -> UI2: Обновление списка друзей
+UI2 --> User2: "Добавлен в друзья"
+
+UI1 -> UI1: Обновление списка друзей
+UI1 --> User1: Показать уведомление
+
+note right of SendHandler
+  Проверяет:
+  - Не отправлена ли уже заявка
+  - Не являются ли уже друзьями
+  - Не заблокирован ли пользователь
+end note
+
+note right of AcceptHandler
+  1. Обновляет статус на Accepted
+  2. Отправляет уведомления
+  3. Оба видят друг друга в друзьях
+end note
+
+@enduml

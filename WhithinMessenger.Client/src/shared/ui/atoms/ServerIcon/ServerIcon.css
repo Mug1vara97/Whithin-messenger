@@ -1,0 +1,108 @@
+.server-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.server-icon:hover {
+  border-radius: 16px;
+  background-color: var(--primary, #5865f2);
+}
+
+.server-icon.active {
+  background-color: var(--primary, #5865f2);
+  border-radius: 16px;
+}
+
+.server-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  transition: border-radius 0.2s ease;
+}
+
+.server-icon:hover .server-avatar-image {
+  border-radius: 16px;
+}
+
+.server-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.server-icon:hover .server-initials {
+  background-color: var(--primary, #5865f2);
+  color: white;
+  border-radius: 16px;
+}
+
+.server-icon.active .server-initials {
+  background-color: var(--primary, #5865f2);
+  color: white;
+  border-radius: 16px;
+}
+
+.server-icon::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 24px;
+  background-color: var(--text, #dcddde);
+  border-radius: 0 4px 4px 0;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.server-icon.active::before {
+  opacity: 1;
+}
+
+.server-icon:hover::before {
+  opacity: 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,86 @@
+@startuml SequenceCreateGroupChat
+
+title Создание группового чата
+
+actor User as "Пользователь"
+participant UI as "Виджет\nChatList"
+participant API as "chatApi"
+participant Controller as "API Контроллер"
+participant Mediator as "MediatR"
+participant Handler as "Обработчик\nCreateGroupChat"
+participant ChatRepo as "ChatRepository"
+participant MemberRepo as "MemberRepository"
+database DB as "PostgreSQL"
+participant Hub as "SignalR Hub"
+participant Participants as "Участники"
+
+User -> UI: Открывает форму создания
+User -> UI: Вводит название
+User -> UI: Выбирает участников
+User -> UI: Подтверждает
+
+UI -> API: createGroupChat(name, userIds)
+activate API
+
+API -> Controller: POST /api/chats/group
+activate Controller
+
+Controller -> Mediator: Send(CreateGroupChatCommand)
+activate Mediator
+
+Mediator -> Handler: Handle(command)
+activate Handler
+
+Handler -> Handler: Валидация участников
+
+Handler -> DB: BEGIN TRANSACTION
+activate DB
+
+Handler -> ChatRepo: CreateAsync(chat)
+ChatRepo -> DB: INSERT INTO Chats
+DB --> ChatRepo: Чат создан
+
+Handler -> MemberRepo: AddMembersAsync(chatId, userIds)
+MemberRepo -> DB: INSERT INTO Members
+
+DB --> Handler: COMMIT
+deactivate DB
+
+Handler -> Handler: Преобразование в ChatDto
+Handler --> Mediator: ChatDto
+deactivate Handler
+
+Mediator --> Controller: ChatDto
+deactivate Mediator
+
+Controller -> Hub: NotifyParticipants(chatId, userIds)
+activate Hub
+Hub -> Participants: Событие ChatCreated
+deactivate Hub
+
+Controller --> API: ChatDto (200 OK)
+deactivate Controller
+
+API -> API: Добавление в локальный список
+API --> UI: ChatDto
+deactivate API
+
+UI -> UI: Навигация к новому чату
+UI --> User: Показать новый чат
+
+Participants -> Participants: Обновление списка чатов
+Participants --> Participants: Показать уведомление
+
+note right of Handler
+  1. Создаёт чат
+  2. Добавляет участников
+  3. Сохраняет в транзакции
+end note
+
+note right of Hub
+  Отправляет уведомление
+  всем участникам через SignalR
+end note
+
+@enduml
+

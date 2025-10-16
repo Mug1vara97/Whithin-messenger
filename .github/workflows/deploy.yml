@@ -1,0 +1,125 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: WhithinMessenger.Client/package-lock.json
+          
+    - name: Install client dependencies
+      run: |
+        cd WhithinMessenger.Client
+        npm ci
+        
+    - name: Build client
+      run: |
+        cd WhithinMessenger.Client
+        npm run build
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Build backend
+      run: |
+        cd WhithinMessenger.Backend
+        dotnet restore
+        dotnet build --configuration Release
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /home
+          
+          # Останавливаем контейнеры в deploy папке
+          echo "Stopping containers..."
+          if [ -d "whithin-messenger" ]; then
+            cd whithin-messenger
+            docker-compose down || true
+            cd ..
+          fi
+          
+          # Создаем бэкап deploy папки
+          echo "Creating backup..."
+          if [ -d "whithin-messenger" ]; then
+            rm -rf whithin-messenger-backup.old
+            mv whithin-messenger-backup whithin-messenger-backup.old 2>/dev/null || true
+            cp -r whithin-messenger whithin-messenger-backup || true
+          fi
+          
+          # Очищаем старые образы
+          echo "Cleaning old images..."
+          docker system prune -f
+          
+    - name: Upload files to server
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "."
+        target: "/home/whithin-messenger"
+        strip_components: 1
+        
+    - name: Start services
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        timeout: 30m
+        script: |
+          cd /home/whithin-messenger
+          
+          # Устанавливаем права
+          echo "Setting permissions..."
+          chmod +x docker-compose.yml
+          chmod -R 755 /home/whithin-messenger
+          
+          # Запускаем Docker контейнеры
+          echo "Starting services..."
+          docker-compose up -d --build
+          
+          # Ждем запуска сервисов
+          echo "Waiting for services to start..."
+          sleep 30
+          
+          # Health check
+          echo "Health check..."
+          if curl -f http://localhost/api/health || curl -f https://whithin.ru/api/health; then
+            echo "Deployment successful!"
+          else
+            echo "Health check failed!"
+            # Rollback
+            echo "Rolling back..."
+            docker-compose down
+            if [ -d "../whithin-messenger-backup.old" ]; then
+              rm -rf ../whithin-messenger-backup
+              mv ../whithin-messenger-backup.old ../whithin-messenger-backup
+            fi
+            exit 1
+          fi
+          
+          # Показываем статус контейнеров
+          echo "Container status:"
+          docker-compose ps
+

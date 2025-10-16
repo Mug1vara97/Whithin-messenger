@@ -1,0 +1,224 @@
+@startuml ER Диаграмма
+
+title WhithinMessenger - Диаграмма "Сущность-Связь"
+
+' Сущности
+entity "ApplicationUser\n(Пользователь)" as User {
+  * Id : UUID <<PK>>
+  --
+  * Username : VARCHAR(20) <<UK>>
+  * Email : VARCHAR(255) <<UK>>
+  * PasswordHash : VARCHAR(255)
+  * CreatedAt : TIMESTAMP
+}
+
+entity "UserProfile\n(Профиль пользователя)" as Profile {
+  * Id : UUID <<PK>>
+  --
+  * UserId : UUID <<FK>> <<UK>>
+  Bio : TEXT
+  AvatarUrl : VARCHAR(500)
+  Status : INT
+  LastSeen : TIMESTAMP
+  ShowLastSeen : BOOLEAN
+  ShowEmail : BOOLEAN
+}
+
+entity "Chat\n(Чат)" as Chat {
+  * Id : UUID <<PK>>
+  --
+  * Name : VARCHAR(100)
+  * Type : INT
+  AvatarUrl : VARCHAR(500)
+  * CreatedAt : TIMESTAMP
+  IsDeleted : BOOLEAN
+}
+
+entity "ChatMember\n(Участник чата)" as ChatMember {
+  * ChatId : UUID <<PK>> <<FK>>
+  * UserId : UUID <<PK>> <<FK>>
+  --
+  IsAdmin : BOOLEAN
+  JoinedAt : TIMESTAMP
+}
+
+entity "Message\n(Сообщение)" as Message {
+  * Id : UUID <<PK>>
+  --
+  * ChatId : UUID <<FK>>
+  * SenderId : UUID <<FK>>
+  Content : TEXT
+  * Timestamp : TIMESTAMP
+  IsEdited : BOOLEAN
+  IsDeleted : BOOLEAN
+  ReplyToMessageId : UUID <<FK>>
+}
+
+entity "MessageRead\n(Прочитанное сообщение)" as MessageRead {
+  * MessageId : UUID <<PK>> <<FK>>
+  * UserId : UUID <<PK>> <<FK>>
+  --
+  ReadAt : TIMESTAMP
+}
+
+entity "MediaFile\n(Медиафайл)" as Media {
+  * Id : UUID <<PK>>
+  --
+  * FileName : VARCHAR(255)
+  * FileUrl : VARCHAR(500)
+  ThumbnailUrl : VARCHAR(500)
+  * FileType : VARCHAR(50)
+  * FileSize : BIGINT
+  Width : INT
+  Height : INT
+  Duration : INT
+  * UploadedBy : UUID <<FK>>
+  ChatId : UUID <<FK>>
+  * UploadedAt : TIMESTAMP
+  IsDeleted : BOOLEAN
+}
+
+entity "MessageMedia\n(Медиа в сообщении)" as MessageMedia {
+  * MessageId : UUID <<PK>> <<FK>>
+  * MediaFileId : UUID <<PK>> <<FK>>
+}
+
+entity "Friendship\n(Дружба)" as Friendship {
+  * Id : UUID <<PK>>
+  --
+  * User1Id : UUID <<FK>>
+  * User2Id : UUID <<FK>>
+  * Status : INT
+  * CreatedAt : TIMESTAMP
+}
+
+entity "Server\n(Сервер)" as Server {
+  * Id : UUID <<PK>>
+  --
+  * Name : VARCHAR(100)
+  Description : TEXT
+  * OwnerId : UUID <<FK>>
+  IsPublic : BOOLEAN
+  AvatarUrl : VARCHAR(500)
+  * CreatedAt : TIMESTAMP
+  IsDeleted : BOOLEAN
+}
+
+entity "ChatCategory\n(Категория)" as Category {
+  * Id : UUID <<PK>>
+  --
+  * ServerId : UUID <<FK>>
+  * Name : VARCHAR(100)
+  * OrderIndex : INT
+  IsPrivate : BOOLEAN
+}
+
+entity "ServerMember\n(Участник сервера)" as ServerMember {
+  * ServerId : UUID <<PK>> <<FK>>
+  * UserId : UUID <<PK>> <<FK>>
+  --
+  * JoinedAt : TIMESTAMP
+  IsBanned : BOOLEAN
+}
+
+entity "ServerRole\n(Роль)" as Role {
+  * Id : UUID <<PK>>
+  --
+  * ServerId : UUID <<FK>>
+  * Name : VARCHAR(50)
+  Color : VARCHAR(7)
+  * Permissions : BIGINT
+  * Position : INT
+}
+
+entity "UserServerRole\n(Роль пользователя)" as UserServerRole {
+  * UserId : UUID <<PK>> <<FK>>
+  * ServerId : UUID <<PK>> <<FK>>
+  * RoleId : UUID <<PK>> <<FK>>
+}
+
+entity "Notification\n(Уведомление)" as Notification {
+  * Id : UUID <<PK>>
+  --
+  * UserId : UUID <<FK>>
+  * Type : INT
+  Content : TEXT
+  IsRead : BOOLEAN
+  * CreatedAt : TIMESTAMP
+}
+
+entity "RefreshToken\n(Токен обновления)" as RefreshToken {
+  * Id : UUID <<PK>>
+  --
+  * UserId : UUID <<FK>>
+  * Token : VARCHAR(500) <<UK>>
+  * ExpiresAt : TIMESTAMP
+  * CreatedAt : TIMESTAMP
+  IsRevoked : BOOLEAN
+}
+
+' Связи
+
+User ||--|| Profile : "имеет"
+User ||--o{ ChatMember : "участник"
+User ||--o{ Message : "отправляет"
+User ||--o{ MessageRead : "читает"
+User ||--o{ Media : "загружает"
+User ||--o{ Friendship : "пользователь1"
+User ||--o{ Friendship : "пользователь2"
+User ||--o{ Server : "владеет"
+User ||--o{ ServerMember : "участник"
+User ||--o{ UserServerRole : "имеет"
+User ||--o{ Notification : "получает"
+User ||--o{ RefreshToken : "имеет"
+
+Chat ||--o{ ChatMember : "имеет"
+Chat ||--o{ Message : "содержит"
+Chat }o--|| Category : "принадлежит (опц.)"
+
+Message ||--o{ MessageRead : "прочитано"
+Message ||--o{ MessageMedia : "имеет"
+Message }o--|| Message : "ответ на (опц.)"
+
+Media ||--o{ MessageMedia : "прикреплено к"
+
+Server ||--o{ Category : "имеет"
+Server ||--o{ ServerMember : "имеет"
+Server ||--o{ Role : "имеет"
+
+Role ||--o{ UserServerRole : "назначена"
+ServerMember ||--o{ UserServerRole : "имеет"
+
+note right of User
+  Основная таблица пользователей
+  Username и Email уникальны
+end note
+
+note right of Chat
+  Type (Тип):
+  1 = Приватный (2 польз.)
+  2 = Групповой (3+ польз.)
+  3 = Канал сервера
+end note
+
+note right of Friendship
+  Status (Статус):
+  0 = Ожидание
+  1 = Принята
+  2 = Отклонена
+end note
+
+note right of Role
+  Permissions хранятся как
+  битовые флаги (BIGINT)
+end note
+
+note bottom of Message
+  Поддерживает:
+  - Редактирование (IsEdited)
+  - Удаление (IsDeleted)
+  - Ответы (ReplyToMessageId)
+  - Медиафайлы (MessageMedia)
+end note
+
+@enduml

@@ -1,0 +1,60 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Основные цвета */
+  --background: #36393f;
+  --background-primary: #2f3136;
+  --background-secondary: #36393f;
+  --surface: #2f3136;
+  --surface-hover: #40444b;
+  
+  /* Цвета текста */
+  --text: #dcddde;
+  --text-normal: #dcddde;
+  --text-muted: #8e9297;
+  --text-secondary: #b9bbbe;
+  
+  /* Акцентные цвета */
+  --primary: #5865f2;
+  --primary-hover: #4752c4;
+  --secondary: #57f287;
+  
+  /* Системные цвета */
+  --success: #43b581;
+  --danger: #ed4245;
+  --warning: #faa61a;
+  --info: #00b0f0;
+  
+  /* Границы и разделители */
+  --border: #4f545c;
+  --border-bottom: #4f545c;
+  --hover: #40444b;
+  --background-modifier-hover: #40444b;
+  
+  /* Специальные цвета */
+  --server-list-background: #1e1f22;
+  --bottom: #36393f;
+  
+  /* RGB значения для rgba */
+  --primary-rgb: 88, 101, 242;
+  --secondary-rgb: 87, 242, 135;
+  --danger-rgb: 237, 66, 69;
+  --success-rgb: 67, 181, 129;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}

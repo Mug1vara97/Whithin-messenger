@@ -1,0 +1,124 @@
+.add-friend-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.add-friend-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.add-friend-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.add-friend-modal__header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.add-friend-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #666;
+  transition: background-color 0.2s ease;
+}
+
+.add-friend-modal__close:hover {
+  background-color: #f5f5f5;
+}
+
+.add-friend-modal__content {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.add-friend-modal__error {
+  color: #f44336;
+  font-size: 14px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #ffebee;
+  border-radius: 4px;
+  border: 1px solid #ffcdd2;
+}
+
+.add-friend-modal__results {
+  margin-top: 16px;
+}
+
+.add-friend-modal__loading,
+.add-friend-modal__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.add-friend-modal__users {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-friend-modal__user {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.add-friend-modal__user:hover {
+  background-color: #f5f5f5;
+}
+
+.add-friend-modal__user-info {
+  flex: 1;
+  margin-left: 12px;
+}
+
+.add-friend-modal__user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.add-friend-modal__user-status {
+  font-size: 12px;
+  color: #666;
+}
+
+
+
+
+
+
+
+

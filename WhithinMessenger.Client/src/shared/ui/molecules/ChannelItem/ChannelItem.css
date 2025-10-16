@@ -1,0 +1,104 @@
+.channel-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  margin: 1px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  position: relative;
+}
+
+.channel-item.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+.channel-item:hover {
+  background-color: var(--hover);
+  color: var(--text);
+}
+
+.channel-item.active {
+  background-color: var(--hover);
+  color: var(--text);
+}
+
+.channel-icon {
+  margin-right: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: inherit;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px; 
+  width: 16px; 
+}
+
+.channel-icon svg {
+  color: inherit;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+
+.channel-icon .MuiSvgIcon-root {
+  vertical-align: middle;
+  line-height: 1;
+  margin-top: -1px; 
+}
+
+.channel-name {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  color: inherit;
+}
+
+.channel-settings {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 4px;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.channel-item:hover .channel-settings {
+  opacity: 1;
+  visibility: visible;
+}
+
+.channel-item .settings-button {
+  background: transparent !important;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted) !important;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  opacity: 0.6;
+  width: 24px;
+  height: 24px;
+}
+
+.channel-item .settings-button:hover {
+  color: var(--text) !important;
+  background-color: var(--surface-hover) !important;
+  opacity: 1;
+  transform: none !important;
+}
+
+.channel-item .settings-button svg {
+  width: 20px !important;
+  height: 20px !important;
+}

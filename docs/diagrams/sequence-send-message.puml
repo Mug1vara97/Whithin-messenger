@@ -1,0 +1,71 @@
+@startuml
+title Отправка сообщения - Диаграмма последовательности
+
+actor "Пользователь" as User
+participant "Виджет\nChatRoom" as UI
+participant "messageApi" as API
+participant "SignalR\nПодключение" as SignalR
+participant "GroupChatHub" as Hub
+participant "Обработчик\nSendMessage" as Handler
+participant "MessageRepository" as Repo
+database "PostgreSQL" as DB
+participant "Другие\nпользователи" as Others
+
+User -> UI: Вводит сообщение
+User -> UI: Нажимает "Отправить"
+
+UI -> API: sendMessage(chatId, content, mediaFiles)
+activate API
+
+API -> SignalR: invoke('SendMessage', ...)
+activate SignalR
+
+SignalR -> Hub: SendMessage(chatId, content)
+activate Hub
+
+Hub -> Handler: Handle(SendMessageCommand)
+activate Handler
+
+Handler -> Handler: Валидация команды
+Handler -> Repo: AddMessageAsync(message)
+activate Repo
+
+Repo -> DB: INSERT INTO Messages
+activate DB
+DB --> Repo: Сообщение сохранено
+deactivate DB
+
+Repo --> Handler: Сущность Message
+deactivate Repo
+
+Handler -> Handler: Преобразование в MessageDto
+Handler --> Hub: MessageDto
+deactivate Handler
+
+Hub -> SignalR: Clients.Group(chatId).SendAsync("ReceiveMessage")
+activate Others
+Hub --> SignalR: Успешно
+deactivate Hub
+
+SignalR -> UI: Событие ReceiveMessage
+deactivate SignalR
+
+UI -> UI: Обновление состояния messages
+UI --> User: Показать сообщение
+deactivate API
+
+SignalR --> Others: Событие ReceiveMessage
+Others -> Others: Обновление UI
+deactivate Others
+
+note right of Handler
+  Создаёт сообщение в БД
+  с timestamp, senderId, content
+end note
+
+note right of Hub
+  Отправляет всем участникам
+  чата через SignalR группу
+end note
+
+@enduml

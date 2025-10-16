@@ -1,0 +1,15 @@
+﻿services:
+  whithinmessenger.api:
+    image: whithinmessenger.api
+    build:
+      context: .
+      dockerfile: src/WhithinMessenger.Api/Dockerfile
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: whithin_db
+    ports:
+      - "5432:5432"

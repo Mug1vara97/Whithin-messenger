@@ -1,0 +1,221 @@
+/* Стили для модального окна создания сервера */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.create-modal {
+  background-color: var(--surface, #36393f);
+  padding: 24px;
+  border-radius: 8px;
+  width: 440px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border, #4f545c);
+  position: relative;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border, #4f545c);
+}
+
+.modal-header h3 {
+  color: var(--text, #dcddde);
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.modal-close-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8e9297);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-button:hover {
+  background-color: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background-color: var(--background, #2f3136);
+  border: 1px solid var(--border, #4f545c);
+  border-radius: 6px;
+  color: var(--text, #dcddde);
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  resize: vertical;
+}
+
+.modal-input::placeholder {
+  color: var(--text-secondary, #8e9297);
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--primary, #5865f2);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+}
+
+.server-type-toggle {
+  margin: 16px 0;
+  padding: 16px;
+  background-color: var(--background, #2f3136);
+  border-radius: 8px;
+  border: 1px solid var(--border, #4f545c);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  margin-right: 12px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary, #5865f2);
+  cursor: pointer;
+}
+
+.toggle-text {
+  font-weight: 500;
+  color: var(--text, #dcddde);
+}
+
+.toggle-description {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary, #8e9297);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.modal-actions button:first-child {
+  background-color: var(--text-muted, #4f545c);
+  color: var(--text, #dcddde);
+}
+
+.modal-actions button:first-child:hover {
+  background-color: var(--text-secondary, #8e9297);
+}
+
+.modal-actions button:last-child {
+  background-color: var(--primary, #5865f2);
+  color: white;
+}
+
+.modal-actions button:last-child:hover {
+  background-color: var(--primary-hover, #4752c4);
+}
+
+.modal-actions button:last-child:disabled {
+  background-color: var(--text-muted, #4f545c);
+  cursor: not-allowed;
+}
+
+/* Стили для модального окна уведомлений */
+.notifications-modal {
+  background-color: var(--surface, #36393f);
+  padding: 24px;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border, #4f545c);
+  position: relative;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+.notifications-content {
+  padding: 20px 0;
+  text-align: center;
+  color: var(--text-secondary, #8e9297);
+}
+
+@media (max-width: 768px) {
+  .create-modal,
+  .notifications-modal {
+    width: 95vw;
+    max-width: 400px;
+    padding: 20px;
+    margin: 20px;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .modal-actions button {
+    width: 100%;
+  }
+}
+
+

@@ -1,0 +1,97 @@
+@startuml Диаграмма вариантов использования
+
+title WhithinMessenger - Диаграмма вариантов использования
+
+left to right direction
+
+actor "Пользователь" as User
+actor "Владелец сервера" as Owner
+
+rectangle "Система WhithinMessenger" {
+  
+  package "Аутентификация" {
+    usecase "Регистрация" as UC1
+    usecase "Вход в систему" as UC2
+    usecase "Выход из системы" as UC3
+  }
+  
+  package "Сообщения" {
+    usecase "Отправить сообщение" as UC4
+    usecase "Редактировать сообщение" as UC5
+    usecase "Удалить сообщение" as UC6
+    usecase "Прикрепить файл" as UC7
+    usecase "Ответить на сообщение" as UC8
+    usecase "Поиск по сообщениям" as UC9
+  }
+  
+  package "Чаты" {
+    usecase "Создать приватный чат" as UC10
+    usecase "Создать групповой чат" as UC11
+    usecase "Добавить участника" as UC12
+    usecase "Покинуть чат" as UC13
+    usecase "Обновить аватар чата" as UC14
+  }
+  
+  package "Друзья" {
+    usecase "Отправить заявку в друзья" as UC15
+    usecase "Принять заявку" as UC16
+    usecase "Отклонить заявку" as UC17
+    usecase "Удалить из друзей" as UC18
+    usecase "Поиск пользователей" as UC19
+  }
+  
+  package "Серверы" {
+    usecase "Создать сервер" as UC20
+    usecase "Присоединиться к серверу" as UC21
+    usecase "Покинуть сервер" as UC22
+    usecase "Создать категорию" as UC23
+    usecase "Создать канал" as UC24
+    usecase "Управление ролями" as UC25
+    usecase "Управление участниками" as UC26
+    usecase "Удалить сервер" as UC27
+  }
+  
+  package "Профиль" {
+    usecase "Просмотр профиля" as UC28
+    usecase "Редактирование профиля" as UC29
+    usecase "Загрузка аватара" as UC30
+  }
+}
+
+' Связи пользователя
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+User --> UC18
+User --> UC19
+User --> UC21
+User --> UC22
+User --> UC28
+User --> UC29
+User --> UC30
+
+' Связи владельца сервера
+Owner --> UC20
+Owner --> UC23
+Owner --> UC24
+Owner --> UC25
+Owner --> UC26
+Owner --> UC27
+
+
+@enduml
+

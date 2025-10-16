@@ -1,0 +1,366 @@
+using MediatR;
+using WhithinMessenger.Domain.Models;
+
+namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
+
+// DeleteCategory
+public class DeleteCategoryCommand : IRequest<DeleteCategoryResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid CategoryId { get; set; }
+    public Guid UserId { get; set; }
+
+    public DeleteCategoryCommand(Guid serverId, Guid categoryId, Guid userId)
+    {
+        ServerId = serverId;
+        CategoryId = categoryId;
+        UserId = userId;
+    }
+}
+
+public class DeleteCategoryResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+
+// CreateChat
+public class CreateChatCommand : IRequest<CreateChatResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid? CategoryId { get; set; }
+    public string ChatName { get; set; }
+    public int ChatType { get; set; }
+    public Guid UserId { get; set; }
+
+    public CreateChatCommand(Guid serverId, Guid? categoryId, string chatName, int chatType, Guid userId)
+    {
+        ServerId = serverId;
+        CategoryId = categoryId;
+        ChatName = chatName;
+        ChatType = chatType;
+        UserId = userId;
+    }
+}
+
+public class CreateChatResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Chat { get; set; }
+}
+
+// UpdateChatName
+public class UpdateChatNameCommand : IRequest<UpdateChatNameResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid ChatId { get; set; }
+    public string NewName { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateChatNameCommand(Guid serverId, Guid chatId, string newName, Guid userId)
+    {
+        ServerId = serverId;
+        ChatId = chatId;
+        NewName = newName;
+        UserId = userId;
+    }
+}
+
+public class UpdateChatNameResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Chat { get; set; }
+}
+
+// DeleteChat
+public class DeleteChatCommand : IRequest<DeleteChatResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid ChatId { get; set; }
+    public Guid UserId { get; set; }
+
+    public DeleteChatCommand(Guid serverId, Guid chatId, Guid userId)
+    {
+        ServerId = serverId;
+        ChatId = chatId;
+        UserId = userId;
+    }
+}
+
+public class DeleteChatResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public Guid? CategoryId { get; set; }
+}
+
+// GetRoles
+public class GetRolesQuery : IRequest<GetRolesResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid UserId { get; set; }
+
+    public GetRolesQuery(Guid serverId, Guid userId)
+    {
+        ServerId = serverId;
+        UserId = userId;
+    }
+}
+
+public class GetRolesResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Roles { get; set; }
+}
+
+// CreateRole
+public class CreateRoleCommand : IRequest<CreateRoleResult>
+{
+    public Guid ServerId { get; set; }
+    public string RoleName { get; set; }
+    public string Color { get; set; }
+    public string Permissions { get; set; }
+    public Guid UserId { get; set; }
+
+    public CreateRoleCommand(Guid serverId, string roleName, string color, string permissions, Guid userId)
+    {
+        ServerId = serverId;
+        RoleName = roleName;
+        Color = color;
+        Permissions = permissions;
+        UserId = userId;
+    }
+}
+
+public class CreateRoleResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Role { get; set; }
+}
+
+// UpdateRole
+public class UpdateRoleCommand : IRequest<UpdateRoleResult>
+{
+    public Guid RoleId { get; set; }
+    public string RoleName { get; set; }
+    public string Color { get; set; }
+    public string Permissions { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateRoleCommand(Guid roleId, string roleName, string color, string permissions, Guid userId)
+    {
+        RoleId = roleId;
+        RoleName = roleName;
+        Color = color;
+        Permissions = permissions;
+        UserId = userId;
+    }
+}
+
+public class UpdateRoleResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Role { get; set; }
+    public Guid ServerId { get; set; }
+}
+
+// DeleteRole
+public class DeleteRoleCommand : IRequest<DeleteRoleResult>
+{
+    public Guid RoleId { get; set; }
+    public Guid UserId { get; set; }
+
+    public DeleteRoleCommand(Guid roleId, Guid userId)
+    {
+        RoleId = roleId;
+        UserId = userId;
+    }
+}
+
+public class DeleteRoleResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public Guid ServerId { get; set; }
+}
+
+// GetServerMembers
+public class GetServerMembersQuery : IRequest<GetServerMembersResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid UserId { get; set; }
+
+    public GetServerMembersQuery(Guid serverId, Guid userId)
+    {
+        ServerId = serverId;
+        UserId = userId;
+    }
+}
+
+public class GetServerMembersResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public List<ServerMemberInfo>? Members { get; set; }
+}
+
+// AssignRole
+public class AssignRoleCommand : IRequest<AssignRoleResult>
+{
+    public Guid UserId { get; set; }
+    public Guid RoleId { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public AssignRoleCommand(Guid userId, Guid roleId, Guid currentUserId)
+    {
+        UserId = userId;
+        RoleId = roleId;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class AssignRoleResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Role { get; set; }
+    public Guid ServerId { get; set; }
+}
+
+// RemoveRole
+public class RemoveRoleCommand : IRequest<RemoveRoleResult>
+{
+    public Guid UserId { get; set; }
+    public Guid RoleId { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public RemoveRoleCommand(Guid userId, Guid roleId, Guid currentUserId)
+    {
+        UserId = userId;
+        RoleId = roleId;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class RemoveRoleResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? RemainingRoles { get; set; }
+    public object? MergedPermissions { get; set; }
+    public Guid ServerId { get; set; }
+}
+
+// KickMember
+public class KickMemberCommand : IRequest<KickMemberResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public KickMemberCommand(Guid serverId, Guid userId, Guid currentUserId)
+    {
+        ServerId = serverId;
+        UserId = userId;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class KickMemberResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+// GetUserRoles
+public class GetUserRolesQuery : IRequest<GetUserRolesResult>
+{
+    public Guid UserId { get; set; }
+    public Guid ServerId { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public GetUserRolesQuery(Guid userId, Guid serverId, Guid currentUserId)
+    {
+        UserId = userId;
+        ServerId = serverId;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class GetUserRolesResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Roles { get; set; }
+}
+
+// UpdateServerName
+public class UpdateServerNameCommand : IRequest<UpdateServerNameResult>
+{
+    public Guid ServerId { get; set; }
+    public string NewName { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateServerNameCommand(Guid serverId, string newName, Guid userId)
+    {
+        ServerId = serverId;
+        NewName = newName;
+        UserId = userId;
+    }
+}
+
+public class UpdateServerNameResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+// GetServerInfo
+public class GetServerInfoQuery : IRequest<GetServerInfoResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid UserId { get; set; }
+
+    public GetServerInfoQuery(Guid serverId, Guid userId)
+    {
+        ServerId = serverId;
+        UserId = userId;
+    }
+}
+
+public class GetServerInfoResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? ServerInfo { get; set; }
+}
+
+// GetAuditLog
+public class GetAuditLogQuery : IRequest<GetAuditLogResult>
+{
+    public Guid ServerId { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public Guid UserId { get; set; }
+
+    public GetAuditLogQuery(Guid serverId, int page, int pageSize, Guid userId)
+    {
+        ServerId = serverId;
+        Page = page;
+        PageSize = pageSize;
+        UserId = userId;
+    }
+}
+
+public class GetAuditLogResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? AuditLogs { get; set; }
+}
