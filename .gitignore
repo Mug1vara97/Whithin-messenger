@@ -58,8 +58,8 @@ project.fragment.lock.json
 artifacts/
 
 # Entity Framework
-**/Migrations/*_*.cs
-!**/Migrations/*_Initial.cs
+# **/Migrations/*_*.cs
+# !**/Migrations/*_Initial.cs
 
 # User-specific files
 *.rsuser
