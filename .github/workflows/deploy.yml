@@ -35,36 +35,16 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
-    - name: Debug - Check structure
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Directory contents:"
-        ls -la
-        echo "Backend directory:"
-        ls -la WhithinMessenger.Backend/ || echo "WhithinMessenger.Backend not found"
-        echo "SLN file check:"
-        test -f WhithinMessenger.Backend/WhithinMessenger.sln && echo "SLN exists" || echo "SLN NOT FOUND"
-        echo "Full path search:"
-        find . -name "WhithinMessenger.sln" 2>/dev/null || echo "find failed"
-        
     - name: Build backend
       run: |
-        if [ ! -f "WhithinMessenger.Backend/WhithinMessenger.sln" ]; then
-          echo "ERROR: WhithinMessenger.sln not found!"
-          echo "Current directory: $(pwd)"
-          echo "Contents:"
-          ls -R
-          exit 1
-        fi
         dotnet restore WhithinMessenger.Backend/WhithinMessenger.sln
         dotnet build WhithinMessenger.Backend/WhithinMessenger.sln --configuration Release --no-restore
         
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
+        host: 2.59.41.26
+        username: root
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd /home
@@ -92,8 +72,8 @@ jobs:
     - name: Upload files to server
       uses: appleboy/scp-action@v0.1.7
       with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
+        host: 2.59.41.26
+        username: root
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "."
         target: "/home/whithin-messenger"
@@ -102,8 +82,8 @@ jobs:
     - name: Start services
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
+        host: 2.59.41.26
+        username: root
         key: ${{ secrets.SERVER_SSH_KEY }}
         timeout: 30m
         script: |
