@@ -137,13 +137,13 @@ docker-compose.override.yml
 
 ## SSL Certificates
 
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-**/ssl/**
-!**/ssl/.gitkeep
+# *.pem
+# *.key
+# *.crt
+# *.p12
+# *.pfx
+# **/ssl/**
+# !**/ssl/.gitkeep
 
 ## Backups
 
