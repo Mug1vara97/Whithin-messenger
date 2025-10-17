@@ -43,9 +43,20 @@ jobs:
         ls -la
         echo "Backend directory:"
         ls -la WhithinMessenger.Backend/ || echo "WhithinMessenger.Backend not found"
+        echo "SLN file check:"
+        test -f WhithinMessenger.Backend/WhithinMessenger.sln && echo "SLN exists" || echo "SLN NOT FOUND"
+        echo "Full path search:"
+        find . -name "WhithinMessenger.sln" 2>/dev/null || echo "find failed"
         
     - name: Build backend
       run: |
+        if [ ! -f "WhithinMessenger.Backend/WhithinMessenger.sln" ]; then
+          echo "ERROR: WhithinMessenger.sln not found!"
+          echo "Current directory: $(pwd)"
+          echo "Contents:"
+          ls -R
+          exit 1
+        fi
         dotnet restore WhithinMessenger.Backend/WhithinMessenger.sln
         dotnet build WhithinMessenger.Backend/WhithinMessenger.sln --configuration Release --no-restore
         
