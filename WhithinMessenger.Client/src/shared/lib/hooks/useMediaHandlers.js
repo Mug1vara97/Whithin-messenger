@@ -25,20 +25,19 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('chatId', chatId);
-      formData.append('caption', ''); // Можно добавить подпись к медиафайлу
+      formData.append('caption', '');
       formData.append('userId', userId);
       formData.append('username', username);
 
       const response = await fetch(`${BASE_URL}/api/media/upload`, {
         method: 'POST',
         body: formData,
-        credentials: 'include' // Используем cookies для авторизации
+        credentials: 'include'
       });
 
       if (response.ok) {
         const result = await response.json();
         
-        // SignalR уведомление придет автоматически от сервера
         return true;
       } else {
         const errorData = await response.json();
@@ -69,14 +68,11 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         const audioFile = new File([audioBlob], `audio-message-${Date.now()}.webm`, {
           type: 'audio/webm'
         });
-        
-        // Отправляем аудио файл
+
         await handleSendMedia(audioFile);
         
-        // Очищаем chunks
         setAudioChunks([]);
         
-        // Останавливаем все треки
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -116,7 +112,6 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const cancelRecording = useCallback(() => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
-      // Очищаем chunks без отправки
       setAudioChunks([]);
       setIsRecording(false);
       setRecordingTime(0);

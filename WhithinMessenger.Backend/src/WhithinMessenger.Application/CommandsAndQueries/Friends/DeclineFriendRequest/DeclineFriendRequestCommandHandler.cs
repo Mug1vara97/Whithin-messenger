@@ -22,19 +22,16 @@ public class DeclineFriendRequestCommandHandler : IRequestHandler<DeclineFriendR
             return new DeclineFriendRequestResult(false, "Запрос в друзья не найден");
         }
 
-        // Проверяем, что пользователь является получателем запроса
         if (friendship.AddresseeId != request.UserId)
         {
             return new DeclineFriendRequestResult(false, "У вас нет прав для отклонения этого запроса");
         }
 
-        // Проверяем, что запрос еще не обработан
         if (friendship.Status != FriendshipStatus.Pending)
         {
             return new DeclineFriendRequestResult(false, "Запрос уже был обработан");
         }
 
-        // Отклоняем запрос
         friendship.Status = FriendshipStatus.Declined;
         friendship.UpdatedAt = DateTimeOffset.UtcNow;
 

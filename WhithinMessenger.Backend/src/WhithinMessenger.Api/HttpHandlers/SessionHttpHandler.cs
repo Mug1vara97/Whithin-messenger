@@ -16,7 +16,6 @@ namespace WhithinMessenger.Api.HttpHandlers
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                // Передаем куки сессии
                 var cookies = httpContext.Request.Headers.Cookie;
                 if (!string.IsNullOrEmpty(cookies))
                 {

@@ -17,7 +17,6 @@ export const useChat = (chatId, username, userId) => {
     const connect = async () => {
       if (!chatId || !userId) return;
       
-      // Если уже есть активное соединение для этого чата, не создаем новое
       const chatIdStr = String(chatId);
       if (connectionRef.current && currentChatIdRef.current === chatIdStr) {
         return;
@@ -37,7 +36,6 @@ export const useChat = (chatId, username, userId) => {
         setConnection(newConnection);
         setIsConnected(true);
 
-        // Добавляем обработчик для получения сообщений
         newConnection.on('ReceiveMessages', (messages) => {
           const processedMessages = messages.map((msg) => {
             
@@ -57,17 +55,14 @@ export const useChat = (chatId, username, userId) => {
           setMessages(processedMessages);
         });
 
-        // Добавляем обработчик ошибок
         newConnection.on('Error', (errorMessage) => {
           console.error('SignalR Error:', errorMessage);
           setError(errorMessage);
         });
 
-        // Присоединяемся к группе и запрашиваем сообщения
         await newConnection.invoke('JoinGroup', chatId);
         await newConnection.invoke('GetMessages', chatId);
         
-        // Сохраняем текущий chatId
         currentChatIdRef.current = chatIdStr;
         
         setTimeout(() => {
@@ -223,7 +218,7 @@ export const useChat = (chatId, username, userId) => {
       await connection.invoke('DeleteMessage', messageId, username);
       return true;
     } catch (error) {
-      console.error('❌ Error deleting message:', error);
+      console.error('Error deleting message:', error);
       setError('Ошибка удаления сообщения');
       return false;
     }

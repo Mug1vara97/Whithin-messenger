@@ -6,6 +6,5 @@ namespace WhithinMessenger.Domain.Interfaces
     {
         Task<ApplicationUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
         Task<ApplicationUser?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default);
-        // Методы с UserSearchInfo перемещены в Application слой
     }
 }

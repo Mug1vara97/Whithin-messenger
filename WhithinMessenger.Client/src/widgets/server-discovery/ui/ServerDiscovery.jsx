@@ -11,7 +11,6 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
   const [filteredServers, setFilteredServers] = useState([]);
   const [joiningServer, setJoiningServer] = useState(null);
   
-  // Используем useServerContext для синхронизации с ServerList
   const {
     publicServers,
     isLoading,
@@ -21,9 +20,6 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
     fetchPublicServers
   } = useServerContext();
   
-  // Функции теперь приходят из useServers хука
-
-  // Загружаем публичные серверы при монтировании компонента
   useEffect(() => {
     console.log('ServerDiscovery: user =', user);
     console.log('ServerDiscovery: user.id =', user?.id);
@@ -55,12 +51,10 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
       await joinPublicServer(server.serverId);
       console.log('ServerDiscovery: Successfully joined server:', server.serverId);
       
-      // Автоматически открываем присоединенный сервер
       if (onServerSelected) {
         onServerSelected(server);
       }
       
-      // Закрываем ServerDiscovery после выбора сервера
       if (onClose) {
         onClose();
       }

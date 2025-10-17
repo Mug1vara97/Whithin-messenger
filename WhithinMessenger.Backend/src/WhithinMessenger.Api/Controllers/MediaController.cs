@@ -46,7 +46,6 @@ public class MediaController : ControllerBase
                 return BadRequest("Файл не выбран");
             }
 
-            // Если userId не передан, пытаемся получить из сессии
             if (userId == null || userId == Guid.Empty)
             {
                 userId = GetCurrentUserId();
@@ -56,7 +55,6 @@ public class MediaController : ControllerBase
                 }
             }
 
-        // Если username не передан, пытаемся получить из сессии
         if (string.IsNullOrEmpty(username))
         {
             username = GetCurrentUsername();
@@ -72,7 +70,6 @@ public class MediaController : ControllerBase
 
             if (result.Success)
             {
-                // Отправляем SignalR уведомление о новом медиафайле
                 try
                 {
                     var mediaFiles = new[]
@@ -90,14 +87,13 @@ public class MediaController : ControllerBase
                         }
                     };
 
-                    // Получаем данные профиля пользователя
                     var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
                     string? avatarUrl = userProfile?.Avatar;
 
                     await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent", 
                         new { 
-                            messageId = result.MediaFileId, // Используем MediaFileId как messageId
+                            messageId = result.MediaFileId,
                             content = caption ?? string.Empty, 
                             username = username ?? "Unknown",
                             chatId = chatId,

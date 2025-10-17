@@ -28,7 +28,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
     {
         try
         {
-            // Получаем сервер
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
@@ -39,7 +38,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
                 };
             }
 
-            // Проверяем доступ пользователя к серверу
             var userServers = await _serverRepository.GetUserServersAsync(request.UserId, cancellationToken);
             if (!userServers.Any(s => s.Id == request.ServerId))
             {
@@ -50,19 +48,15 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
                 };
             }
 
-            // Получаем роли пользователя на сервере
             var userRoles = await _roleRepository.GetUserRolesAsync(request.UserId, request.ServerId, cancellationToken);
             var userRoleIds = userRoles.Select(r => r.Id).ToList();
 
-            // Получаем категории сервера
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var orderedCategories = categories.OrderBy(c => c.CategoryOrder).ToList();
 
-            // Получаем чаты сервера
             var chats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var orderedChats = chats.OrderBy(c => c.ChatOrder).ToList();
 
-            // Фильтруем категории по доступу
             var filteredCategories = orderedCategories
                 .Where(category => HasAccessToCategory(category, request.UserId, userRoleIds, server.OwnerId))
                 .Select(category => new
@@ -91,7 +85,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
                 })
                 .ToList();
 
-            // Получаем чаты без категории
             var uncategorizedChats = orderedChats
                 .Where(c => c.CategoryId == null)
                 .Where(chat => HasAccessToChat(chat, request.UserId, userRoleIds, server.OwnerId))
@@ -152,19 +145,16 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
 
     private bool HasAccessToCategory(ChatCategory category, Guid userId, List<Guid> userRoleIds, Guid ownerId)
     {
-        // Владелец сервера имеет доступ ко всем категориям
         if (ownerId == userId)
         {
             return true;
         }
 
-        // Публичные категории доступны всем
         if (!category.IsPrivate)
         {
             return true;
         }
 
-        // Проверяем доступ по ролям
         if (!string.IsNullOrEmpty(category.AllowedRoleIds))
         {
             try
@@ -177,7 +167,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             }
             catch
             {
-                // Fallback для старых форматов
                 var roleIdStr = category.AllowedRoleIds.Trim('[', ']', ' ');
                 if (Guid.TryParse(roleIdStr, out Guid roleId))
                 {
@@ -189,7 +178,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             }
         }
 
-        // Проверяем доступ по пользователям
         if (!string.IsNullOrEmpty(category.AllowedUserIds))
         {
             try
@@ -202,7 +190,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             }
             catch
             {
-                // Fallback для старых форматов
                 var userIdStr = category.AllowedUserIds.Trim('[', ']', ' ');
                 if (Guid.TryParse(userIdStr, out Guid allowedUserId))
                 {
@@ -219,19 +206,16 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
 
     private bool HasAccessToChat(Chat chat, Guid userId, List<Guid> userRoleIds, Guid ownerId)
     {
-        // Владелец сервера имеет доступ ко всем чатам
         if (ownerId == userId)
         {
             return true;
         }
 
-        // Публичные чаты доступны всем
         if (!chat.IsPrivate)
         {
             return true;
         }
 
-        // Проверяем доступ по ролям
         if (!string.IsNullOrEmpty(chat.AllowedRoleIds))
         {
             try
@@ -244,7 +228,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             }
             catch
             {
-                // Fallback для старых форматов
                 var roleIdStr = chat.AllowedRoleIds.Trim('[', ']', ' ');
                 if (Guid.TryParse(roleIdStr, out Guid roleId))
                 {
@@ -256,7 +239,6 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             }
         }
 
-        // Проверяем доступ по участникам чата
         return chat.Members.Any(m => m.UserId == userId);
     }
 }

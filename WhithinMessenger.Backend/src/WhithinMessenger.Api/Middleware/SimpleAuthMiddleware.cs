@@ -20,7 +20,6 @@ public class SimpleAuthMiddleware
     {
         _logger.LogInformation($"SimpleAuthMiddleware: Processing request to {context.Request.Path}");
 
-        // Пропускаем авторизацию для SignalR запросов
         if (context.Request.Path.StartsWithSegments("/chatlisthub") || 
             context.Request.Path.StartsWithSegments("/groupchathub") ||
             context.Request.Path.StartsWithSegments("/serverhub") ||
@@ -28,14 +27,12 @@ public class SimpleAuthMiddleware
         {
             _logger.LogInformation($"SimpleAuthMiddleware: SignalR request, skipping auth for {context.Request.Path}");
             
-            // Для SignalR запросов все равно пытаемся получить userId из query параметров
             var userIdFromQuery = context.Request.Query["userId"].FirstOrDefault();
             if (!string.IsNullOrEmpty(userIdFromQuery) && Guid.TryParse(userIdFromQuery, out var signalRUserId))
             {
                 _logger.LogInformation($"SimpleAuthMiddleware: Found userId in SignalR query: {signalRUserId}");
                 context.Items["UserId"] = signalRUserId;
                 
-                // Создаем Claims для пользователя
                 var claims = new List<Claim>
                 {
                     new Claim("UserId", signalRUserId.ToString()),
@@ -57,7 +54,6 @@ public class SimpleAuthMiddleware
         {
             _logger.LogInformation($"SimpleAuthMiddleware: Parsed UserId: {userId}");
             
-            // Создаем Claims для пользователя
             var claims = new List<Claim>
             {
                 new Claim("UserId", userId.ToString()),
@@ -69,7 +65,6 @@ public class SimpleAuthMiddleware
             
             try
             {
-                // Получаем UserManager из scoped provider только для обычных HTTP запросов
                 var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
                 var user = await userManager.FindByIdAsync(userId.ToString());
                 if (user != null)

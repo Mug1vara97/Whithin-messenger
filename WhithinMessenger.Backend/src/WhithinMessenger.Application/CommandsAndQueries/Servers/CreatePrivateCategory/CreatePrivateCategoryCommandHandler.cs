@@ -20,7 +20,6 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
     {
         try
         {
-            // Проверяем, что сервер существует и пользователь имеет доступ
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
@@ -40,7 +39,6 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
                 };
             }
 
-            // Проверяем, что категория с таким именем не существует
             if (await _categoryRepository.ExistsAsync(request.ServerId, request.CategoryName, cancellationToken))
             {
                 return new CreatePrivateCategoryResult
@@ -50,11 +48,9 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
                 };
             }
 
-            // Получаем следующий порядок категории
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var categoryOrder = categories.Count;
 
-            // Создаем новую приватную категорию
             var newCategory = new ChatCategory
             {
                 Id = Guid.NewGuid(),
@@ -80,7 +76,7 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
                     isPrivate = createdCategory.IsPrivate,
                     allowedRoleIds = createdCategory.AllowedRoleIds,
                     allowedUserIds = createdCategory.AllowedUserIds,
-                    chats = new object[0] // Пустой массив чатов
+                    chats = new object[0]
                 }
             };
         }

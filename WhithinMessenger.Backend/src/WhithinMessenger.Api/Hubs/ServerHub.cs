@@ -21,14 +21,12 @@ public class ServerHub : Hub
 
     private Guid? GetCurrentUserId()
     {
-        // Сначала пытаемся получить из query параметра
         var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
         if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
         {
             return userIdFromQueryParsed;
         }
 
-        // Если не найден в query, пытаемся получить из claims
         var userIdClaim = Context.User?.FindFirst("userId")?.Value;
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
@@ -43,7 +41,6 @@ public class ServerHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, serverId);
     }
 
-    // Управление категориями
     public async Task MoveCategory(Guid serverId, Guid categoryId, int newPosition)
     {
         try
@@ -160,7 +157,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Управление чатами
     public async Task MoveChat(Guid serverId, Guid chatId, Guid? sourceCategoryId, Guid? targetCategoryId, int newPosition)
     {
         try
@@ -278,7 +274,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Управление ролями
     public async Task GetRoles(Guid serverId)
     {
         try
@@ -395,7 +390,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Управление участниками
     public async Task GetServerMembers(Guid serverId)
     {
         try
@@ -531,7 +525,6 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                // Уведомляем всех участников сервера о добавлении нового участника
                 await Clients.Group(serverId.ToString()).SendAsync("MemberAdded", new
                 {
                     serverId,
@@ -540,7 +533,6 @@ public class ServerHub : Hub
                     addedBy = currentUserId.Value
                 });
 
-                // Уведомляем добавленного пользователя через ServerListHub
                 Console.WriteLine($"ServerHub: Sending YouWereAddedToServer to user {userId} via ServerListHub");
                 var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
                 if (serverListHubContext != null)
@@ -597,7 +589,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Управление сервером
     public async Task UpdateServerName(Guid serverId, string newName)
     {
         try
@@ -658,7 +649,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Журнал аудита
     public async Task GetAuditLog(Guid serverId, int page = 1, int pageSize = 50)
     {
         try
@@ -688,7 +678,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Создание сервера
     public async Task CreateServer(string serverName, bool isPublic = false, string? description = null)
     {
         try
@@ -718,7 +707,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Получение списка серверов пользователя
     public async Task GetUserServers()
     {
         try
@@ -748,7 +736,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Покинуть сервер
     public async Task LeaveServer(Guid serverId)
     {
         try
@@ -765,17 +752,14 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                // Уведомляем всех участников сервера о том, что пользователь покинул сервер
                 await Clients.Group(serverId.ToString()).SendAsync("MemberLeft", new
                 {
                     serverId = serverId,
                     userId = userId.Value
                 });
 
-                // Уведомляем покинувшего пользователя
                 await Clients.Caller.SendAsync("ServerLeft", serverId);
                 
-                // Также уведомляем через ServerListHub для обновления списка серверов
                 var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
                 if (serverListHubContext != null)
                 {
@@ -793,7 +777,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Удалить сервер
     public async Task DeleteServer(Guid serverId)
     {
         try
@@ -805,7 +788,6 @@ public class ServerHub : Hub
                 return;
             }
 
-            // Получаем список участников сервера ПЕРЕД удалением сервера
             var serverMembers = await GetServerMembersList(serverId);
             Console.WriteLine($"ServerHub: Found {serverMembers?.Count ?? 0} server members to notify before deletion");
             if (serverMembers != null && serverMembers.Any())
@@ -823,29 +805,24 @@ public class ServerHub : Hub
             {
                 Console.WriteLine($"ServerHub: Server {serverId} deleted successfully, sending notifications");
                 
-                // Уведомляем всех участников сервера о том, что сервер удален
                 await Clients.Group(serverId.ToString()).SendAsync("ServerDeleted", serverId);
                 Console.WriteLine($"ServerHub: Sent ServerDeleted to group {serverId}");
 
-                // Уведомляем владельца
                 await Clients.Caller.SendAsync("ServerDeleted", serverId);
                 Console.WriteLine($"ServerHub: Sent ServerDeleted to caller");
                 
-                // Также уведомляем через ServerListHub для обновления списка серверов
                 var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
                 if (serverListHubContext != null)
                 {
-                    // Уведомляем создателя сервера
                     await serverListHubContext.Clients.User(userId.Value.ToString()).SendAsync("ServerDeleted", serverId);
                     Console.WriteLine($"ServerHub: Sent ServerDeleted to ServerListHub for user {userId}");
                     
-                    // Уведомляем всех участников сервера через ServerListHub
                     if (serverMembers != null && serverMembers.Any())
                     {
                         Console.WriteLine($"ServerHub: Notifying {serverMembers.Count} members via ServerListHub");
                         foreach (var member in serverMembers)
                         {
-                            if (member.UserId != userId.Value) // Не уведомляем создателя дважды
+                            if (member.UserId != userId.Value)
                             {
                                 Console.WriteLine($"ServerHub: Sending ServerDeleted to ServerListHub for member {member.UserId}");
                                 await serverListHubContext.Clients.User(member.UserId.ToString()).SendAsync("ServerDeleted", serverId);
@@ -874,7 +851,6 @@ public class ServerHub : Hub
         }
     }
 
-    // Приватный метод для получения списка участников сервера
     private async Task<List<ServerMemberInfo>?> GetServerMembersList(Guid serverId)
     {
         try

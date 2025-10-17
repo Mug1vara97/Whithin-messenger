@@ -50,8 +50,6 @@ const ChatList = ({ onChatSelected, onFriendsSelected }) => {
 
   const handleCreateGroupChat = useCallback(async (chatId) => {
     try {
-      // После создания группового чата обновляем список чатов
-      // и выбираем созданный чат
       const newChat = {
         chatId: chatId,
         username: 'Новый групповой чат',

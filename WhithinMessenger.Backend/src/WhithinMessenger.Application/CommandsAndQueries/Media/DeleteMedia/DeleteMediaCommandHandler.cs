@@ -35,7 +35,6 @@ public class DeleteMediaCommandHandler : IRequestHandler<DeleteMediaCommand, Del
                 };
             }
 
-            // Проверяем права доступа (пользователь может удалять только свои файлы)
             if (mediaFile.Message.UserId != request.UserId)
             {
                 return new DeleteMediaResult
@@ -45,16 +44,13 @@ public class DeleteMediaCommandHandler : IRequestHandler<DeleteMediaCommand, Del
                 };
             }
 
-            // Удаляем физический файл
             await _fileService.DeleteFileAsync(mediaFile.FilePath);
             
-            // Удаляем превью, если есть
             if (!string.IsNullOrEmpty(mediaFile.ThumbnailPath))
             {
                 await _fileService.DeleteFileAsync(mediaFile.ThumbnailPath);
             }
 
-            // Помечаем файл как удаленный в базе данных
             await _mediaFileRepository.DeleteAsync(request.MediaFileId, cancellationToken);
 
             return new DeleteMediaResult

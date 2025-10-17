@@ -16,14 +16,12 @@ public class ServerListHub : Hub
 
     private Guid? GetCurrentUserId()
     {
-        // Сначала пытаемся получить из query параметра
         var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
         if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
         {
             return userIdFromQueryParsed;
         }
 
-        // Если не найден в query, пытаемся получить из claims
         var userIdClaim = Context.User?.FindFirst("userId")?.Value;
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
@@ -46,7 +44,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Получение списка серверов пользователя
     public async Task<object?> GetUserServers()
     {
         try
@@ -78,7 +75,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Создание нового сервера
     public async Task<object?> CreateServer(string serverName, bool isPublic = false, string? description = null)
     {
         try
@@ -95,7 +91,6 @@ public class ServerListHub : Hub
 
             if (result.Success)
             {
-                // Отправляем событие ServerCreated для обновления списка серверов
                 await Clients.Caller.SendAsync("ServerCreated", result.Server);
                 return result.Server;
             }
@@ -112,7 +107,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Получение публичных серверов
     public async Task<object?> GetPublicServers()
     {
         try
@@ -137,7 +131,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Присоединение к публичному серверу
     public async Task<object?> JoinServer(Guid serverId)
     {
         try
@@ -154,10 +147,8 @@ public class ServerListHub : Hub
 
             if (result.Success)
             {
-                // Обновляем список серверов пользователя
                 var updatedServers = await GetUserServers();
                 
-                // Уведомляем пользователя об обновлении списка
                 await Clients.Caller.SendAsync("ServerListUpdated");
                 
                 return new { message = "Успешно присоединились к серверу" };
@@ -175,7 +166,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Обновление списка серверов для всех пользователей
     public async Task NotifyServerListUpdated()
     {
         try
@@ -192,7 +182,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Метод для уведомления пользователя о том, что его добавили на сервер
     public async Task NotifyUserAddedToServer(Guid userId, Guid serverId, Guid addedBy)
     {
         try
@@ -211,7 +200,6 @@ public class ServerListHub : Hub
         }
     }
 
-    // Статический метод для уведомления пользователя о том, что его добавили на сервер
     public static async Task NotifyUserAddedToServer(IServiceProvider? serviceProvider, Guid userId, Guid serverId, Guid addedBy)
     {
         try

@@ -11,7 +11,7 @@ namespace WhithinMessenger.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[RequireAuth] // Требует авторизации через сессии
+[RequireAuth]
 public class UserController : ControllerBase
 {
     private readonly WithinDbContext _context;

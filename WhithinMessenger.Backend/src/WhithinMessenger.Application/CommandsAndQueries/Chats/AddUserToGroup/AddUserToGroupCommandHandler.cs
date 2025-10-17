@@ -16,7 +16,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup
         {
             try
             {
-                Console.WriteLine($"🔍 AddUserToGroup - GroupChatId: {request.GroupChatId}, UserId: {request.UserId}, CurrentUserId: {request.CurrentUserId}");
+                Console.WriteLine($"AddUserToGroup - GroupChatId: {request.GroupChatId}, UserId: {request.UserId}, CurrentUserId: {request.CurrentUserId}");
                 
                 var success = await _chatRepository.AddUserToGroupAsync(
                     request.GroupChatId, 
@@ -25,7 +25,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup
                 
                 if (success)
                 {
-                    Console.WriteLine($"✅ AddUserToGroup - User {request.UserId} added to group {request.GroupChatId}");
+                    Console.WriteLine($"AddUserToGroup - User {request.UserId} added to group {request.GroupChatId}");
                     return new AddUserToGroupResult
                     {
                         Success = true
@@ -33,7 +33,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup
                 }
                 else
                 {
-                    Console.WriteLine($"❌ AddUserToGroup - Failed to add user {request.UserId} to group {request.GroupChatId}");
+                    Console.WriteLine($"AddUserToGroup - Failed to add user {request.UserId} to group {request.GroupChatId}");
                     return new AddUserToGroupResult
                     {
                         Success = false,
@@ -43,7 +43,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ AddUserToGroup - Error: {ex.Message}");
+                Console.WriteLine($"AddUserToGroup - Error: {ex.Message}");
                 return new AddUserToGroupResult
                 {
                     Success = false,

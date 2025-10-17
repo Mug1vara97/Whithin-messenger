@@ -137,6 +137,14 @@
   word-break: break-word;
 }
 
+.search-loading,
+.search-no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--textMuted);
+  font-size: 14px;
+}
+
 
 
 

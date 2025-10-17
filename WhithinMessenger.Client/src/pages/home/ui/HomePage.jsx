@@ -6,7 +6,7 @@ import { ServerDiscovery } from '../../../widgets/server-discovery';
 import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
-import { useServer } from '../../../entities/server/hooks'; // Убираем useServers из HomePage
+import { useServer } from '../../../entities/server/hooks';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
@@ -27,18 +27,15 @@ const HomePage = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   
-  // Определяем показ системы друзей на основе URL
   const showFriends = location.pathname === '/channels/@me/friends';
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   const [createdServerData, setCreatedServerData] = useState(null);
   const { chats, createPrivateChat } = useChatList(user?.id || null, (chatId) => {
-    // Навигация к созданному чату
     navigate(`/channels/@me/${chatId}`);
   });
   const { createServer, servers, createConnection } = useServerContext();
 
-  // Инициализируем соединение с серверами при загрузке
   React.useEffect(() => {
     if (user?.id) {
       console.log('HomePage: Creating server connection for user:', user.id);
@@ -46,7 +43,6 @@ const HomePage = () => {
     }
   }, [user?.id, createConnection]);
 
-  // Обработчик события ServerCreated для автоматического переключения на новый сервер
   React.useEffect(() => {
     const handleServerCreated = (event) => {
       const serverData = event.detail;
@@ -54,7 +50,6 @@ const HomePage = () => {
       console.log('HomePage: Current location:', window.location.pathname);
       console.log('HomePage: Target URL:', `/server/${serverData.serverId}`);
       
-      // Небольшая задержка для полной инициализации сервера
       setTimeout(() => {
         console.log('HomePage: Executing navigation to:', `/server/${serverData.serverId}`);
         try {
@@ -66,22 +61,12 @@ const HomePage = () => {
       }, 200);
     };
 
-    // Подписываемся на глобальное событие serverCreated
     window.addEventListener('serverCreated', handleServerCreated);
     
     return () => {
       window.removeEventListener('serverCreated', handleServerCreated);
     };
   }, [navigate]);
-
-  // Обработчики ChatCreated и ChatDeleted теперь находятся в ServerPanel
-  // HomePage полагается на обновленные данные от ServerPanel
-
-  // Дополнительный обработчик для обновления данных при изменении selectedChat
-  // Убираем этот обработчик, чтобы избежать "мигания" - полагаемся на данные от сервера
-
-  // Проверка доступа к серверу теперь обрабатывается в ServerPanel
-  // HomePage полагается на serverAccessDenied от useServer
 
   useEffect(() => {
     if (serverAccessDenied) {
@@ -92,7 +77,6 @@ const HomePage = () => {
     }
   }, [serverAccessDenied, navigate]);
 
-  // Обновляем список серверов при изменении
   useEffect(() => {
     if (servers && servers.length > 0) {
       console.log('HomePage: Servers updated:', servers);
@@ -107,7 +91,6 @@ const HomePage = () => {
     }
   }, [serverId, serverData]);
 
-  // Проверяем, что selectedServer все еще в списке серверов пользователя
   useEffect(() => {
     if (selectedServer && servers && serverId) {
       console.log('HomePage: Checking if selectedServer is in servers list');
@@ -115,7 +98,6 @@ const HomePage = () => {
       console.log('HomePage: current serverId:', serverId);
       console.log('HomePage: servers list:', servers.map(s => s.serverId));
       
-      // Проверяем, что selectedServer соответствует текущему serverId
       if (selectedServer.serverId !== serverId) {
         console.log('HomePage: selectedServer does not match current serverId, skipping check');
         return;
@@ -124,7 +106,6 @@ const HomePage = () => {
       const isServerInList = servers.some(server => server.serverId === selectedServer.serverId);
       if (!isServerInList) {
         console.log('HomePage: Selected server no longer in user servers, checking again in 1 second...');
-        // Даем время серверу обновиться в списке
         setTimeout(() => {
           const isServerInListAfterDelay = servers.some(server => server.serverId === selectedServer.serverId);
           if (!isServerInListAfterDelay) {
@@ -142,10 +123,8 @@ const HomePage = () => {
     }
   }, [selectedServer, servers, serverId, navigate]);
 
-  // Отдельный useEffect для поиска канала с учетом данных от ServerPanel
   useEffect(() => {
     if (serverId && channelId) {
-      // Используем данные от ServerPanel, если они есть, иначе от useServer
       const currentServerData = serverDataFromPanel || serverData;
       
       if (currentServerData) {
@@ -267,7 +246,6 @@ const HomePage = () => {
     setShowNotificationsModal(false);
   }, []);
 
-  // Обработчик клавиши Escape для закрытия модальных окон
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -320,9 +298,7 @@ const HomePage = () => {
                 <FriendsPanel 
                   onStartChat={async (userId) => {
                     try {
-                      // Создаем приватный чат с другом
                       await createPrivateChat(userId);
-                      // Навигация произойдет автоматически через обработчик ChatCreated в useChatList
                     } catch (error) {
                       console.error('Error creating private chat:', error);
                     }
@@ -360,7 +336,6 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Модальное окно создания сервера */}
       {showCreateServerModal && (
         <div 
           className="modal-overlay"
@@ -389,13 +364,11 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Модальное окно настроек */}
       <SettingsModal 
         isOpen={showSettingsModal} 
         onClose={handleCloseSettingsModal} 
       />
 
-      {/* Модальное окно уведомлений */}
       {showNotificationsModal && (
         <div 
           className="modal-overlay"
@@ -426,7 +399,6 @@ const HomePage = () => {
   );
 };
 
-// Компонент формы создания сервера
 const CreateServerForm = ({ onClose, onCreate }) => {
   const [serverName, setServerName] = useState('');
   const [description, setDescription] = useState('');

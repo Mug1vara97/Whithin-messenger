@@ -43,7 +43,5 @@ export const HUB_ENDPOINTS = {
   NOTIFICATION_HUB: '/notificationhub',
 };
 
-// В production (через nginx) используем пустую строку для относительных путей
-// В development используем прямой URL к бэкенду
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.MODE === 'production' ? '' : 'http://localhost:5109');

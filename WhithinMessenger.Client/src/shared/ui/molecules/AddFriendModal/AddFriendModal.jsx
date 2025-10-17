@@ -87,28 +87,46 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
             
             {!loading && searchResults.length > 0 && (
               <div className="add-friend-modal__users">
-                {searchResults.map(user => (
-                  <div key={user.userId} className="add-friend-modal__user">
-                    <UserAvatar
-                      username={user.username}
-                      avatar={user.avatarUrl}
-                      avatarColor={user.avatarColor}
-                      size="medium"
-                    />
-                    <div className="add-friend-modal__user-info">
-                      <div className="add-friend-modal__user-name">{user.username}</div>
-                      <div className="add-friend-modal__user-status">{user.userStatus}</div>
+                {searchResults.map(user => {
+                  const isFriend = user.isFriend;
+                  const isPending = user.friendshipStatus === 'Pending';
+                  const isBlocked = user.friendshipStatus === 'Blocked';
+                  const isDeclined = user.friendshipStatus === 'Declined';
+                  
+                  return (
+                    <div key={user.userId} className="add-friend-modal__user">
+                      <UserAvatar
+                        username={user.username}
+                        avatar={user.avatarUrl}
+                        avatarColor={user.avatarColor}
+                        size="medium"
+                      />
+                      <div className="add-friend-modal__user-info">
+                        <div className="add-friend-modal__user-name">{user.username}</div>
+                        <div className="add-friend-modal__user-status">
+                          {isFriend ? 'Уже друзья' : 
+                           isPending ? 'Запрос отправлен' :
+                           isBlocked ? 'Заблокирован' :
+                           isDeclined ? 'Запрос отклонен' :
+                           user.userStatus}
+                        </div>
+                      </div>
+                      {!isFriend && !isPending && !isBlocked && (
+                        <Button
+                          variant="primary"
+                          size="small"
+                          onClick={() => handleSendRequest(user.userId)}
+                          icon={<PersonAdd />}
+                        >
+                          Добавить
+                        </Button>
+                      )}
+                      {isFriend && (
+                        <div className="add-friend-modal__friend-badge">Друг</div>
+                      )}
                     </div>
-                    <Button
-                      variant="primary"
-                      size="small"
-                      onClick={() => handleSendRequest(user.userId)}
-                      icon={<PersonAdd />}
-                    >
-                      Добавить
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

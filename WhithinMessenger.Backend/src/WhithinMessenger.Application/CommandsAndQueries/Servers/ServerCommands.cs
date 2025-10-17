@@ -3,7 +3,6 @@ using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
 
-// DeleteCategory
 public class DeleteCategoryCommand : IRequest<DeleteCategoryResult>
 {
     public Guid ServerId { get; set; }
@@ -25,7 +24,6 @@ public class DeleteCategoryResult
 }
 
 
-// CreateChat
 public class CreateChatCommand : IRequest<CreateChatResult>
 {
     public Guid ServerId { get; set; }
@@ -51,7 +49,6 @@ public class CreateChatResult
     public object? Chat { get; set; }
 }
 
-// UpdateChatName
 public class UpdateChatNameCommand : IRequest<UpdateChatNameResult>
 {
     public Guid ServerId { get; set; }
@@ -75,7 +72,6 @@ public class UpdateChatNameResult
     public object? Chat { get; set; }
 }
 
-// DeleteChat
 public class DeleteChatCommand : IRequest<DeleteChatResult>
 {
     public Guid ServerId { get; set; }
@@ -97,7 +93,6 @@ public class DeleteChatResult
     public Guid? CategoryId { get; set; }
 }
 
-// GetRoles
 public class GetRolesQuery : IRequest<GetRolesResult>
 {
     public Guid ServerId { get; set; }
@@ -117,7 +112,6 @@ public class GetRolesResult
     public object? Roles { get; set; }
 }
 
-// CreateRole
 public class CreateRoleCommand : IRequest<CreateRoleResult>
 {
     public Guid ServerId { get; set; }
@@ -143,7 +137,6 @@ public class CreateRoleResult
     public object? Role { get; set; }
 }
 
-// UpdateRole
 public class UpdateRoleCommand : IRequest<UpdateRoleResult>
 {
     public Guid RoleId { get; set; }
@@ -170,7 +163,6 @@ public class UpdateRoleResult
     public Guid ServerId { get; set; }
 }
 
-// DeleteRole
 public class DeleteRoleCommand : IRequest<DeleteRoleResult>
 {
     public Guid RoleId { get; set; }
@@ -190,7 +182,6 @@ public class DeleteRoleResult
     public Guid ServerId { get; set; }
 }
 
-// GetServerMembers
 public class GetServerMembersQuery : IRequest<GetServerMembersResult>
 {
     public Guid ServerId { get; set; }
@@ -210,7 +201,6 @@ public class GetServerMembersResult
     public List<ServerMemberInfo>? Members { get; set; }
 }
 
-// AssignRole
 public class AssignRoleCommand : IRequest<AssignRoleResult>
 {
     public Guid UserId { get; set; }
@@ -233,7 +223,6 @@ public class AssignRoleResult
     public Guid ServerId { get; set; }
 }
 
-// RemoveRole
 public class RemoveRoleCommand : IRequest<RemoveRoleResult>
 {
     public Guid UserId { get; set; }
@@ -257,7 +246,6 @@ public class RemoveRoleResult
     public Guid ServerId { get; set; }
 }
 
-// KickMember
 public class KickMemberCommand : IRequest<KickMemberResult>
 {
     public Guid ServerId { get; set; }
@@ -278,7 +266,6 @@ public class KickMemberResult
     public string? ErrorMessage { get; set; }
 }
 
-// GetUserRoles
 public class GetUserRolesQuery : IRequest<GetUserRolesResult>
 {
     public Guid UserId { get; set; }
@@ -300,7 +287,6 @@ public class GetUserRolesResult
     public object? Roles { get; set; }
 }
 
-// UpdateServerName
 public class UpdateServerNameCommand : IRequest<UpdateServerNameResult>
 {
     public Guid ServerId { get; set; }
@@ -321,7 +307,6 @@ public class UpdateServerNameResult
     public string? ErrorMessage { get; set; }
 }
 
-// GetServerInfo
 public class GetServerInfoQuery : IRequest<GetServerInfoResult>
 {
     public Guid ServerId { get; set; }
@@ -341,7 +326,6 @@ public class GetServerInfoResult
     public object? ServerInfo { get; set; }
 }
 
-// GetAuditLog
 public class GetAuditLogQuery : IRequest<GetAuditLogResult>
 {
     public Guid ServerId { get; set; }

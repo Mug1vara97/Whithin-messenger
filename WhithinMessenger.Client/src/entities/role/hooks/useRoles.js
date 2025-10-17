@@ -12,7 +12,6 @@ export const useRoles = (connection, serverId, userId) => {
       return;
     }
 
-    // Предотвращаем множественные запросы
     if (isLoading) {
       console.log('useRoles: already loading, skipping request');
       return;
@@ -101,7 +100,6 @@ export const useRoles = (connection, serverId, userId) => {
     }
   }, [connection, userId]);
 
-  // Подписка на SignalR события
   useEffect(() => {
     if (!connection) return;
 
@@ -113,7 +111,6 @@ export const useRoles = (connection, serverId, userId) => {
     const handleRoleCreated = (newRole) => {
       console.log('useRoles: Получено событие RoleCreated:', newRole);
       setRoles(prev => {
-        // Проверяем, что роль еще не добавлена
         const exists = prev.some(role => role.roleId === newRole.roleId);
         if (exists) {
           console.log('useRoles: Роль уже существует, пропускаем добавление');

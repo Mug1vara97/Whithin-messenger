@@ -27,8 +27,6 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
                 };
             }
 
-            // For now, allow any user to delete any message
-            // In the future, you might want to add authorization logic here
             await _messageRepository.DeleteAsync(request.MessageId, cancellationToken);
 
             return new DeleteMessageResult

@@ -95,7 +95,6 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь имеет доступ к серверу
             var userServers = await _serverRepository.GetUserServersAsync(userId);
             if (!userServers.Any(s => s.Id == serverId))
             {
@@ -172,14 +171,11 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != userId)
             {
                 return Forbid("Только владелец сервера может загружать баннер");
             }
 
-            // TODO: Реализовать загрузку файлов
-            // Пока возвращаем заглушку
             return Ok(new { banner = "/uploads/banners/placeholder.jpg" });
         }
         catch (Exception ex)
@@ -201,13 +197,11 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != userId)
             {
                 return Forbid("Только владелец сервера может удалять баннер");
             }
 
-            // Удаляем файл если существует
             if (!string.IsNullOrEmpty(server.Banner))
             {
                 var filePath = Path.Combine("wwwroot", server.Banner.TrimStart('/'));
@@ -217,7 +211,6 @@ public class ServerController : ControllerBase
                 }
             }
 
-            // Очищаем путь к баннеру в базе данных
             server.Banner = null;
             await _serverRepository.UpdateAsync(server);
 
@@ -242,14 +235,11 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != userId)
             {
                 return Forbid("Только владелец сервера может загружать аватар");
             }
 
-            // TODO: Реализовать загрузку файлов
-            // Пока возвращаем заглушку
             return Ok(new { avatar = "/uploads/avatars/placeholder.jpg" });
         }
         catch (Exception ex)
@@ -271,13 +261,11 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != userId)
             {
                 return Forbid("Только владелец сервера может удалять аватар");
             }
 
-            // Удаляем файл если существует
             if (!string.IsNullOrEmpty(server.Avatar))
             {
                 var filePath = Path.Combine("wwwroot", server.Avatar.TrimStart('/'));
@@ -287,7 +275,6 @@ public class ServerController : ControllerBase
                 }
             }
 
-            // Очищаем путь к аватару в базе данных
             server.Avatar = null;
             await _serverRepository.UpdateAsync(server);
 
@@ -347,10 +334,8 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            // Проверяем, что пользователь является владельцем сервера или имеет права на добавление участников
             if (server.OwnerId != userId)
             {
-                // TODO: Добавить проверку прав через роли
                 return Forbid("Недостаточно прав для добавления участников");
             }
 

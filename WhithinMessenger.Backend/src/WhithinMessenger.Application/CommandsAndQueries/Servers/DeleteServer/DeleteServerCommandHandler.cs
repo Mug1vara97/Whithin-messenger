@@ -26,29 +26,23 @@ public class DeleteServerCommandHandler : IRequestHandler<DeleteServerCommand, D
     {
         try
         {
-            // Проверяем существование сервера
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
                 return new DeleteServerResult(false, "Сервер не найден");
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != request.UserId)
             {
                 return new DeleteServerResult(false, "Только владелец сервера может его удалить");
             }
 
-            // Удаляем всех участников сервера
             await _serverMemberRepository.RemoveAllMembersAsync(request.ServerId, cancellationToken);
 
-            // Удаляем все чаты сервера
             await _chatRepository.DeleteAllByServerIdAsync(request.ServerId, cancellationToken);
 
-            // Удаляем все категории сервера
             await _categoryRepository.DeleteAllByServerIdAsync(request.ServerId, cancellationToken);
 
-            // Удаляем сервер
             await _serverRepository.DeleteAsync(request.ServerId, cancellationToken);
 
             return new DeleteServerResult(true, null);

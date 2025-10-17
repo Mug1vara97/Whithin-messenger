@@ -19,7 +19,6 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
-                    // Если запрос пустой, возвращаем пользователей с существующими чатами
                     Console.WriteLine($"SearchUsersQueryHandler: Getting users with existing chats for user {request.CurrentUserId}");
                     var usersWithChats = await _userRepository.GetUsersWithExistingChatsAsync(request.CurrentUserId, cancellationToken);
                     Console.WriteLine($"SearchUsersQueryHandler: Found {usersWithChats.Count} users with existing chats");

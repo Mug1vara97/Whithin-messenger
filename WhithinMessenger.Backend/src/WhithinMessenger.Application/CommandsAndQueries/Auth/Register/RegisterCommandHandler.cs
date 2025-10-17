@@ -19,19 +19,17 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterR
 
     public async Task<RegisterResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
-        // Проверяем, существует ли пользователь
         var existingUser = await _userManager.FindByNameAsync(request.Username);
         if (existingUser != null)
         {
             return new RegisterResult(false, ErrorMessage: "Пользователь с таким именем уже существует");
         }
 
-        // Создаем нового пользователя
         var user = new ApplicationUser
         {
             UserName = request.Username,
             Email = request.Email,
-            PasswordHash = request.Password, // Сохраняем пароль без хеширования
+            PasswordHash = request.Password,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -39,7 +37,6 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterR
         
         if (result.Succeeded)
         {
-            // Создаем профиль пользователя с случайным цветом аватара
             var userProfile = new UserProfile
             {
                 Id = Guid.NewGuid(),

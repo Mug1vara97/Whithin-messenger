@@ -17,7 +17,6 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
 
     public async Task<SendFriendRequestResult> Handle(SendFriendRequestCommand request, CancellationToken cancellationToken)
     {
-        // Проверяем, что пользователи существуют
         var requester = await _userRepository.GetByIdAsync(request.RequesterId, cancellationToken);
         var addressee = await _userRepository.GetByIdAsync(request.AddresseeId, cancellationToken);
 
@@ -26,13 +25,11 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
             return new SendFriendRequestResult(false, "Один или оба пользователя не найдены");
         }
 
-        // Нельзя отправить запрос самому себе
         if (request.RequesterId == request.AddresseeId)
         {
             return new SendFriendRequestResult(false, "Нельзя отправить запрос в друзья самому себе");
         }
 
-        // Проверяем, не являются ли уже друзьями
         var existingFriendship = await _friendshipRepository.GetByUsersAsync(request.RequesterId, request.AddresseeId, cancellationToken);
         if (existingFriendship != null)
         {
@@ -50,7 +47,6 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
             }
         }
 
-        // Создаем новый запрос в друзья
         var friendship = new Friendship
         {
             Id = Guid.NewGuid(),

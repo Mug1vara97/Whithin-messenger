@@ -17,7 +17,6 @@ public class GetMediaFilesQueryHandler : IRequestHandler<GetMediaFilesQuery, Get
     {
         var mediaFiles = await _mediaFileRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
         
-        // Фильтрация по типу медиафайла
         if (!string.IsNullOrEmpty(request.MediaType))
         {
             mediaFiles = request.MediaType.ToLower() switch

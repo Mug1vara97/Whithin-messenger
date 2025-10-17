@@ -33,7 +33,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
     {
         try
         {
-            // Проверяем, что владелец существует
             var owner = await _userRepository.GetByIdAsync(request.OwnerId, cancellationToken);
             if (owner == null)
             {
@@ -44,7 +43,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
                 };
             }
 
-            // Создаем сервер
             var server = new Server
             {
                 Id = Guid.NewGuid(),
@@ -57,7 +55,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             var createdServer = await _serverRepository.CreateAsync(server, cancellationToken);
 
-            // Создаем категорию "Текстовые каналы"
             var category = new ChatCategory
             {
                 Id = Guid.NewGuid(),
@@ -69,7 +66,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             var createdCategory = await _categoryRepository.CreateAsync(category, cancellationToken);
 
-            // Получаем тип чата "TextChannel" для текстового канала
             var chatType = await _chatRepository.GetChatTypeByNameAsync("TextChannel", cancellationToken);
             if (chatType == null)
             {
@@ -80,7 +76,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
                 };
             }
 
-            // Создаем чат "Основной"
             var chat = new Chat
             {
                 Id = Guid.NewGuid(),
@@ -95,7 +90,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
             await _chatRepository.CreateAsync(chat, cancellationToken);
             var createdChat = chat;
 
-            // Добавляем владельца как участника сервера
             var serverMember = new ServerMember
             {
                 Id = Guid.NewGuid(),
@@ -106,7 +100,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             await _serverMemberRepository.CreateAsync(serverMember, cancellationToken);
 
-            // Добавляем владельца как участника чата
             var chatMember = new Member
             {
                 Id = Guid.NewGuid(),
@@ -134,7 +127,7 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
                     banner = createdServer.Banner,
                     bannerColor = createdServer.BannerColor,
                     defaultChannelId = createdChat.Id,
-                    position = 0 // TODO: Implement server ordering
+                    position = 0
                 }
             };
         }

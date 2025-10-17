@@ -7,13 +7,11 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Важно для работы с сессиями
+  withCredentials: true,
 });
 
 apiClient.interceptors.request.use(
   (config) => {
-    // Для сессий не нужен Authorization header
-    // Сессии автоматически передаются через cookies
     return config;
   },
   (error) => {

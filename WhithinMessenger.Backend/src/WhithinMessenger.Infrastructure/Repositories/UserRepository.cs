@@ -34,11 +34,20 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             var normalizedName = searchTerm.Trim().ToLower();
 
-            // Получаем ID друзей текущего пользователя
-            var friendIds = await _context.Friendships
-                .Where(f => (f.RequesterId == currentUserId || f.AddresseeId == currentUserId) && f.Status == FriendshipStatus.Accepted)
-                .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
+            var friendships = await _context.Friendships
+                .Where(f => f.RequesterId == currentUserId || f.AddresseeId == currentUserId)
                 .ToListAsync(cancellationToken);
+
+            var friendIds = friendships
+                .Where(f => f.Status == FriendshipStatus.Accepted)
+                .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
+                .ToHashSet();
+
+            var friendshipStatusMap = friendships
+                .ToDictionary(
+                    f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId,
+                    f => f.Status.ToString()
+                );
 
             var existingChatUserIds = await _context.Members
                 .Where(m => m.UserId == currentUserId)
@@ -64,11 +73,13 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
                     LastSeen = u.LastSeen,
-                    HasExistingChat = existingChatUserIds.Contains(u.Id)
+                    HasExistingChat = existingChatUserIds.Contains(u.Id),
+                    IsFriend = friendIds.Contains(u.Id),
+                    FriendshipStatus = friendshipStatusMap.ContainsKey(u.Id) ? friendshipStatusMap[u.Id] : null
                 })
                 .OrderByDescending(u => u.HasExistingChat)
                 .ThenBy(u => u.Username)
-                .Take(20)
+                .Take(50)
                 .ToListAsync(cancellationToken);
 
             return users;
@@ -76,6 +87,21 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         public async Task<List<UserSearchInfo>> GetAllUsersAsync(Guid currentUserId, CancellationToken cancellationToken = default)
         {
+            var friendships = await _context.Friendships
+                .Where(f => f.RequesterId == currentUserId || f.AddresseeId == currentUserId)
+                .ToListAsync(cancellationToken);
+
+            var friendIds = friendships
+                .Where(f => f.Status == FriendshipStatus.Accepted)
+                .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
+                .ToHashSet();
+
+            var friendshipStatusMap = friendships
+                .ToDictionary(
+                    f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId,
+                    f => f.Status.ToString()
+                );
+
             var existingChatUserIds = await _context.Members
                 .Where(m => m.UserId == currentUserId)
                 .Select(m => m.ChatId)
@@ -95,11 +121,13 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
                     LastSeen = u.LastSeen,
-                    HasExistingChat = existingChatUserIds.Contains(u.Id)
+                    HasExistingChat = existingChatUserIds.Contains(u.Id),
+                    IsFriend = friendIds.Contains(u.Id),
+                    FriendshipStatus = friendshipStatusMap.ContainsKey(u.Id) ? friendshipStatusMap[u.Id] : null
                 })
                 .OrderByDescending(u => u.HasExistingChat)
                 .ThenBy(u => u.Username)
-                .Take(50) // Ограничиваем количество для производительности
+                .Take(50)
                 .ToListAsync(cancellationToken);
 
             return users;
@@ -109,13 +137,21 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             Console.WriteLine($"GetUsersWithExistingChatsAsync: Getting users for {currentUserId}");
             
-            // Получаем ID друзей текущего пользователя
-            var friendIds = await _context.Friendships
-                .Where(f => (f.RequesterId == currentUserId || f.AddresseeId == currentUserId) && f.Status == FriendshipStatus.Accepted)
-                .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
+            var friendships = await _context.Friendships
+                .Where(f => f.RequesterId == currentUserId || f.AddresseeId == currentUserId)
                 .ToListAsync(cancellationToken);
 
-            // Получаем ID пользователей, с которыми у текущего пользователя есть чаты
+            var friendIds = friendships
+                .Where(f => f.Status == FriendshipStatus.Accepted)
+                .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
+                .ToHashSet();
+
+            var friendshipStatusMap = friendships
+                .ToDictionary(
+                    f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId,
+                    f => f.Status.ToString()
+                );
+
             var existingChatUserIds = await _context.Members
                 .Where(m => m.UserId == currentUserId)
                 .Select(m => m.ChatId)
@@ -143,7 +179,9 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
                     LastSeen = u.LastSeen,
-                    HasExistingChat = true 
+                    HasExistingChat = true,
+                    IsFriend = friendIds.Contains(u.Id),
+                    FriendshipStatus = friendshipStatusMap.ContainsKey(u.Id) ? friendshipStatusMap[u.Id] : null
                 })
                 .OrderBy(u => u.Username)
                 .ToListAsync(cancellationToken);

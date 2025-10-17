@@ -19,7 +19,6 @@ public class JoinServerCommandHandler : IRequestHandler<JoinServerCommand, JoinS
     {
         try
         {
-            // Проверяем, что сервер существует и является публичным
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
@@ -39,7 +38,6 @@ public class JoinServerCommandHandler : IRequestHandler<JoinServerCommand, JoinS
                 };
             }
 
-            // Проверяем, не является ли пользователь уже участником
             var isAlreadyMember = await _serverMemberRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken);
             if (isAlreadyMember)
             {
@@ -50,7 +48,6 @@ public class JoinServerCommandHandler : IRequestHandler<JoinServerCommand, JoinS
                 };
             }
 
-            // Добавляем пользователя к серверу
             var serverMember = new ServerMember
             {
                 ServerId = request.ServerId,

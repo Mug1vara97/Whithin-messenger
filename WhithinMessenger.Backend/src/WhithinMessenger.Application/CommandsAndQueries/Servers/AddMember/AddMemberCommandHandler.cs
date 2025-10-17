@@ -24,28 +24,24 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
     {
         try
         {
-            // Проверяем существование сервера
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
                 return new AddMemberResult(false, "Сервер не найден");
             }
 
-            // Проверяем существование пользователя
             var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
             if (user == null)
             {
                 return new AddMemberResult(false, "Пользователь не найден");
             }
 
-            // Проверяем, не является ли пользователь уже участником сервера
             var existingMember = await _serverMemberRepository.GetByServerAndUserAsync(request.ServerId, request.UserId, cancellationToken);
             if (existingMember != null)
             {
                 return new AddMemberResult(false, "Пользователь уже является участником этого сервера");
             }
 
-            // Создаем нового участника сервера
             var serverMember = new ServerMember
             {
                 Id = Guid.NewGuid(),

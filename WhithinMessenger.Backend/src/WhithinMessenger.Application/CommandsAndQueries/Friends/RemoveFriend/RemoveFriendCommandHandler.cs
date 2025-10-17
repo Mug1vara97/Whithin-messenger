@@ -22,13 +22,11 @@ public class RemoveFriendCommandHandler : IRequestHandler<RemoveFriendCommand, R
             return new RemoveFriendResult(false, "Дружба не найдена");
         }
 
-        // Проверяем, что пользователи действительно друзья
         if (friendship.Status != FriendshipStatus.Accepted)
         {
             return new RemoveFriendResult(false, "Пользователи не являются друзьями");
         }
 
-        // Удаляем дружбу
         await _friendshipRepository.DeleteAsync(friendship.Id, cancellationToken);
 
         return new RemoveFriendResult(true);

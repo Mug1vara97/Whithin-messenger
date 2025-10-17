@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
-// import { useServers } from '../../../entities/server'; // Убираем useServers из ServerPanel
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { CategoriesList } from '../../categories-list';
 import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, UserPanel, AddMemberModal } from '../../../shared/ui/molecules';
@@ -25,10 +24,6 @@ const ServerPanel = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  // Убираем useServers из ServerPanel - он создает дополнительные подключения
-  // const { createCategory, servers: userServers, connection: serverConnection } = useServers(user?.id, null, selectedServer?.serverId);
-  
-  // Создаем категорию через API напрямую
   const createCategory = useCallback(async (categoryData) => {
     if (!selectedServer?.serverId) return;
     
@@ -45,7 +40,6 @@ const ServerPanel = ({
       if (response.ok) {
         const newCategory = await response.json();
         console.log('Category created:', newCategory);
-        // Обновляем данные сервера
         fetchServerData();
         return newCategory;
       } else {
@@ -72,7 +66,6 @@ const ServerPanel = ({
   const connectionRef = useRef(null);
   const currentServerRef = useRef(null);
   
-  // Определяем текущий сервер
   const currentServer = server || selectedServer;
   const isConnectingRef = useRef(false);
 
@@ -95,7 +88,6 @@ const ServerPanel = ({
   }, [selectedServer?.serverId]);
 
 
-  // Обработчик для создания чата через SignalR
   useEffect(() => {
     if (!serverConnection) return;
 
@@ -106,7 +98,6 @@ const ServerPanel = ({
         
         const updatedCategories = [...(prev.categories || [])];
         
-        // Обрабатываем новый чат
         const processedChat = {
           ...newChat,
           chatId: newChat.chatId || newChat.ChatId,
@@ -120,33 +111,28 @@ const ServerPanel = ({
         };
         
         if (categoryId === null) {
-          // Ищем существующую категорию без категории (null category)
           const existingNullCategory = updatedCategories.find(cat => {
             const id = cat.categoryId || cat.CategoryId;
             return id === null || id === undefined;
           });
           if (existingNullCategory) {
-            // Проверяем, не существует ли уже такой канал
             const existingChat = (existingNullCategory.chats || existingNullCategory.Chats || []).find(chat => 
               (chat.chatId || chat.ChatId) === (processedChat.chatId || processedChat.ChatId)
             );
             
             if (!existingChat) {
-              // Добавляем чат в существующую null категорию только если его еще нет
               existingNullCategory.chats = [...(existingNullCategory.chats || existingNullCategory.Chats || []), processedChat];
             }
           } else {
-            // Создаем новую null категорию (она будет отображаться как uncategorized-channels)
             const newNullCategory = {
               categoryId: null,
               categoryName: null,
               chats: [processedChat],
-              categoryOrder: -1 // Специальный порядок для null категории
+              categoryOrder: -1
             };
             updatedCategories.push(newNullCategory);
           }
         } else {
-          // Добавляем чат в существующую категорию
           const categoryIndex = updatedCategories.findIndex(cat => (cat.categoryId || cat.CategoryId) === categoryId);
           if (categoryIndex !== -1) {
             const existingChat = (updatedCategories[categoryIndex].chats || updatedCategories[categoryIndex].Chats || []).find(chat => 
@@ -164,7 +150,6 @@ const ServerPanel = ({
         
         const updatedServer = { ...prev, categories: updatedCategories };
         
-        // Уведомляем HomePage об обновлении данных
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
@@ -182,7 +167,6 @@ const ServerPanel = ({
           ...cat,
           chats: (cat.chats || cat.Chats || []).filter(chat => (chat.chatId || chat.ChatId) !== chatId)
         })).filter(cat => {
-          // Удаляем пустые null категории
           if ((cat.categoryId || cat.CategoryId) === null) {
             return (cat.chats || cat.Chats || []).length > 0;
           }
@@ -191,7 +175,6 @@ const ServerPanel = ({
         
         const updatedServer = { ...prev, categories: updatedCategories };
         
-        // Уведомляем HomePage об обновлении данных
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
@@ -226,7 +209,6 @@ const ServerPanel = ({
         
         const updatedServer = { ...prev, categories: updatedCategories };
         
-        // Уведомляем HomePage об обновлении данных
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
@@ -265,7 +247,6 @@ const ServerPanel = ({
         
         const updatedServer = { ...prev, categories: updatedCategories };
         
-        // Уведомляем HomePage об обновлении данных
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
@@ -285,7 +266,6 @@ const ServerPanel = ({
         
         const updatedServer = { ...prev, categories: updatedCategories };
         
-        // Уведомляем HomePage об обновлении данных
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
@@ -335,14 +315,12 @@ const ServerPanel = ({
       fetchServerData();
       fetchServerBanner();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServer]);
 
 
   useEffect(() => {
     let isMounted = true;
     
-    // Предотвращаем множественные вызовы для одного и того же сервера
     if (currentServerRef.current === selectedServer?.serverId && 
         connectionRef.current && 
         connectionRef.current.state === 'Connected') {
@@ -354,7 +332,6 @@ const ServerPanel = ({
       console.log('connectToServer: selectedServer?.serverId:', selectedServer?.serverId, 'user?.userId:', user?.userId, 'user?.id:', user?.id);
       if (!selectedServer?.serverId || !user?.id) return;
       
-      // Проверяем, что подключение уже существует для этого сервера
       if (currentServerRef.current === selectedServer.serverId && 
           connectionRef.current && 
           (connectionRef.current.state === 'Connected' || connectionRef.current.state === 'Connecting')) {
@@ -379,7 +356,7 @@ const ServerPanel = ({
       const newConnection = new HubConnectionBuilder()
         .withUrl(`${BASE_URL}/serverhub?userId=${user.id}`, {
           skipNegotiation: true,
-          transport: 1 // WebSockets
+          transport: 1
         })
         .withAutomaticReconnect()
         .build();
@@ -387,7 +364,6 @@ const ServerPanel = ({
 
       newConnection.onreconnected(() => {
         if (selectedServer?.serverId) {
-          // Добавляем задержку перед повторным подключением к группе
           setTimeout(() => {
             newConnection.invoke("JoinServerGroup", selectedServer.serverId.toString())
               .catch(error => console.error('Error rejoining server group:', error));
@@ -417,7 +393,6 @@ const ServerPanel = ({
         currentServerRef.current = selectedServer.serverId;
         console.log('Connected to server hub');
         
-        // Добавляем небольшую задержку перед вызовом JoinServerGroup
         await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
@@ -425,7 +400,6 @@ const ServerPanel = ({
           console.log('ServerPanel: Successfully connected to serverhub and joined group');
         } catch (error) {
           console.error('ServerPanel: Error joining server group:', error);
-          // Не прерываем подключение, так как это не критично
         }
         
         if (!isMounted) {
@@ -548,7 +522,6 @@ const ServerPanel = ({
             
             const updatedServer = { ...prev, categories: processedCategories };
             
-            // Уведомляем HomePage об обновлении данных
             if (onServerDataUpdated) {
               onServerDataUpdated(updatedServer);
             }
@@ -574,7 +547,6 @@ const ServerPanel = ({
             
             const updatedServer = { ...prev, categories: processedCategories };
             
-            // Уведомляем HomePage об обновлении данных
             if (onServerDataUpdated) {
               onServerDataUpdated(updatedServer);
             }
@@ -601,32 +573,24 @@ const ServerPanel = ({
           });
         });
 
-        // Обработчик добавления участника
         newConnection.on("MemberAdded", (data) => {
           if (!isMounted) return;
           console.log('MemberAdded event received:', data);
-          // Можно добавить уведомление или обновление списка участников
         });
 
-        // Обработчик покидания сервера - теперь обрабатывается в useServers
         newConnection.on("ServerLeft", (serverId) => {
           if (!isMounted) return;
           console.log('ServerLeft event received in ServerPanel:', serverId);
-          // Навигация обрабатывается в useServers, здесь только логируем
         });
 
-        // Обработчик удаления сервера - теперь обрабатывается в useServers
         newConnection.on("ServerDeleted", (serverId) => {
           if (!isMounted) return;
           console.log('ServerDeleted event received in ServerPanel:', serverId);
-          // Навигация обрабатывается в useServers, здесь только логируем
         });
 
-        // Обработчик ошибок
         newConnection.on("Error", (errorMessage) => {
           if (!isMounted) return;
           console.error('ServerHub error:', errorMessage);
-          // Можно показать уведомление об ошибке
         });
         
       } catch (error) {
@@ -691,7 +655,6 @@ const ServerPanel = ({
     try {
       console.log('Создание канала:', channelData);
       
-      // Используем собственное SignalR соединение
       if (!serverConnection || serverConnection.state !== 'Connected') {
         throw new Error(`SignalR connection not available. State: ${serverConnection?.state || 'null'}`);
       }
@@ -884,7 +847,6 @@ const ServerPanel = ({
 
   const handleMemberAdded = useCallback((result) => {
     console.log('Member added successfully:', result);
-    // Участник добавлен успешно, список обновится автоматически
   }, []);
 
   const handleLeaveServer = useCallback(async () => {
@@ -901,15 +863,12 @@ const ServerPanel = ({
         throw new Error('Нет подключения к серверу');
       }
 
-      // Используем SignalR для покидания сервера
       await serverConnection.invoke('LeaveServer', serverId);
       
-      // Навигация обрабатывается в useServers через SignalR событие
       console.log('LeaveServer completed, navigation will be handled by useServers');
       
     } catch (err) {
       console.error('Leave server error:', err);
-      // Ошибка при покидании сервера
     }
   }, [currentServer, serverConnection]);
 
@@ -928,15 +887,12 @@ const ServerPanel = ({
         throw new Error('Нет подключения к серверу');
       }
 
-      // Используем SignalR для удаления сервера
       await serverConnection.invoke('DeleteServer', serverId);
       
-      // Навигация обрабатывается в useServers через SignalR событие
       console.log('DeleteServer completed, navigation will be handled by useServers');
       
     } catch (err) {
       console.error('Delete server error:', err);
-      // Ошибка при удалении сервера
     }
   }, [currentServer, serverConnection]);
 
@@ -1002,9 +958,6 @@ const ServerPanel = ({
       </div>
     );
   }
-
-  // Убираем проверку userServers, так как мы больше не используем useServers в ServerPanel
-  // Проверка доступа к серверу теперь обрабатывается в HomePage через useServer
 
   return (
     <div className="server-panel">

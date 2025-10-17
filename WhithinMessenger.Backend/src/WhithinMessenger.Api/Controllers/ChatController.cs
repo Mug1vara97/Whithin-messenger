@@ -211,26 +211,26 @@ namespace WhithinMessenger.Api.Controllers
             try
             {
                 var userId = (Guid)HttpContext.Items["UserId"]!;
-                Console.WriteLine($"🔍 ChatController - GetChatParticipants called for chatId: {chatId}, userId: {userId}");
+                Console.WriteLine($"ChatController - GetChatParticipants called for chatId: {chatId}, userId: {userId}");
                 
                 var query = new GetChatParticipantsQuery(chatId, userId);
                 var result = await _mediator.Send(query);
 
-                Console.WriteLine($"🔍 ChatController - Query result: Success={result.Success}, ParticipantsCount={result.Participants?.Count ?? 0}");
+                Console.WriteLine($"ChatController - Query result: Success={result.Success}, ParticipantsCount={result.Participants?.Count ?? 0}");
 
                 if (!result.Success)
                 {
-                    Console.WriteLine($"❌ ChatController - Query failed: {result.ErrorMessage}");
+                    Console.WriteLine($"ChatController - Query failed: {result.ErrorMessage}");
                     return BadRequest(new { error = result.ErrorMessage });
                 }
 
-                Console.WriteLine($"✅ ChatController - Returning {result.Participants.Count} participants");
+                Console.WriteLine($"ChatController - Returning {result.Participants.Count} participants");
                 return Ok(result.Participants);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatController - Exception: {ex.Message}");
-                Console.WriteLine($"❌ ChatController - Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"ChatController - Exception: {ex.Message}");
+                Console.WriteLine($"ChatController - Stack trace: {ex.StackTrace}");
                 return StatusCode(500, new { error = "Произошла ошибка при получении участников чата: " + ex.Message });
             }
         }
@@ -250,16 +250,16 @@ namespace WhithinMessenger.Api.Controllers
 
             if (!result.Success)
             {
-                Console.WriteLine($"❌ ChatController - Query failed: {result.ErrorMessage}");
+                Console.WriteLine($"ChatController - Query failed: {result.ErrorMessage}");
                 return BadRequest(new { error = result.ErrorMessage });
             }
 
-            Console.WriteLine($"✅ ChatController - Returning {result.AvailableUsers.Count} available users");
+            Console.WriteLine($"ChatController - Returning {result.AvailableUsers.Count} available users");
             return Ok(result.AvailableUsers);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ ChatController - Exception: {ex.Message}");
+            Console.WriteLine($"ChatController - Exception: {ex.Message}");
             return StatusCode(500, new { error = "Произошла ошибка при получении доступных пользователей: " + ex.Message });
         }
     }
@@ -270,25 +270,25 @@ namespace WhithinMessenger.Api.Controllers
         try
         {
             var userId = (Guid)HttpContext.Items["UserId"]!;
-            Console.WriteLine($"🔍 ChatController - AddUserToGroup called for chatId: {chatId}, targetUserId: {request.UserId}, currentUserId: {userId}");
+            Console.WriteLine($"ChatController - AddUserToGroup called for chatId: {chatId}, targetUserId: {request.UserId}, currentUserId: {userId}");
             
             var command = new AddUserToGroupCommand(chatId, request.UserId, userId);
             var result = await _mediator.Send(command);
 
-            Console.WriteLine($"🔍 ChatController - Command result: Success={result.Success}");
+            Console.WriteLine($"ChatController - Command result: Success={result.Success}");
 
             if (!result.Success)
             {
-                Console.WriteLine($"❌ ChatController - Command failed: {result.ErrorMessage}");
+                Console.WriteLine($"ChatController - Command failed: {result.ErrorMessage}");
                 return BadRequest(new { error = result.ErrorMessage });
             }
 
-            Console.WriteLine($"✅ ChatController - User {request.UserId} added to group {chatId}");
+            Console.WriteLine($"ChatController - User {request.UserId} added to group {chatId}");
             return Ok(new { message = "Пользователь успешно добавлен в группу" });
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ ChatController - Exception: {ex.Message}");
+            Console.WriteLine($"ChatController - Exception: {ex.Message}");
             return StatusCode(500, new { error = "Произошла ошибка при добавлении пользователя в группу: " + ex.Message });
         }
     }

@@ -36,8 +36,6 @@ public static class Infrastructure
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         
-        // Обработчики команд и запросов теперь регистрируются в Application слое
-
         return services;
     }
 }

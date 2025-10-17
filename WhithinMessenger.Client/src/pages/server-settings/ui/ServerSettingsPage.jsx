@@ -63,11 +63,11 @@ const ServerSettingsPage = () => {
         setError(errorMessage);
       });
 
-      return true; // Connection successful
+      return true;
     } catch (err) {
       console.error('Failed to initialize SignalR connection:', err);
       setError('Не удалось подключиться к серверу');
-      return false; // Connection failed
+      return false;
     }
   }, [serverId, user?.id]);
 
@@ -75,7 +75,7 @@ const ServerSettingsPage = () => {
     if (!serverId) return;
 
     const maxRetries = 3;
-    const retryDelay = 1000; // 1 second
+    const retryDelay = 1000;
 
     try {
       setIsLoading(true);
@@ -85,15 +85,13 @@ const ServerSettingsPage = () => {
         const serverInfo = await connectionRef.current.invoke("GetServerInfo", serverId);
         console.log('GetServerInfo response:', serverInfo);
         
-        // Add null check for serverInfo
         if (serverInfo && serverInfo.ownerId) {
           setServer(serverInfo);
           setIsServerOwner(serverInfo.ownerId === user?.id);
-          setIsLoading(false); // Устанавливаем loading в false при успешной загрузке
+          setIsLoading(false);
         } else {
           console.warn('ServerInfo is null or missing ownerId:', serverInfo);
           
-          // Retry if we haven't exceeded max retries
           if (retryCount < maxRetries) {
             console.log(`Retrying fetchServerData (attempt ${retryCount + 1}/${maxRetries})`);
             setTimeout(() => {
@@ -107,7 +105,6 @@ const ServerSettingsPage = () => {
       } else {
         console.warn('Connection not available for fetching server data');
         
-        // Retry if we haven't exceeded max retries
         if (retryCount < maxRetries) {
           console.log(`Retrying fetchServerData due to no connection (attempt ${retryCount + 1}/${maxRetries})`);
           setTimeout(() => {
@@ -122,7 +119,6 @@ const ServerSettingsPage = () => {
     } catch (err) {
       console.error('Error fetching server data:', err);
       
-      // Retry if we haven't exceeded max retries
       if (retryCount < maxRetries) {
         console.log(`Retrying fetchServerData due to error (attempt ${retryCount + 1}/${maxRetries})`);
         setTimeout(() => {
@@ -133,7 +129,6 @@ const ServerSettingsPage = () => {
       
       setError('Не удалось загрузить данные сервера');
     } finally {
-      // Всегда устанавливаем loading в false в конце, если не делаем retry
       if (retryCount >= maxRetries) {
         setIsLoading(false);
       }
@@ -158,7 +153,6 @@ const ServerSettingsPage = () => {
         const connectionSuccess = await initializeConnection();
         
         if (connectionSuccess && connectionRef.current) {
-          // Wait a bit more for the connection to be ready
           setTimeout(() => {
             fetchServerData();
           }, 300);

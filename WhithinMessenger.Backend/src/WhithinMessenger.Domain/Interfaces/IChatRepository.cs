@@ -9,7 +9,6 @@ namespace WhithinMessenger.Domain.Interfaces
         Task<Chat?> GetByIdAsync(Guid chatId, CancellationToken cancellationToken = default);
         Task<List<Guid>> GetChatMembersAsync(Guid chatId, CancellationToken cancellationToken = default);
         Task<List<ChatParticipantInfo>> GetChatParticipantsAsync(Guid chatId, CancellationToken cancellationToken = default);
-    // Метод GetChatInfoAsync перемещен в Application слой
         Task<List<AvailableUserInfo>> GetAvailableUsersForGroupAsync(Guid currentUserId, Guid groupChatId, CancellationToken cancellationToken = default);
         Task<bool> AddUserToGroupAsync(Guid groupChatId, Guid userId, CancellationToken cancellationToken = default);
         Task<List<Chat>> GetByServerIdAsync(Guid serverId, CancellationToken cancellationToken = default);

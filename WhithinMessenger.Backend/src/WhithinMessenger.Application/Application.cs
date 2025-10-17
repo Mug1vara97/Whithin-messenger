@@ -13,7 +13,6 @@ public static class Application
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddMediatR(x => x.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         
-        // Регистрируем сервисы для работы с файлами
         services.AddScoped<IFileService>(provider => 
         {
             var logger = provider.GetRequiredService<ILogger<FileService>>();

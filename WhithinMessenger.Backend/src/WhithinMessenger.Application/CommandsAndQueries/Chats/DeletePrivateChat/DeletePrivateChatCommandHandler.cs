@@ -16,24 +16,20 @@ public class DeletePrivateChatCommandHandler : IRequestHandler<DeletePrivateChat
     {
         try
         {
-            // Проверяем, что чат существует
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
                 return new DeletePrivateChatResult { Success = false, ErrorMessage = "Чат не найден" };
             }
 
-            // Проверяем, что пользователь является участником чата
             var isParticipant = await _chatRepository.IsUserParticipantAsync(request.ChatId, request.UserId, cancellationToken);
             if (!isParticipant)
             {
                 return new DeletePrivateChatResult { Success = false, ErrorMessage = "Вы не являетесь участником этого чата" };
             }
 
-            // Получаем список участников чата перед удалением
             var participants = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
 
-            // Удаляем чат
             await _chatRepository.DeleteAsync(request.ChatId, cancellationToken);
 
             return new DeletePrivateChatResult { Success = true, Participants = participants };

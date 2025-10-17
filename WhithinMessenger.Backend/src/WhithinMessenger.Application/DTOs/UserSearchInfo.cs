@@ -9,6 +9,8 @@ namespace WhithinMessenger.Application.DTOs
         public string UserStatus { get; init; } = "offline";
         public DateTimeOffset? LastSeen { get; init; }
         public bool HasExistingChat { get; init; }
+        public bool IsFriend { get; init; }
+        public string? FriendshipStatus { get; init; }
     }
 }
 

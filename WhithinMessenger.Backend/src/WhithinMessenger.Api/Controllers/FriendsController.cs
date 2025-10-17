@@ -149,7 +149,6 @@ public class FriendsController : ControllerBase
     }
 }
 
-// Request DTOs
 public record SendFriendRequestRequest(Guid TargetUserId);
 public record AcceptFriendRequestRequest(Guid FriendshipId);
 public record DeclineFriendRequestRequest(Guid FriendshipId);

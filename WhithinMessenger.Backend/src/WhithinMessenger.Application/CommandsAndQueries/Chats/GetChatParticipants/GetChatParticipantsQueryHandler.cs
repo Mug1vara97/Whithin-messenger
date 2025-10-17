@@ -16,11 +16,10 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipa
         {
             try
             {
-                // Получаем информацию об участниках чата
                 var participants = await _chatRepository.GetChatParticipantsAsync(request.ChatId, cancellationToken);
                 
-                Console.WriteLine($"🔍 GetChatParticipants - ChatId: {request.ChatId}");
-                Console.WriteLine($"✅ Found {participants.Count} participants for chat {request.ChatId}");
+                Console.WriteLine($"GetChatParticipants - ChatId: {request.ChatId}");
+                Console.WriteLine($"Found {participants.Count} participants for chat {request.ChatId}");
                 foreach (var participant in participants)
                 {
                     Console.WriteLine($"  - {participant.Username} (ID: {participant.UserId})");
@@ -34,7 +33,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipa
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error getting chat participants: {ex.Message}");
+                Console.WriteLine($"Error getting chat participants: {ex.Message}");
                 return new GetChatParticipantsResult
                 {
                     Success = false,

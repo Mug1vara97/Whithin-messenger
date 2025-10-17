@@ -4,7 +4,6 @@ using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
 
-// DeleteCategoryCommandHandler
 public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, DeleteCategoryResult>
 {
     private readonly ICategoryRepository _categoryRepository;
@@ -18,20 +17,17 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
     {
         try
         {
-            // Проверяем, что категория существует
             var category = await _categoryRepository.GetByIdAsync(request.CategoryId, cancellationToken);
             if (category == null)
             {
                 return new DeleteCategoryResult { Success = false, ErrorMessage = "Категория не найдена" };
             }
 
-            // Проверяем, что категория принадлежит указанному серверу
             if (category.ServerId != request.ServerId)
             {
                 return new DeleteCategoryResult { Success = false, ErrorMessage = "Категория не принадлежит указанному серверу" };
             }
 
-            // Удаляем категорию из базы данных
             await _categoryRepository.DeleteAsync(request.CategoryId, cancellationToken);
 
             return new DeleteCategoryResult { Success = true };
@@ -44,7 +40,6 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
 }
 
 
-// CreateChatCommandHandler
 public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, CreateChatResult>
 {
     private readonly IChatRepository _chatRepository;
@@ -60,7 +55,6 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
     {
         try
         {
-            // Проверяем, что категория существует (если указана)
             if (request.CategoryId.HasValue)
             {
                 var category = await _categoryRepository.GetByIdAsync(request.CategoryId.Value, cancellationToken);
@@ -70,7 +64,6 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 }
             }
 
-            // Определяем TypeId в зависимости от типа чата
             Guid typeId = request.ChatType switch
             {
                 1 => Guid.Parse("11111111-1111-1111-1111-111111111111"), // Private
@@ -80,7 +73,6 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 _ => Guid.Parse("33333333-3333-3333-3333-333333333333")  // По умолчанию TextChannel
             };
 
-            // Создаем новый чат
             var chat = new Chat
             {
                 Id = Guid.NewGuid(),
@@ -92,10 +84,8 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 IsPrivate = false
             };
 
-            // Сохраняем чат в базе данных
             await _chatRepository.CreateAsync(chat, cancellationToken);
 
-            // Возвращаем созданный чат в формате, ожидаемом клиентом
             var result = new
             {
                 chatId = chat.Id,
@@ -105,8 +95,8 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 typeId = chat.TypeId,
                 createdAt = chat.CreatedAt,
                 isPrivate = chat.IsPrivate,
-                chatOrder = 0, // Добавляем порядок для сортировки
-                members = new List<object>() // Пустой список участников
+                chatOrder = 0,
+                members = new List<object>()
             };
 
             return new CreateChatResult { Success = true, Chat = result };
@@ -118,7 +108,6 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
     }
 }
 
-// DeleteChatCommandHandler
 public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, DeleteChatResult>
 {
     private readonly IChatRepository _chatRepository;
@@ -132,23 +121,18 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
     {
         try
         {
-            // Проверяем, что чат существует
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
                 return new DeleteChatResult { Success = false, ErrorMessage = "Чат не найден" };
             }
 
-            // Проверяем, что чат принадлежит указанному серверу
             if (chat.ServerId != request.ServerId)
             {
                 return new DeleteChatResult { Success = false, ErrorMessage = "Чат не принадлежит указанному серверу" };
             }
-
-            // Сохраняем CategoryId перед удалением
             var categoryId = chat.CategoryId;
 
-            // Удаляем чат из базы данных
             await _chatRepository.DeleteAsync(request.ChatId, cancellationToken);
 
             return new DeleteChatResult { Success = true, CategoryId = categoryId };
@@ -160,7 +144,6 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
     }
 }
 
-// UpdateChatNameCommandHandler
 public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameCommand, UpdateChatNameResult>
 {
     private readonly IChatRepository _chatRepository;
@@ -174,24 +157,20 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
     {
         try
         {
-            // Проверяем, что чат существует
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
                 return new UpdateChatNameResult { Success = false, ErrorMessage = "Чат не найден" };
             }
 
-            // Проверяем, что чат принадлежит указанному серверу
             if (chat.ServerId != request.ServerId)
             {
                 return new UpdateChatNameResult { Success = false, ErrorMessage = "Чат не принадлежит указанному серверу" };
             }
 
-            // Обновляем название чата
             chat.Name = request.NewName;
             await _chatRepository.UpdateAsync(chat, cancellationToken);
 
-            // Возвращаем обновленный чат в формате, ожидаемом клиентом
             var result = new
             {
                 chatId = chat.Id,
@@ -214,7 +193,6 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
 }
 
 
-// GetRolesQueryHandler
 public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, GetRolesResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -228,7 +206,6 @@ public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, GetRolesResul
     {
         try
         {
-            // TODO: Implement roles retrieval logic
             return Task.FromResult(new GetRolesResult { Success = true, Roles = new List<object>() });
         }
         catch (Exception ex)
@@ -238,7 +215,6 @@ public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, GetRolesResul
     }
 }
 
-// CreateRoleCommandHandler
 public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, CreateRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -252,7 +228,6 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
     {
         try
         {
-            // TODO: Implement role creation logic
             return Task.FromResult(new CreateRoleResult { Success = true, Role = new { } });
         }
         catch (Exception ex)
@@ -262,7 +237,6 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
     }
 }
 
-// UpdateRoleCommandHandler
 public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, UpdateRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -276,7 +250,6 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
     {
         try
         {
-            // TODO: Implement role update logic
             return Task.FromResult(new UpdateRoleResult { Success = true, Role = new { }, ServerId = Guid.NewGuid() });
         }
         catch (Exception ex)
@@ -286,7 +259,6 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
     }
 }
 
-// DeleteRoleCommandHandler
 public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, DeleteRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -300,7 +272,6 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
     {
         try
         {
-            // TODO: Implement role deletion logic
             return Task.FromResult(new DeleteRoleResult { Success = true, ServerId = Guid.NewGuid() });
         }
         catch (Exception ex)
@@ -310,7 +281,6 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
     }
 }
 
-// GetServerMembersQueryHandler
 public class GetServerMembersQueryHandler : IRequestHandler<GetServerMembersQuery, GetServerMembersResult>
 {
     private readonly IServerMemberRepository _serverMemberRepository;
@@ -324,7 +294,6 @@ public class GetServerMembersQueryHandler : IRequestHandler<GetServerMembersQuer
     {
         try
         {
-            // Проверяем, что пользователь является участником сервера
             var isMember = await _serverMemberRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken);
             if (!isMember)
             {
@@ -335,7 +304,6 @@ public class GetServerMembersQueryHandler : IRequestHandler<GetServerMembersQuer
                 };
             }
 
-            // Получаем участников сервера
             var members = await _serverMemberRepository.GetServerMembersAsync(request.ServerId, cancellationToken);
 
             return new GetServerMembersResult
@@ -355,7 +323,6 @@ public class GetServerMembersQueryHandler : IRequestHandler<GetServerMembersQuer
     }
 }
 
-// AssignRoleCommandHandler
 public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, AssignRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -369,7 +336,6 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
     {
         try
         {
-            // TODO: Implement role assignment logic
             return Task.FromResult(new AssignRoleResult { Success = true, Role = new { }, ServerId = Guid.NewGuid() });
         }
         catch (Exception ex)
@@ -379,7 +345,6 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
     }
 }
 
-// RemoveRoleCommandHandler
 public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, RemoveRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -393,7 +358,6 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
     {
         try
         {
-            // TODO: Implement role removal logic
             return Task.FromResult(new RemoveRoleResult { Success = true, RemainingRoles = new List<object>(), MergedPermissions = new { }, ServerId = Guid.NewGuid() });
         }
         catch (Exception ex)
@@ -403,7 +367,6 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
     }
 }
 
-// KickMemberCommandHandler
 public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickMemberResult>
 {
     private readonly IMemberRepository _memberRepository;
@@ -417,7 +380,6 @@ public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickM
     {
         try
         {
-            // TODO: Implement member kicking logic
             return Task.FromResult(new KickMemberResult { Success = true });
         }
         catch (Exception ex)
@@ -427,7 +389,6 @@ public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickM
     }
 }
 
-// GetUserRolesQueryHandler
 public class GetUserRolesQueryHandler : IRequestHandler<GetUserRolesQuery, GetUserRolesResult>
 {
     private readonly IRoleRepository _roleRepository;
@@ -440,8 +401,7 @@ public class GetUserRolesQueryHandler : IRequestHandler<GetUserRolesQuery, GetUs
     public Task<GetUserRolesResult> Handle(GetUserRolesQuery request, CancellationToken cancellationToken)
     {
         try
-        {
-            // TODO: Implement user roles retrieval logic
+        {   
             return Task.FromResult(new GetUserRolesResult { Success = true, Roles = new List<object>() });
         }
         catch (Exception ex)
@@ -451,7 +411,6 @@ public class GetUserRolesQueryHandler : IRequestHandler<GetUserRolesQuery, GetUs
     }
 }
 
-// UpdateServerNameCommandHandler
 public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCommand, UpdateServerNameResult>
 {
     private readonly IServerRepository _serverRepository;
@@ -471,13 +430,11 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
                 return new UpdateServerNameResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            // Проверяем, что пользователь является владельцем сервера
             if (server.OwnerId != request.UserId)
             {
                 return new UpdateServerNameResult { Success = false, ErrorMessage = "Только владелец сервера может изменить его название" };
             }
 
-            // Обновляем название сервера
             server.Name = request.NewName;
             await _serverRepository.UpdateAsync(server);
 
@@ -490,7 +447,6 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
     }
 }
 
-// GetServerInfoQueryHandler
 public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, GetServerInfoResult>
 {
     private readonly IServerRepository _serverRepository;
@@ -510,7 +466,6 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
                 return new GetServerInfoResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            // Проверяем, что пользователь имеет доступ к серверу
             var userServers = await _serverRepository.GetUserServersAsync(request.UserId);
             if (!userServers.Any(s => s.Id == request.ServerId))
             {
@@ -539,7 +494,6 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
     }
 }
 
-// GetAuditLogQueryHandler
 public class GetAuditLogQueryHandler : IRequestHandler<GetAuditLogQuery, GetAuditLogResult>
 {
     private readonly IServerRepository _serverRepository;
@@ -553,7 +507,6 @@ public class GetAuditLogQueryHandler : IRequestHandler<GetAuditLogQuery, GetAudi
     {
         try
         {
-            // TODO: Implement audit log retrieval logic
             return Task.FromResult(new GetAuditLogResult { Success = true, AuditLogs = new List<object>() });
         }
         catch (Exception ex)

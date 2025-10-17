@@ -10,7 +10,6 @@ export const useAuth = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Проверяем, есть ли активная сессия на сервере
         const user = await authApi.getCurrentUser();
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
@@ -19,7 +18,6 @@ export const useAuth = () => {
           localStorage.removeItem('user');
         }
       } catch (error) {
-        // Это нормально, если пользователь не авторизован
         console.log('User not authenticated, continuing...');
         localStorage.removeItem('user');
       } finally {
@@ -68,7 +66,6 @@ export const useAuth = () => {
       console.log('Register response in useAuth:', response);
       
       if (response && response.userId) {
-        // После регистрации нужно войти в систему
         const loginResponse = await authApi.login({
           username: userData.username,
           password: userData.password

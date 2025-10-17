@@ -15,7 +15,6 @@ export const ServerProvider = ({ children }) => {
   const isConnectingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
-  // Загрузка серверов через SignalR Hub
   const fetchServers = useCallback(async () => {
     if (!connectionRef.current) {
       console.log('ServerContext: No SignalR connection available for fetching servers');
@@ -38,11 +37,9 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Создание SignalR соединения
   const createConnection = useCallback(async (userId) => {
     if (!userId) return;
     
-    // Проверяем, что соединение уже существует и активно
     if (connectionRef.current && connectionRef.current.state === 'Connected') {
       console.log('ServerContext: Connection already exists and is connected, skipping...');
       return;
@@ -72,11 +69,9 @@ export const ServerProvider = ({ children }) => {
         setIsConnected(true);
         console.log('ServerContext: SignalR connection established for user:', userId);
 
-        // Подключаемся к группе списка серверов
         await connection.invoke('JoinServerListGroup');
         console.log('ServerContext: Joined server list group');
 
-        // Обработчики SignalR событий
         connection.on('ServerCreated', (serverData) => {
           console.log('ServerContext: ServerCreated event received:', serverData);
           setServers(prev => {
@@ -89,7 +84,6 @@ export const ServerProvider = ({ children }) => {
             return [...prev, serverData];
           });
           
-          // Уведомляем о создании сервера через глобальное событие
           console.log('ServerContext: Server created, dispatching event:', serverData.serverId);
           window.dispatchEvent(new CustomEvent('serverCreated', { detail: serverData }));
         });
@@ -109,7 +103,6 @@ export const ServerProvider = ({ children }) => {
 
         connection.on('YouWereAddedToServer', async (data) => {
           console.log('ServerContext: YouWereAddedToServer event received:', data);
-          // Обновляем список серверов через SignalR
           try {
             const updatedServers = await connection.invoke('GetUserServers');
             setServers(updatedServers);
@@ -147,7 +140,6 @@ export const ServerProvider = ({ children }) => {
           }
         });
 
-        // Загружаем начальный список серверов
         await fetchServers();
 
       } catch (err) {
@@ -162,12 +154,10 @@ export const ServerProvider = ({ children }) => {
     connectToServerList();
   }, [fetchServers]);
 
-  // Логирование изменений состояния серверов
   useEffect(() => {
     console.log('ServerContext: Servers state updated:', servers);
   }, [servers]);
 
-  // Создание сервера через SignalR
   const createServer = useCallback(async (serverData) => {
     if (!connectionRef.current) {
       throw new Error('SignalR connection not available');
@@ -181,10 +171,8 @@ export const ServerProvider = ({ children }) => {
         serverData.description || null
       );
       
-      // Добавляем сервер в список после успешного создания
       if (newServer) {
         setServers(prev => {
-          // Проверяем, что сервер еще не добавлен
           const exists = prev.some(server => server.serverId === newServer.serverId);
           if (exists) {
             console.log('ServerContext: Server already exists in list, skipping addition');
@@ -203,7 +191,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Обновление сервера
   const updateServer = useCallback(async (serverId, serverData) => {
     if (!connectionRef.current) return;
 
@@ -215,7 +202,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Удаление сервера
   const deleteServer = useCallback(async (serverId) => {
     if (!connectionRef.current) return;
 
@@ -227,7 +213,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Покидание сервера
   const leaveServer = useCallback(async (serverId) => {
     if (!connectionRef.current) return;
 
@@ -239,7 +224,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Переупорядочивание серверов
   const reorderServers = useCallback(async (serverIds) => {
     if (!connectionRef.current) return;
 
@@ -251,7 +235,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Загрузка публичных серверов через SignalR
   const fetchPublicServers = useCallback(async () => {
     if (!connectionRef.current) {
       console.log('ServerContext: No SignalR connection available for fetching public servers');
@@ -274,7 +257,6 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Присоединение к публичному серверу через SignalR
   const joinPublicServer = useCallback(async (serverId) => {
     if (!connectionRef.current) {
       throw new Error('SignalR connection not available');
@@ -288,7 +270,6 @@ export const ServerProvider = ({ children }) => {
       
       if (result && result.message) {
         console.log('ServerContext: Successfully joined public server via SignalR');
-        // Обновляем список серверов пользователя через SignalR
         const updatedServers = await connectionRef.current.invoke('GetUserServers');
         setServers(updatedServers);
         console.log('ServerContext: Server list updated after joining server');
@@ -304,16 +285,13 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
-  // Проверка, является ли пользователь участником сервера
   const isUserMember = useCallback((serverId) => {
     return servers.some(server => server.serverId === serverId);
   }, [servers]);
 
-  // Очистка соединения при размонтировании
   useEffect(() => {
     return () => {
       if (connectionRef.current) {
-        // Очищаем обработчики событий
         connectionRef.current.off('ServerCreated');
         connectionRef.current.off('ServerJoined');
         connectionRef.current.off('YouWereAddedToServer');

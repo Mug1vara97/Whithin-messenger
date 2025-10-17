@@ -25,14 +25,12 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
     {
         try
         {
-            // Проверяем, что создатель существует
             var creator = await _userRepository.GetByIdAsync(request.CreatorId);
             if (creator == null)
             {
                 return CreateGroupChatResult.FailureResult("Пользователь-создатель не найден");
             }
 
-            // Проверяем, что все участники существуют
             foreach (var memberId in request.MemberIds)
             {
                 var member = await _userRepository.GetByIdAsync(memberId);
@@ -42,8 +40,6 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
                 }
             }
 
-            // Создаем групповой чат
-            // Получаем тип группового чата
             var groupChatType = await _chatRepository.GetChatTypeByNameAsync("Group", cancellationToken);
             if (groupChatType == null)
             {
@@ -55,14 +51,13 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
                 Id = Guid.NewGuid(),
                 Name = request.ChatName,
                 TypeId = groupChatType.Id,
-                IsPrivate = false, // Групповой чат не приватный
+                IsPrivate = false,
                 CreatedAt = DateTimeOffset.UtcNow,
                 ServerId = null
             };
 
             await _chatRepository.CreateAsync(groupChat, cancellationToken);
 
-            // Добавляем участников в чат
             var members = new List<Member>();
             foreach (var memberId in request.MemberIds)
             {
@@ -82,7 +77,6 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
                 }
             }
             
-            // Сохраняем всех участников одним запросом
             await _memberRepository.AddRangeAsync(members, cancellationToken);
 
             return CreateGroupChatResult.SuccessResult(groupChat.Id);

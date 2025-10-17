@@ -1,7 +1,6 @@
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 
 export const serverApi = {
-  // Получение данных сервера через HTTP API
   getServerById: async (serverId) => {
     const response = await fetch(`${BASE_URL}/api/server/${serverId}`, {
       credentials: 'include'
@@ -14,10 +13,9 @@ export const serverApi = {
     return response.json();
   },
 
-  // Получение списка серверов пользователя через HTTP API
   getUserServers: async (userId) => {
     const response = await fetch(`${BASE_URL}/api/server/servers`, {
-      credentials: 'include' // Для передачи сессионных куки
+      credentials: 'include'
     });
     
     if (!response.ok) {
@@ -25,11 +23,9 @@ export const serverApi = {
     }
     
     const data = await response.json();
-    // Сортируем по позиции, как в оригинальном клиенте
     return data.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   },
 
-  // Создание сервера через HTTP API
   createServer: async (serverData, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers`, {
       method: 'POST',
@@ -52,7 +48,6 @@ export const serverApi = {
     return response.json();
   },
 
-  // Обновление сервера через HTTP API
   updateServer: async (serverId, serverData) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}`, {
       method: 'PUT',
@@ -71,7 +66,6 @@ export const serverApi = {
     return response.json();
   },
 
-  // Удаление сервера через HTTP API
   deleteServer: async (serverId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}`, {
       method: 'DELETE',
@@ -88,7 +82,6 @@ export const serverApi = {
     return response.json();
   },
 
-  // Присоединение к серверу через HTTP API
   joinServer: async (serverId, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}/add-member`, {
       method: 'POST',
@@ -109,7 +102,6 @@ export const serverApi = {
     return response.json();
   },
 
-  // Покидание сервера через HTTP API
   leaveServer: async (serverId, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}/remove-member`, {
       method: 'POST',

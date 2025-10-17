@@ -25,7 +25,6 @@ public class AuthController : ControllerBase
 
         if (result.IsSuccess && result.User != null)
         {
-            // Сохраняем пользователя в сессии
             HttpContext.Session.SetString("UserId", result.User.Id.ToString());
             HttpContext.Session.SetString("Username", result.User.UserName ?? "");
             
@@ -90,6 +89,5 @@ public class AuthController : ControllerBase
     }
 }
 
-// DTO для запросов
 public record LoginRequest(string Username, string Password);
 public record RegisterRequest(string Username, string Password, string Email);

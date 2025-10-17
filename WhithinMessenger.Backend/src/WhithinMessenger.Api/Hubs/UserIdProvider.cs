@@ -7,11 +7,9 @@ namespace WhithinMessenger.Api.Hubs
     {
         public string? GetUserId(HubConnectionContext connection)
         {
-            // Получаем ID пользователя из HttpContext
             var httpContext = connection.GetHttpContext();
             if (httpContext?.User?.Identity?.IsAuthenticated == true)
             {
-                // Получаем ID пользователя из Claims
                 var userIdClaim = httpContext.User.FindFirst("UserId");
                 if (userIdClaim != null)
                 {

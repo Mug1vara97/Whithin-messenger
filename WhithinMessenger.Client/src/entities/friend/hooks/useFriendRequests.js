@@ -45,7 +45,6 @@ export const useFriendRequests = () => {
   const sendRequest = useCallback(async (targetUserId) => {
     try {
       await friendApi.sendFriendRequest(targetUserId);
-      // Обновляем список запросов после отправки
       await fetchFriendRequests();
     } catch (err) {
       setError(err.message);

@@ -51,7 +51,6 @@ namespace WhithinMessenger.Api.Hubs
                 }
 
                 _logger.LogInformation($"ChatListHub: Getting chats for user: {userId}");
-                // Вызываем MediatR напрямую
                 var query = new GetUserChatsQuery(userId.Value);
                 var result = await _mediator.Send(query);
                 _logger.LogInformation($"ChatListHub: Found {result.Chats.Count} chats");
@@ -75,7 +74,6 @@ namespace WhithinMessenger.Api.Hubs
                     return;
                 }
 
-                // Вызываем MediatR напрямую
                 var command = new CreatePrivateChatCommand(userId.Value, targetUserId);
                 var result = await _mediator.Send(command);
                 
@@ -83,21 +81,17 @@ namespace WhithinMessenger.Api.Hubs
                 {
                     await Clients.Caller.SendAsync("privatechatcreated", new { chatId = result.ChatId, exists = result.Exists });
                     
-                    // Уведомляем участников чата о создании чата
                     var chatData = new { 
                         chatId = result.ChatId, 
                         exists = result.Exists, 
                         createdBy = userId,
                         targetUserId = targetUserId
                     };
-                    
-                    // Уведомляем только участников чата о создании чата
+
                     Console.WriteLine($"Sending ChatCreated to participants (createdBy: {userId}, targetUserId: {targetUserId})");
                     
-                    // Отправляем создателю чата
                     await Clients.User(userId.ToString()).SendAsync("chatcreated", userId, chatData);
                     
-                    // Отправляем второму участнику чата
                     await Clients.User(targetUserId.ToString()).SendAsync("chatcreated", userId, chatData);
                 }
                 else
@@ -123,10 +117,6 @@ namespace WhithinMessenger.Api.Hubs
                     return;
                 }
 
-                // Убираем проверку на длину строки, так как пустые запросы теперь разрешены
-                // для получения пользователей с существующими чатами
-
-                // Вызываем MediatR напрямую
                 var query = new SearchUsersQuery(currentUserId.Value, name);
                 var result = await _mediator.Send(query);
                 await Clients.Caller.SendAsync("receivesearchresults", result.Users);
@@ -154,17 +144,14 @@ namespace WhithinMessenger.Api.Hubs
                     return;
                 }
 
-                // Добавляем создателя в список участников
                 var allUserIds = new List<Guid> { currentUserId.Value };
                 allUserIds.AddRange(userIds);
 
-                // Создаем групповой чат через MediatR
                 var command = new CreateGroupChatCommand(currentUserId.Value, chatName, allUserIds);
                 var result = await _mediator.Send(command);
 
                 if (result.Success)
                 {
-                    // Уведомляем всех участников о создании чата
                     foreach (var userId in allUserIds)
                     {
                         await Clients.All.SendAsync("chatcreated", userId, new { chatId = result.ChatId });

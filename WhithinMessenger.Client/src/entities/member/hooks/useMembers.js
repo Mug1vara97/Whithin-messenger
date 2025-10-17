@@ -12,7 +12,6 @@ export const useMembers = (connection, serverId, userId) => {
       return;
     }
 
-    // Предотвращаем множественные запросы
     if (isLoading) {
       console.log('fetchMembers: already loading, skipping request');
       return;
@@ -57,7 +56,6 @@ export const useMembers = (connection, serverId, userId) => {
     }
   }, [userId]);
 
-  // Подписка на SignalR события и автоматическая загрузка участников
   useEffect(() => {
     if (!connection || !serverId) return;
 
@@ -68,13 +66,11 @@ export const useMembers = (connection, serverId, userId) => {
 
     const handleRoleAssigned = async (assignedUserId, roleData) => {
       console.log('RoleAssigned event received:', { assignedUserId, roleData });
-      // Обновляем участников после назначения роли
       await memberApi.getServerMembers(connection, serverId);
     };
 
     const handleRoleRemoved = async (removedUserId, removedRoleId) => {
       console.log('RoleRemoved event received:', { removedUserId, removedRoleId });
-      // Обновляем участников после удаления роли
       await memberApi.getServerMembers(connection, serverId);
     };
 
@@ -82,7 +78,6 @@ export const useMembers = (connection, serverId, userId) => {
     connection.on("RoleAssigned", handleRoleAssigned);
     connection.on("RoleRemoved", handleRoleRemoved);
 
-    // Автоматически загружаем участников при подключении
     fetchMembers();
 
     return () => {

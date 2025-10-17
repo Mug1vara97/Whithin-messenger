@@ -16,14 +16,14 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.GetAvailableUser
         {
             try
             {
-                Console.WriteLine($"🔍 GetAvailableUsers - GroupChatId: {request.GroupChatId}, CurrentUserId: {request.CurrentUserId}");
+                Console.WriteLine($"GetAvailableUsers - GroupChatId: {request.GroupChatId}, CurrentUserId: {request.CurrentUserId}");
                 
                 var availableUsers = await _chatRepository.GetAvailableUsersForGroupAsync(
                     request.CurrentUserId, 
                     request.GroupChatId, 
                     cancellationToken);
                 
-                Console.WriteLine($"✅ GetAvailableUsers - Found {availableUsers.Count} available users");
+                Console.WriteLine($"GetAvailableUsers - Found {availableUsers.Count} available users");
                 foreach (var user in availableUsers)
                 {
                     Console.WriteLine($"  - {user.Username} (ID: {user.UserId})");
@@ -37,7 +37,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.GetAvailableUser
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ GetAvailableUsers - Error: {ex.Message}");
+                Console.WriteLine($"GetAvailableUsers - Error: {ex.Message}");
                 return new GetAvailableUsersResult
                 {
                     Success = false,

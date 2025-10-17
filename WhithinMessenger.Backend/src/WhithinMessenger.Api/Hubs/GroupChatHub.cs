@@ -6,6 +6,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessageById;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.EditMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.SearchMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipants;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetAvailableUsers;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup;
@@ -80,6 +81,44 @@ public class GroupChatHub : Hub
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("Error", $"Ошибка при получении сообщений: {ex.Message}");
+            }
+        }
+
+        public async Task SearchMessages(string chatId, string query)
+        {
+            try
+            {
+                _logger.LogInformation($"SearchMessages called with chatId: {chatId}, query: {query}");
+                
+                if (!Guid.TryParse(chatId, out Guid parsedChatId))
+                {
+                    _logger.LogWarning($"Invalid chatId format: {chatId}");
+                    await Clients.Caller.SendAsync("Error", $"Invalid chatId format: {chatId}");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    await Clients.Caller.SendAsync("SearchMessagesResult", new List<object>());
+                    return;
+                }
+
+                _logger.LogInformation($"Parsed chatId: {parsedChatId}");
+                var searchQuery = new SearchMessagesQuery(parsedChatId, query);
+                var result = await _mediator.Send(searchQuery);
+
+                if (result.Success)
+                {
+                    await Clients.Caller.SendAsync("SearchMessagesResult", result.Messages);
+                }
+                else
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при поиске сообщений: {ex.Message}");
             }
         }
 
@@ -223,7 +262,6 @@ public class GroupChatHub : Hub
                     _logger.LogInformation($"AddUserToGroup: User {parsedTargetUserId} added to group {parsedChatId}");
                     await Clients.Caller.SendAsync("UserAddedToGroup", parsedTargetUserId);
                     
-                    // Уведомляем всех участников группы об обновлении
                     await Clients.Group(chatId).SendAsync("GroupUpdated", "user_added", parsedTargetUserId);
                 }
                 else
@@ -268,7 +306,6 @@ public class GroupChatHub : Hub
 
                 if (result.Success)
                 {
-                    // Загружаем информацию о сообщении, на которое отвечаем
                     object? repliedMessage = null;
                     if (repliedToMessageId.HasValue)
                     {
@@ -296,7 +333,6 @@ public class GroupChatHub : Hub
                         }
                     }
 
-                    // Загружаем полную информацию о сообщении с медиафайлами
                     var messageQuery = new GetMessageByIdQuery(result.MessageId.Value);
                     var messageResult = await _mediator.Send(messageQuery);
                     
@@ -316,12 +352,10 @@ public class GroupChatHub : Hub
                         }).ToList();
                     }
 
-                    // Получаем данные профиля пользователя
                     var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
                     string? avatarUrl = userProfile?.Avatar;
 
-                    // Уведомляем всех участников чата о новом сообщении
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId, 
@@ -668,7 +702,6 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                // Получаем информацию о чате
                 var chatInfo = await _mediator.Send(new GetChatInfoQuery(chatId, userId.Value));
                 
                 if (chatInfo.Success && chatInfo.ChatInfo != null)
@@ -682,7 +715,7 @@ public class GroupChatHub : Hub
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ GroupChatHub - Error getting chat info: {ex.Message}");
+                Console.WriteLine($"GroupChatHub - Error getting chat info: {ex.Message}");
                 await Clients.Caller.SendAsync("Error", "Ошибка при получении информации о чате");
             }
         }
@@ -694,7 +727,6 @@ public class GroupChatHub : Hub
             return colors[index];
         }
 
-        // Удаление приватного чата
         public async Task DeleteChat(Guid chatId)
         {
             try
@@ -711,14 +743,12 @@ public class GroupChatHub : Hub
 
                 if (result.Success)
                 {
-                    // Уведомляем всех участников чата об удалении через GroupChatHub
                     await Clients.Group(chatId.ToString()).SendAsync("chatdeleted", new
                     {
                         chatId = chatId,
                         deletedBy = userId.Value
                     });
 
-                    // Уведомляем ChatListHub об обновлении списка чатов для всех участников
                     await _chatListHubContext.Clients.All.SendAsync("chatdeleted", new
                     {
                         chatId = chatId,

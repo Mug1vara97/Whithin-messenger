@@ -20,8 +20,6 @@ export const useServer = (serverId) => {
       setAccessDenied(false);
       const serverData = await serverApi.getServerById(serverId);
       
-      // Новый API возвращает полную структуру сервера с категориями и чатами
-      // Преобразуем в формат, ожидаемый клиентом
       console.log('useServer: Raw server data from API:', serverData);
       
       const formattedServer = {
@@ -39,7 +37,6 @@ export const useServer = (serverId) => {
       setError(err.message);
       setServer(null);
       
-      // Проверяем, является ли ошибка связанной с доступом
       if (err.message.includes('403') || err.message.includes('Forbidden') || err.message.includes('Unauthorized')) {
         setAccessDenied(true);
         console.warn('SECURITY WARNING: Access denied to server:', serverId);
@@ -49,7 +46,6 @@ export const useServer = (serverId) => {
     }
   }, [serverId]);
 
-  // Автоматически загружаем данные сервера при изменении serverId
   useEffect(() => {
     if (serverId) {
       fetchServer();

@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,14 +12,14 @@
 }
 
 .add-friend-modal {
-  background: white;
+  background: #2f3136;
   border-radius: 8px;
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .add-friend-modal__header {
@@ -27,14 +27,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #40444b;
 }
 
 .add-friend-modal__header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
 }
 
 .add-friend-modal__close {
@@ -43,12 +43,13 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
-  color: #666;
-  transition: background-color 0.2s ease;
+  color: #b9bbbe;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .add-friend-modal__close:hover {
-  background-color: #f5f5f5;
+  background-color: #40444b;
+  color: #ffffff;
 }
 
 .add-friend-modal__content {
@@ -58,13 +59,13 @@
 }
 
 .add-friend-modal__error {
-  color: #f44336;
+  color: #ed4245;
   font-size: 14px;
   margin-top: 8px;
   padding: 8px 12px;
-  background-color: #ffebee;
+  background-color: rgba(237, 66, 69, 0.1);
   border-radius: 4px;
-  border: 1px solid #ffcdd2;
+  border: 1px solid rgba(237, 66, 69, 0.3);
 }
 
 .add-friend-modal__results {
@@ -75,7 +76,7 @@
 .add-friend-modal__empty {
   text-align: center;
   padding: 40px 20px;
-  color: #666;
+  color: #b9bbbe;
   font-size: 14px;
 }
 
@@ -89,13 +90,14 @@
   display: flex;
   align-items: center;
   padding: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #40444b;
   border-radius: 8px;
+  background-color: #36393f;
   transition: background-color 0.2s ease;
 }
 
 .add-friend-modal__user:hover {
-  background-color: #f5f5f5;
+  background-color: #40444b;
 }
 
 .add-friend-modal__user-info {
@@ -106,13 +108,22 @@
 .add-friend-modal__user-name {
   font-weight: 600;
   font-size: 14px;
-  color: #333;
+  color: #ffffff;
   margin-bottom: 2px;
 }
 
 .add-friend-modal__user-status {
   font-size: 12px;
-  color: #666;
+  color: #b9bbbe;
+}
+
+.add-friend-modal__friend-badge {
+  padding: 6px 12px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 

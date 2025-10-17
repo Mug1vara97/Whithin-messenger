@@ -13,7 +13,7 @@ const FriendsPanel = ({ onStartChat }) => {
 
   const onlineFriends = friends.filter(friend => friend.status === 'Online');
   const allFriends = friends;
-  const blockedFriends = []; // Пока нет блокировки
+  const blockedFriends = [];
 
   const getCurrentFriends = () => {
     switch (activeTab) {

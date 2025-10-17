@@ -19,7 +19,6 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
     {
         try
         {
-            // Получаем чат для перемещения
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
@@ -30,32 +29,26 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
                 };
             }
 
-            // Сохраняем исходный порядок чата для логики переупорядочивания
             var originalChatOrder = chat.ChatOrder;
             
-            // Обновляем категорию и порядок чата
             chat.CategoryId = request.TargetCategoryId;
             chat.ChatOrder = request.NewPosition;
 
-            // Получаем все чаты сервера для работы с порядком
             var allServerChats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             
-            // Если чат перемещается в той же категории, пересчитываем все порядки
             if (request.SourceCategoryId == request.TargetCategoryId)
             {
-                // Получаем все чаты в этой категории (кроме перемещаемого)
                 var categoryChats = allServerChats
                     .Where(c => c.CategoryId == request.TargetCategoryId && c.Id != request.ChatId)
                     .OrderBy(c => c.ChatOrder)
                     .ToList();
                 
-                // Пересчитываем порядки для всех чатов в категории
                 var order = 0;
                 foreach (var categoryChat in categoryChats)
                 {
                     if (order == request.NewPosition)
                     {
-                        order++; // Пропускаем позицию для перемещаемого чата
+                        order++;
                     }
                     categoryChat.ChatOrder = order++;
                     await _chatRepository.UpdateAsync(categoryChat, cancellationToken);
@@ -63,7 +56,6 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
             }
             else
             {
-                // Если чат перемещается в другую категорию, обновляем порядок в исходной категории
                 if (request.SourceCategoryId.HasValue)
                 {
                     var sourceCategoryChats = allServerChats.Where(c => c.CategoryId == request.SourceCategoryId.Value).ToList();
@@ -74,7 +66,6 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
                     }
                 }
                 
-                // Обновляем порядок в целевой категории
                 var targetCategoryChats = allServerChats.Where(c => c.CategoryId == request.TargetCategoryId).ToList();
                 foreach (var targetChat in targetCategoryChats.Where(c => c.ChatOrder >= request.NewPosition && c.Id != request.ChatId))
                 {
@@ -83,17 +74,13 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
                 }
             }
 
-            // Сохраняем изменения перемещаемого чата
             await _chatRepository.UpdateAsync(chat, cancellationToken);
 
-            // Получаем обновленные категории для отправки клиенту
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var chats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
 
-            // Формируем структуру данных для клиента
             var result = new List<object>();
 
-            // Добавляем каналы без категории
             var uncategorizedChats = chats.Where(c => c.CategoryId == null).OrderBy(c => c.ChatOrder).ToList();
             if (uncategorizedChats.Any())
             {
@@ -119,7 +106,6 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
                 });
             }
 
-            // Добавляем категории с их чатами
             foreach (var category in categories.OrderBy(c => c.CategoryOrder))
             {
                 var categoryChats = chats.Where(c => c.CategoryId == category.Id).OrderBy(c => c.ChatOrder).ToList();

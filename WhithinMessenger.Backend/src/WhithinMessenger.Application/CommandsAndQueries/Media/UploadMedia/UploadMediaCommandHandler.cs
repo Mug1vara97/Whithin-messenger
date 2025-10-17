@@ -29,7 +29,6 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     {
         try
         {
-            // Проверяем размер файла (максимум 50MB)
             if (request.File.Length > 50 * 1024 * 1024)
             {
                 return new UploadMediaResult
@@ -39,14 +38,11 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 };
             }
 
-            // Определяем тип медиафайла
             var contentType = request.File.ContentType;
             var folderPath = _fileService.GetMediaFolderPath(contentType);
 
-            // Сохраняем файл
             var filePath = await _fileService.SaveFileAsync(request.File, folderPath);
 
-            // Создаем сообщение с медиафайлом
             var message = new Message
             {
                 Id = Guid.NewGuid(),
@@ -59,7 +55,6 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
 
             var savedMessage = await _messageRepository.AddAsync(message, cancellationToken);
 
-            // Создаем запись о медиафайле
             var mediaFile = new MediaFile
             {
                 Id = Guid.NewGuid(),
@@ -72,7 +67,6 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            // Создаем превью для изображений
             if (_fileService.IsImageFile(contentType))
             {
                 try

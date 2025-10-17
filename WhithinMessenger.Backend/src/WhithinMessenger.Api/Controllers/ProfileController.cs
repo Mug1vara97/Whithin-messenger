@@ -28,7 +28,6 @@ public class ProfileController : ControllerBase
             
             if (userProfile == null)
             {
-                // Создаем профиль с случайным цветом, если его нет
                 userProfile = new UserProfile
                 {
                     Id = Guid.NewGuid(),
@@ -49,7 +48,7 @@ public class ProfileController : ControllerBase
                 avatarColor = userProfile.AvatarColor,
                 description = userProfile.Description,
                 banner = userProfile.Banner,
-                createdAt = DateTimeOffset.UtcNow // Можно добавить поле CreatedAt в модель
+                createdAt = DateTimeOffset.UtcNow
             });
         }
         catch (Exception ex)
@@ -114,14 +113,12 @@ public class ProfileController : ControllerBase
                 return BadRequest(new { error = "Файл не выбран" });
             }
 
-            // Проверяем тип файла
             var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
             if (!allowedTypes.Contains(file.ContentType))
             {
                 return BadRequest(new { error = "Неподдерживаемый тип файла" });
             }
 
-            // Проверяем размер файла (максимум 5MB)
             if (file.Length > 5 * 1024 * 1024)
             {
                 return BadRequest(new { error = "Файл слишком большой (максимум 5MB)" });
@@ -160,14 +157,12 @@ public class ProfileController : ControllerBase
                 return BadRequest(new { error = "Файл не выбран" });
             }
 
-            // Проверяем тип файла
             var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
             if (!allowedTypes.Contains(file.ContentType))
             {
                 return BadRequest(new { error = "Неподдерживаемый тип файла" });
             }
 
-            // Проверяем размер файла (максимум 10MB для баннеров)
             if (file.Length > 10 * 1024 * 1024)
             {
                 return BadRequest(new { error = "Файл слишком большой (максимум 10MB)" });

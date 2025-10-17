@@ -19,7 +19,6 @@ public class GetChatInfoQueryHandler : IRequestHandler<GetChatInfoQuery, GetChat
     {
         try
         {
-            // Получаем информацию о чате
             var chatInfo = await _chatRepository.GetChatInfoAsync(request.ChatId, request.UserId, cancellationToken);
             
             if (chatInfo == null)

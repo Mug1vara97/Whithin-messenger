@@ -16,7 +16,6 @@ public class UpdateChatAvatarCommandHandler : IRequestHandler<UpdateChatAvatarCo
     {
         try
         {
-            // Получаем чат
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
@@ -27,7 +26,6 @@ public class UpdateChatAvatarCommandHandler : IRequestHandler<UpdateChatAvatarCo
                 };
             }
 
-            // Проверяем, что пользователь является участником чата
             var members = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
             if (!members.Contains(request.UserId))
             {
@@ -38,7 +36,6 @@ public class UpdateChatAvatarCommandHandler : IRequestHandler<UpdateChatAvatarCo
                 };
             }
 
-            // Обновляем аватар чата
             chat.Avatar = request.AvatarUrl;
             await _chatRepository.UpdateAsync(chat, cancellationToken);
 

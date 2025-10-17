@@ -127,7 +127,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     };
                 }
 
-                // Получаем ID для типа "Private" чата
                 var privateChatType = await _context.ChatTypes
                     .Where(ct => ct.TypeName == "Private")
                     .FirstOrDefaultAsync(cancellationToken);
@@ -220,12 +219,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     })
                     .ToListAsync(cancellationToken);
                 
-                Console.WriteLine($"✅ ChatRepository - Found {participants.Count} participants");
+                Console.WriteLine($"ChatRepository - Found {participants.Count} participants");
                 return participants;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatRepository - Error getting participants: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error getting participants: {ex.Message}");
                 throw;
             }
         }
@@ -255,7 +254,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     return null;
                 }
 
-                // Для приватного чата получаем информацию о другом пользователе
                 if (chat.Type.TypeName == "Private")
                 {
                     var otherMember = chat.Members.FirstOrDefault(m => m.UserId != userId);
@@ -273,7 +271,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     }
                 }
 
-                // Для группового чата
                 return new ChatInfoDto
                 {
                     ChatId = chat.Id,
@@ -288,7 +285,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatRepository - Error getting chat info: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error getting chat info: {ex.Message}");
                 return null;
             }
         }
@@ -338,10 +335,9 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 ChatRepository - Getting available users for group {groupChatId} by user {currentUserId}");
+                Console.WriteLine($"ChatRepository - Getting available users for group {groupChatId} by user {currentUserId}");
                 
-                // Получаем всех пользователей, с которыми у текущего пользователя есть приватные чаты
-                Console.WriteLine($"🔍 ChatRepository - Querying users with private chats...");
+                Console.WriteLine($"ChatRepository - Querying users with private chats...");
                 var usersWithPrivateChats = await _context.Members
                     .Where(m => m.UserId == currentUserId)
                     .Include(m => m.Chat)
@@ -353,21 +349,19 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Distinct()
                     .ToListAsync(cancellationToken);
 
-                Console.WriteLine($"🔍 ChatRepository - Found {usersWithPrivateChats.Count} users with private chats");
+                Console.WriteLine($"ChatRepository - Found {usersWithPrivateChats.Count} users with private chats");
 
-                // Получаем участников группового чата
-                Console.WriteLine($"🔍 ChatRepository - Querying group members...");
+                Console.WriteLine($"ChatRepository - Querying group members...");
                 var groupMembers = await _context.Members
                     .Where(m => m.ChatId == groupChatId)
                     .Select(m => m.UserId)
                     .ToListAsync(cancellationToken);
 
-                Console.WriteLine($"🔍 ChatRepository - Found {groupMembers.Count} group members");
-                Console.WriteLine($"🔍 ChatRepository - Group members: {string.Join(", ", groupMembers)}");
+                Console.WriteLine($"ChatRepository - Found {groupMembers.Count} group members");
+                Console.WriteLine($"ChatRepository - Group members: {string.Join(", ", groupMembers)}");
 
-                // Фильтруем пользователей, исключая тех, кто уже в группе
-                Console.WriteLine($"🔍 ChatRepository - Filtering available users...");
-                Console.WriteLine($"🔍 ChatRepository - Users with private chats: {string.Join(", ", usersWithPrivateChats.Select(u => $"{u.UserName}({u.Id})"))}");
+                Console.WriteLine($"ChatRepository - Filtering available users...");
+                Console.WriteLine($"ChatRepository - Users with private chats: {string.Join(", ", usersWithPrivateChats.Select(u => $"{u.UserName}({u.Id})"))}");
                 
                 var availableUsers = usersWithPrivateChats
                     .Where(u => u != null && !groupMembers.Contains(u.Id))
@@ -383,12 +377,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     })
                     .ToList();
 
-                Console.WriteLine($"✅ ChatRepository - Found {availableUsers.Count} available users");
+                Console.WriteLine($"ChatRepository - Found {availableUsers.Count} available users");
                 return availableUsers;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatRepository - Error getting available users: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error getting available users: {ex.Message}");
                 throw;
             }
         }
@@ -397,55 +391,52 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 ChatRepository - Adding user {userId} to group {groupChatId}");
+                Console.WriteLine($"ChatRepository - Adding user {userId} to group {groupChatId}");
                 
-                // Проверяем, что чат существует и является групповым
                 var chat = await _context.Chats
                     .Include(c => c.Type)
                     .FirstOrDefaultAsync(c => c.Id == groupChatId, cancellationToken);
 
                 if (chat == null)
                 {
-                    Console.WriteLine($"❌ ChatRepository - Group chat {groupChatId} not found");
+                    Console.WriteLine($"ChatRepository - Group chat {groupChatId} not found");
                     return false;
                 }
 
                 if (chat.Type.TypeName != "Group")
                 {
-                    Console.WriteLine($"❌ ChatRepository - Chat {groupChatId} is not a group chat");
+                    Console.WriteLine($"ChatRepository - Chat {groupChatId} is not a group chat");
                     return false;
                 }
 
-                // Проверяем, что пользователь еще не в группе
                 var existingMember = await _context.Members
                     .FirstOrDefaultAsync(m => m.ChatId == groupChatId && m.UserId == userId, cancellationToken);
 
                 if (existingMember != null)
                 {
-                    Console.WriteLine($"❌ ChatRepository - User {userId} is already in group {groupChatId}");
+                    Console.WriteLine($"ChatRepository - User {userId} is already in group {groupChatId}");
                     return false;
                 }
 
-                // Добавляем пользователя в группу
                 var member = new Member
                 {
                     Id = Guid.NewGuid(),
                     ChatId = groupChatId,
                     UserId = userId,
                     JoinedAt = DateTimeOffset.UtcNow,
-                    Chat = chat, // Используем уже загруженный чат
-                    User = null! // Временно null, EF Core заполнит при сохранении
+                    Chat = chat,
+                    User = null!
                 };
 
                 _context.Members.Add(member);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                Console.WriteLine($"✅ ChatRepository - User {userId} added to group {groupChatId}");
+                Console.WriteLine($"ChatRepository - User {userId} added to group {groupChatId}");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatRepository - Error adding user to group: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error adding user to group: {ex.Message}");
                 throw;
             }
         }
@@ -457,12 +448,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 var isParticipant = await _context.Members
                     .AnyAsync(m => m.ChatId == chatId && m.UserId == userId, cancellationToken);
                 
-                Console.WriteLine($"🔍 ChatRepository - User {userId} is participant of chat {chatId}: {isParticipant}");
+                Console.WriteLine($"ChatRepository - User {userId} is participant of chat {chatId}: {isParticipant}");
                 return isParticipant;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ ChatRepository - Error checking user participation: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error checking user participation: {ex.Message}");
                 return false;
             }
         }

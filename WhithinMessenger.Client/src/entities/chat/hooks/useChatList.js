@@ -16,7 +16,6 @@ export const useChatList = (userId, onChatCreated = null) => {
 
   useEffect(() => {
     if (!userId) {
-      // Очищаем соединение если userId отсутствует
       if (connectionRef.current) {
         connectionRef.current.stop();
         connectionRef.current = null;
@@ -25,7 +24,6 @@ export const useChatList = (userId, onChatCreated = null) => {
     }
 
     const createConnection = async () => {
-      // Если соединение уже существует и активно, не создаем новое
       if (connectionRef.current && connectionRef.current.state === signalR.HubConnectionState.Connected) {
         console.log('useChatList: Connection already exists and is connected, skipping creation');
         return;
@@ -47,7 +45,6 @@ export const useChatList = (userId, onChatCreated = null) => {
         .configureLogging(signalR.LogLevel.Warning)
         .build();
 
-      // Добавляем обработчики событий подключения
       newConnection.onclose((error) => {
         console.log('SignalR connection closed:', error);
         setIsConnected(false);
@@ -107,12 +104,10 @@ export const useChatList = (userId, onChatCreated = null) => {
     const handleChatCreated = async (createdUserId, chatResult) => {
       console.log('Chat created:', { createdUserId, chatResult, currentUserId: userId });
       
-      // Проверяем, является ли текущий пользователь участником чата
       const isParticipant = createdUserId === userId || chatResult?.targetUserId === userId;
       
       if (isParticipant) {
         console.log('Current user is participant, updating chat list');
-        // Обновляем список чатов только для участников
         try {
           await connection.invoke("GetUserChats");
         } catch (err) {
@@ -128,7 +123,6 @@ export const useChatList = (userId, onChatCreated = null) => {
       try {
         await connection.invoke("GetUserChats");
         
-        // Навигация к созданному чату
         if (onChatCreated && chatResult?.chatId) {
           onChatCreated(chatResult.chatId);
         }
@@ -138,16 +132,12 @@ export const useChatList = (userId, onChatCreated = null) => {
     };
 
     const handleChatDeleted = (data) => {
-      // Если data - это объект с chatId и deletedBy
       if (typeof data === 'object' && data.chatId) {
         setChats(prev => prev.filter(chat => chat.chatId !== data.chatId));
-        // Перенаправляем на список чатов, если удален текущий чат
         navigate('/channels/@me');
       }
-      // Если data - это просто chatId (строка)
       else if (typeof data === 'string') {
         setChats(prev => prev.filter(chat => chat.chatId !== data));
-        // Перенаправляем на список чатов, если удален текущий чат
         navigate('/channels/@me');
       }
     };
@@ -168,7 +158,6 @@ export const useChatList = (userId, onChatCreated = null) => {
           return chat;
         });
         
-        // Сортируем чаты по времени последнего сообщения
         const sortedChats = updatedChats.sort((a, b) => {
           const timeA = new Date(a.lastMessageTime || 0).getTime();
           const timeB = new Date(b.lastMessageTime || 0).getTime();
@@ -184,7 +173,6 @@ export const useChatList = (userId, onChatCreated = null) => {
       console.error('SignalR error:', errorMessage);
     };
 
-    // Удаляем старые обработчики перед добавлением новых
     connection.off("receivechats", handleReceiveChats);
     connection.off("receivesearchresults", handleSearchResults);
     connection.off("chatcreated", handleChatCreated);
@@ -249,14 +237,12 @@ export const useChatList = (userId, onChatCreated = null) => {
       );
       
       if (existingChat) {
-        // Если чат уже существует, сразу переходим к нему
         if (onChatCreated && existingChat.chatId) {
           onChatCreated(existingChat.chatId);
         }
         return existingChat;
       }
 
-      // Преобразуем targetUserId в Guid (если это строка)
       const targetUserIdGuid = typeof targetUserId === 'string' ? targetUserId : targetUserId.toString();
       await connection.invoke("CreatePrivateChat", targetUserIdGuid);
     } catch (error) {
@@ -266,7 +252,6 @@ export const useChatList = (userId, onChatCreated = null) => {
   }, [connection, isConnected, chats, onChatCreated]);
 
   const createGroupChat = useCallback(async () => {
-    // TODO: Implement group chat creation through API
     throw new Error('Group chat creation not implemented yet');
   }, []);
 

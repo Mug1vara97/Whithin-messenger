@@ -53,7 +53,7 @@ const ChatRoom = ({
     searchMessages,
     clearSearch,
     scrollToMessage
-  } = useMessageSearch(chatId);
+  } = useMessageSearch(chatId, connection);
 
   const {
     isRecording,
@@ -96,18 +96,15 @@ const ChatRoom = ({
 
   const inputRef = useRef(null);
 
-  // Функция для загрузки информации о чате через SignalR
   const loadChatInfo = useCallback(() => {
     if (!chatId || !connection) return;
     
     console.log('ChatRoom - Loading chat info via SignalR for chatId:', chatId);
     console.log('ChatRoom - Connection state:', connection.state);
     
-    // Проверяем состояние соединения
     if (connection.state !== 'Connected') {
       console.log('ChatRoom - Connection not ready, waiting...');
       
-      // Ждем подключения и повторяем попытку
       const checkConnection = () => {
         if (connection.state === 'Connected') {
           console.log('ChatRoom - Connection ready, sending GetChatInfo');
@@ -124,11 +121,9 @@ const ChatRoom = ({
       return;
     }
     
-    // Отправляем запрос через SignalR
     connection.invoke("GetChatInfo", chatId).catch(error => {
       console.error('Error invoking GetChatInfo:', error);
       
-      // Fallback к API если SignalR не работает
       console.log('ChatRoom - Falling back to API for chat info');
       fetch(`${BASE_URL}/api/chat/${chatId}/info`)
         .then(response => response.json())
@@ -145,29 +140,27 @@ const ChatRoom = ({
     });
   }, [chatId, connection]);
 
-  // Функция для загрузки участников чата через SignalR
   const loadChatParticipants = useCallback(async () => {
     if (!chatId || isPrivateChat || !connection) {
-      console.log('🔍 ChatRoom - Skipping participants load: chatId =', chatId, 'isPrivateChat =', isPrivateChat, 'connection =', !!connection);
+      console.log('ChatRoom - Skipping participants load: chatId =', chatId, 'isPrivateChat =', isPrivateChat, 'connection =', !!connection);
       return;
     }
 
     try {
-      console.log('🔍 ChatRoom - Loading participants via SignalR for chatId:', chatId);
+      console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
       await connection.invoke('GetChatParticipants', chatId);
     } catch (error) {
-      console.error('❌ ChatRoom - Error loading participants via SignalR:', error);
+      console.error('ChatRoom - Error loading participants via SignalR:', error);
       setChatParticipants([]);
     }
   }, [chatId, isPrivateChat, connection]);
 
-  // Настраиваем обработчик для получения участников через SignalR
   useEffect(() => {
     if (!connection) return;
 
     const handleReceiveChatParticipants = (participants) => {
-      console.log('🔍 ChatRoom - Received participants via SignalR:', participants);
-      console.log('🔍 ChatRoom - Participants details:', participants.map(p => ({
+      console.log('ChatRoom - Received participants via SignalR:', participants);
+      console.log('ChatRoom - Participants details:', participants.map(p => ({
         userId: p.userId,
         username: p.username,
         avatarUrl: p.avatarUrl,
@@ -176,31 +169,30 @@ const ChatRoom = ({
       })));
       if (participants && Array.isArray(participants)) {
         setChatParticipants(participants);
-        console.log('✅ ChatRoom - Loaded', participants.length, 'participants:', participants.map(p => p.username));
+        console.log('ChatRoom - Loaded', participants.length, 'participants:', participants.map(p => p.username));
       } else {
-        console.log('❌ ChatRoom - Invalid participants data:', participants);
+        console.log('ChatRoom - Invalid participants data:', participants);
         setChatParticipants([]);
       }
     };
 
     const handleError = (error) => {
-      console.error('❌ ChatRoom - SignalR error:', error);
+      console.error('ChatRoom - SignalR error:', error);
       setChatParticipants([]);
     };
 
     const handleGroupUpdated = (action, userId) => {
-      console.log('🔍 ChatRoom - Group updated:', action, userId);
+      console.log('ChatRoom - Group updated:', action, userId);
       if (action === 'user_added' && showChatInfo && connection && chatId) {
-        // Обновляем список участников только если модальное окно открыто
-        console.log('🔍 ChatRoom - Reloading participants after user added');
+        console.log('ChatRoom - Reloading participants after user added');
         connection.invoke('GetChatParticipants', chatId).catch(error => {
-          console.error('❌ ChatRoom - Error reloading participants:', error);
+          console.error('ChatRoom - Error reloading participants:', error);
         });
       }
     };
 
     const handleChatInfoReceived = (chatInfo) => {
-      console.log('ℹ️ ChatRoom - Chat info received:', chatInfo);
+      console.log('ChatRoom - Chat info received:', chatInfo);
       setChatUserProfile({
         avatar: chatInfo.type === 'group' ? chatInfo.chatAvatar : chatInfo.avatar,
         avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor
@@ -216,7 +208,6 @@ const ChatRoom = ({
     };
 
     const handleChatDeleted = (data) => {
-      // Если удален текущий чат, перенаправляем на список чатов
       if (typeof data === 'object' && data.chatId === chatId) {
         navigate('/channels/@me');
       } else if (typeof data === 'string' && data === chatId) {
@@ -230,7 +221,6 @@ const ChatRoom = ({
     connection.on('Error', handleError);
     connection.on('chatdeleted', handleChatDeleted);
     
-    // Слушаем изменения состояния соединения
     connection.onclose(() => handleConnectionStateChanged('Disconnected'));
     connection.onreconnecting(() => handleConnectionStateChanged('Reconnecting'));
     connection.onreconnected(() => handleConnectionStateChanged('Connected'));
@@ -244,18 +234,16 @@ const ChatRoom = ({
     };
   }, [connection, showChatInfo]);
 
-  // Загружаем участников при открытии ChatInfo
   useEffect(() => {
     if (showChatInfo && !isPrivateChat && connection && chatId) {
-      console.log('🔍 ChatRoom - Loading participants via SignalR for chatId:', chatId);
+      console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
       connection.invoke('GetChatParticipants', chatId).catch(error => {
-        console.error('❌ ChatRoom - Error loading participants via SignalR:', error);
+        console.error('ChatRoom - Error loading participants via SignalR:', error);
         setChatParticipants([]);
       });
     }
   }, [showChatInfo, isPrivateChat, chatId, connection]);
 
-  // Загружаем информацию о чате
   useEffect(() => {
     if (showChatInfo && connection && chatId) {
       console.log('ChatRoom - Loading chat info via SignalR for chatId:', chatId);
@@ -274,13 +262,12 @@ const ChatRoom = ({
     isPrivateChat;
 
   const handleAddUserClick = () => {
-    console.log('🔍 ChatRoom - Add user button clicked');
+    console.log('ChatRoom - Add user button clicked');
     setShowAddUserModal(true);
   };
 
   const handleUserAdded = (userId) => {
-    console.log('🔍 ChatRoom - User added:', userId);
-    // Обновляем список участников
+    console.log('ChatRoom - User added:', userId);
     loadChatParticipants();
   };
 
@@ -291,11 +278,9 @@ const ChatRoom = ({
     let success = false;
 
     if (editingMessageId) {
-      // Редактируем существующее сообщение
       console.log('Editing message:', editingMessageId, 'with content:', newMessage);
       success = await editMessage(editingMessageId, newMessage);
     } else {
-      // Отправляем новое сообщение
       console.log('Sending new message:', newMessage);
       success = await sendMessage(
         newMessage, 
@@ -536,7 +521,6 @@ const ChatRoom = ({
     );
   };
 
-  // Дополнительная проверка безопасности - если нет chatId, показываем ошибку
   if (!chatId) {
     console.warn('SECURITY WARNING: ChatRoom rendered without chatId');
     return (
@@ -933,7 +917,6 @@ const ChatRoom = ({
         connection={connection}
       />
 
-      {/* Модальное окно добавления пользователей */}
       <AddUserModal
         open={showAddUserModal}
         onClose={() => setShowAddUserModal(false)}

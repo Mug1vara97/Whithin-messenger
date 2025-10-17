@@ -20,27 +20,23 @@ public class LeaveServerCommandHandler : IRequestHandler<LeaveServerCommand, Lea
     {
         try
         {
-            // Проверяем существование сервера
             var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
             if (server == null)
             {
                 return new LeaveServerResult(false, "Сервер не найден");
             }
 
-            // Проверяем, что пользователь является участником сервера
             var isMember = await _serverMemberRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken);
             if (!isMember)
             {
                 return new LeaveServerResult(false, "Вы не являетесь участником этого сервера");
             }
 
-            // Проверяем, что пользователь не является владельцем сервера
             if (server.OwnerId == request.UserId)
             {
                 return new LeaveServerResult(false, "Владелец сервера не может покинуть сервер. Используйте удаление сервера.");
             }
 
-            // Удаляем пользователя из участников сервера
             await _serverMemberRepository.DeleteByServerAndUserAsync(request.ServerId, request.UserId, cancellationToken);
 
             return new LeaveServerResult(true, null);

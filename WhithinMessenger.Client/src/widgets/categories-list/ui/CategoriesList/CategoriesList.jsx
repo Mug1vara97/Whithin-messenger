@@ -18,12 +18,10 @@ const CategoriesList = ({
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
 
-  // Обновляем локальное состояние при изменении пропсов
   useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
 
-  // Обработчики SignalR событий
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
     if (!connection || connection.state !== 'Connected') return;
@@ -32,7 +30,6 @@ const CategoriesList = ({
       console.log('CategoriesReordered received:', updatedCategories);
       setLocalCategories(updatedCategories);
       
-      // Уведомляем родительский компонент об обновлении
       if (onCategoriesReordered) {
         onCategoriesReordered(updatedCategories);
       }
@@ -42,7 +39,6 @@ const CategoriesList = ({
       console.log('ChatsReordered received:', updatedCategories);
       setLocalCategories(updatedCategories);
       
-      // Уведомляем родительский компонент об обновлении
       if (onChatsReordered) {
         onChatsReordered(updatedCategories);
       }
@@ -79,7 +75,6 @@ const CategoriesList = ({
       ));
     };
 
-    // Регистрируем обработчики
     connection.on("CategoriesReordered", handleCategoriesReordered);
     connection.on("ChatsReordered", handleChatsReordered);
     connection.on("ChatCreated", handleChatCreated);
@@ -139,7 +134,6 @@ const CategoriesList = ({
       return;
     }
 
-    // Предотвращаем дублирование операций
     if (result.reason !== 'DROP') {
       console.log('Not a drop operation, ignoring');
       return;
@@ -152,7 +146,6 @@ const CategoriesList = ({
       if (type === 'CATEGORY') {
         console.log('Moving category');
         
-        // Получаем категории (исключая null категории)
         const regularCategories = localCategories.filter(cat => {
           const id = cat.categoryId || cat.CategoryId;
           return id !== null && id !== undefined;
@@ -178,14 +171,12 @@ const CategoriesList = ({
           isNull: (cat.categoryId || cat.CategoryId) === null || (cat.categoryId || cat.CategoryId) === undefined
         })));
 
-        // Обновляем локальное состояние - используем только обычные категории
         const newCategories = reorderCategories(
           regularCategories,
           source.index,
           destination.index
         );
 
-        // Добавляем обратно null категории
         const nullCategories = localCategories.filter(cat => {
           const id = cat.categoryId || cat.CategoryId;
           return id === null || id === undefined;
@@ -196,7 +187,6 @@ const CategoriesList = ({
         console.log('Setting local categories for category move:', finalCategories);
         setLocalCategories(finalCategories);
 
-        // Отправляем на сервер
         const movedCategory = regularCategories[source.index];
         console.log('Invoking MoveCategory with:', { 
           serverId, 
@@ -220,7 +210,6 @@ const CategoriesList = ({
         const targetId = destination.droppableId === 'category-null' ? null :
           destination.droppableId.replace('category-', '');
 
-        // Обновляем локальное состояние
         const updatedCategories = moveChatBetweenCategories(
           localCategories,
           source,
@@ -230,7 +219,6 @@ const CategoriesList = ({
         console.log('Setting local categories for chat move:', updatedCategories);
         setLocalCategories(updatedCategories);
 
-        // Отправляем на сервер
         const chatId = result.draggableId.replace('chat-', '');
         console.log('Invoking MoveChat with:', { 
           serverId, 
@@ -256,14 +244,11 @@ const CategoriesList = ({
     }
   }, [localCategories, connection, serverId]);
 
-  // Получаем несортированные каналы
   const uncategorizedChannels = localCategories.find(cat => 
     cat.categoryId === null
   )?.chats || [];
 
-  // Отладочная информация убрана - все работает корректно
 
-  // Сортируем категории
   const sortedCategories = localCategories
     .filter(cat => cat.categoryId !== null)
     .sort((a, b) => (a.categoryOrder || a.CategoryOrder) - (b.categoryOrder || b.CategoryOrder));
@@ -290,7 +275,6 @@ const CategoriesList = ({
               }
             }}
           >
-            {/* Несортированные каналы */}
             <Droppable
               droppableId="category-null"
               type="CHAT"
@@ -318,7 +302,6 @@ const CategoriesList = ({
               )}
             </Droppable>
 
-            {/* Категории */}
             {sortedCategories
               .filter(category => category.categoryId !== null)
               .map((category, index) => (

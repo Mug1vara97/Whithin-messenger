@@ -20,7 +20,6 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
     reorderServers
   } = useServerContext();
 
-  // Логирование для отладки
   React.useEffect(() => {
     console.log('ServerList: Servers updated:', servers);
   }, [servers]);
@@ -128,7 +127,7 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                         to={`/channels/${server.serverId}`}
                         className="server-button"
                         onClick={(e) => {
-                          e.preventDefault(); // Предотвращаем навигацию
+                          e.preventDefault();
                           if (!snapshot.isDragging) {
                             onDiscoverClick && onDiscoverClick(false);
                             onServerSelected && onServerSelected(server);
@@ -307,7 +306,6 @@ const CreateServerForm = ({ onClose, onCreate }) => {
 };
 
 export default memo(ServerList, (prevProps, nextProps) => {
-  // Сравниваем только важные пропсы
   return (
     prevProps.userId === nextProps.userId &&
     prevProps.selectedServerId === nextProps.selectedServerId &&

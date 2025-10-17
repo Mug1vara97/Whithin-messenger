@@ -13,12 +13,10 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
   const [isConnected, setIsConnected] = useState(false);
   const [connection, setConnection] = useState(null);
   
-  // Refs для предотвращения множественных подключений
   const connectionRef = useRef(null);
   const isConnectingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
-  // Простая функция загрузки серверов через HTTP API
   const fetchServers = useCallback(async () => {
     if (!userId) return;
 
@@ -35,9 +33,8 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     } finally {
       setIsLoading(false);
     }
-  }, [userId]); // Убрали isLoading из зависимостей
+  }, [userId]);
 
-  // SignalR подключение для real-time обновлений
   useEffect(() => {
     if (!userId || hasInitializedRef.current || connectionRef.current) return;
 
@@ -60,12 +57,8 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
         setIsConnected(true);
         console.log('useServers: SignalR connection established for user:', userId);
 
-        // Подключаемся к группе списка серверов
         await connection.invoke('JoinServerListGroup');
         console.log('useServers: Joined server list group');
-
-        // Обработчики SignalR событий
-        // ServerCreated больше не обрабатываем, так как сервер добавляется напрямую в createServer
 
         connection.on('ServerJoined', (serverData) => {
           console.log('useServers: ServerJoined event received:', serverData);
@@ -84,7 +77,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
           console.log('useServers: YouWereAddedToServer event received:', data);
           console.log('useServers: Current servers before update:', servers);
           
-          // Обновляем список серверов, чтобы показать новый сервер
           try {
             const serversData = await serverApi.getUserServers(userId);
             console.log('useServers: Fetched updated servers:', serversData);
@@ -92,31 +84,26 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
             console.log('useServers: Server list updated after being added to server');
           } catch (err) {
             console.error('useServers: Error updating server list after being added:', err);
-            // Fallback на полное обновление при ошибке
             fetchServers();
           }
         });
 
         connection.on('ServerListUpdated', async () => {
           console.log('useServers: ServerListUpdated event received - getting updated server list');
-          // Получаем обновленный список серверов без полной перезагрузки
           try {
             const serversData = await serverApi.getUserServers(userId);
             setServers(serversData);
             console.log('useServers: Server list updated smoothly');
           } catch (err) {
             console.error('useServers: Error updating server list:', err);
-            // Fallback на полное обновление при ошибке
             fetchServers();
           }
         });
 
         connection.on('ServerLeft', async (serverId) => {
           console.log('useServers: ServerLeft event received:', serverId);
-          // Удаляем сервер из списка
           setServers(prev => prev.filter(server => server.serverId !== serverId));
           console.log('useServers: Server removed from list');
-          // Перенаправляем в список чатов с задержкой
           setTimeout(() => {
             navigate('/channels/@me');
           }, 100);
@@ -126,14 +113,12 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
           console.log('useServers: ServerDeleted event received:', serverId);
           console.log('useServers: Connection state:', connection.state);
           console.log('useServers: Current servers before deletion:', servers);
-          // Удаляем сервер из списка
           setServers(prev => {
             const filtered = prev.filter(server => server.serverId !== serverId);
             console.log('useServers: Servers after filtering:', filtered);
             return filtered;
           });
           console.log('useServers: Server removed from list');
-          // Перенаправляем в список чатов с задержкой
           setTimeout(() => {
             console.log('useServers: Navigating to /channels/@me');
             navigate('/channels/@me');
@@ -145,17 +130,14 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
           setServers(serversData);
         });
 
-        // Добавляем обработчик для всех событий для отладки
         connection.onreconnecting(() => {
           console.log('useServers: SignalR reconnecting...');
         });
 
-        // Добавляем общий обработчик для отладки всех событий
         connection.on('YouWereAddedToServer', (data) => {
           console.log('useServers: YouWereAddedToServer received (general handler):', data);
         });
 
-        // Добавляем обработчик для всех событий для отладки
         connection.on('*', (eventName, ...args) => {
           console.log('useServers: Received SignalR event:', eventName, args);
         });
@@ -174,14 +156,12 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
           setError(errorMessage);
         });
 
-        // Загружаем серверы после подключения
         await fetchServers();
 
       } catch (err) {
         console.error('useServers: SignalR connection failed:', err);
         setConnection(null);
         setIsConnected(false);
-        // Fallback на HTTP API
         await fetchServers();
       } finally {
         isConnectingRef.current = false;
@@ -204,9 +184,8 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
         setIsConnected(false);
       }
     };
-  }, [userId]); // Убрали fetchServers и onServerSelected из зависимостей
+  }, [userId]);
 
-  // Создание сервера через SignalR
   const createServer = useCallback(async (serverData) => {
     if (!userId || !connectionRef.current) {
       throw new Error('SignalR connection not available');
@@ -220,10 +199,8 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
         serverData.description || null
       );
       
-      // Добавляем сервер в список после успешного создания
       if (newServer) {
         setServers(prev => {
-          // Проверяем, что сервер еще не добавлен
           const exists = prev.some(server => server.serverId === newServer.serverId);
           if (exists) {
             console.log('useServers: Server already exists in list, skipping addition');
@@ -242,7 +219,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Обновление сервера
   const updateServer = useCallback(async (serverId, serverData) => {
     if (!userId) return;
 
@@ -260,7 +236,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Удаление сервера
   const deleteServer = useCallback(async (serverId) => {
     if (!userId) return;
 
@@ -275,7 +250,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Присоединение к серверу
   const joinServer = useCallback(async (serverId) => {
     if (!userId) return;
 
@@ -283,7 +257,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
       setError(null);
       const serverData = await serverApi.joinServer(serverId, userId);
       
-      // Добавляем сервер локально для мгновенного отображения
       setServers(prev => {
         const exists = prev.some(server => server.serverId === serverId);
         if (!exists) {
@@ -293,7 +266,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
         return prev;
       });
       
-      // Уведомляем сервер о присоединении через SignalR для real-time обновления
       if (connectionRef.current && connectionRef.current.state === 'Connected') {
         try {
           await connectionRef.current.invoke('NotifyServerListUpdated');
@@ -311,7 +283,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Покидание сервера
   const leaveServer = useCallback(async (serverId) => {
     if (!userId) return;
 
@@ -326,7 +297,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Изменение порядка серверов
   const reorderServers = useCallback(async (serverIds) => {
     if (!userId || !connectionRef.current) return;
 
@@ -346,7 +316,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Загрузка публичных серверов
   const fetchPublicServers = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -370,7 +339,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, []);
 
-  // Присоединение к публичному серверу
   const joinPublicServer = useCallback(async (serverId) => {
     console.log('joinPublicServer: userId =', userId);
     if (!userId) {
@@ -393,7 +361,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
       const serverData = await response.json();
       console.log('joinPublicServer: Server joined successfully:', serverData);
       
-      // Добавляем сервер локально для мгновенного отображения
       setServers(prev => {
         const exists = prev.some(server => server.serverId === serverId);
         if (!exists) {
@@ -403,7 +370,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
         return prev;
       });
       
-      // Уведомляем сервер о присоединении через SignalR для real-time обновления
       if (connectionRef.current && connectionRef.current.state === 'Connected') {
         try {
           await connectionRef.current.invoke('NotifyServerListUpdated');
@@ -421,7 +387,6 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
     }
   }, [userId]);
 
-  // Проверка, является ли пользователь участником сервера
   const isUserMember = useCallback((serverId) => {
     return servers.some(server => server.serverId === serverId);
   }, [servers]);
