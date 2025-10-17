@@ -51,7 +51,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var users = await _context.Users
                 .Where(u => u.Id != currentUserId)
-                .Where(u => friendIds.Contains(u.Id)) // Фильтруем только друзей
                 .Where(u =>
                     u.UserName.ToLower().Contains(normalizedName) ||
                     u.UserName.ToLower().Replace(" ", "").Contains(normalizedName.Replace(" ", "")) ||
@@ -136,7 +135,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var users = await _context.Users
                 .Where(u => existingChatUserIds.Contains(u.Id))
-                .Where(u => friendIds.Contains(u.Id)) // Фильтруем только друзей
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
@@ -145,7 +143,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
                     LastSeen = u.LastSeen,
-                    HasExistingChat = true // Все эти пользователи имеют существующие чаты
+                    HasExistingChat = true 
                 })
                 .OrderBy(u => u.Username)
                 .ToListAsync(cancellationToken);
