@@ -1,0 +1,48 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36401.2
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhithinMessenger.Api", "src\WhithinMessenger.Api\WhithinMessenger.Api.csproj", "{E69D4F66-A0A3-408B-A679-546F4E929833}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhithinMessenger.Application", "src\WhithinMessenger.Application\WhithinMessenger.Application.csproj", "{9FE1AAA8-BF7D-426F-B77E-A79F1F890CF4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhithinMessenger.Domain", "src\WhithinMessenger.Domain\WhithinMessenger.Domain.csproj", "{CF5AA90C-67E6-4D83-A3B3-A8B2DB13E36E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhithinMessenger.Infrastructure", "src\WhithinMessenger.Infrastructure\WhithinMessenger.Infrastructure.csproj", "{07CA33D7-1473-4527-8369-1C31CF4FE243}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0F1F559D-DE94-4F30-9C68-BB14292F50CB}"
+	ProjectSection(SolutionItems) = preProject
+		compose.yaml = compose.yaml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E69D4F66-A0A3-408B-A679-546F4E929833}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E69D4F66-A0A3-408B-A679-546F4E929833}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E69D4F66-A0A3-408B-A679-546F4E929833}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E69D4F66-A0A3-408B-A679-546F4E929833}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FE1AAA8-BF7D-426F-B77E-A79F1F890CF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FE1AAA8-BF7D-426F-B77E-A79F1F890CF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FE1AAA8-BF7D-426F-B77E-A79F1F890CF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FE1AAA8-BF7D-426F-B77E-A79F1F890CF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF5AA90C-67E6-4D83-A3B3-A8B2DB13E36E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF5AA90C-67E6-4D83-A3B3-A8B2DB13E36E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF5AA90C-67E6-4D83-A3B3-A8B2DB13E36E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF5AA90C-67E6-4D83-A3B3-A8B2DB13E36E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07CA33D7-1473-4527-8369-1C31CF4FE243}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07CA33D7-1473-4527-8369-1C31CF4FE243}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07CA33D7-1473-4527-8369-1C31CF4FE243}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07CA33D7-1473-4527-8369-1C31CF4FE243}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9F33ECC8-5475-458C-A572-573D55BBCAD3}
+	EndGlobalSection
+EndGlobal

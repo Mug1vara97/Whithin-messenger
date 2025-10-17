@@ -113,7 +113,7 @@ pnpm-debug.log*
 *.suo
 *.ntvs*
 *.njsproj
-*.sln
+# *.sln - Commented out to allow WhithinMessenger.sln
 *.sw?
 
 ## Database
