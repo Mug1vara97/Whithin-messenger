@@ -34,12 +34,20 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
+    
+    - name: Debug - Check structure
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Backend directory:"
+        ls -la WhithinMessenger.Backend/ || echo "WhithinMessenger.Backend not found"
         
     - name: Build backend
       run: |
-        cd WhithinMessenger.Backend
-        dotnet restore
-        dotnet build --configuration Release
+        dotnet restore WhithinMessenger.Backend/WhithinMessenger.sln
+        dotnet build WhithinMessenger.Backend/WhithinMessenger.sln --configuration Release --no-restore
         
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
