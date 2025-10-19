@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp, VolumeOff, Mic, MicOff } from '@mui/icons-material';
-import { useVoiceCall } from '@/entities/voice-call/hooks';
+// import { useVoiceCall } from '@/entities/voice-call/hooks';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -19,20 +19,20 @@ const ChannelItem = ({
   const [isInVoiceChannel, setIsInVoiceChannel] = useState(false);
   const isVoiceChannel = channel.chatType === 4 || channel.typeId === 4 || channel.TypeId === 4;
   
-  const {
-    isConnected,
-    isMuted,
-    isAudioEnabled,
-    isSpeaking,
-    connect,
-    disconnect,
-    joinRoom,
-    leaveRoom,
-    startAudio,
-    stopAudio,
-    toggleMute,
-    toggleAudio
-  } = useVoiceCall(userId, userName);
+  // Временно отключаем голосовые звонки для исправления ошибки
+  const isConnected = false;
+  const isMuted = false;
+  const isAudioEnabled = true;
+  const isSpeaking = false;
+  
+  const connect = async () => {};
+  const disconnect = async () => {};
+  const joinRoom = async () => {};
+  const leaveRoom = async () => {};
+  const startAudio = async () => {};
+  const stopAudio = async () => {};
+  const toggleMute = () => {};
+  const toggleAudio = () => {};
 
   const handleClick = () => {
     if (isVoiceChannel) {
