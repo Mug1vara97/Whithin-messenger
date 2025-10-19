@@ -103,21 +103,55 @@ jobs:
           echo "Waiting for services to start..."
           sleep 30
           
-          # Health check
+          # Проверяем статус всех контейнеров
+          echo "Container status:"
+          docker-compose ps
+          
+          # Проверяем логи проблемных сервисов
+          echo "Backend logs:"
+          docker-compose logs backend --tail=20
+          
+          echo "Client logs:"
+          docker-compose logs client --tail=20
+          
+          echo "Voice server logs:"
+          docker-compose logs voice-server --tail=20
+          
+          # Health check - проверяем HTTP сначала
           echo "Health check..."
-          if curl -f http://localhost/api/health || curl -f https://whithin.ru/api/health; then
-            echo "Deployment successful!"
+          sleep 10
+          
+          # Проверяем что backend отвечает
+          if curl -f http://localhost:8080 2>/dev/null || curl -f http://localhost:5109 2>/dev/null; then
+            echo "Backend is responding!"
           else
-            echo "Health check failed!"
-            # Rollback
-            echo "Rolling back..."
-            docker-compose down
-            if [ -d "../whithin-messenger-backup.old" ]; then
-              rm -rf ../whithin-messenger-backup
-              mv ../whithin-messenger-backup.old ../whithin-messenger-backup
-            fi
+            echo "Backend is not responding!"
+            echo "Checking what ports are open:"
+            netstat -tulpn | grep -E ':(8080|5109)'
+            echo "Backend logs:"
+            docker-compose logs backend --tail=10
             exit 1
           fi
+          
+          # Проверяем клиент
+          if curl -f http://localhost:3001 2>/dev/null; then
+            echo "Client health check passed!"
+          else
+            echo "Client health check failed!"
+            docker-compose logs client
+            exit 1
+          fi
+          
+          # Проверяем голосовой сервер
+          if curl -f http://localhost:3000 2>/dev/null; then
+            echo "Voice server health check passed!"
+          else
+            echo "Voice server health check failed!"
+            docker-compose logs voice-server
+            exit 1
+          fi
+          
+          echo "All services are healthy!"
           
           # Показываем статус контейнеров
           echo "Container status:"

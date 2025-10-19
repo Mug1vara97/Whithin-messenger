@@ -26,6 +26,7 @@ services:
     volumes:
       - ./WhithinMessenger.Backend/src/WhithinMessenger.Api/wwwroot/uploads:/app/wwwroot/uploads
       - uploads_data:/app/wwwroot/uploads
+      - ./ssl:/app/ssl
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
@@ -53,8 +54,12 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
+      - "40000-40100:40000-40100/udp"
+      - "40000-40100:40000-40100/tcp"
+    volumes:
+      - ./ssl:/app/ssl
     environment:
       - NODE_ENV=production
       - MEDIASOUP_LISTEN_IP=0.0.0.0
