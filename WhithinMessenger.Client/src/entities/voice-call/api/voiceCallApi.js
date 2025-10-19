@@ -1,6 +1,15 @@
 import { io } from 'socket.io-client';
-import { Device } from 'mediasoup-client';
 import { VOICE_SERVER_URL, VOICE_SERVER_CONFIG } from '../../../shared/lib/constants/apiEndpoints';
+
+// Ленивый импорт mediasoup-client
+let Device = null;
+const getDevice = async () => {
+  if (!Device) {
+    const { Device: MediasoupDevice } = await import('mediasoup-client');
+    Device = MediasoupDevice;
+  }
+  return Device;
+};
 
 class VoiceCallApi {
   constructor() {
@@ -53,15 +62,21 @@ class VoiceCallApi {
 
   // Инициализация медиа-устройства
   async initializeDevice(routerRtpCapabilities) {
-    if (!this.device) {
-      this.device = new Device();
-    }
+    try {
+      if (!this.device) {
+        const DeviceClass = await getDevice();
+        this.device = new DeviceClass();
+      }
 
-    if (!this.device.loaded) {
-      await this.device.load({ routerRtpCapabilities });
-    }
+      if (!this.device.loaded) {
+        await this.device.load({ routerRtpCapabilities });
+      }
 
-    return this.device;
+      return this.device;
+    } catch (error) {
+      console.error('Failed to initialize device:', error);
+      throw error;
+    }
   }
 
   // Создание комнаты
