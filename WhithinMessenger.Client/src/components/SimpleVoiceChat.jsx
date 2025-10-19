@@ -325,7 +325,7 @@ const SimpleVoiceChat = ({
       }
 
       socketRef.current.emit(event, data, (response) => {
-        if (response.error) {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
