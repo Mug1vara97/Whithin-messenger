@@ -149,9 +149,7 @@ const SimpleVoiceChat = ({
   const createTransports = async () => {
     try {
       // Создание send transport
-      const sendTransportData = await socketEmit('createWebRtcTransport', {
-        direction: 'send'
-      });
+      const sendTransportData = await socketEmit('createWebRtcTransport', {});
 
       sendTransportRef.current = deviceRef.current.createSendTransport({
         id: sendTransportData.id,
@@ -187,9 +185,7 @@ const SimpleVoiceChat = ({
       });
 
       // Создание recv transport
-      const recvTransportData = await socketEmit('createWebRtcTransport', {
-        direction: 'recv'
-      });
+      const recvTransportData = await socketEmit('createWebRtcTransport', {});
 
       recvTransportRef.current = deviceRef.current.createRecvTransport({
         id: recvTransportData.id,

@@ -352,7 +352,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('createWebRtcTransport', async (callback) => {
+    socket.on('createWebRtcTransport', async (data, callback) => {
         try {
             if (!socket.data?.roomId) {
                 throw new Error('Not joined to any room');
@@ -376,15 +376,19 @@ io.on('connection', async (socket) => {
                 peer.removeTransport(transport.id);
             });
 
-            callback({
-                id: transport.id,
-                iceParameters: transport.iceParameters,
-                iceCandidates: transport.iceCandidates,
-                dtlsParameters: transport.dtlsParameters,
-            });
+            if (callback) {
+                callback({
+                    id: transport.id,
+                    iceParameters: transport.iceParameters,
+                    iceCandidates: transport.iceCandidates,
+                    dtlsParameters: transport.dtlsParameters,
+                });
+            }
         } catch (error) {
             console.error('Error in createWebRtcTransport:', error);
-            callback({ error: error.message });
+            if (callback) {
+                callback({ error: error.message });
+            }
         }
     });
 
