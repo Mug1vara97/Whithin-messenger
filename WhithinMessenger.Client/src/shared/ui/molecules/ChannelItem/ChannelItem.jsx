@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp, VolumeOff, Mic, MicOff } from '@mui/icons-material';
-import { useVoiceCall } from '@/entities/voice-call/hooks';
+import { useSimpleVoiceCall } from '@/entities/voice-call/hooks/useSimpleVoiceCall';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -35,7 +35,7 @@ const ChannelItem = ({
     stopAudio,
     toggleMute,
     toggleAudio
-  } = useVoiceCall(userId, userName);
+  } = useSimpleVoiceCall(userId, userName);
 
   const handleClick = () => {
     if (isVoiceChannel) {

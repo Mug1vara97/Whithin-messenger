@@ -1,15 +1,6 @@
 import { io } from 'socket.io-client';
+import { Device } from 'mediasoup-client';
 import { VOICE_SERVER_URL, VOICE_SERVER_CONFIG } from '../../../shared/lib/constants/apiEndpoints';
-
-// Ленивый импорт mediasoup-client
-let Device = null;
-const getDevice = async () => {
-  if (!Device) {
-    const { Device: MediasoupDevice } = await import('mediasoup-client');
-    Device = MediasoupDevice;
-  }
-  return Device;
-};
 
 class VoiceCallApi {
   constructor() {
@@ -64,8 +55,7 @@ class VoiceCallApi {
   async initializeDevice(routerRtpCapabilities) {
     try {
       if (!this.device) {
-        const DeviceClass = await getDevice();
-        this.device = new DeviceClass();
+        this.device = new Device();
       }
 
       if (!this.device.loaded) {
