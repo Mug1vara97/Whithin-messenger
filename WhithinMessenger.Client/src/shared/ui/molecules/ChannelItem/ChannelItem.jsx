@@ -17,7 +17,10 @@ const ChannelItem = ({
   userName
 }) => {
   const [isInVoiceChannel, setIsInVoiceChannel] = useState(false);
-  const isVoiceChannel = channel.chatType === 4 || channel.typeId === 4 || channel.TypeId === 4;
+  const isVoiceChannel = channel.chatType === 4 || 
+                        channel.typeId === 4 || 
+                        channel.TypeId === 4 ||
+                        channel.typeId === "44444444-4444-4444-4444-444444444444";
   
   // Временно отключаем голосовые звонки для исправления ошибки
   const isConnected = false;
