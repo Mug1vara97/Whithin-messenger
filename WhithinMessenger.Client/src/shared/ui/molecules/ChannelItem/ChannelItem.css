@@ -102,3 +102,30 @@
   width: 20px !important;
   height: 20px !important;
 }
+
+.voice-control-button {
+  background: transparent !important;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  opacity: 0.8;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+}
+
+.voice-control-button:hover {
+  background-color: var(--surface-hover) !important;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.voice-control-button svg {
+  width: 14px !important;
+  height: 14px !important;
+}

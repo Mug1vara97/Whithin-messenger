@@ -1037,6 +1037,8 @@ const ServerPanel = ({
           serverId={currentServer?.serverId}
           onCategoriesReordered={handleCategoriesReordered}
           onChatsReordered={handleChatsReordered}
+          userId={user?.id}
+          userName={user?.username || user?.userName}
         />
       </div>
 

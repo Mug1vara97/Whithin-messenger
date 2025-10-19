@@ -49,6 +49,20 @@ services:
       - app-network
     restart: unless-stopped
 
+  voice-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - MEDIASOUP_LISTEN_IP=0.0.0.0
+      - MEDIASOUP_ANNOUNCED_IP=whithin.ru
+    networks:
+      - app-network
+    restart: unless-stopped
+
   nginx:
     image: nginx:alpine
     ports:
@@ -60,9 +74,12 @@ services:
     depends_on:
       - client
       - backend
+      - voice-server
     networks:
       - app-network
     restart: unless-stopped
+    environment:
+      - DOMAIN=whithin.ru
 
 volumes:
   postgres_data:

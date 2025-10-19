@@ -45,3 +45,12 @@ export const HUB_ENDPOINTS = {
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.MODE === 'production' ? '' : 'http://localhost:5109');
+
+// Voice server endpoints
+export const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 
+  (import.meta.env.MODE === 'production' ? 'https://whithin.ru' : 'https://whithin.ru');
+export const VOICE_SERVER_CONFIG = {
+  transports: ['websocket'],
+  upgrade: false,
+  rememberUpgrade: false
+};

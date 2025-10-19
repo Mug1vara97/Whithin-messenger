@@ -41,3 +41,6 @@ EXPOSE 3001
 # Serve the Vite build output
 CMD ["serve", "-s", "dist", "-l", "3001"]
 
+
+
+

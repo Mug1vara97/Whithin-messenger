@@ -14,7 +14,9 @@ const CategoriesList = ({
   onChannelSettings,
   onEmptySpaceContextMenu,
   connection,
-  serverId
+  serverId,
+  userId,
+  userName
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
 
@@ -295,6 +297,8 @@ const CategoriesList = ({
                       onContextMenu={(e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })}
                       onSettings={handleChannelSettings}
                       isDragDisabled={false}
+                      userId={userId}
+                      userName={userName}
                     />
                   ))}
                   {provided.placeholder}
@@ -323,6 +327,8 @@ const CategoriesList = ({
                     onContextMenu={(e) => handleChannelContextMenu(e, channel, category)}
                     onSettings={handleChannelSettings}
                     isDragDisabled={false}
+                    userId={userId}
+                    userName={userName}
                   />
                 )) || (
                   <div className="no-channels">

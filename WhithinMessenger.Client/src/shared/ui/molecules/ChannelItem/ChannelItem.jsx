@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
-import { VolumeUp } from '@mui/icons-material';
+import { VolumeUp, VolumeOff, Mic, MicOff } from '@mui/icons-material';
+import { useVoiceCall } from '@/entities/voice-call/hooks';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -11,11 +12,56 @@ const ChannelItem = ({
   onClick,
   onContextMenu,
   onSettings,
-  isDragDisabled = false
+  isDragDisabled = false,
+  userId,
+  userName
 }) => {
+  const [isInVoiceChannel, setIsInVoiceChannel] = useState(false);
+  const isVoiceChannel = channel.chatType === 4 || channel.typeId === 4 || channel.TypeId === 4;
+  
+  const {
+    isConnected,
+    isMuted,
+    isAudioEnabled,
+    isSpeaking,
+    connect,
+    disconnect,
+    joinRoom,
+    leaveRoom,
+    startAudio,
+    stopAudio,
+    toggleMute,
+    toggleAudio
+  } = useVoiceCall(userId, userName);
+
   const handleClick = () => {
-    if (onClick) {
+    if (isVoiceChannel) {
+      handleVoiceChannelClick();
+    } else if (onClick) {
       onClick(channel);
+    }
+  };
+
+  const handleVoiceChannelClick = async () => {
+    if (isInVoiceChannel) {
+      // Покинуть голосовой канал
+      try {
+        await leaveRoom();
+        await disconnect();
+        setIsInVoiceChannel(false);
+      } catch (error) {
+        console.error('Failed to leave voice channel:', error);
+      }
+    } else {
+      // Присоединиться к голосовому каналу
+      try {
+        await connect();
+        await joinRoom(channel.chatId || channel.ChatId);
+        await startAudio();
+        setIsInVoiceChannel(true);
+      } catch (error) {
+        console.error('Failed to join voice channel:', error);
+      }
     }
   };
 
@@ -35,10 +81,21 @@ const ChannelItem = ({
   };
 
   const getChannelIcon = () => {
-    if (channel.chatType === 4 || channel.typeId === 4 || channel.TypeId === 4) {
-      return <VolumeUp sx={{ fontSize: 16, width: 16, height: 16 }} />; 
+    if (isVoiceChannel) {
+      if (isInVoiceChannel) {
+        return <VolumeUp sx={{ fontSize: 16, width: 16, height: 16, color: isSpeaking ? '#43b581' : '#43b581' }} />;
+      }
+      return <VolumeOff sx={{ fontSize: 16, width: 16, height: 16 }} />;
     }
     return '#'; 
+  };
+
+  const getChannelName = () => {
+    const name = channel.name || channel.Name || channel.groupName;
+    if (isVoiceChannel && isInVoiceChannel) {
+      return `${name} (Connected)`;
+    }
+    return name;
   };
 
   return (
@@ -64,9 +121,41 @@ const ChannelItem = ({
             {getChannelIcon()}
           </span>
           <span className="channel-name">
-            {channel.name || channel.Name || channel.groupName}
+            {getChannelName()}
           </span>
           <div className="channel-settings">
+            {isVoiceChannel && isInVoiceChannel && (
+              <>
+                <button
+                  className="voice-control-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleMute();
+                  }}
+                  aria-label={isMuted ? "Unmute" : "Mute"}
+                  style={{ 
+                    color: isMuted ? '#ed4245' : '#43b581',
+                    marginRight: '4px'
+                  }}
+                >
+                  {isMuted ? <MicOff sx={{ fontSize: 14 }} /> : <Mic sx={{ fontSize: 14 }} />}
+                </button>
+                <button
+                  className="voice-control-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAudio();
+                  }}
+                  aria-label={isAudioEnabled ? "Disable Audio" : "Enable Audio"}
+                  style={{ 
+                    color: isAudioEnabled ? '#43b581' : '#ed4245',
+                    marginRight: '4px'
+                  }}
+                >
+                  {isAudioEnabled ? <VolumeUp sx={{ fontSize: 14 }} /> : <VolumeOff sx={{ fontSize: 14 }} />}
+                </button>
+              </>
+            )}
             <button
               className="settings-button"
               onClick={handleSettingsClick}
