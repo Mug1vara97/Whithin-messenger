@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp, VolumeOff } from '@mui/icons-material';
-import VoiceChat from '@/components/VoiceChat';
+import SimpleVoiceChat from '@/components/SimpleVoiceChat';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -112,7 +112,7 @@ const VoiceChannelItem = ({ channel, userId, userName, ...props }) => {
         onClick={() => setShowVoiceChat(!showVoiceChat)}
       />
       {showVoiceChat && (
-        <VoiceChat
+        <SimpleVoiceChat
           channelId={channel.chatId || channel.ChatId}
           channelName={channel.name || channel.Name || channel.groupName}
           userId={userId}
