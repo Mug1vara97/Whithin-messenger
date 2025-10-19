@@ -45,10 +45,10 @@ import {
 } from '@mui/icons-material';
 import { Device } from 'mediasoup-client';
 import { io } from 'socket.io-client';
-import { NoiseSuppressionManager } from './utils/noiseSuppression';
-import voiceDetectorWorklet from './utils/voiceDetector.worklet.js?url';
-import volumeStorage from './utils/volumeStorage';
-import UserAvatar from './UserAvatar';
+// import { NoiseSuppressionManager } from './utils/noiseSuppression';
+// import // voiceDetectorWorklet from './utils/voiceDetector.worklet.js?url';
+// import // volumeStorage from './utils/// volumeStorage';
+// import div from './div';
 
 
 
@@ -1186,8 +1186,8 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
     leaveVoiceChannel,
     updateUserMuteState,
     updateUserAudioState
-  } = useVoiceChannel();
-  const { colors } = useTheme();
+  } = {}; // useVoiceChannel();
+  const colors = {}; // useTheme();
   const styles = useMemo(() => createStyles(colors, isPrivateCall), [colors, isPrivateCall]);
   const [isJoined, setIsJoined] = useState(false);
 
@@ -2266,7 +2266,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
           
           // Получаем реальный ID пользователя
           console.log('About to get realUserId for producer:', producer.producerSocketId);
-          const realUserId = getRealUserId(producer, appData);
+          // const realUserId = getRealUserId(producer, appData);
           
 
           
@@ -2281,7 +2281,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
           // Получаем сохраненную громкость для этого пользователя
           let savedVolume = 100; // Значение по умолчанию
           try {
-            savedVolume = await volumeStorage.getUserVolume(realUserId);
+            savedVolume = 1.0; // Default volume
           } catch (error) {
             console.error('Failed to load saved volume for user:', realUserId, error);
           }
@@ -2725,7 +2725,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
         // Получаем реальный ID пользователя из маппинга
         const realUserId = userIdMappingRef.current.get(peerId) || peerId;
 
-        await volumeStorage.saveUserVolume(realUserId, newVolume);
+        // await volumeStorage.saveUserVolume(realUserId, newVolume);
       } catch (error) {
         console.error('Failed to save volume for user:', peerId, error);
       }
@@ -2782,7 +2782,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
          // Получаем реальный ID пользователя из маппинга
          const realUserId = userIdMappingRef.current.get(peerId) || peerId;
          
-         await volumeStorage.saveUserVolume(realUserId, newVolume);
+         // await volumeStorage.saveUserVolume(realUserId, newVolume);
        } catch (error) {
          console.error('Failed to save volume for user:', peerId, error);
        }
@@ -2995,7 +2995,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
       localStreamRef.current = stream;
       
       // Initialize audio context and noise suppression
-      noiseSuppressionRef.current = new NoiseSuppressionManager();
+      // noiseSuppressionRef.current = new NoiseSuppressionManager();
       
       // Initialize noise suppression with the stream
       await noiseSuppressionRef.current.initialize(stream, audioContextRef.current);
@@ -3592,7 +3592,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
 
       // Загружаем воркер если еще не загружен
       try {
-        await audioContextRef.current.audioWorklet.addModule(voiceDetectorWorklet);
+        // await audioContextRef.current.audioWorklet.addModule(voiceDetectorWorklet);
         console.log('Voice detector worklet loaded successfully');
       } catch (error) {
         console.error('Failed to load voice detector worklet:', error);
@@ -4126,7 +4126,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
           
                             // Получаем реальный ID пользователя
           console.log('About to get realUserId for producer:', producer.producerSocketId);
-          const realUserId = getRealUserId(producer, appData);
+          // const realUserId = getRealUserId(producer, appData);
         
         console.log('Consumer appData and realUserId:', {
           producerSocketId: producer.producerSocketId,
@@ -4148,7 +4148,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
           // Получаем сохраненную громкость для этого пользователя
           let savedVolume = 100; // Значение по умолчанию
           try {
-            savedVolume = await volumeStorage.getUserVolume(realUserId);
+            savedVolume = 1.0; // Default volume
           } catch (error) {
             console.error('Failed to load saved volume for user:', realUserId, error);
           }
@@ -4510,7 +4510,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
                         const avatarData = userProfiles.get(userId);
                         console.log('Rendering local user avatar:', { userId, userName, avatarData });
                         return (
-                          <UserAvatar
+                          <div
                             username={userName}
                             avatarUrl={avatarData?.avatarUrl}
                             avatarColor={avatarData?.avatarColor}
@@ -4586,7 +4586,7 @@ const VoiceChat = forwardRef(({ roomId, roomName, userName, userId, serverId, au
                           const avatarData = userProfiles.get(peer.userId);
                           console.log('Rendering remote user avatar:', { peerId: peer.id, userId: peer.userId, name: peer.name, avatarData });
                           return (
-                            <UserAvatar
+                            <div
                               username={peer.name}
                               avatarUrl={avatarData?.avatarUrl}
                               avatarColor={avatarData?.avatarColor}
