@@ -155,7 +155,20 @@ const SimpleVoiceChat = ({
         id: sendTransportData.id,
         iceParameters: sendTransportData.iceParameters,
         iceCandidates: sendTransportData.iceCandidates,
-        dtlsParameters: sendTransportData.dtlsParameters
+        dtlsParameters: sendTransportData.dtlsParameters,
+        iceServers: [
+          { urls: ['stun:185.119.59.23:3478'] },
+          {
+            urls: ['turn:185.119.59.23:3478?transport=udp'],
+            username: 'test',
+            credential: 'test123'
+          },
+          {
+            urls: ['turn:185.119.59.23:3478?transport=tcp'],
+            username: 'test',
+            credential: 'test123'
+          }
+        ]
       });
 
       sendTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
@@ -191,7 +204,20 @@ const SimpleVoiceChat = ({
         id: recvTransportData.id,
         iceParameters: recvTransportData.iceParameters,
         iceCandidates: recvTransportData.iceCandidates,
-        dtlsParameters: recvTransportData.dtlsParameters
+        dtlsParameters: recvTransportData.dtlsParameters,
+        iceServers: [
+          { urls: ['stun:185.119.59.23:3478'] },
+          {
+            urls: ['turn:185.119.59.23:3478?transport=udp'],
+            username: 'test',
+            credential: 'test123'
+          },
+          {
+            urls: ['turn:185.119.59.23:3478?transport=tcp'],
+            username: 'test',
+            credential: 'test123'
+          }
+        ]
       });
 
       recvTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
@@ -285,14 +311,26 @@ const SimpleVoiceChat = ({
   // Обработка нового producer
   const handleNewProducer = async (producerData) => {
     try {
-      const consumer = await recvTransportRef.current.consume({
-        id: producerData.id,
-        producerId: producerData.id,
-        kind: producerData.kind,
-        rtpParameters: producerData.rtpParameters
+      console.log('Handling new producer:', producerData);
+      
+      // Запрашиваем данные consumer у сервера
+      const consumerData = await socketEmit('consume', {
+        rtpCapabilities: deviceRef.current.rtpCapabilities,
+        remoteProducerId: producerData.producerId,
+        transportId: recvTransportRef.current.id
       });
 
-      consumersRef.current.set(producerData.id, consumer);
+      console.log('Consumer data received:', consumerData);
+
+      // Создаем consumer
+      const consumer = await recvTransportRef.current.consume({
+        id: consumerData.id,
+        producerId: producerData.producerId,
+        kind: producerData.kind,
+        rtpParameters: consumerData.rtpParameters
+      });
+
+      consumersRef.current.set(consumerData.id, consumer);
       
       // Создание аудио элемента
       const audioElement = document.createElement('audio');
@@ -301,7 +339,10 @@ const SimpleVoiceChat = ({
       audioElement.autoplay = true;
       document.body.appendChild(audioElement);
 
-      console.log('New consumer created:', producerData.id);
+      // Resume consumer
+      await socketEmit('resumeConsumer', { consumerId: consumerData.id });
+
+      console.log('New consumer created:', consumerData.id);
     } catch (error) {
       console.error('Failed to handle new producer:', error);
     }
