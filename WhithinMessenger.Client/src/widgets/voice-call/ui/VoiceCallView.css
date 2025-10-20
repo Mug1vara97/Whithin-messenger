@@ -140,17 +140,35 @@
 
 /* Participants Row */
 .participants-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
   padding: 16px;
-  justify-content: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Single participant - full width */
+.participants-row:has(.tile-wrapper:only-child) {
+  grid-template-columns: 1fr;
+  max-width: 800px;
+}
+
+/* Two participants - 2 columns */
+.participants-row:has(.tile-wrapper:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Three or more - auto-fit with min 300px */
+.participants-row:has(.tile-wrapper:nth-child(3)) {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 /* Tile */
 .tile-wrapper {
-  width: 585px;
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .tile-sizer {
@@ -642,16 +660,32 @@
 }
 
 /* Responsive */
-@media (max-width: 1200px) {
-  .tile-wrapper {
-    width: 480px;
+@media (max-width: 1400px) {
+  .participants-row {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    max-width: 1200px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .participants-row {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    padding: 12px;
   }
 }
 
 @media (max-width: 768px) {
-  .tile-wrapper {
-    width: 100%;
-    max-width: 480px;
+  .participants-row {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 12px;
+  }
+
+  /* Force single column on small screens with 3+ participants */
+  .participants-row:has(.tile-wrapper:nth-child(3)) {
+    grid-template-columns: 1fr;
+    max-width: 500px;
   }
 
   .bottom-controls {
@@ -679,11 +713,17 @@
   .edge-controls.right {
     display: none;
   }
+
+  .list-items {
+    inset: 48px 0 56px 0;
+  }
 }
 
 @media (max-width: 480px) {
-  .tile-wrapper {
-    width: 100%;
+  .participants-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
   }
 
   .bottom-controls {
@@ -693,6 +733,7 @@
   .wrapper {
     gap: 12px;
     flex-wrap: wrap;
+    justify-content: center;
   }
 
   .button-section {
@@ -707,6 +748,18 @@
   .center-button.disconnect {
     width: 52px;
     height: 52px;
+  }
+
+  .header-bar {
+    padding: 0 8px;
+  }
+
+  .channel-title {
+    font-size: 14px;
+  }
+
+  .list-items {
+    inset: 40px 0 56px 0;
   }
 }
 
