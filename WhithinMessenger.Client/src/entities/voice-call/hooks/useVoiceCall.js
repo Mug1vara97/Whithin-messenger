@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { CALL_STATUS, MEDIA_TYPES } from '../model/types';
 
@@ -35,68 +35,42 @@ export const useVoiceCall = (userId, userName) => {
   const producersRef = useRef(new Map());
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
-  const pendingProducersRef = useRef([]);
 
   // Подключение к серверу
-  const connect = useCallback(async () => {
+  const connect = async () => {
     try {
       setError(null);
       await voiceCallApi.connect(userId, userName);
       setIsConnected(true);
     } catch (error) {
-      console.error('Failed to connect to voice server:', error);
+      console.error('Failed to connect:', error);
       setError(error.message);
     }
-  }, [userId, userName]);
-
-  // Отключение от сервера
-  const disconnect = useCallback(async () => {
-    try {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-        localStreamRef.current = null;
-      }
-      
-      if (sendTransportRef.current) {
-        sendTransportRef.current.close();
-        sendTransportRef.current = null;
-      }
-      
-      if (recvTransportRef.current) {
-        recvTransportRef.current.close();
-        recvTransportRef.current = null;
-      }
-      
-      consumersRef.current.forEach(consumer => consumer.close());
-      consumersRef.current.clear();
-      
-      producersRef.current.forEach(producer => producer.close());
-      producersRef.current.clear();
-      
-      await voiceCallApi.disconnect();
-      setIsConnected(false);
-      setParticipants([]);
-    } catch (error) {
-      console.error('Failed to disconnect:', error);
-    }
-  }, []);
+  };
 
   // Инициализация устройства
-  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
+  const initializeDevice = async (routerRtpCapabilities) => {
     try {
-      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
-      await createTransports();
+      if (!deviceRef.current) {
+        deviceRef.current = new Device();
+      }
+
+      if (!deviceRef.current.loaded) {
+        await deviceRef.current.load({ routerRtpCapabilities });
+      }
+      console.log('Device initialized');
     } catch (error) {
       console.error('Failed to initialize device:', error);
       setError(error.message);
     }
-  }, []);
+  };
 
   // Создание транспортов
-  const createTransports = useCallback(async () => {
+  const createTransports = async () => {
     try {
       // Создание send transport
       const sendTransportData = await voiceCallApi.createWebRtcTransport();
+
       sendTransportRef.current = deviceRef.current.createSendTransport({
         id: sendTransportData.id,
         iceParameters: sendTransportData.iceParameters,
@@ -125,6 +99,7 @@ export const useVoiceCall = (userId, userName) => {
 
       // Создание recv transport
       const recvTransportData = await voiceCallApi.createWebRtcTransport();
+
       recvTransportRef.current = deviceRef.current.createRecvTransport({
         id: recvTransportData.id,
         iceParameters: recvTransportData.iceParameters,
@@ -147,10 +122,10 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to create transports:', error);
       setError(error.message);
     }
-  }, []);
+  };
 
   // Создание аудио потока
-  const createAudioStream = useCallback(async () => {
+  const createAudioStream = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -184,10 +159,10 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to create audio stream:', error);
       setError(error.message);
     }
-  }, [userId, userName]);
+  };
 
   // Присоединение к комнате
-  const joinRoom = useCallback(async (roomId) => {
+  const joinRoom = async (roomId) => {
     try {
       const response = await voiceCallApi.joinRoom(roomId, userName, userId);
       
@@ -215,21 +190,17 @@ export const useVoiceCall = (userId, userName) => {
         }
       }
       
-      // Небольшая задержка перед созданием producer'а, чтобы обработчики событий успели настроиться
+      // Небольшая задержка перед созданием producer'а
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Обрабатываем pending producer'ы после создания транспортов
-      await processPendingProducers();
-      
       await createAudioStream();
     } catch (error) {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, createAudioStream, processPendingProducers]);
+  };
 
   // Обработка нового producer
-  const handleNewProducer = useCallback(async (producerData) => {
+  const handleNewProducer = async (producerData) => {
     try {
       const consumerData = await voiceCallApi.consume(
         deviceRef.current.rtpCapabilities,
@@ -266,6 +237,7 @@ export const useVoiceCall = (userId, userName) => {
         setTimeout(async () => {
           try {
             await audioElement.play();
+            console.log('Audio playback started after delay');
             setAudioBlocked(false);
           } catch (e) {
             console.log('Audio playback still blocked');
@@ -273,15 +245,76 @@ export const useVoiceCall = (userId, userName) => {
         }, 1000);
       }
 
+      audioElement.addEventListener('loadedmetadata', () => {
+        console.log('Audio metadata loaded for consumer:', consumerData.id);
+      });
+
+      audioElement.addEventListener('canplay', () => {
+        console.log('Audio can play for consumer:', consumerData.id);
+        audioElement.play().catch(e => console.log('Play failed:', e));
+      });
+
+      audioElement.addEventListener('error', (e) => {
+        console.error('Audio element error:', e);
+      });
+
       await voiceCallApi.resumeConsumer(consumerData.id);
       console.log('New consumer created:', consumerData.id);
     } catch (error) {
       console.error('Failed to handle new producer:', error);
     }
-  }, [volume]);
+  };
+
+  // Удаление consumer
+  const removeConsumer = (producerId) => {
+    const consumer = consumersRef.current.get(producerId);
+    if (consumer) {
+      consumer.close();
+      consumersRef.current.delete(producerId);
+    }
+  };
+
+  // Удаление всех consumer'ов для конкретного peer'а
+  const removeConsumerForPeer = (userId) => {
+    const consumersToRemove = [];
+    consumersRef.current.forEach((consumer, consumerId) => {
+      if (consumer.appData && consumer.appData.userId === userId) {
+        consumersToRemove.push(consumerId);
+      }
+    });
+    
+    consumersToRemove.forEach(consumerId => {
+      removeConsumer(consumerId);
+    });
+  };
+
+  // Отключение
+  const disconnect = async () => {
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      producersRef.current.forEach(producer => producer.close());
+      consumersRef.current.forEach(consumer => consumer.close());
+      sendTransportRef.current?.close();
+      recvTransportRef.current?.close();
+      producersRef.current.clear();
+      consumersRef.current.clear();
+      localStreamRef.current = null;
+      sendTransportRef.current = null;
+      recvTransportRef.current = null;
+
+      await voiceCallApi.leaveRoom();
+      await voiceCallApi.disconnect();
+      setIsConnected(false);
+      setParticipants([]);
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    }
+  };
 
   // Переключение микрофона
-  const toggleMute = useCallback(() => {
+  const toggleMute = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
@@ -289,38 +322,21 @@ export const useVoiceCall = (userId, userName) => {
         setIsMuted(!audioTrack.enabled);
       }
     }
-  }, []);
+  };
 
   // Переключение аудио
-  const toggleAudio = useCallback(() => {
+  const toggleAudio = () => {
     setIsAudioEnabled(!isAudioEnabled);
-  }, [isAudioEnabled]);
+  };
 
   // Изменение громкости
-  const handleVolumeChange = useCallback((newVolume) => {
-    setVolume(newVolume);
+  const handleVolumeChange = (event, newValue) => {
+    setVolume(newValue);
     const audioElements = document.querySelectorAll('audio');
     audioElements.forEach(audio => {
-      audio.volume = newVolume;
+      audio.volume = newValue;
     });
-  }, []);
-
-  // Обработка очереди pending producer'ов
-  const processPendingProducers = useCallback(async () => {
-    if (pendingProducersRef.current.length > 0 && deviceRef.current && recvTransportRef.current) {
-      console.log('Processing pending producers:', pendingProducersRef.current.length);
-      const producers = [...pendingProducersRef.current];
-      pendingProducersRef.current = [];
-      
-      for (const producer of producers) {
-        try {
-          await handleNewProducer(producer);
-        } catch (error) {
-          console.error('Failed to process pending producer:', error);
-        }
-      }
-    }
-  }, [handleNewProducer]);
+  };
 
   // Обработка событий
   useEffect(() => {
@@ -339,19 +355,11 @@ export const useVoiceCall = (userId, userName) => {
     const handlePeerLeft = (peerData) => {
       console.log('Peer left:', peerData);
       setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+      removeConsumerForPeer(peerData.userId);
     };
 
     const handleNewProducerEvent = (producerData) => {
       console.log('New producer event received:', producerData);
-      console.log('Current device state:', deviceRef.current ? 'loaded' : 'not loaded');
-      console.log('Current recv transport:', recvTransportRef.current ? 'ready' : 'not ready');
-      
-      if (!deviceRef.current || !recvTransportRef.current) {
-        console.warn('Device or transport not ready, queuing producer');
-        pendingProducersRef.current.push(producerData);
-        return;
-      }
-      
       handleNewProducer(producerData);
     };
 
@@ -375,7 +383,7 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('newProducer', handleNewProducerEvent);
       voiceCallApi.off('producerClosed', handleProducerClosed);
     };
-  }, [handleNewProducer]);
+  }, []);
 
   return {
     // Состояние

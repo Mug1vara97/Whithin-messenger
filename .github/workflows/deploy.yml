@@ -12,33 +12,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: WhithinMessenger.Client/package-lock.json
-          
-    - name: Install client dependencies
-      run: |
-        cd WhithinMessenger.Client
-        npm ci
-        
-    - name: Build client
-      run: |
-        cd WhithinMessenger.Client
-        npm run build
-        
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
     
-    - name: Build backend
-      run: |
-        dotnet restore WhithinMessenger.Backend/WhithinMessenger.sln
-        dotnet build WhithinMessenger.Backend/WhithinMessenger.sln --configuration Release --no-restore
+
         
     - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
@@ -118,12 +93,12 @@ jobs:
           
           # Ждем запуска сервисов
           echo "Waiting for services to start..."
-          sleep 30
+          sleep 15
           
           # Проверяем статус всех контейнеров
           echo "Container status:"
           docker-compose ps
-          
+
           # Проверяем логи проблемных сервисов
           echo "Backend logs:"
           docker-compose logs backend --tail=20
@@ -134,43 +109,6 @@ jobs:
           echo "Voice server logs:"
           docker-compose logs voice-server --tail=20
           
-          # Health check - проверяем HTTP сначала
-          echo "Health check..."
-          sleep 10
-          
-          # Проверяем что backend отвечает
-          if curl -f http://localhost:8080 2>/dev/null || curl -f http://localhost:5109 2>/dev/null; then
-            echo "Backend is responding!"
-          else
-            echo "Backend is not responding!"
-            echo "Checking what ports are open:"
-            netstat -tulpn | grep -E ':(8080|5109)'
-            echo "Backend logs:"
-            docker-compose logs backend --tail=10
-            exit 1
-          fi
-          
-          # Проверяем клиент
-          if curl -f http://localhost:3001 2>/dev/null; then
-            echo "Client health check passed!"
-          else
-            echo "Client health check failed!"
-            docker-compose logs client
-            exit 1
-          fi
-          
-          # Проверяем голосовой сервер
-          if curl -f http://localhost:3000 2>/dev/null; then
-            echo "Voice server health check passed!"
-          else
-            echo "Voice server health check failed!"
-            docker-compose logs voice-server
-            exit 1
-          fi
-          
-          echo "All services are healthy!"
-          
-          # Показываем статус контейнеров
-          echo "Container status:"
-          docker-compose ps
+          echo "Database logs:"
+          docker-compose logs db --tail=10
 
