@@ -177,19 +177,21 @@ const SimpleVoiceChat = ({
         iceParameters: sendTransportData.iceParameters,
         iceCandidates: sendTransportData.iceCandidates,
         dtlsParameters: sendTransportData.dtlsParameters,
-        iceServers: [
-          { urls: ['stun:185.119.59.23:3478'] },
-          {
-            urls: ['turn:185.119.59.23:3478?transport=udp'],
-            username: 'test',
-            credential: 'test123'
-          },
-          {
-            urls: ['turn:185.119.59.23:3478?transport=tcp'],
-            username: 'test',
-            credential: 'test123'
-          }
-        ]
+         iceServers: [
+           { urls: ['stun:185.119.59.23:3478'] },
+           { urls: ['stun:stun.l.google.com:19302'] },
+           { urls: ['stun:stun1.l.google.com:19302'] },
+           {
+             urls: ['turn:185.119.59.23:3478?transport=udp'],
+             username: 'test',
+             credential: 'test123'
+           },
+           {
+             urls: ['turn:185.119.59.23:3478?transport=tcp'],
+             username: 'test',
+             credential: 'test123'
+           }
+         ]
       });
 
       sendTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
@@ -226,19 +228,21 @@ const SimpleVoiceChat = ({
         iceParameters: recvTransportData.iceParameters,
         iceCandidates: recvTransportData.iceCandidates,
         dtlsParameters: recvTransportData.dtlsParameters,
-        iceServers: [
-          { urls: ['stun:185.119.59.23:3478'] },
-          {
-            urls: ['turn:185.119.59.23:3478?transport=udp'],
-            username: 'test',
-            credential: 'test123'
-          },
-          {
-            urls: ['turn:185.119.59.23:3478?transport=tcp'],
-            username: 'test',
-            credential: 'test123'
-          }
-        ]
+         iceServers: [
+           { urls: ['stun:185.119.59.23:3478'] },
+           { urls: ['stun:stun.l.google.com:19302'] },
+           { urls: ['stun:stun1.l.google.com:19302'] },
+           {
+             urls: ['turn:185.119.59.23:3478?transport=udp'],
+             username: 'test',
+             credential: 'test123'
+           },
+           {
+             urls: ['turn:185.119.59.23:3478?transport=tcp'],
+             username: 'test',
+             credential: 'test123'
+           }
+         ]
       });
 
       recvTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
@@ -306,13 +310,17 @@ const SimpleVoiceChat = ({
   // Создание аудио потока
   const createAudioStream = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+       const stream = await navigator.mediaDevices.getUserMedia({
+         audio: {
+           echoCancellation: true,
+           noiseSuppression: true,
+           autoGainControl: true,
+           sampleRate: 48000,
+           channelCount: 2,
+           latency: 0,
+           suppressLocalAudioPlayback: true
+         }
+       });
 
       localStreamRef.current = stream;
       
