@@ -78,7 +78,7 @@ class VoiceCallApi {
 
   async createWebRtcTransport() {
     return new Promise((resolve, reject) => {
-      this.socket.emit('createWebRtcTransport', {}, (response) => {
+      this.socket.emit('createWebRtcTransport', { roomId: this.roomId }, (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
         } else {

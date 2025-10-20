@@ -354,6 +354,17 @@ io.on('connection', async (socket) => {
 
     socket.on('createWebRtcTransport', async (data, callback) => {
         try {
+            // Принимаем roomId от клиента, если сокет ещё не привязан
+            if (data?.roomId && !socket.data?.roomId) {
+                let room = rooms.get(data.roomId);
+                if (!room) {
+                    const worker = getMediasoupWorker();
+                    room = await createRoom(data.roomId, worker);
+                    rooms.set(data.roomId, room);
+                }
+                socket.data.roomId = data.roomId;
+            }
+
             if (!socket.data?.roomId) {
                 throw new Error('Not joined to any room');
             }
