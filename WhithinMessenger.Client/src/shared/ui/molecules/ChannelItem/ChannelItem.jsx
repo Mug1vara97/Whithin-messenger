@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
-import { VolumeUp, VolumeOff } from '@mui/icons-material';
-import { VoiceCallWidget } from '@/widgets/voice-call';
+import { VolumeOff } from '@mui/icons-material';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -92,36 +91,4 @@ const ChannelItem = ({
   );
 };
 
-// Добавляем VoiceChat компонент для голосовых каналов
-const VoiceChannelItem = ({ channel, userId, userName, ...props }) => {
-  const [showVoiceChat, setShowVoiceChat] = useState(false);
-  const isVoiceChannel = channel.chatType === 4 || 
-                        channel.typeId === 4 || 
-                        channel.TypeId === 4 ||
-                        channel.typeId === "44444444-4444-4444-4444-444444444444";
-
-  if (!isVoiceChannel) {
-    return <ChannelItem channel={channel} {...props} />;
-  }
-
-  return (
-    <>
-      <ChannelItem 
-        channel={channel} 
-        {...props}
-        onClick={() => setShowVoiceChat(!showVoiceChat)}
-      />
-      {showVoiceChat && (
-        <VoiceCallWidget
-          channelId={channel.chatId || channel.ChatId}
-          channelName={channel.name || channel.Name || channel.groupName}
-          userId={userId}
-          userName={userName}
-          onClose={() => setShowVoiceChat(false)}
-        />
-      )}
-    </>
-  );
-};
-
-export default VoiceChannelItem;
+export default ChannelItem;
