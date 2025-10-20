@@ -20,7 +20,7 @@ import {
   PhoneDisabled,
   Headset
 } from '@mui/icons-material';
-import { useVoiceCall } from '../../../entities/voice-call';
+import { useVoiceCall } from '../../../entities/voice-call/hooks';
 
 const VoiceCallWidget = ({
   channelId,

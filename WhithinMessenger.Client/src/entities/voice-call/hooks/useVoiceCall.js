@@ -1,7 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { CALL_STATUS, MEDIA_TYPES } from '../model/types';
-import { ICE_SERVERS } from '../../../shared/lib/constants/iceServers';
+
+// ICE серверы для WebRTC
+const ICE_SERVERS = [
+  { urls: ['stun:185.119.59.23:3478'] },
+  { urls: ['stun:stun.l.google.com:19302'] },
+  { urls: ['stun:stun1.l.google.com:19302'] },
+  {
+    urls: ['turn:185.119.59.23:3478?transport=udp'],
+    username: 'test',
+    credential: 'test123'
+  },
+  {
+    urls: ['turn:185.119.59.23:3478?transport=tcp'],
+    username: 'test',
+    credential: 'test123'
+  }
+];
 
 export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -132,37 +148,6 @@ export const useVoiceCall = (userId, userName) => {
     }
   }, []);
 
-  // Присоединение к комнате
-  const joinRoom = useCallback(async (roomId) => {
-    try {
-      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
-      
-      if (response.routerRtpCapabilities) {
-        await initializeDevice(response.routerRtpCapabilities);
-      }
-      
-      if (response.existingPeers) {
-        setParticipants(response.existingPeers.map(peer => ({
-          userId: peer.userId,
-          name: peer.name,
-          isMuted: peer.isMuted,
-          isSpeaking: false
-        })));
-      }
-      
-      if (response.existingProducers) {
-        for (const producer of response.existingProducers) {
-          await handleNewProducer(producer);
-        }
-      }
-      
-      await createAudioStream();
-    } catch (error) {
-      console.error('Failed to join room:', error);
-      setError(error.message);
-    }
-  }, [userName, userId, initializeDevice, createAudioStream]);
-
   // Создание аудио потока
   const createAudioStream = useCallback(async () => {
     try {
@@ -199,6 +184,37 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
     }
   }, [userId, userName]);
+
+  // Присоединение к комнате
+  const joinRoom = useCallback(async (roomId) => {
+    try {
+      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
+      
+      if (response.routerRtpCapabilities) {
+        await initializeDevice(response.routerRtpCapabilities);
+      }
+      
+      if (response.existingPeers) {
+        setParticipants(response.existingPeers.map(peer => ({
+          userId: peer.userId,
+          name: peer.name,
+          isMuted: peer.isMuted,
+          isSpeaking: false
+        })));
+      }
+      
+      if (response.existingProducers) {
+        for (const producer of response.existingProducers) {
+          await handleNewProducer(producer);
+        }
+      }
+      
+      await createAudioStream();
+    } catch (error) {
+      console.error('Failed to join room:', error);
+      setError(error.message);
+    }
+  }, [userName, userId, initializeDevice, createAudioStream]);
 
   // Обработка нового producer
   const handleNewProducer = useCallback(async (producerData) => {

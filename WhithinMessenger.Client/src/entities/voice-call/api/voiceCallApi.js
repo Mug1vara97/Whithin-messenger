@@ -1,6 +1,13 @@
 import { io } from 'socket.io-client';
 import { Device } from 'mediasoup-client';
-import { VOICE_SERVER_URL, VOICE_SERVER_CONFIG } from '../../../shared/lib/constants/apiEndpoints';
+
+// Конфигурация для голосового сервера
+const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
+const VOICE_SERVER_CONFIG = {
+  transports: ['websocket'],
+  upgrade: false,
+  rememberUpgrade: false
+};
 
 class VoiceCallApi {
   constructor() {
