@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
-import { CALL_STATUS, MEDIA_TYPES } from '../model/types';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -23,7 +22,7 @@ export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeaking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [volume, setVolume] = useState(1.0);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -35,12 +34,46 @@ export const useVoiceCall = (userId, userName) => {
   const producersRef = useRef(new Map());
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
+  const handleNewProducerRef = useRef(null);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
     try {
       setError(null);
       await voiceCallApi.connect(userId, userName);
+      
+      // Регистрируем обработчики событий СРАЗУ после подключения
+      voiceCallApi.on('peerJoined', (peerData) => {
+        console.log('Peer joined:', peerData);
+        setParticipants(prev => [...prev, {
+          userId: peerData.userId,
+          name: peerData.name,
+          isMuted: peerData.isMuted,
+          isSpeaking: false
+        }]);
+      });
+
+      voiceCallApi.on('peerLeft', (peerData) => {
+        console.log('Peer left:', peerData);
+        setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+      });
+
+      voiceCallApi.on('newProducer', async (producerData) => {
+        console.log('New producer event received:', producerData);
+        if (handleNewProducerRef.current) {
+          await handleNewProducerRef.current(producerData);
+        }
+      });
+
+      voiceCallApi.on('producerClosed', (producerId) => {
+        console.log('Producer closed:', producerId);
+        const consumer = consumersRef.current.get(producerId);
+        if (consumer) {
+          consumer.close();
+          consumersRef.current.delete(producerId);
+        }
+      });
+      
       setIsConnected(true);
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
@@ -77,17 +110,6 @@ export const useVoiceCall = (userId, userName) => {
       setParticipants([]);
     } catch (error) {
       console.error('Failed to disconnect:', error);
-    }
-  }, []);
-
-  // Инициализация устройства
-  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
-    try {
-      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
-      await createTransports();
-    } catch (error) {
-      console.error('Failed to initialize device:', error);
-      setError(error.message);
     }
   }, []);
 
@@ -147,6 +169,17 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
     }
   }, []);
+
+  // Инициализация устройства
+  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
+    try {
+      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
+      await createTransports();
+    } catch (error) {
+      console.error('Failed to initialize device:', error);
+      setError(error.message);
+    }
+  }, [createTransports]);
 
   // Создание аудио потока
   const createAudioStream = useCallback(async () => {
@@ -219,7 +252,7 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, createAudioStream]);
+  }, [userName, userId, initializeDevice, createAudioStream, handleNewProducer]);
 
   // Обработка нового producer
   const handleNewProducer = useCallback(async (producerData) => {
@@ -260,7 +293,7 @@ export const useVoiceCall = (userId, userName) => {
           try {
             await audioElement.play();
             setAudioBlocked(false);
-          } catch (e) {
+          } catch {
             console.log('Audio playback still blocked');
           }
         }, 1000);
@@ -272,6 +305,9 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to handle new producer:', error);
     }
   }, [volume]);
+  
+  // Обновляем ref при изменении handleNewProducer
+  handleNewProducerRef.current = handleNewProducer;
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {
@@ -298,51 +334,7 @@ export const useVoiceCall = (userId, userName) => {
     });
   }, []);
 
-  // Обработка событий
-  useEffect(() => {
-    if (!voiceCallApi.socket) return;
-
-    const handlePeerJoined = (peerData) => {
-      console.log('Peer joined:', peerData);
-      setParticipants(prev => [...prev, {
-        userId: peerData.userId,
-        name: peerData.name,
-        isMuted: peerData.isMuted,
-        isSpeaking: false
-      }]);
-    };
-
-    const handlePeerLeft = (peerData) => {
-      console.log('Peer left:', peerData);
-      setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
-    };
-
-    const handleNewProducerEvent = (producerData) => {
-      console.log('New producer event:', producerData);
-      handleNewProducer(producerData);
-    };
-
-    const handleProducerClosed = (producerId) => {
-      console.log('Producer closed:', producerId);
-      const consumer = consumersRef.current.get(producerId);
-      if (consumer) {
-        consumer.close();
-        consumersRef.current.delete(producerId);
-      }
-    };
-
-    voiceCallApi.on('peerJoined', handlePeerJoined);
-    voiceCallApi.on('peerLeft', handlePeerLeft);
-    voiceCallApi.on('newProducer', handleNewProducerEvent);
-    voiceCallApi.on('producerClosed', handleProducerClosed);
-
-    return () => {
-      voiceCallApi.off('peerJoined', handlePeerJoined);
-      voiceCallApi.off('peerLeft', handlePeerLeft);
-      voiceCallApi.off('newProducer', handleNewProducerEvent);
-      voiceCallApi.off('producerClosed', handleProducerClosed);
-    };
-  }, [handleNewProducer]);
+  // Удалён useEffect - обработчики теперь регистрируются в connect()
 
   return {
     // Состояние

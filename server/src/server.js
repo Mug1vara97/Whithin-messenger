@@ -321,7 +321,8 @@ io.on('connection', async (socket) => {
                     existingProducers.push({
                         producerId,
                         producerSocketId: producerData.peerId,
-                        kind: producerData.producer.kind
+                        kind: producerData.producer.kind,
+                        appData: producerData.producer.appData
                     });
                 }
             });
@@ -710,10 +711,13 @@ io.on('connection', async (socket) => {
                 producerId: producer.id,
                 producerSocketId: socket.id,
                 kind: producer.kind,
-                appData: producer.appData
+                appData: producer.appData,
+                numberOfPeersToNotify: otherPeers.length,
+                peerIds: otherPeers.map(p => p.id)
             });
 
             for (const otherPeer of otherPeers) {
+                console.log(`  -> Sending newProducer to peer ${otherPeer.id} (${otherPeer.name})`);
                 otherPeer.socket.emit('newProducer', {
                     producerId: producer.id,
                     producerSocketId: socket.id,

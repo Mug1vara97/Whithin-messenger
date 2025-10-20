@@ -29,6 +29,12 @@ class VoiceCallApi {
 
     this.socket = io(serverUrl, VOICE_SERVER_CONFIG);
 
+    // Регистрируем базовые обработчики сразу
+    this.socket.on('disconnect', () => {
+      console.log('Disconnected from voice server');
+      this.isConnected = false;
+    });
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Connection timeout'));
