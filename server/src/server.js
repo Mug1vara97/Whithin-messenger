@@ -360,7 +360,14 @@ io.on('connection', async (socket) => {
 
             const peer = peers.get(socket.id);
             if (!peer) {
-                throw new Error('Peer not found');
+                // Автоматически создаём peer, если он ещё не создан, но сокет уже привязан к комнатe
+                const room = rooms.get(socket.data.roomId);
+                if (!room) {
+                    throw new Error('Room not found');
+                }
+                const autoPeer = new Peer(socket, socket.data.roomId, 'Unknown', socket.id);
+                peers.set(socket.id, autoPeer);
+                room.addPeer(autoPeer);
             }
 
             const room = rooms.get(socket.data.roomId);
@@ -473,9 +480,15 @@ io.on('connection', async (socket) => {
                 throw new Error('Not joined to any room');
             }
 
-            const peer = peers.get(socket.id);
+            let peer = peers.get(socket.id);
             if (!peer) {
-                throw new Error('Peer not found');
+                const roomIfAny = rooms.get(socket.data.roomId);
+                if (!roomIfAny) {
+                    throw new Error('Room not found');
+                }
+                peer = new Peer(socket, socket.data.roomId, 'Unknown', socket.id);
+                peers.set(socket.id, peer);
+                roomIfAny.addPeer(peer);
             }
 
             const room = rooms.get(socket.data.roomId);
@@ -794,9 +807,15 @@ io.on('connection', async (socket) => {
                 throw new Error('Not joined to any room');
             }
 
-            const peer = peers.get(socket.id);
+            let peer = peers.get(socket.id);
             if (!peer) {
-                throw new Error('Peer not found');
+                const roomIfAny = rooms.get(socket.data.roomId);
+                if (!roomIfAny) {
+                    throw new Error('Room not found');
+                }
+                peer = new Peer(socket, socket.data.roomId, 'Unknown', socket.id);
+                peers.set(socket.id, peer);
+                roomIfAny.addPeer(peer);
             }
 
             const room = rooms.get(socket.data.roomId);

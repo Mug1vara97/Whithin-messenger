@@ -36,6 +36,9 @@ export const useVoiceCall = (userId, userName) => {
   const producersRef = useRef(new Map());
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
+  const isJoiningRef = useRef(false);
+  const hasJoinedRef = useRef(false);
+  const creatingTransportsRef = useRef(false);
 
   // Подключение к серверу
   const connect = async () => {
@@ -68,6 +71,13 @@ export const useVoiceCall = (userId, userName) => {
 
   // Создание транспортов
   const createTransports = async () => {
+    if (creatingTransportsRef.current) {
+      return;
+    }
+    if (sendTransportRef.current && recvTransportRef.current) {
+      return;
+    }
+    creatingTransportsRef.current = true;
     try {
       // Создание send transport
       const sendTransportData = await voiceCallApi.createWebRtcTransport();
@@ -122,6 +132,8 @@ export const useVoiceCall = (userId, userName) => {
     } catch (error) {
       console.error('Failed to create transports:', error);
       setError(error.message);
+    } finally {
+      creatingTransportsRef.current = false;
     }
   };
 
@@ -167,6 +179,10 @@ export const useVoiceCall = (userId, userName) => {
 
   // Присоединение к комнате
   const joinRoom = async (roomId) => {
+    if (hasJoinedRef.current || isJoiningRef.current) {
+      return;
+    }
+    isJoiningRef.current = true;
     try {
       const response = await voiceCallApi.joinRoom(roomId, userName, userId);
       
@@ -197,10 +213,17 @@ export const useVoiceCall = (userId, userName) => {
       
       // Небольшая задержка перед созданием producer'а
       await new Promise(resolve => setTimeout(resolve, 100));
+      // Гарантируем, что транспорты готовы перед попыткой produce
+      if (!sendTransportRef.current) {
+        await createTransports();
+      }
       await createAudioStream();
+      hasJoinedRef.current = true;
     } catch (error) {
       console.error('Failed to join room:', error);
       setError(error.message);
+    } finally {
+      isJoiningRef.current = false;
     }
   };
 
@@ -313,6 +336,8 @@ export const useVoiceCall = (userId, userName) => {
       await voiceCallApi.disconnect();
       setIsConnected(false);
       setParticipants([]);
+      hasJoinedRef.current = false;
+      isJoiningRef.current = false;
     } catch (error) {
       console.error('Failed to disconnect:', error);
     }
