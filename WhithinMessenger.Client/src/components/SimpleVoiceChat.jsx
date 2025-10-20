@@ -39,6 +39,8 @@ const SimpleVoiceChat = ({
   // const [isSpeaking, setIsSpeaking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [volume, setVolume] = useState(1.0);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [maxParticipants] = useState(10); // Ограничение на количество участников
   
   const socketRef = useRef(null);
   const deviceRef = useRef(null);
@@ -99,17 +101,29 @@ const SimpleVoiceChat = ({
 
       socket.on('peerJoined', (peerData) => {
         console.log('Peer joined:', peerData);
-        setParticipants(prev => [...prev, {
-          userId: peerData.userId,
-          name: peerData.name,
-          isMuted: peerData.isMuted,
-          isSpeaking: false
-        }]);
+        setParticipants(prev => {
+          const newParticipants = [...prev, {
+            userId: peerData.userId,
+            name: peerData.name,
+            isMuted: peerData.isMuted,
+            isSpeaking: false
+          }];
+          
+          // Проверяем лимит участников
+          if (newParticipants.length > maxParticipants) {
+            console.warn(`Too many participants (${newParticipants.length}), limiting to ${maxParticipants}`);
+            return newParticipants.slice(0, maxParticipants);
+          }
+          
+          return newParticipants;
+        });
       });
 
       socket.on('peerLeft', (peerData) => {
         console.log('Peer left:', peerData);
         setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+        // Удаляем все consumer'ы для этого peer'а
+        removeConsumerForPeer(peerData.userId);
       });
 
       socket.on('newProducer', async (producerData) => {
@@ -120,6 +134,13 @@ const SimpleVoiceChat = ({
       socket.on('producerClosed', (producerId) => {
         console.log('Producer closed:', producerId);
         removeConsumer(producerId);
+      });
+
+      socket.on('peerLeft', (peerData) => {
+        console.log('Peer left:', peerData);
+        setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+        // Удаляем все consumer'ы для этого peer'а
+        removeConsumerForPeer(peerData.userId);
       });
 
     } catch (error) {
@@ -266,6 +287,14 @@ const SimpleVoiceChat = ({
         })));
       }
       
+      // Обработка существующих producer'ов
+      if (response.existingProducers) {
+        console.log('Processing existing producers:', response.existingProducers);
+        for (const producer of response.existingProducers) {
+          await handleNewProducer(producer);
+        }
+      }
+      
       // Создание аудио потока
       await createAudioStream();
       
@@ -337,7 +366,43 @@ const SimpleVoiceChat = ({
       audioElement.srcObject = new MediaStream([consumer.track]);
       audioElement.volume = volume;
       audioElement.autoplay = true;
+      audioElement.playsInline = true;
+      audioElement.controls = false;
+      audioElement.style.display = 'none';
       document.body.appendChild(audioElement);
+
+      // Принудительно запускаем воспроизведение
+      try {
+        await audioElement.play();
+        console.log('Audio playback started for consumer:', consumerData.id);
+      } catch (error) {
+        console.log('Auto-play blocked, user interaction required:', error);
+        setAudioBlocked(true);
+        // Попробуем запустить после небольшой задержки
+        setTimeout(async () => {
+          try {
+            await audioElement.play();
+            console.log('Audio playback started after delay');
+            setAudioBlocked(false);
+          } catch (e) {
+            console.log('Audio playback still blocked');
+          }
+        }, 1000);
+      }
+
+      // Обработчики событий для аудио элемента
+      audioElement.addEventListener('loadedmetadata', () => {
+        console.log('Audio metadata loaded for consumer:', consumerData.id);
+      });
+
+      audioElement.addEventListener('canplay', () => {
+        console.log('Audio can play for consumer:', consumerData.id);
+        audioElement.play().catch(e => console.log('Play failed:', e));
+      });
+
+      audioElement.addEventListener('error', (e) => {
+        console.error('Audio element error:', e);
+      });
 
       // Resume consumer
       await socketEmit('resumeConsumer', { consumerId: consumerData.id });
@@ -355,6 +420,20 @@ const SimpleVoiceChat = ({
       consumer.close();
       consumersRef.current.delete(producerId);
     }
+  };
+
+  // Удаление всех consumer'ов для конкретного peer'а
+  const removeConsumerForPeer = (userId) => {
+    const consumersToRemove = [];
+    consumersRef.current.forEach((consumer, consumerId) => {
+      if (consumer.appData && consumer.appData.userId === userId) {
+        consumersToRemove.push(consumerId);
+      }
+    });
+    
+    consumersToRemove.forEach(consumerId => {
+      removeConsumer(consumerId);
+    });
   };
 
   // Вспомогательная функция для отправки событий
@@ -444,11 +523,44 @@ const SimpleVoiceChat = ({
           </Typography>
         </Box>
 
-        {/* Участники */}
-        <Box mb={3}>
-          <Typography variant="subtitle1" gutterBottom>
-            Участники ({participants.length})
-          </Typography>
+        {/* Предупреждение о блокировке аудио */}
+        {audioBlocked && (
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+            <Typography variant="body2" color="warning.contrastText" sx={{ mb: 1 }}>
+              Браузер заблокировал автовоспроизведение аудио
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="warning" 
+              size="small"
+              onClick={async () => {
+                // Попробуем запустить все аудио элементы
+                const audioElements = document.querySelectorAll('audio');
+                for (const audio of audioElements) {
+                  try {
+                    await audio.play();
+                  } catch (e) {
+                    console.log('Failed to play audio:', e);
+                  }
+                }
+                setAudioBlocked(false);
+              }}
+            >
+              Разрешить воспроизведение
+            </Button>
+          </Box>
+        )}
+
+         {/* Участники */}
+         <Box mb={3}>
+           <Typography variant="subtitle1" gutterBottom>
+             Участники ({participants.length}/{maxParticipants})
+           </Typography>
+           {participants.length >= maxParticipants && (
+             <Typography variant="caption" color="warning.main">
+               Достигнут лимит участников ({maxParticipants})
+             </Typography>
+           )}
           <List dense>
             {participants.map((participant, index) => (
               <ListItem key={index}>
