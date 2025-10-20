@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Device } from 'mediasoup-client';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { CALL_STATUS, MEDIA_TYPES } from '../model/types';
 
@@ -23,7 +24,7 @@ export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeaking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [volume, setVolume] = useState(1.0);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -168,6 +169,7 @@ export const useVoiceCall = (userId, userName) => {
       
       if (response.routerRtpCapabilities) {
         await initializeDevice(response.routerRtpCapabilities);
+        await createTransports();
       }
       
       if (response.existingPeers) {
@@ -200,7 +202,7 @@ export const useVoiceCall = (userId, userName) => {
   };
 
   // Обработка нового producer
-  const handleNewProducer = async (producerData) => {
+  const handleNewProducer = useCallback(async (producerData) => {
     try {
       const consumerData = await voiceCallApi.consume(
         deviceRef.current.rtpCapabilities,
@@ -239,8 +241,8 @@ export const useVoiceCall = (userId, userName) => {
             await audioElement.play();
             console.log('Audio playback started after delay');
             setAudioBlocked(false);
-          } catch (e) {
-            console.log('Audio playback still blocked');
+          } catch (playError) {
+            console.log('Audio playback still blocked:', playError);
           }
         }, 1000);
       }
@@ -263,7 +265,7 @@ export const useVoiceCall = (userId, userName) => {
     } catch (error) {
       console.error('Failed to handle new producer:', error);
     }
-  };
+  }, [volume]);
 
   // Удаление consumer
   const removeConsumer = (producerId) => {
@@ -275,7 +277,7 @@ export const useVoiceCall = (userId, userName) => {
   };
 
   // Удаление всех consumer'ов для конкретного peer'а
-  const removeConsumerForPeer = (userId) => {
+  const removeConsumerForPeer = useCallback((userId) => {
     const consumersToRemove = [];
     consumersRef.current.forEach((consumer, consumerId) => {
       if (consumer.appData && consumer.appData.userId === userId) {
@@ -286,7 +288,7 @@ export const useVoiceCall = (userId, userName) => {
     consumersToRemove.forEach(consumerId => {
       removeConsumer(consumerId);
     });
-  };
+  }, []);
 
   // Отключение
   const disconnect = async () => {
@@ -383,7 +385,7 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('newProducer', handleNewProducerEvent);
       voiceCallApi.off('producerClosed', handleProducerClosed);
     };
-  }, []);
+  }, [handleNewProducer, removeConsumerForPeer]);
 
   return {
     // Состояние

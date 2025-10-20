@@ -25,3 +25,4 @@ export const VOICE_STATES = {
   DEAFENED: 'deafened',
   SPEAKING: 'speaking'
 };
+
