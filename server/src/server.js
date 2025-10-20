@@ -381,9 +381,12 @@ io.on('connection', async (socket) => {
                 room.addPeer(autoPeer);
             }
 
-            const room = rooms.get(socket.data.roomId);
+            let room = rooms.get(socket.data.roomId);
             if (!room) {
-                throw new Error('Room not found');
+                // На случай гонки: создаём комнату по известному roomId
+                const worker = getMediasoupWorker();
+                room = await createRoom(socket.data.roomId, worker);
+                rooms.set(socket.data.roomId, room);
             }
 
             const transport = await room.createWebRtcTransport(config.mediasoup.webRtcTransport);
