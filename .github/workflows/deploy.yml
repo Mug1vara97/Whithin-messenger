@@ -53,7 +53,7 @@ jobs:
           echo "Stopping containers..."
           if [ -d "whithin-messenger" ]; then
             cd whithin-messenger
-            docker-compose down -v || true
+            docker-compose down || true
             docker rm -f whithin-messenger-db-1 whithin-messenger-backend-1 whithin-messenger-client-1 whithin-messenger-nginx-1 2>/dev/null || true
             cd ..
           fi
@@ -90,6 +90,12 @@ jobs:
         script: |
           cd /home/whithin-messenger
           
+          # Создаем директории для данных
+          echo "Creating data directories..."
+          mkdir -p /home/whithin-messenger/data/postgres
+          mkdir -p /home/whithin-messenger/data/uploads
+          chmod -R 755 /home/whithin-messenger/data
+          
           # Устанавливаем права
           echo "Setting permissions..."
           chmod +x docker-compose.yml
@@ -98,6 +104,17 @@ jobs:
           # Запускаем Docker контейнеры
           echo "Starting services..."
           docker-compose up -d --build
+          
+          # Ждем запуска базы данных
+          echo "Waiting for database to start..."
+          sleep 10
+          
+          # Инициализируем базу данных, если нужно
+          echo "Initializing database..."
+          docker-compose exec -T db psql -U postgres -d whithin_db -c "SELECT 1;" 2>/dev/null || {
+            echo "Database not found, creating..."
+            docker-compose exec -T db createdb -U postgres whithin_db 2>/dev/null || true
+          }
           
           # Ждем запуска сервисов
           echo "Waiting for services to start..."

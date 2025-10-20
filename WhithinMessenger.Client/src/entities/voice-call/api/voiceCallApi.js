@@ -46,12 +46,12 @@ class VoiceCallApi {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected = false;
-      this.roomId = null;
     }
+    this.isConnected = false;
+    this.device = null;
+    this.roomId = null;
   }
 
-  // Инициализация медиа-устройства
   async initializeDevice(routerRtpCapabilities) {
     try {
       if (!this.device) {
@@ -69,57 +69,10 @@ class VoiceCallApi {
     }
   }
 
-  // Создание комнаты
-  async createRoom(roomId) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    return new Promise((resolve, reject) => {
-      this.socket.emit('createRoom', { roomId }, (response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-        } else {
-          this.roomId = roomId;
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  // Присоединение к комнате
-  async joinRoom(roomId, name, initialMuted = false, initialAudioEnabled = true) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    return new Promise((resolve, reject) => {
-      this.socket.emit('join', {
-        roomId,
-        name: name || this.userName,
-        userId: this.userId,
-        initialMuted,
-        initialAudioEnabled
-      }, (response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-        } else {
-          this.roomId = roomId;
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  // Создание WebRTC транспорта
   async createWebRtcTransport() {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
     return new Promise((resolve, reject) => {
-      this.socket.emit('createWebRtcTransport', (response) => {
-        if (response.error) {
+      this.socket.emit('createWebRtcTransport', {}, (response) => {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
@@ -128,15 +81,13 @@ class VoiceCallApi {
     });
   }
 
-  // Подключение транспорта
   async connectTransport(transportId, dtlsParameters) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
     return new Promise((resolve, reject) => {
-      this.socket.emit('connectTransport', { transportId, dtlsParameters }, (response) => {
-        if (response.error) {
+      this.socket.emit('connectTransport', {
+        transportId,
+        dtlsParameters
+      }, (response) => {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
@@ -145,23 +96,15 @@ class VoiceCallApi {
     });
   }
 
-  // Создание producer (аудио/видео)
-  async produce(transportId, kind, rtpParameters, appData = {}) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
+  async produce(transportId, kind, rtpParameters, appData) {
     return new Promise((resolve, reject) => {
       this.socket.emit('produce', {
         transportId,
         kind,
         rtpParameters,
-        appData: {
-          ...appData,
-          userId: this.userId
-        }
+        appData
       }, (response) => {
-        if (response.error) {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
@@ -170,19 +113,14 @@ class VoiceCallApi {
     });
   }
 
-  // Создание consumer
   async consume(rtpCapabilities, remoteProducerId, transportId) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
     return new Promise((resolve, reject) => {
       this.socket.emit('consume', {
         rtpCapabilities,
         remoteProducerId,
         transportId
       }, (response) => {
-        if (response.error) {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
@@ -191,15 +129,12 @@ class VoiceCallApi {
     });
   }
 
-  // Возобновление consumer
   async resumeConsumer(consumerId) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
     return new Promise((resolve, reject) => {
-      this.socket.emit('resumeConsumer', { consumerId }, (response) => {
-        if (response.error) {
+      this.socket.emit('resumeConsumer', {
+        consumerId
+      }, (response) => {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
@@ -208,81 +143,35 @@ class VoiceCallApi {
     });
   }
 
-  // Изменение состояния микрофона
-  async toggleMute(isMuted) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    this.socket.emit('muteState', { isMuted });
-  }
-
-  // Изменение состояния аудио
-  async toggleAudio(isEnabled) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    this.socket.emit('audioState', { isEnabled });
-  }
-
-  // Отправка состояния говорения
-  async setSpeaking(speaking) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    this.socket.emit('speaking', { speaking });
-  }
-
-  // Остановка демонстрации экрана
-  async stopScreenShare(producerId) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
-    this.socket.emit('stopScreenSharing', { producerId });
-  }
-
-  // Получение участников комнаты
-  async getPeers() {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
-    }
-
+  async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true) {
     return new Promise((resolve, reject) => {
-      this.socket.emit('getPeers', (response) => {
-        if (response.error) {
+      this.socket.emit('join', {
+        roomId,
+        name,
+        userId,
+        initialMuted,
+        initialAudioEnabled
+      }, (response) => {
+        if (response && response.error) {
           reject(new Error(response.error));
         } else {
+          this.roomId = roomId;
           resolve(response);
         }
       });
     });
   }
 
-  // Получение участников голосового канала
-  async getVoiceChannelParticipants() {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
+  on(event, callback) {
+    if (this.socket) {
+      this.socket.on(event, callback);
     }
-
-    this.socket.emit('getVoiceChannelParticipants');
   }
 
-  // Обновление состояния пользователя в голосовом канале
-  async updateUserVoiceState(userId, userName, channelId, isMuted, isAudioDisabled) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Voice connection not established');
+  off(event, callback) {
+    if (this.socket) {
+      this.socket.off(event, callback);
     }
-
-    this.socket.emit('updateUserVoiceState', {
-      userId,
-      userName,
-      channelId,
-      isMuted,
-      isAudioDisabled
-    });
   }
 }
 

@@ -5,118 +5,81 @@ import { ICE_SERVERS } from '../../../shared/lib/constants/iceServers';
 
 export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState(null);
-  const [roomId, setRoomId] = useState(null);
-  const [participants, setParticipants] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
+  const [participants, setParticipants] = useState([]);
+  const [volume, setVolume] = useState(1.0);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [error, setError] = useState(null);
+
   const deviceRef = useRef(null);
   const sendTransportRef = useRef(null);
   const recvTransportRef = useRef(null);
   const producersRef = useRef(new Map());
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
-  const screenStreamRef = useRef(null);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
-    if (isConnected || isConnecting) return;
-    
-    setIsConnecting(true);
-    setError(null);
-
     try {
+      setError(null);
       await voiceCallApi.connect(userId, userName);
       setIsConnected(true);
-      console.log('Connected to voice server');
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
       setError(error.message);
-    } finally {
-      setIsConnecting(false);
     }
-  }, [userId, userName, isConnected, isConnecting]);
+  }, [userId, userName]);
 
   // Отключение от сервера
   const disconnect = useCallback(async () => {
-    if (!isConnected) return;
-
     try {
-      // Очистка всех медиа-потоков
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
       }
-
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => track.stop());
-        screenStreamRef.current = null;
-      }
-
-      // Закрытие всех транспортов
+      
       if (sendTransportRef.current) {
         sendTransportRef.current.close();
         sendTransportRef.current = null;
       }
-
+      
       if (recvTransportRef.current) {
         recvTransportRef.current.close();
         recvTransportRef.current = null;
       }
-
-      // Очистка producers и consumers
-      producersRef.current.clear();
+      
+      consumersRef.current.forEach(consumer => consumer.close());
       consumersRef.current.clear();
-
+      
+      producersRef.current.forEach(producer => producer.close());
+      producersRef.current.clear();
+      
       await voiceCallApi.disconnect();
       setIsConnected(false);
-      setRoomId(null);
       setParticipants([]);
-      console.log('Disconnected from voice server');
     } catch (error) {
-      console.error('Error disconnecting from voice server:', error);
+      console.error('Failed to disconnect:', error);
     }
-  }, [isConnected]);
+  }, []);
 
-  // Присоединение к комнате
-  const joinRoom = useCallback(async (targetRoomId, initialMuted = false, initialAudioEnabled = true) => {
-    if (!isConnected) {
-      throw new Error('Not connected to voice server');
-    }
-
+  // Инициализация устройства
+  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
     try {
-      const response = await voiceCallApi.joinRoom(
-        targetRoomId,
-        userName,
-        initialMuted,
-        initialAudioEnabled
-      );
+      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
+      await createTransports();
+    } catch (error) {
+      console.error('Failed to initialize device:', error);
+      setError(error.message);
+    }
+  }, []);
 
-      setRoomId(targetRoomId);
-      setIsMuted(initialMuted);
-      setIsAudioEnabled(initialAudioEnabled);
-
-      // Инициализация устройства
-      if (!deviceRef.current) {
-        deviceRef.current = await voiceCallApi.initializeDevice(response.routerRtpCapabilities);
-        
-        // Настройка ICE серверов для медиа-устройства
-        if (deviceRef.current && deviceRef.current.rtpCapabilities) {
-          // Устанавливаем ICE серверы для WebRTC соединений
-          deviceRef.current.iceServers = ICE_SERVERS;
-        }
-      }
-
-      // Создание транспортов
-      const sendTransportData = await voiceCallApi.createWebRtcTransport();
-      const recvTransportData = await voiceCallApi.createWebRtcTransport();
-
+  // Создание транспортов
+  const createTransports = useCallback(async () => {
+    try {
       // Создание send transport
+      const sendTransportData = await voiceCallApi.createWebRtcTransport();
       sendTransportRef.current = deviceRef.current.createSendTransport({
         id: sendTransportData.id,
         iceParameters: sendTransportData.iceParameters,
@@ -125,16 +88,6 @@ export const useVoiceCall = (userId, userName) => {
         iceServers: ICE_SERVERS
       });
 
-      // Создание recv transport
-      recvTransportRef.current = deviceRef.current.createRecvTransport({
-        id: recvTransportData.id,
-        iceParameters: recvTransportData.iceParameters,
-        iceCandidates: recvTransportData.iceCandidates,
-        dtlsParameters: recvTransportData.dtlsParameters,
-        iceServers: ICE_SERVERS
-      });
-
-      // Настройка обработчиков для send transport
       sendTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
         try {
           await voiceCallApi.connectTransport(sendTransportData.id, dtlsParameters);
@@ -144,16 +97,25 @@ export const useVoiceCall = (userId, userName) => {
         }
       });
 
-      sendTransportRef.current.on('produce', async ({ kind, rtpParameters }, callback, errback) => {
+      sendTransportRef.current.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
         try {
-          const { id } = await voiceCallApi.produce(sendTransportData.id, kind, rtpParameters);
+          const { id } = await voiceCallApi.produce(sendTransportData.id, kind, rtpParameters, appData);
           callback({ id });
         } catch (error) {
           errback(error);
         }
       });
 
-      // Настройка обработчиков для recv transport
+      // Создание recv transport
+      const recvTransportData = await voiceCallApi.createWebRtcTransport();
+      recvTransportRef.current = deviceRef.current.createRecvTransport({
+        id: recvTransportData.id,
+        iceParameters: recvTransportData.iceParameters,
+        iceCandidates: recvTransportData.iceCandidates,
+        dtlsParameters: recvTransportData.dtlsParameters,
+        iceServers: ICE_SERVERS
+      });
+
       recvTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
         try {
           await voiceCallApi.connectTransport(recvTransportData.id, dtlsParameters);
@@ -163,68 +125,46 @@ export const useVoiceCall = (userId, userName) => {
         }
       });
 
-      // Обработка существующих producers
-      for (const producerData of response.existingProducers) {
-        await handleExistingProducer(producerData);
-      }
-
-      console.log('Joined room:', targetRoomId);
+      console.log('Transports created');
     } catch (error) {
-      console.error('Failed to join room:', error);
-      throw error;
-    }
-  }, [isConnected, userName, handleExistingProducer]);
-
-  // Обработка существующего producer
-  const handleExistingProducer = useCallback(async (producerData) => {
-    try {
-      const { producerId } = producerData;
-      
-      const consumerData = await voiceCallApi.consume(
-        deviceRef.current.rtpCapabilities,
-        producerId,
-        recvTransportRef.current.id
-      );
-
-      const consumer = recvTransportRef.current.consume({
-        id: consumerData.id,
-        producerId: consumerData.producerId,
-        kind: consumerData.kind,
-        rtpParameters: consumerData.rtpParameters,
-        type: consumerData.type,
-        producerPaused: consumerData.producerPaused,
-        appData: consumerData.appData
-      });
-
-      consumersRef.current.set(consumer.id, consumer);
-
-      // Возобновление consumer если он не на паузе
-      if (!consumerData.producerPaused) {
-        await voiceCallApi.resumeConsumer(consumer.id);
-        await consumer.resume();
-      }
-
-      // Подключение к аудио элементу
-      if (consumer.kind === 'audio') {
-        const audioElement = document.createElement('audio');
-        audioElement.srcObject = new MediaStream([consumer.track]);
-        audioElement.autoplay = true;
-        audioElement.volume = 1.0;
-        document.body.appendChild(audioElement);
-      }
-
-      console.log('Created consumer for existing producer:', producerId);
-    } catch (error) {
-      console.error('Failed to handle existing producer:', error);
+      console.error('Failed to create transports:', error);
+      setError(error.message);
     }
   }, []);
 
-  // Начало аудио потока
-  const startAudio = useCallback(async () => {
-    if (!sendTransportRef.current || !deviceRef.current) {
-      throw new Error('Transport or device not initialized');
+  // Присоединение к комнате
+  const joinRoom = useCallback(async (roomId) => {
+    try {
+      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
+      
+      if (response.routerRtpCapabilities) {
+        await initializeDevice(response.routerRtpCapabilities);
+      }
+      
+      if (response.existingPeers) {
+        setParticipants(response.existingPeers.map(peer => ({
+          userId: peer.userId,
+          name: peer.name,
+          isMuted: peer.isMuted,
+          isSpeaking: false
+        })));
+      }
+      
+      if (response.existingProducers) {
+        for (const producer of response.existingProducers) {
+          await handleNewProducer(producer);
+        }
+      }
+      
+      await createAudioStream();
+    } catch (error) {
+      console.error('Failed to join room:', error);
+      setError(error.message);
     }
+  }, [userName, userId, initializeDevice, createAudioStream]);
 
+  // Создание аудио потока
+  const createAudioStream = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -232,246 +172,170 @@ export const useVoiceCall = (userId, userName) => {
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
-          channelCount: 1
+          channelCount: 2,
+          latency: 0,
+          suppressLocalAudioPlayback: true
         }
       });
 
       localStreamRef.current = stream;
+      
       const audioTrack = stream.getAudioTracks()[0];
-
       const producer = await sendTransportRef.current.produce({
         track: audioTrack,
-        appData: { mediaType: 'audio' }
+        appData: { userId, userName }
       });
 
       producersRef.current.set(producer.id, producer);
-
-      // Обработка состояния говорения
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      analyser.fftSize = 256;
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      const checkSpeaking = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-        const speaking = average > 30; // Порог для определения говорения
-
-        if (speaking !== isSpeaking) {
-          setIsSpeaking(speaking);
-          voiceCallApi.setSpeaking(speaking);
-        }
-
-        if (isAudioEnabled && !isMuted) {
-          requestAnimationFrame(checkSpeaking);
-        }
+      
+      audioTrack.onended = () => {
+        console.log('Audio track ended');
       };
 
-      checkSpeaking();
-
-      console.log('Audio stream started');
+      console.log('Audio stream created');
+      return producer;
     } catch (error) {
-      console.error('Failed to start audio stream:', error);
-      throw error;
+      console.error('Failed to create audio stream:', error);
+      setError(error.message);
     }
-  }, [isSpeaking, isAudioEnabled, isMuted]);
+  }, [userId, userName]);
 
-  // Остановка аудио потока
-  const stopAudio = useCallback(() => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
+  // Обработка нового producer
+  const handleNewProducer = useCallback(async (producerData) => {
+    try {
+      const consumerData = await voiceCallApi.consume(
+        deviceRef.current.rtpCapabilities,
+        producerData.producerId,
+        recvTransportRef.current.id
+      );
 
-    // Остановка всех аудио producers
-    producersRef.current.forEach((producer, id) => {
-      if (producer.kind === 'audio') {
-        producer.close();
-        producersRef.current.delete(id);
+      const consumer = await recvTransportRef.current.consume({
+        id: consumerData.id,
+        producerId: producerData.producerId,
+        kind: producerData.kind,
+        rtpParameters: consumerData.rtpParameters
+      });
+
+      consumersRef.current.set(consumerData.id, consumer);
+      
+      // Создание аудио элемента
+      const audioElement = document.createElement('audio');
+      audioElement.srcObject = new MediaStream([consumer.track]);
+      audioElement.volume = volume;
+      audioElement.autoplay = true;
+      audioElement.playsInline = true;
+      audioElement.controls = false;
+      audioElement.style.display = 'none';
+      document.body.appendChild(audioElement);
+
+      try {
+        await audioElement.play();
+        console.log('Audio playback started for consumer:', consumerData.id);
+        setAudioBlocked(false);
+      } catch (error) {
+        console.log('Auto-play blocked, user interaction required:', error);
+        setAudioBlocked(true);
+        setTimeout(async () => {
+          try {
+            await audioElement.play();
+            setAudioBlocked(false);
+          } catch (e) {
+            console.log('Audio playback still blocked');
+          }
+        }, 1000);
       }
-    });
 
-    console.log('Audio stream stopped');
-  }, []);
+      await voiceCallApi.resumeConsumer(consumerData.id);
+      console.log('New consumer created:', consumerData.id);
+    } catch (error) {
+      console.error('Failed to handle new producer:', error);
+    }
+  }, [volume]);
 
   // Переключение микрофона
-  const toggleMute = useCallback(async () => {
-    const newMutedState = !isMuted;
-    setIsMuted(newMutedState);
-    
-    if (voiceCallApi.socket) {
-      await voiceCallApi.toggleMute(newMutedState);
-    }
-
-    // Остановка/возобновление аудио producers
-    producersRef.current.forEach((producer) => {
-      if (producer.kind === 'audio') {
-        if (newMutedState) {
-          producer.pause();
-        } else {
-          producer.resume();
-        }
+  const toggleMute = useCallback(() => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
       }
-    });
-  }, [isMuted]);
-
-  // Переключение аудио
-  const toggleAudio = useCallback(async () => {
-    const newAudioState = !isAudioEnabled;
-    setIsAudioEnabled(newAudioState);
-    
-    if (voiceCallApi.socket) {
-      await voiceCallApi.toggleAudio(newAudioState);
     }
-
-    // Остановка/возобновление всех consumers
-    consumersRef.current.forEach((consumer) => {
-      if (newAudioState) {
-        consumer.resume();
-      } else {
-        consumer.pause();
-      }
-    });
-  }, [isAudioEnabled]);
-
-  // Начало демонстрации экрана
-  const startScreenShare = useCallback(async () => {
-    if (!sendTransportRef.current) {
-      throw new Error('Transport not initialized');
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
-        },
-        audio: false
-      });
-
-      screenStreamRef.current = stream;
-      const videoTrack = stream.getVideoTracks()[0];
-
-      const producer = await sendTransportRef.current.produce({
-        track: videoTrack,
-        appData: { mediaType: 'screen' }
-      });
-
-      producersRef.current.set(producer.id, producer);
-      setIsScreenSharing(true);
-
-      // Обработка остановки демонстрации экрана
-      videoTrack.onended = () => {
-        stopScreenShare();
-      };
-
-      console.log('Screen sharing started');
-    } catch (error) {
-      console.error('Failed to start screen sharing:', error);
-      throw error;
-    }
-  }, [stopScreenShare]);
-
-  // Остановка демонстрации экрана
-  const stopScreenShare = useCallback(() => {
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
-      screenStreamRef.current = null;
-    }
-
-    // Остановка screen sharing producers
-    producersRef.current.forEach((producer, id) => {
-      if (producer.appData?.mediaType === 'screen') {
-        producer.close();
-        producersRef.current.delete(id);
-        voiceCallApi.stopScreenShare(id);
-      }
-    });
-
-    setIsScreenSharing(false);
-    console.log('Screen sharing stopped');
   }, []);
 
-  // Покидание комнаты
-  const leaveRoom = useCallback(async () => {
-    if (!roomId) return;
+  // Переключение аудио
+  const toggleAudio = useCallback(() => {
+    setIsAudioEnabled(!isAudioEnabled);
+  }, [isAudioEnabled]);
 
-    try {
-      // Очистка всех медиа-потоков
-      stopAudio();
-      stopScreenShare();
+  // Изменение громкости
+  const handleVolumeChange = useCallback((newVolume) => {
+    setVolume(newVolume);
+    const audioElements = document.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+      audio.volume = newVolume;
+    });
+  }, []);
 
-      // Закрытие транспортов
-      if (sendTransportRef.current) {
-        sendTransportRef.current.close();
-        sendTransportRef.current = null;
-      }
-
-      if (recvTransportRef.current) {
-        recvTransportRef.current.close();
-        recvTransportRef.current = null;
-      }
-
-      // Очистка producers и consumers
-      producersRef.current.clear();
-      consumersRef.current.clear();
-
-      setRoomId(null);
-      setParticipants([]);
-      setIsMuted(false);
-      setIsAudioEnabled(true);
-      setIsVideoEnabled(false);
-      setIsScreenSharing(false);
-      setIsSpeaking(false);
-
-      console.log('Left room');
-    } catch (error) {
-      console.error('Failed to leave room:', error);
-    }
-  }, [roomId, stopAudio, stopScreenShare]);
-
-  // Очистка при размонтировании
+  // Обработка событий
   useEffect(() => {
-    return () => {
-      disconnect();
+    if (!voiceCallApi.socket) return;
+
+    const handlePeerJoined = (peerData) => {
+      setParticipants(prev => [...prev, {
+        userId: peerData.userId,
+        name: peerData.name,
+        isMuted: peerData.isMuted,
+        isSpeaking: false
+      }]);
     };
-  }, [disconnect]);
+
+    const handlePeerLeft = (peerData) => {
+      setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+    };
+
+    const handleNewProducer = (producerData) => {
+      handleNewProducer(producerData);
+    };
+
+    const handleProducerClosed = (producerId) => {
+      const consumer = consumersRef.current.get(producerId);
+      if (consumer) {
+        consumer.close();
+        consumersRef.current.delete(producerId);
+      }
+    };
+
+    voiceCallApi.on('peerJoined', handlePeerJoined);
+    voiceCallApi.on('peerLeft', handlePeerLeft);
+    voiceCallApi.on('newProducer', handleNewProducer);
+    voiceCallApi.on('producerClosed', handleProducerClosed);
+
+    return () => {
+      voiceCallApi.off('peerJoined', handlePeerJoined);
+      voiceCallApi.off('peerLeft', handlePeerLeft);
+      voiceCallApi.off('newProducer', handleNewProducer);
+      voiceCallApi.off('producerClosed', handleProducerClosed);
+    };
+  }, [handleNewProducer]);
 
   return {
-    // Состояние подключения
+    // Состояние
     isConnected,
-    isConnecting,
-    error,
-    
-    // Состояние комнаты
-    roomId,
-    participants,
-    
-    // Состояние медиа
     isMuted,
     isAudioEnabled,
-    isVideoEnabled,
-    isScreenSharing,
     isSpeaking,
+    participants,
+    volume,
+    audioBlocked,
+    error,
     
-    // Методы управления
+    // Методы
     connect,
     disconnect,
     joinRoom,
-    leaveRoom,
-    startAudio,
-    stopAudio,
     toggleMute,
     toggleAudio,
-    startScreenShare,
-    stopScreenShare,
-    
-    // API для прямого доступа
-    api: voiceCallApi
+    handleVolumeChange
   };
 };

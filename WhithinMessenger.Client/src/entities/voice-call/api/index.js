@@ -1,2 +1,1 @@
-export * from './voiceCallApi';
-
+export { voiceCallApi } from './voiceCallApi';

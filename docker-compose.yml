@@ -88,7 +88,17 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/whithin-messenger/data/postgres
   uploads_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/whithin-messenger/data/uploads
 
 networks:
   app-network:
