@@ -12,8 +12,9 @@ module.exports = {
     mediasoup: {
         numWorkers: Object.keys(require('os').cpus()).length,
         worker: {
+            // Расширяем портовый диапазон для избежания ошибки "no more available ports"
             rtcMinPort: 40000,
-            rtcMaxPort: 40100,
+            rtcMaxPort: 41000,
             logLevel: 'debug',
             logTags: [
                 'info',

@@ -88,6 +88,27 @@ class VoiceCallApi {
     });
   }
 
+  async leaveRoom() {
+    return new Promise((resolve) => {
+      if (!this.socket) {
+        resolve();
+        return;
+      }
+      // Поддерживаем оба события на сервере: leave и leaveRoom
+      const cb = () => resolve();
+      try {
+        this.socket.emit('leave', {}, cb);
+      } catch {
+        cb();
+      }
+      try {
+        this.socket.emit('leaveRoom', {}, cb);
+      } catch {
+        // no-op
+      }
+    });
+  }
+
   async connectTransport(transportId, dtlsParameters) {
     return new Promise((resolve, reject) => {
       this.socket.emit('connectTransport', {

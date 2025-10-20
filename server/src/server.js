@@ -392,6 +392,57 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Корректный выход из комнаты: закрываем все ресурсы пира, освобождаем порты
+    const handleLeave = () => {
+        const peer = peers.get(socket.id);
+        if (!peer) return;
+
+        const roomId = peer.roomId;
+        const room = rooms.get(roomId);
+
+        // Уведомляем о закрытии всех producers
+        if (room) {
+            peer.producers.forEach((producer, producerId) => {
+                const mediaType = producer.appData?.mediaType || 'audio';
+                io.to(room.id).emit('producerClosed', {
+                    producerId,
+                    producerSocketId: socket.id,
+                    mediaType
+                });
+            });
+        }
+
+        // Закрываем все медиаресурсы пира
+        try { peer.close(); } catch (_) {}
+
+        // Удаляем пира из комнаты
+        if (room) {
+            room.removePeer(socket.id);
+            // Если комната пустая — удаляем
+            if (room.peers.size === 0) {
+                rooms.delete(roomId);
+                io.emit('voiceChannelParticipantsUpdate', { channelId: roomId, participants: [] });
+            } else {
+                socket.to(room.id).emit('peerLeft', { peerId: socket.id });
+            }
+        }
+
+        // Чистим глобальные мапы и состояние пользователя
+        const uId = peer.userId;
+        peers.delete(socket.id);
+        if (uId) {
+            const state = getUserVoiceState(uId);
+            if (state.channelId) {
+                updateUserVoiceState(uId, { channelId: null });
+                io.emit('userLeftVoiceChannel', { channelId: state.channelId, userId: uId });
+                scheduleChannelUpdate(state.channelId, 50);
+            }
+        }
+    };
+
+    socket.on('leave', handleLeave);
+    socket.on('leaveRoom', handleLeave);
+
     socket.on('connectTransport', async ({ transportId, dtlsParameters }, callback) => {
         try {
             if (!socket.data?.roomId) {

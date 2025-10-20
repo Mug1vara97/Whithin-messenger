@@ -128,6 +128,9 @@ export const useVoiceCall = (userId, userName) => {
   // Создание аудио потока
   const createAudioStream = async () => {
     try {
+      if (!sendTransportRef.current) {
+        throw new Error('Send transport is not ready');
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
