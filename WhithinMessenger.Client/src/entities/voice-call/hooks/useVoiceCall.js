@@ -181,6 +181,61 @@ export const useVoiceCall = (userId, userName) => {
     }
   }, [createTransports]);
 
+  // Обработка нового producer
+  const handleNewProducer = useCallback(async (producerData) => {
+    try {
+      const consumerData = await voiceCallApi.consume(
+        deviceRef.current.rtpCapabilities,
+        producerData.producerId,
+        recvTransportRef.current.id
+      );
+
+      const consumer = await recvTransportRef.current.consume({
+        id: consumerData.id,
+        producerId: producerData.producerId,
+        kind: producerData.kind,
+        rtpParameters: consumerData.rtpParameters
+      });
+
+      consumersRef.current.set(consumerData.id, consumer);
+      
+      // Создание аудио элемента
+      const audioElement = document.createElement('audio');
+      audioElement.srcObject = new MediaStream([consumer.track]);
+      audioElement.volume = volume;
+      audioElement.autoplay = true;
+      audioElement.playsInline = true;
+      audioElement.controls = false;
+      audioElement.style.display = 'none';
+      document.body.appendChild(audioElement);
+
+      try {
+        await audioElement.play();
+        console.log('Audio playback started for consumer:', consumerData.id);
+        setAudioBlocked(false);
+      } catch (error) {
+        console.log('Auto-play blocked, user interaction required:', error);
+        setAudioBlocked(true);
+        setTimeout(async () => {
+          try {
+            await audioElement.play();
+            setAudioBlocked(false);
+          } catch {
+            console.log('Audio playback still blocked');
+          }
+        }, 1000);
+      }
+
+      await voiceCallApi.resumeConsumer(consumerData.id);
+      console.log('New consumer created:', consumerData.id);
+    } catch (error) {
+      console.error('Failed to handle new producer:', error);
+    }
+  }, [volume]);
+  
+  // Обновляем ref при изменении handleNewProducer
+  handleNewProducerRef.current = handleNewProducer;
+
   // Создание аудио потока
   const createAudioStream = useCallback(async () => {
     try {
@@ -253,61 +308,6 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
     }
   }, [userName, userId, initializeDevice, createAudioStream, handleNewProducer]);
-
-  // Обработка нового producer
-  const handleNewProducer = useCallback(async (producerData) => {
-    try {
-      const consumerData = await voiceCallApi.consume(
-        deviceRef.current.rtpCapabilities,
-        producerData.producerId,
-        recvTransportRef.current.id
-      );
-
-      const consumer = await recvTransportRef.current.consume({
-        id: consumerData.id,
-        producerId: producerData.producerId,
-        kind: producerData.kind,
-        rtpParameters: consumerData.rtpParameters
-      });
-
-      consumersRef.current.set(consumerData.id, consumer);
-      
-      // Создание аудио элемента
-      const audioElement = document.createElement('audio');
-      audioElement.srcObject = new MediaStream([consumer.track]);
-      audioElement.volume = volume;
-      audioElement.autoplay = true;
-      audioElement.playsInline = true;
-      audioElement.controls = false;
-      audioElement.style.display = 'none';
-      document.body.appendChild(audioElement);
-
-      try {
-        await audioElement.play();
-        console.log('Audio playback started for consumer:', consumerData.id);
-        setAudioBlocked(false);
-      } catch (error) {
-        console.log('Auto-play blocked, user interaction required:', error);
-        setAudioBlocked(true);
-        setTimeout(async () => {
-          try {
-            await audioElement.play();
-            setAudioBlocked(false);
-          } catch {
-            console.log('Audio playback still blocked');
-          }
-        }, 1000);
-      }
-
-      await voiceCallApi.resumeConsumer(consumerData.id);
-      console.log('New consumer created:', consumerData.id);
-    } catch (error) {
-      console.error('Failed to handle new producer:', error);
-    }
-  }, [volume]);
-  
-  // Обновляем ref при изменении handleNewProducer
-  handleNewProducerRef.current = handleNewProducer;
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {
