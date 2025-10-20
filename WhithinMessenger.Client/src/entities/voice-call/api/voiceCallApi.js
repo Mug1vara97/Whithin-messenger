@@ -78,34 +78,13 @@ class VoiceCallApi {
 
   async createWebRtcTransport() {
     return new Promise((resolve, reject) => {
-      this.socket.emit('createWebRtcTransport', { roomId: this.roomId }, (response) => {
+      this.socket.emit('createWebRtcTransport', {}, (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
         } else {
           resolve(response);
         }
       });
-    });
-  }
-
-  async leaveRoom() {
-    return new Promise((resolve) => {
-      if (!this.socket) {
-        resolve();
-        return;
-      }
-      // Поддерживаем оба события на сервере: leave и leaveRoom
-      const cb = () => resolve();
-      try {
-        this.socket.emit('leave', {}, cb);
-      } catch {
-        cb();
-      }
-      try {
-        this.socket.emit('leaveRoom', {}, cb);
-      } catch {
-        // no-op
-      }
     });
   }
 

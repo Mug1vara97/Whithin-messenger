@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { io } from 'socket.io-client';
-import { Device } from 'mediasoup-client';
+import { voiceCallApi } from '../api/voiceCallApi';
+import { CALL_STATUS, MEDIA_TYPES } from '../model/types';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -23,13 +23,12 @@ export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isSpeaking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [volume, setVolume] = useState(1.0);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [error, setError] = useState(null);
 
-  const socketRef = useRef(null);
   const deviceRef = useRef(null);
   const sendTransportRef = useRef(null);
   const recvTransportRef = useRef(null);
@@ -37,49 +36,66 @@ export const useVoiceCall = (userId, userName) => {
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
 
-  // Вспомогательная функция для отправки событий (как в рабочем примере)
-  const socketEmit = useCallback((event, data) => {
-    return new Promise((resolve, reject) => {
-      if (!socketRef.current) {
-        reject(new Error('Socket not connected'));
-        return;
-      }
+  // Подключение к серверу
+  const connect = useCallback(async () => {
+    try {
+      setError(null);
+      await voiceCallApi.connect(userId, userName);
+      setIsConnected(true);
+    } catch (error) {
+      console.error('Failed to connect to voice server:', error);
+      setError(error.message);
+    }
+  }, [userId, userName]);
 
-      socketRef.current.emit(event, data, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
+  // Отключение от сервера
+  const disconnect = useCallback(async () => {
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
+      
+      if (sendTransportRef.current) {
+        sendTransportRef.current.close();
+        sendTransportRef.current = null;
+      }
+      
+      if (recvTransportRef.current) {
+        recvTransportRef.current.close();
+        recvTransportRef.current = null;
+      }
+      
+      consumersRef.current.forEach(consumer => consumer.close());
+      consumersRef.current.clear();
+      
+      producersRef.current.forEach(producer => producer.close());
+      producersRef.current.clear();
+      
+      await voiceCallApi.disconnect();
+      setIsConnected(false);
+      setParticipants([]);
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    }
   }, []);
 
-  // Инициализация mediasoup устройства
-  const initializeDevice = async (routerRtpCapabilities) => {
+  // Инициализация устройства
+  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
     try {
-      if (!deviceRef.current) {
-        deviceRef.current = new Device();
-      }
-
-      if (!deviceRef.current.loaded) {
-        await deviceRef.current.load({ routerRtpCapabilities });
-      }
-
-      console.log('Device initialized');
+      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
       await createTransports();
     } catch (error) {
       console.error('Failed to initialize device:', error);
       setError(error.message);
     }
-  };
+  }, []);
 
   // Создание транспортов
-  const createTransports = async () => {
+  const createTransports = useCallback(async () => {
     try {
       // Создание send transport
-      const sendTransportData = await socketEmit('createWebRtcTransport', {});
-
+      const sendTransportData = await voiceCallApi.createWebRtcTransport();
       sendTransportRef.current = deviceRef.current.createSendTransport({
         id: sendTransportData.id,
         iceParameters: sendTransportData.iceParameters,
@@ -90,10 +106,7 @@ export const useVoiceCall = (userId, userName) => {
 
       sendTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
         try {
-          await socketEmit('connectTransport', {
-            transportId: sendTransportData.id,
-            dtlsParameters
-          });
+          await voiceCallApi.connectTransport(sendTransportData.id, dtlsParameters);
           callback();
         } catch (error) {
           errback(error);
@@ -102,12 +115,7 @@ export const useVoiceCall = (userId, userName) => {
 
       sendTransportRef.current.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
         try {
-          const { id } = await socketEmit('produce', {
-            transportId: sendTransportData.id,
-            kind,
-            rtpParameters,
-            appData
-          });
+          const { id } = await voiceCallApi.produce(sendTransportData.id, kind, rtpParameters, appData);
           callback({ id });
         } catch (error) {
           errback(error);
@@ -115,8 +123,7 @@ export const useVoiceCall = (userId, userName) => {
       });
 
       // Создание recv transport
-      const recvTransportData = await socketEmit('createWebRtcTransport', {});
-
+      const recvTransportData = await voiceCallApi.createWebRtcTransport();
       recvTransportRef.current = deviceRef.current.createRecvTransport({
         id: recvTransportData.id,
         iceParameters: recvTransportData.iceParameters,
@@ -127,10 +134,7 @@ export const useVoiceCall = (userId, userName) => {
 
       recvTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
         try {
-          await socketEmit('connectTransport', {
-            transportId: recvTransportData.id,
-            dtlsParameters
-          });
+          await voiceCallApi.connectTransport(recvTransportData.id, dtlsParameters);
           callback();
         } catch (error) {
           errback(error);
@@ -142,10 +146,10 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to create transports:', error);
       setError(error.message);
     }
-  };
+  }, []);
 
   // Создание аудио потока
-  const createAudioStream = async () => {
+  const createAudioStream = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -179,20 +183,52 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to create audio stream:', error);
       setError(error.message);
     }
-  };
+  }, [userId, userName]);
+
+  // Присоединение к комнате
+  const joinRoom = useCallback(async (roomId) => {
+    try {
+      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
+      
+      if (response.routerRtpCapabilities) {
+        await initializeDevice(response.routerRtpCapabilities);
+      }
+      
+      if (response.existingPeers) {
+        setParticipants(response.existingPeers.map(peer => ({
+          userId: peer.userId,
+          name: peer.name,
+          isMuted: peer.isMuted,
+          isSpeaking: false
+        })));
+      }
+      
+      if (response.existingProducers && response.existingProducers.length > 0) {
+        console.log('Processing existing producers:', response.existingProducers);
+        for (const producer of response.existingProducers) {
+          try {
+            await handleNewProducer(producer);
+          } catch (error) {
+            console.error('Failed to process existing producer:', error);
+          }
+        }
+      }
+      
+      await createAudioStream();
+    } catch (error) {
+      console.error('Failed to join room:', error);
+      setError(error.message);
+    }
+  }, [userName, userId, initializeDevice, createAudioStream]);
 
   // Обработка нового producer
   const handleNewProducer = useCallback(async (producerData) => {
     try {
-      console.log('Handling new producer:', producerData);
-      
-      const consumerData = await socketEmit('consume', {
-        rtpCapabilities: deviceRef.current.rtpCapabilities,
-        remoteProducerId: producerData.producerId,
-        transportId: recvTransportRef.current.id
-      });
-
-      console.log('Consumer data received:', consumerData);
+      const consumerData = await voiceCallApi.consume(
+        deviceRef.current.rtpCapabilities,
+        producerData.producerId,
+        recvTransportRef.current.id
+      );
 
       const consumer = await recvTransportRef.current.consume({
         id: consumerData.id,
@@ -223,194 +259,22 @@ export const useVoiceCall = (userId, userName) => {
         setTimeout(async () => {
           try {
             await audioElement.play();
-            console.log('Audio playback started after delay');
             setAudioBlocked(false);
-          } catch (playError) {
-            console.log('Audio playback still blocked:', playError);
+          } catch (e) {
+            console.log('Audio playback still blocked');
           }
         }, 1000);
       }
 
-      audioElement.addEventListener('loadedmetadata', () => {
-        console.log('Audio metadata loaded for consumer:', consumerData.id);
-      });
-
-      audioElement.addEventListener('canplay', () => {
-        console.log('Audio can play for consumer:', consumerData.id);
-        audioElement.play().catch(e => console.log('Play failed:', e));
-      });
-
-      audioElement.addEventListener('error', (e) => {
-        console.error('Audio element error:', e);
-      });
-
-      await socketEmit('resumeConsumer', { consumerId: consumerData.id });
+      await voiceCallApi.resumeConsumer(consumerData.id);
       console.log('New consumer created:', consumerData.id);
     } catch (error) {
       console.error('Failed to handle new producer:', error);
     }
-  }, [socketEmit, volume]);
-
-  // Удаление consumer
-  const removeConsumer = (producerId) => {
-    const consumer = consumersRef.current.get(producerId);
-    if (consumer) {
-      consumer.close();
-      consumersRef.current.delete(producerId);
-    }
-  };
-
-  // Удаление всех consumer'ов для конкретного peer'а
-  const removeConsumerForPeer = useCallback((userId) => {
-    const consumersToRemove = [];
-    consumersRef.current.forEach((consumer, consumerId) => {
-      if (consumer.appData && consumer.appData.userId === userId) {
-        consumersToRemove.push(consumerId);
-      }
-    });
-    
-    consumersToRemove.forEach(consumerId => {
-      removeConsumer(consumerId);
-    });
-  }, []);
-
-  // Присоединение к комнате
-  const joinRoom = async (roomId) => {
-    try {
-      const response = await socketEmit('join', {
-        roomId: roomId,
-        name: userName,
-        userId: userId,
-        initialMuted: false,
-        initialAudioEnabled: true
-      });
-      
-      console.log('Joined room:', roomId, response);
-      
-      // Инициализация устройства с полученными RTP capabilities
-      if (response.routerRtpCapabilities) {
-        await initializeDevice(response.routerRtpCapabilities);
-      }
-      
-      // Обработка существующих участников
-      if (response.existingPeers) {
-        setParticipants(response.existingPeers.map(peer => ({
-          userId: peer.userId,
-          name: peer.name,
-          isMuted: peer.isMuted,
-          isSpeaking: false
-        })));
-      }
-      
-      // Обработка существующих producer'ов
-      if (response.existingProducers) {
-        console.log('Processing existing producers:', response.existingProducers);
-        for (const producer of response.existingProducers) {
-          await handleNewProducer(producer);
-        }
-      }
-      
-      // Создание аудио потока
-      await createAudioStream();
-      
-    } catch (error) {
-      console.error('Failed to join room:', error);
-      setError(error.message);
-    }
-  };
-
-  // Подключение к серверу
-  const connect = async () => {
-    try {
-      console.log('Connecting to voice server...');
-      
-      const socket = io('https://whithin.ru', {
-        transports: ['websocket'],
-        upgrade: false,
-        rememberUpgrade: false
-      });
-
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        console.log('Voice call connection established');
-        setIsConnected(true);
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Disconnected from voice server');
-        setIsConnected(false);
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-        setError(error.message);
-      });
-
-      // Обработчики событий
-      socket.on('peerJoined', (peerData) => {
-        console.log('Peer joined:', peerData);
-        setParticipants(prev => [...prev, {
-          userId: peerData.userId,
-          name: peerData.name,
-          isMuted: peerData.isMuted,
-          isSpeaking: false
-        }]);
-      });
-
-      socket.on('peerLeft', (peerData) => {
-        console.log('Peer left:', peerData);
-        setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
-        removeConsumerForPeer(peerData.userId);
-      });
-
-      socket.on('newProducer', async (producerData) => {
-        console.log('New producer:', producerData);
-        await handleNewProducer(producerData);
-      });
-
-      socket.on('producerClosed', (producerId) => {
-        console.log('Producer closed:', producerId);
-        removeConsumer(producerId);
-      });
-
-      setError(null);
-    } catch (error) {
-      console.error('Failed to connect:', error);
-      setError(error.message);
-    }
-  };
-
-  // Отключение
-  const disconnect = async () => {
-    try {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      producersRef.current.forEach(producer => producer.close());
-      consumersRef.current.forEach(consumer => consumer.close());
-      sendTransportRef.current?.close();
-      recvTransportRef.current?.close();
-      producersRef.current.clear();
-      consumersRef.current.clear();
-      localStreamRef.current = null;
-      sendTransportRef.current = null;
-      recvTransportRef.current = null;
-
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-      
-      setIsConnected(false);
-      setParticipants([]);
-    } catch (error) {
-      console.error('Failed to disconnect:', error);
-    }
-  };
+  }, [volume]);
 
   // Переключение микрофона
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
@@ -418,33 +282,67 @@ export const useVoiceCall = (userId, userName) => {
         setIsMuted(!audioTrack.enabled);
       }
     }
-  };
+  }, []);
 
   // Переключение аудио
-  const toggleAudio = () => {
+  const toggleAudio = useCallback(() => {
     setIsAudioEnabled(!isAudioEnabled);
-  };
+  }, [isAudioEnabled]);
 
   // Изменение громкости
-  const handleVolumeChange = (event, newValue) => {
-    setVolume(newValue);
+  const handleVolumeChange = useCallback((newVolume) => {
+    setVolume(newVolume);
     const audioElements = document.querySelectorAll('audio');
     audioElements.forEach(audio => {
-      audio.volume = newValue;
+      audio.volume = newVolume;
     });
-  };
+  }, []);
 
-  // Очистка при размонтировании
+  // Обработка событий
   useEffect(() => {
-    return () => {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+    if (!voiceCallApi.socket) return;
+
+    const handlePeerJoined = (peerData) => {
+      console.log('Peer joined:', peerData);
+      setParticipants(prev => [...prev, {
+        userId: peerData.userId,
+        name: peerData.name,
+        isMuted: peerData.isMuted,
+        isSpeaking: false
+      }]);
+    };
+
+    const handlePeerLeft = (peerData) => {
+      console.log('Peer left:', peerData);
+      setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+    };
+
+    const handleNewProducerEvent = (producerData) => {
+      console.log('New producer event:', producerData);
+      handleNewProducer(producerData);
+    };
+
+    const handleProducerClosed = (producerId) => {
+      console.log('Producer closed:', producerId);
+      const consumer = consumersRef.current.get(producerId);
+      if (consumer) {
+        consumer.close();
+        consumersRef.current.delete(producerId);
       }
     };
-  }, []);
+
+    voiceCallApi.on('peerJoined', handlePeerJoined);
+    voiceCallApi.on('peerLeft', handlePeerLeft);
+    voiceCallApi.on('newProducer', handleNewProducerEvent);
+    voiceCallApi.on('producerClosed', handleProducerClosed);
+
+    return () => {
+      voiceCallApi.off('peerJoined', handlePeerJoined);
+      voiceCallApi.off('peerLeft', handlePeerLeft);
+      voiceCallApi.off('newProducer', handleNewProducerEvent);
+      voiceCallApi.off('producerClosed', handleProducerClosed);
+    };
+  }, [handleNewProducer]);
 
   return {
     // Состояние
