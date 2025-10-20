@@ -29,8 +29,6 @@ const VoiceCallWidget = ({
   userName,
   onClose
 }) => {
-  const [showVoiceChat, setShowVoiceChat] = useState(false);
-  
   const {
     isConnected,
     isMuted,
@@ -65,24 +63,10 @@ const VoiceCallWidget = ({
 
   const handleClose = () => {
     disconnect();
-    setShowVoiceChat(false);
     if (onClose) {
       onClose();
     }
   };
-
-  if (!showVoiceChat) {
-    return (
-      <Button
-        variant="contained"
-        onClick={() => setShowVoiceChat(true)}
-        startIcon={<Headset />}
-        fullWidth
-      >
-        Подключиться к голосовому каналу
-      </Button>
-    );
-  }
 
   return (
     <Container maxWidth="sm" sx={{ mt: 2 }}>
@@ -189,17 +173,6 @@ const VoiceCallWidget = ({
             />
           </Box>
 
-          {/* Кнопка подключения */}
-          {!isConnected && (
-            <Button
-              variant="contained"
-              onClick={connect}
-              fullWidth
-              startIcon={<Headset />}
-            >
-              Подключиться
-            </Button>
-          )}
         </Box>
       </Paper>
     </Container>

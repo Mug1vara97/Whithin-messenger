@@ -203,9 +203,14 @@ export const useVoiceCall = (userId, userName) => {
         })));
       }
       
-      if (response.existingProducers) {
+      if (response.existingProducers && response.existingProducers.length > 0) {
+        console.log('Processing existing producers:', response.existingProducers);
         for (const producer of response.existingProducers) {
-          await handleNewProducer(producer);
+          try {
+            await handleNewProducer(producer);
+          } catch (error) {
+            console.error('Failed to process existing producer:', error);
+          }
         }
       }
       
@@ -298,6 +303,7 @@ export const useVoiceCall = (userId, userName) => {
     if (!voiceCallApi.socket) return;
 
     const handlePeerJoined = (peerData) => {
+      console.log('Peer joined:', peerData);
       setParticipants(prev => [...prev, {
         userId: peerData.userId,
         name: peerData.name,
@@ -307,14 +313,17 @@ export const useVoiceCall = (userId, userName) => {
     };
 
     const handlePeerLeft = (peerData) => {
+      console.log('Peer left:', peerData);
       setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
     };
 
-    const handleNewProducer = (producerData) => {
+    const handleNewProducerEvent = (producerData) => {
+      console.log('New producer event:', producerData);
       handleNewProducer(producerData);
     };
 
     const handleProducerClosed = (producerId) => {
+      console.log('Producer closed:', producerId);
       const consumer = consumersRef.current.get(producerId);
       if (consumer) {
         consumer.close();
@@ -324,13 +333,13 @@ export const useVoiceCall = (userId, userName) => {
 
     voiceCallApi.on('peerJoined', handlePeerJoined);
     voiceCallApi.on('peerLeft', handlePeerLeft);
-    voiceCallApi.on('newProducer', handleNewProducer);
+    voiceCallApi.on('newProducer', handleNewProducerEvent);
     voiceCallApi.on('producerClosed', handleProducerClosed);
 
     return () => {
       voiceCallApi.off('peerJoined', handlePeerJoined);
       voiceCallApi.off('peerLeft', handlePeerLeft);
-      voiceCallApi.off('newProducer', handleNewProducer);
+      voiceCallApi.off('newProducer', handleNewProducerEvent);
       voiceCallApi.off('producerClosed', handleProducerClosed);
     };
   }, [handleNewProducer]);
