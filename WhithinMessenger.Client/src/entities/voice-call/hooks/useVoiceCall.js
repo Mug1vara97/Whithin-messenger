@@ -35,6 +35,7 @@ export const useVoiceCall = (userId, userName) => {
   const producersRef = useRef(new Map());
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
+  const pendingProducersRef = useRef([]);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
@@ -214,12 +215,18 @@ export const useVoiceCall = (userId, userName) => {
         }
       }
       
+      // Небольшая задержка перед созданием producer'а, чтобы обработчики событий успели настроиться
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Обрабатываем pending producer'ы после создания транспортов
+      await processPendingProducers();
+      
       await createAudioStream();
     } catch (error) {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, createAudioStream]);
+  }, [userName, userId, initializeDevice, createAudioStream, processPendingProducers]);
 
   // Обработка нового producer
   const handleNewProducer = useCallback(async (producerData) => {
@@ -298,6 +305,23 @@ export const useVoiceCall = (userId, userName) => {
     });
   }, []);
 
+  // Обработка очереди pending producer'ов
+  const processPendingProducers = useCallback(async () => {
+    if (pendingProducersRef.current.length > 0 && deviceRef.current && recvTransportRef.current) {
+      console.log('Processing pending producers:', pendingProducersRef.current.length);
+      const producers = [...pendingProducersRef.current];
+      pendingProducersRef.current = [];
+      
+      for (const producer of producers) {
+        try {
+          await handleNewProducer(producer);
+        } catch (error) {
+          console.error('Failed to process pending producer:', error);
+        }
+      }
+    }
+  }, [handleNewProducer]);
+
   // Обработка событий
   useEffect(() => {
     if (!voiceCallApi.socket) return;
@@ -318,7 +342,16 @@ export const useVoiceCall = (userId, userName) => {
     };
 
     const handleNewProducerEvent = (producerData) => {
-      console.log('New producer event:', producerData);
+      console.log('New producer event received:', producerData);
+      console.log('Current device state:', deviceRef.current ? 'loaded' : 'not loaded');
+      console.log('Current recv transport:', recvTransportRef.current ? 'ready' : 'not ready');
+      
+      if (!deviceRef.current || !recvTransportRef.current) {
+        console.warn('Device or transport not ready, queuing producer');
+        pendingProducersRef.current.push(producerData);
+        return;
+      }
+      
       handleNewProducer(producerData);
     };
 
