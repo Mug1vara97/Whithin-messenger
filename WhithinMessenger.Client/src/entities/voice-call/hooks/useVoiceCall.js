@@ -410,18 +410,33 @@ export const useVoiceCall = (userId, userName) => {
       }
 
       const newState = !isNoiseSuppressed;
+      console.log(`Toggling noise suppression: ${isNoiseSuppressed} -> ${newState}`);
+      
       let success = false;
 
       if (newState) {
         success = await noiseSuppressionRef.current.enable(noiseSuppressionMode);
+        console.log(`Noise suppression enabled with mode: ${noiseSuppressionMode}, success: ${success}`);
       } else {
         success = await noiseSuppressionRef.current.disable();
+        console.log(`Noise suppression disabled, success: ${success}`);
       }
 
       if (success) {
         setIsNoiseSuppressed(newState);
         localStorage.setItem('noiseSuppression', JSON.stringify(newState));
-        console.log('Noise suppression ' + (newState ? 'enabled' : 'disabled'));
+        
+        // Обновляем состояние микрофона для обработанного трека
+        if (noiseSuppressionRef.current) {
+          const processedStream = noiseSuppressionRef.current.getProcessedStream();
+          const audioTrack = processedStream?.getAudioTracks()[0];
+          if (audioTrack) {
+            audioTrack.enabled = !isMuted;
+            console.log(`Updated audio track enabled state: ${audioTrack.enabled}`);
+          }
+        }
+        
+        console.log('Noise suppression ' + (newState ? 'enabled' : 'disabled') + ' successfully');
         return true;
       } else {
         console.error('Failed to toggle noise suppression');
@@ -431,7 +446,7 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Error toggling noise suppression:', error);
       return false;
     }
-  }, [isNoiseSuppressed, noiseSuppressionMode]);
+  }, [isNoiseSuppressed, noiseSuppressionMode, isMuted]);
 
   // Изменение режима шумоподавления
   const changeNoiseSuppressionMode = useCallback(async (mode) => {
@@ -441,14 +456,19 @@ export const useVoiceCall = (userId, userName) => {
         return false;
       }
 
+      console.log(`Changing noise suppression mode from ${noiseSuppressionMode} to ${mode}`);
+      
       let success = false;
 
       if (!isNoiseSuppressed) {
         success = await noiseSuppressionRef.current.enable(mode);
+        console.log(`Enabled noise suppression with mode: ${mode}, success: ${success}`);
       } else if (mode !== noiseSuppressionMode) {
         // Если меняем режим при включенном шумоподавлении
         success = await noiseSuppressionRef.current.enable(mode);
+        console.log(`Changed mode to: ${mode}, success: ${success}`);
       } else {
+        console.log(`Mode ${mode} is already active`);
         return true; // Режим уже установлен
       }
 
@@ -456,6 +476,17 @@ export const useVoiceCall = (userId, userName) => {
         setNoiseSuppressionMode(mode);
         setIsNoiseSuppressed(true);
         localStorage.setItem('noiseSuppression', JSON.stringify(true));
+        
+        // Обновляем состояние микрофона для обработанного трека
+        if (noiseSuppressionRef.current) {
+          const processedStream = noiseSuppressionRef.current.getProcessedStream();
+          const audioTrack = processedStream?.getAudioTracks()[0];
+          if (audioTrack) {
+            audioTrack.enabled = !isMuted;
+            console.log(`Updated audio track enabled state after mode change: ${audioTrack.enabled}`);
+          }
+        }
+        
         console.log('Noise suppression mode changed to:', mode);
         return true;
       }
@@ -465,7 +496,7 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Error changing noise suppression mode:', error);
       return false;
     }
-  }, [isNoiseSuppressed, noiseSuppressionMode]);
+  }, [isNoiseSuppressed, noiseSuppressionMode, isMuted]);
 
   // Обработчик изменения настроек шумоподавления из других компонентов
   useEffect(() => {

@@ -253,41 +253,86 @@ export class NoiseSuppressionManager {
 
   cleanup() {
     try {
+      console.log('Starting noise suppression cleanup...');
+      
       // Отключаем шумоподавление если включено
       if (this.currentMode) {
+        console.log('Disabling current mode:', this.currentMode);
         this.disable();
       }
 
       // Отключаем все узлы
-      this.sourceNode?.disconnect();
-      this.gainNode?.disconnect();
-      this.rnnWorkletNode?.disconnect();
-      this.speexWorkletNode?.disconnect();
-      this.noiseGateNode?.disconnect();
+      try {
+        this.sourceNode?.disconnect();
+        console.log('Source node disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting source node:', e);
+      }
+      
+      try {
+        this.gainNode?.disconnect();
+        console.log('Gain node disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting gain node:', e);
+      }
+      
+      try {
+        this.rnnWorkletNode?.disconnect();
+        console.log('RNN worklet node disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting RNN worklet node:', e);
+      }
+      
+      try {
+        this.speexWorkletNode?.disconnect();
+        console.log('Speex worklet node disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting Speex worklet node:', e);
+      }
+      
+      try {
+        this.noiseGateNode?.disconnect();
+        console.log('Noise gate node disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting noise gate node:', e);
+      }
 
       // Уничтожаем worklet nodes
-      this.rnnWorkletNode?.destroy?.();
-      this.speexWorkletNode?.destroy?.();
-
-      // Останавливаем оригинальный поток
-      if (this.originalStream) {
-        this.originalStream.getTracks().forEach(track => {
-          track.stop();
-        });
+      try {
+        this.rnnWorkletNode?.destroy?.();
+        console.log('RNN worklet node destroyed');
+      } catch (e) {
+        console.warn('Error destroying RNN worklet node:', e);
+      }
+      
+      try {
+        this.speexWorkletNode?.destroy?.();
+        console.log('Speex worklet node destroyed');
+      } catch (e) {
+        console.warn('Error destroying Speex worklet node:', e);
       }
 
-      // Останавливаем обработанный поток
+      // НЕ останавливаем оригинальный поток - он управляется извне
+      // if (this.originalStream) {
+      //   this.originalStream.getTracks().forEach(track => {
+      //     track.stop();
+      //   });
+      // }
+
+      // Останавливаем только обработанный поток
       if (this.processedStream) {
         this.processedStream.getTracks().forEach(track => {
-          track.stop();
+          try {
+            track.stop();
+            console.log('Processed track stopped:', track.id);
+          } catch (e) {
+            console.warn('Error stopping processed track:', e);
+          }
         });
       }
 
-      // Закрываем аудио контекст только если мы его создали
-      if (this.audioContext && this.audioContext.state !== 'closed') {
-        // Не закрываем контекст, так как он может использоваться другими компонентами
-        // this.audioContext.close();
-      }
+      // НЕ закрываем аудио контекст - он используется другими компонентами
+      // AudioContext будет закрыт в useVoiceCall при disconnect
 
       this.audioContext = null;
       this.sourceNode = null;

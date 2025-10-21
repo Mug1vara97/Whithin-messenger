@@ -113,8 +113,24 @@ const VoiceCallView = ({
   };
 
   const handleNoiseSuppressionModeSelect = async (mode) => {
-    await changeNoiseSuppressionMode(mode);
+    console.log('UI: Selecting noise suppression mode:', mode);
+    const success = await changeNoiseSuppressionMode(mode);
+    if (success) {
+      console.log('UI: Noise suppression mode changed successfully');
+    } else {
+      console.error('UI: Failed to change noise suppression mode');
+    }
     handleNoiseSuppressionMenuClose();
+  };
+
+  const handleToggleNoiseSuppression = async () => {
+    console.log('UI: Toggling noise suppression, current state:', isNoiseSuppressed);
+    const success = await toggleNoiseSuppression();
+    if (success) {
+      console.log('UI: Noise suppression toggled successfully to:', !isNoiseSuppressed);
+    } else {
+      console.error('UI: Failed to toggle noise suppression');
+    }
   };
 
 
@@ -269,8 +285,9 @@ const VoiceCallView = ({
                         <button 
                           className={`center-button attached-button ${isNoiseSuppressed ? '' : 'muted'}`}
                           type="button"
-                          onClick={toggleNoiseSuppression}
-                          aria-label={isNoiseSuppressed ? 'Выключить шумоподавление' : 'Включить шумоподавление'}
+                          onClick={handleToggleNoiseSuppression}
+                          aria-label={isNoiseSuppressed ? `Выключить шумоподавление (${noiseSuppressionMode})` : 'Включить шумоподавление'}
+                          title={isNoiseSuppressed ? `Шумоподавление включено: ${noiseSuppressionMode === 'rnnoise' ? 'RNNoise (AI)' : noiseSuppressionMode === 'speex' ? 'Speex' : 'Noise Gate'}` : 'Шумоподавление выключено'}
                         >
                           {isNoiseSuppressed ? (
                             <NoiseAwareIcon sx={{ fontSize: 24 }} />
@@ -281,6 +298,8 @@ const VoiceCallView = ({
                         <div 
                           className={`context-menu-caret ${isNoiseSuppressed ? '' : 'muted'}`}
                           onClick={(e) => setNoiseSuppressMenuAnchor(e.currentTarget)}
+                          title="Выбрать режим шумоподавления"
+                          style={{ cursor: 'pointer' }}
                         >
                           <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
                         </div>
@@ -351,9 +370,13 @@ const VoiceCallView = ({
             color: '#f2f3f5',
             borderRadius: '8px',
             border: '1px solid #1e1f22',
+            minWidth: '220px',
             '& .MuiMenuItem-root': {
               fontSize: '14px',
-              padding: '8px 16px',
+              padding: '10px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
               '&:hover': {
                 backgroundColor: '#2e3035',
               },
@@ -371,19 +394,22 @@ const VoiceCallView = ({
           onClick={() => handleNoiseSuppressionModeSelect('rnnoise')}
           selected={noiseSuppressionMode === 'rnnoise'}
         >
-          RNNoise (AI-based)
+          <div style={{ fontWeight: 600 }}>RNNoise</div>
+          <div style={{ fontSize: '12px', color: '#b5bac1', marginTop: '2px' }}>AI-алгоритм, лучшее качество</div>
         </MenuItem>
         <MenuItem 
           onClick={() => handleNoiseSuppressionModeSelect('speex')}
           selected={noiseSuppressionMode === 'speex'}
         >
-          Speex (Classic)
+          <div style={{ fontWeight: 600 }}>Speex</div>
+          <div style={{ fontSize: '12px', color: '#b5bac1', marginTop: '2px' }}>Классический, стабильный</div>
         </MenuItem>
         <MenuItem 
           onClick={() => handleNoiseSuppressionModeSelect('noisegate')}
           selected={noiseSuppressionMode === 'noisegate'}
         >
-          Noise Gate
+          <div style={{ fontWeight: 600 }}>Noise Gate</div>
+          <div style={{ fontSize: '12px', color: '#b5bac1', marginTop: '2px' }}>Простой, быстрый</div>
         </MenuItem>
       </Menu>
     </div>
