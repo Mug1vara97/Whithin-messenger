@@ -49,9 +49,14 @@ export class NoiseSuppressionManager {
         latencyHint: 'interactive'
       });
 
+      // ВАЖНО: Убедимся что AudioContext не создает локальное воспроизведение
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
       this.processedStream = new MediaStream();
 
-      console.log('Loading WASM binaries...');
+      console.log('NoiseSuppressionManager: Loading WASM binaries...');
       const [speexWasmBinary, rnnoiseWasmBinary] = await Promise.all([
         loadSpeex({ url: speexWasmPath }),
         loadRnnoise({
@@ -62,28 +67,34 @@ export class NoiseSuppressionManager {
 
       this.wasmBinaries.speex = speexWasmBinary;
       this.wasmBinaries.rnnoise = rnnoiseWasmBinary;
+      console.log('NoiseSuppressionManager: WASM binaries loaded');
 
+      // Создаем source node (не подключаем к destination для предотвращения локального воспроизведения)
       this.sourceNode = this.audioContext.createMediaStreamSource(stream);
+      console.log('NoiseSuppressionManager: Source node created');
 
+      // Создаем destination для обработанного потока
       this.destinationNode = this.audioContext.createMediaStreamDestination();
       
       const destinationTrack = this.destinationNode.stream.getAudioTracks()[0];
       if (destinationTrack) {
         this.processedStream.addTrack(destinationTrack);
+        console.log('NoiseSuppressionManager: Processed stream track added');
       } else {
         throw new Error('No audio track in destination node');
       }
 
-      console.log('Loading worklet modules...');
+      console.log('NoiseSuppressionManager: Loading worklet modules...');
       await Promise.all([
         this.audioContext.audioWorklet.addModule(rnnoiseWorkletPath),
         this.audioContext.audioWorklet.addModule(speexWorkletPath),
         this.audioContext.audioWorklet.addModule(noiseGateWorkletPath)
       ]);
+      console.log('NoiseSuppressionManager: Worklet modules loaded');
 
       this.rnnWorkletNode = new RnnoiseWorkletNode(this.audioContext, {
         wasmBinary: this.wasmBinaries.rnnoise,
-        maxChannels: 2,
+        maxChannels: 1, // Изменено на 1 канал для совместимости с getUserMedia
         vadOffset: 0.25,
         gainOffset: -25,
         enableVAD: true
@@ -91,7 +102,7 @@ export class NoiseSuppressionManager {
 
       this.speexWorkletNode = new SpeexWorkletNode(this.audioContext, {
         wasmBinary: this.wasmBinaries.speex,
-        maxChannels: 2,
+        maxChannels: 1, // Изменено на 1 канал для совместимости с getUserMedia
         denoise: true,
         aggressiveness: 15,
         vadOffset: 1.5,
@@ -103,17 +114,19 @@ export class NoiseSuppressionManager {
         openThreshold: -65,
         closeThreshold: -70,
         holdMs: 150,
-        maxChannels: 2
+        maxChannels: 1 // Изменено на 1 канал для совместимости с getUserMedia
       });
 
       this.gainNode = this.audioContext.createGain();
       this.gainNode.gain.value = 1.0;
 
+      // Подключаем source -> gain -> destination (без обработки по умолчанию)
       this.sourceNode.connect(this.gainNode);
       this.gainNode.connect(this.destinationNode);
+      console.log('NoiseSuppressionManager: Audio nodes connected (passthrough mode)');
 
       this._isInitialized = true;
-      console.log('Noise suppression initialized successfully');
+      console.log('NoiseSuppressionManager: Initialization completed successfully');
       return true;
     } catch (error) {
       console.error('Failed to initialize noise suppression:', error);
@@ -133,24 +146,41 @@ export class NoiseSuppressionManager {
   async enable(mode = 'rnnoise') {
     try {
       if (!this._isInitialized) {
-        console.error('Not initialized');
+        console.error('NoiseSuppressionManager: Not initialized');
         return false;
       }
 
+      console.log(`NoiseSuppressionManager: Enabling noise suppression with mode: ${mode}`);
+      console.log('NoiseSuppressionManager: Current mode:', this.currentMode);
+
       // Отключаем текущие соединения
-      this.sourceNode.disconnect();
-      this.gainNode.disconnect();
+      try {
+        this.sourceNode.disconnect();
+        console.log('NoiseSuppressionManager: Source node disconnected');
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting source node:', e);
+      }
+      
+      try {
+        this.gainNode.disconnect();
+        console.log('NoiseSuppressionManager: Gain node disconnected');
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting gain node:', e);
+      }
 
       let processingNode;
       switch (mode) {
         case 'rnnoise':
           processingNode = this.rnnWorkletNode;
+          console.log('NoiseSuppressionManager: Selected RNNoise worklet');
           break;
         case 'speex':
           processingNode = this.speexWorkletNode;
+          console.log('NoiseSuppressionManager: Selected Speex worklet');
           break;
         case 'noisegate':
           processingNode = this.noiseGateNode;
+          console.log('NoiseSuppressionManager: Selected Noise Gate worklet');
           break;
         case 'combined':
           this.sourceNode.connect(this.noiseGateNode);
@@ -158,36 +188,40 @@ export class NoiseSuppressionManager {
           this.rnnWorkletNode.connect(this.gainNode);
           this.gainNode.connect(this.destinationNode);
           this.currentMode = mode;
-          console.log('Noise suppression enabled in combined mode');
+          console.log('NoiseSuppressionManager: Enabled in combined mode');
           return true;
         default:
           throw new Error('Invalid noise suppression mode');
       }
 
-      // Подключаем новую цепочку
+      // Подключаем новую цепочку: source -> gain -> processing -> destination
       this.sourceNode.connect(this.gainNode);
       this.gainNode.connect(processingNode);
       processingNode.connect(this.destinationNode);
+      console.log(`NoiseSuppressionManager: Audio chain connected: source -> gain -> ${mode} -> destination`);
 
       this.currentMode = mode;
-      console.log(`Noise suppression enabled in ${mode} mode`);
 
       if (this.producer) {
         try {
           const newTrack = this.processedStream.getAudioTracks()[0];
           if (newTrack) {
+            console.log('NoiseSuppressionManager: Replacing producer track...');
             await this.producer.replaceTrack({ track: newTrack });
-            console.log('Producer track replaced with noise-suppressed track');
+            console.log('NoiseSuppressionManager: Producer track replaced successfully');
           }
         } catch (error) {
-          console.error('Error replacing producer track:', error);
+          console.error('NoiseSuppressionManager: Error replacing producer track:', error);
           return false;
         }
+      } else {
+        console.log('NoiseSuppressionManager: No producer set, skipping track replacement');
       }
 
+      console.log(`NoiseSuppressionManager: Noise suppression enabled successfully in ${mode} mode`);
       return true;
     } catch (error) {
-      console.error('Error enabling noise suppression:', error);
+      console.error('NoiseSuppressionManager: Error enabling noise suppression:', error);
       return false;
     }
   }
@@ -195,54 +229,93 @@ export class NoiseSuppressionManager {
   async disable() {
     try {
       if (!this._isInitialized) {
-        console.error('Not initialized');
+        console.error('NoiseSuppressionManager: Not initialized');
         return false;
       }
 
+      console.log('NoiseSuppressionManager: Disabling noise suppression');
+      console.log('NoiseSuppressionManager: Current mode:', this.currentMode);
+
       // Отключаем текущие соединения
-      this.sourceNode.disconnect();
+      try {
+        this.sourceNode.disconnect();
+        console.log('NoiseSuppressionManager: Source node disconnected');
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting source node:', e);
+      }
+      
       if (this.currentMode) {
         switch (this.currentMode) {
           case 'rnnoise':
-            this.rnnWorkletNode?.disconnect();
+            try {
+              this.rnnWorkletNode?.disconnect();
+              console.log('NoiseSuppressionManager: RNN worklet disconnected');
+            } catch (e) {
+              console.warn('NoiseSuppressionManager: Error disconnecting RNN worklet:', e);
+            }
             break;
           case 'speex':
-            this.speexWorkletNode?.disconnect();
+            try {
+              this.speexWorkletNode?.disconnect();
+              console.log('NoiseSuppressionManager: Speex worklet disconnected');
+            } catch (e) {
+              console.warn('NoiseSuppressionManager: Error disconnecting Speex worklet:', e);
+            }
             break;
           case 'noisegate':
-            this.noiseGateNode?.disconnect();
+            try {
+              this.noiseGateNode?.disconnect();
+              console.log('NoiseSuppressionManager: Noise gate disconnected');
+            } catch (e) {
+              console.warn('NoiseSuppressionManager: Error disconnecting noise gate:', e);
+            }
             break;
           case 'combined':
-            this.noiseGateNode?.disconnect();
-            this.rnnWorkletNode?.disconnect();
+            try {
+              this.noiseGateNode?.disconnect();
+              this.rnnWorkletNode?.disconnect();
+              console.log('NoiseSuppressionManager: Combined mode worklets disconnected');
+            } catch (e) {
+              console.warn('NoiseSuppressionManager: Error disconnecting combined worklets:', e);
+            }
             break;
         }
       }
-      this.gainNode.disconnect();
+      
+      try {
+        this.gainNode.disconnect();
+        console.log('NoiseSuppressionManager: Gain node disconnected');
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting gain node:', e);
+      }
 
-      // Подключаем прямую цепочку без обработки
+      // Подключаем прямую цепочку без обработки: source -> gain -> destination
       this.sourceNode.connect(this.gainNode);
       this.gainNode.connect(this.destinationNode);
+      console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode)');
 
       this.currentMode = null;
-      console.log('Noise suppression disabled');
 
       if (this.producer) {
         try {
-          const newTrack = this.destinationNode.stream.getAudioTracks()[0];
+          const newTrack = this.processedStream.getAudioTracks()[0];
           if (newTrack) {
+            console.log('NoiseSuppressionManager: Replacing producer track with passthrough...');
             await this.producer.replaceTrack({ track: newTrack });
-            console.log('Producer track replaced with original track');
+            console.log('NoiseSuppressionManager: Producer track replaced successfully');
           }
         } catch (error) {
-          console.error('Error replacing producer track:', error);
+          console.error('NoiseSuppressionManager: Error replacing producer track:', error);
           return false;
         }
+      } else {
+        console.log('NoiseSuppressionManager: No producer set, skipping track replacement');
       }
 
+      console.log('NoiseSuppressionManager: Noise suppression disabled successfully');
       return true;
     } catch (error) {
-      console.error('Error disabling noise suppression:', error);
+      console.error('NoiseSuppressionManager: Error disabling noise suppression:', error);
       return false;
     }
   }
@@ -281,9 +354,9 @@ export class NoiseSuppressionManager {
         console.log('RNN worklet node disconnected');
       } catch (e) {
         console.warn('Error disconnecting RNN worklet node:', e);
-      }
-      
-      try {
+    }
+
+    try {
         this.speexWorkletNode?.disconnect();
         console.log('Speex worklet node disconnected');
       } catch (e) {
