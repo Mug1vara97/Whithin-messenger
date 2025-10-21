@@ -578,9 +578,9 @@ export const useVoiceCall = (userId, userName) => {
         return newMap;
       });
     } else {
-      // Размутиваем - восстанавливаем предыдущую громкость
+      // Размутиваем - восстанавливаем предыдущую громкость, но только если глобально не замучено
       const previousVolume = previousVolumesRef.current.get(peerId) || 100;
-      const gainValue = (previousVolume / 100.0) * 4.0;
+      const gainValue = isGlobalAudioMuted ? 0 : (previousVolume / 100.0) * 4.0;
       gainNode.gain.setValueAtTime(gainValue, audioContextRef.current.currentTime);
       setUserVolumes(prev => {
         const newMap = new Map(prev);
@@ -596,14 +596,15 @@ export const useVoiceCall = (userId, userName) => {
     });
 
     console.log(`User ${peerId} ${newIsMuted ? 'muted' : 'unmuted'}`);
-  }, [userVolumes, userMutedStates]);
+  }, [userVolumes, userMutedStates, isGlobalAudioMuted]);
 
   // Изменение громкости отдельного пользователя
   const changeUserVolume = useCallback((peerId, newVolume) => {
     const gainNode = gainNodesRef.current.get(peerId);
     if (!gainNode) return;
 
-    const gainValue = (newVolume / 100.0) * 4.0;
+    // Если глобально замучено, применяем только состояние, но не звук
+    const gainValue = isGlobalAudioMuted ? 0 : (newVolume / 100.0) * 4.0;
     gainNode.gain.setValueAtTime(gainValue, audioContextRef.current.currentTime);
 
     setUserVolumes(prev => {
@@ -628,7 +629,7 @@ export const useVoiceCall = (userId, userName) => {
     }
 
     console.log(`User ${peerId} volume set to ${newVolume}%`);
-  }, [userMutedStates]);
+  }, [userMutedStates, isGlobalAudioMuted]);
 
   // Переключение отображения слайдера громкости
   const toggleVolumeSlider = useCallback((peerId) => {
