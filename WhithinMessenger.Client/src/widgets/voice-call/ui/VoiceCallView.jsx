@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useVoiceCall } from '../../../entities/voice-call/hooks';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { createParticipant } from '../../../entities/video-call';
+import { Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
@@ -11,6 +12,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
+import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -27,15 +30,20 @@ const VoiceCallView = ({
     participants,
     audioBlocked,
     error,
+    isNoiseSuppressed,
+    noiseSuppressionMode,
     connect,
     disconnect,
     joinRoom,
     toggleMute,
-    toggleAudio
+    toggleAudio,
+    toggleNoiseSuppression,
+    changeNoiseSuppressionMode
   } = useVoiceCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [videoParticipants, setVideoParticipants] = useState([]);
+  const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
 
   useEffect(() => {
     if (channelId && userId && userName) {
@@ -97,6 +105,16 @@ const VoiceCallView = ({
         console.log('Failed to play audio:', e);
       }
     }
+  };
+
+  // Обработчики меню шумоподавления
+  const handleNoiseSuppressionMenuClose = () => {
+    setNoiseSuppressMenuAnchor(null);
+  };
+
+  const handleNoiseSuppressionModeSelect = async (mode) => {
+    await changeNoiseSuppressionMode(mode);
+    handleNoiseSuppressionMenuClose();
   };
 
 
@@ -240,9 +258,32 @@ const VoiceCallView = ({
                           className={`center-button ${!isAudioEnabled ? 'muted' : ''}`}
                           type="button"
                           onClick={toggleAudio}
+                          aria-label={isAudioEnabled ? 'Выключить звук' : 'Включить звук'}
                         >
                           <VolumeUpIcon sx={{ fontSize: 24 }} />
                         </button>
+                      </div>
+
+                      {/* Noise Suppression with dropdown */}
+                      <div className="attached-caret-button-container">
+                        <button 
+                          className={`center-button attached-button ${isNoiseSuppressed ? '' : 'muted'}`}
+                          type="button"
+                          onClick={toggleNoiseSuppression}
+                          aria-label={isNoiseSuppressed ? 'Выключить шумоподавление' : 'Включить шумоподавление'}
+                        >
+                          {isNoiseSuppressed ? (
+                            <NoiseAwareIcon sx={{ fontSize: 24 }} />
+                          ) : (
+                            <NoiseControlOffIcon sx={{ fontSize: 24 }} />
+                          )}
+                        </button>
+                        <div 
+                          className={`context-menu-caret ${isNoiseSuppressed ? '' : 'muted'}`}
+                          onClick={(e) => setNoiseSuppressMenuAnchor(e.currentTarget)}
+                        >
+                          <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                        </div>
                       </div>
 
                       {/* More Options */}
@@ -290,6 +331,61 @@ const VoiceCallView = ({
           </div>
         </div>
       </div>
+
+      {/* Noise Suppression Menu */}
+      <Menu
+        anchorEl={noiseSuppressMenuAnchor}
+        open={Boolean(noiseSuppressMenuAnchor)}
+        onClose={handleNoiseSuppressionMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        PaperProps={{
+          sx: {
+            backgroundColor: '#111214',
+            color: '#f2f3f5',
+            borderRadius: '8px',
+            border: '1px solid #1e1f22',
+            '& .MuiMenuItem-root': {
+              fontSize: '14px',
+              padding: '8px 16px',
+              '&:hover': {
+                backgroundColor: '#2e3035',
+              },
+              '&.Mui-selected': {
+                backgroundColor: '#5865f2',
+                '&:hover': {
+                  backgroundColor: '#4752c4',
+                },
+              },
+            },
+          },
+        }}
+      >
+        <MenuItem 
+          onClick={() => handleNoiseSuppressionModeSelect('rnnoise')}
+          selected={noiseSuppressionMode === 'rnnoise'}
+        >
+          RNNoise (AI-based)
+        </MenuItem>
+        <MenuItem 
+          onClick={() => handleNoiseSuppressionModeSelect('speex')}
+          selected={noiseSuppressionMode === 'speex'}
+        >
+          Speex (Classic)
+        </MenuItem>
+        <MenuItem 
+          onClick={() => handleNoiseSuppressionModeSelect('noisegate')}
+          selected={noiseSuppressionMode === 'noisegate'}
+        >
+          Noise Gate
+        </MenuItem>
+      </Menu>
     </div>
   );
 };

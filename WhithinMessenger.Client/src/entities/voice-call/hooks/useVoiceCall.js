@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
+import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -27,6 +28,11 @@ export const useVoiceCall = (userId, userName) => {
   const [volume, setVolume] = useState(1.0);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [error, setError] = useState(null);
+  const [isNoiseSuppressed, setIsNoiseSuppressed] = useState(() => {
+    const saved = localStorage.getItem('noiseSuppression');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [noiseSuppressionMode, setNoiseSuppressionMode] = useState('rnnoise');
 
   const deviceRef = useRef(null);
   const sendTransportRef = useRef(null);
@@ -35,6 +41,8 @@ export const useVoiceCall = (userId, userName) => {
   const consumersRef = useRef(new Map());
   const localStreamRef = useRef(null);
   const handleNewProducerRef = useRef(null);
+  const noiseSuppressionRef = useRef(null);
+  const audioContextRef = useRef(null);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
@@ -87,6 +95,18 @@ export const useVoiceCall = (userId, userName) => {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
+      }
+      
+      // Очистка шумоподавления
+      if (noiseSuppressionRef.current) {
+        noiseSuppressionRef.current.cleanup();
+        noiseSuppressionRef.current = null;
+      }
+      
+      // Закрытие audio context
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        await audioContextRef.current.close();
+        audioContextRef.current = null;
       }
       
       if (sendTransportRef.current) {
@@ -245,7 +265,7 @@ export const useVoiceCall = (userId, userName) => {
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
-          channelCount: 2,
+          channelCount: 1,
           latency: 0,
           suppressLocalAudioPlayback: true
         }
@@ -253,7 +273,42 @@ export const useVoiceCall = (userId, userName) => {
 
       localStreamRef.current = stream;
       
-      const audioTrack = stream.getAudioTracks()[0];
+      // Инициализация audio context
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 48000,
+          latencyHint: 'interactive'
+        });
+      }
+      
+      // Resume audio context if suspended
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      
+      // Инициализация шумоподавления
+      noiseSuppressionRef.current = new NoiseSuppressionManager();
+      await noiseSuppressionRef.current.initialize(stream, audioContextRef.current);
+      
+      // Получаем обработанный поток
+      const processedStream = noiseSuppressionRef.current.getProcessedStream();
+      const audioTrack = processedStream.getAudioTracks()[0];
+      
+      if (!audioTrack) {
+        throw new Error('No audio track in processed stream');
+      }
+      
+      // Применяем шумоподавление если оно было включено
+      if (isNoiseSuppressed) {
+        const enabled = await noiseSuppressionRef.current.enable(noiseSuppressionMode);
+        if (!enabled) {
+          console.warn('Failed to enable noise suppression, continuing without it');
+        }
+      }
+      
+      // Устанавливаем состояние микрофона
+      audioTrack.enabled = !isMuted;
+      
       const producer = await sendTransportRef.current.produce({
         track: audioTrack,
         appData: { userId, userName }
@@ -261,17 +316,22 @@ export const useVoiceCall = (userId, userName) => {
 
       producersRef.current.set(producer.id, producer);
       
+      // Устанавливаем producer в noise suppression manager
+      if (noiseSuppressionRef.current) {
+        noiseSuppressionRef.current.setProducer(producer);
+      }
+      
       audioTrack.onended = () => {
         console.log('Audio track ended');
       };
 
-      console.log('Audio stream created');
+      console.log('Audio stream created with noise suppression support');
       return producer;
     } catch (error) {
       console.error('Failed to create audio stream:', error);
       setError(error.message);
     }
-  }, [userId, userName]);
+  }, [userId, userName, isMuted, isNoiseSuppressed, noiseSuppressionMode]);
 
   // Присоединение к комнате
   const joinRoom = useCallback(async (roomId) => {
@@ -311,7 +371,14 @@ export const useVoiceCall = (userId, userName) => {
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {
-    if (localStreamRef.current) {
+    if (noiseSuppressionRef.current) {
+      const processedStream = noiseSuppressionRef.current.getProcessedStream();
+      const audioTrack = processedStream?.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    } else if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
@@ -334,7 +401,91 @@ export const useVoiceCall = (userId, userName) => {
     });
   }, []);
 
-  // Удалён useEffect - обработчики теперь регистрируются в connect()
+  // Переключение шумоподавления
+  const toggleNoiseSuppression = useCallback(async () => {
+    try {
+      if (!noiseSuppressionRef.current || !noiseSuppressionRef.current.isInitialized()) {
+        console.error('Noise suppression not initialized');
+        return false;
+      }
+
+      const newState = !isNoiseSuppressed;
+      let success = false;
+
+      if (newState) {
+        success = await noiseSuppressionRef.current.enable(noiseSuppressionMode);
+      } else {
+        success = await noiseSuppressionRef.current.disable();
+      }
+
+      if (success) {
+        setIsNoiseSuppressed(newState);
+        localStorage.setItem('noiseSuppression', JSON.stringify(newState));
+        console.log('Noise suppression ' + (newState ? 'enabled' : 'disabled'));
+        return true;
+      } else {
+        console.error('Failed to toggle noise suppression');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error toggling noise suppression:', error);
+      return false;
+    }
+  }, [isNoiseSuppressed, noiseSuppressionMode]);
+
+  // Изменение режима шумоподавления
+  const changeNoiseSuppressionMode = useCallback(async (mode) => {
+    try {
+      if (!noiseSuppressionRef.current || !noiseSuppressionRef.current.isInitialized()) {
+        console.error('Noise suppression not initialized');
+        return false;
+      }
+
+      let success = false;
+
+      if (!isNoiseSuppressed) {
+        success = await noiseSuppressionRef.current.enable(mode);
+      } else if (mode !== noiseSuppressionMode) {
+        // Если меняем режим при включенном шумоподавлении
+        success = await noiseSuppressionRef.current.enable(mode);
+      } else {
+        return true; // Режим уже установлен
+      }
+
+      if (success) {
+        setNoiseSuppressionMode(mode);
+        setIsNoiseSuppressed(true);
+        localStorage.setItem('noiseSuppression', JSON.stringify(true));
+        console.log('Noise suppression mode changed to:', mode);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error changing noise suppression mode:', error);
+      return false;
+    }
+  }, [isNoiseSuppressed, noiseSuppressionMode]);
+
+  // Обработчик изменения настроек шумоподавления из других компонентов
+  useEffect(() => {
+    const handleNoiseSuppressionChanged = (event) => {
+      const { enabled } = event.detail;
+      setIsNoiseSuppressed(enabled);
+      
+      // Если шумоподавление включено и у нас есть поток, включаем его
+      if (enabled && noiseSuppressionRef.current) {
+        noiseSuppressionRef.current.enable(noiseSuppressionMode);
+      } else if (!enabled && noiseSuppressionRef.current) {
+        noiseSuppressionRef.current.disable();
+      }
+    };
+
+    window.addEventListener('noiseSuppressionChanged', handleNoiseSuppressionChanged);
+    return () => {
+      window.removeEventListener('noiseSuppressionChanged', handleNoiseSuppressionChanged);
+    };
+  }, [noiseSuppressionMode]);
 
   return {
     // Состояние
@@ -346,6 +497,8 @@ export const useVoiceCall = (userId, userName) => {
     volume,
     audioBlocked,
     error,
+    isNoiseSuppressed,
+    noiseSuppressionMode,
     
     // Методы
     connect,
@@ -353,6 +506,8 @@ export const useVoiceCall = (userId, userName) => {
     joinRoom,
     toggleMute,
     toggleAudio,
-    handleVolumeChange
+    handleVolumeChange,
+    toggleNoiseSuppression,
+    changeNoiseSuppressionMode
   };
 };
