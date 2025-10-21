@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useVoiceCall } from '../../../entities/voice-call/hooks';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { createParticipant } from '../../../entities/video-call';
+import MicIcon from '@mui/icons-material/Mic';
+import MicOffIcon from '@mui/icons-material/MicOff';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import ScreenShareIcon from '@mui/icons-material/ScreenShare';
+import CallEndIcon from '@mui/icons-material/CallEnd';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import ChatIcon from '@mui/icons-material/Chat';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -49,26 +57,30 @@ const VoiceCallView = ({
 
   // Преобразуем участников голосового звонка в формат для видеосетки
   useEffect(() => {
-    const videoParticipantsList = [
-      createParticipant(userId, userName, null, 'online', 'host')
-    ];
+    // Текущий пользователь (хост)
+    const currentUser = createParticipant(userId, userName, null, 'online', 'host');
+    currentUser.isMuted = isMuted;
+    currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    
+    const videoParticipantsList = [currentUser];
     
     // Добавляем всех остальных участников
     participants.forEach(participant => {
-      videoParticipantsList.push(
-        createParticipant(
-          participant.userId || participant.id || participant.name, 
-          participant.name, 
-          participant.avatar || null, 
-          'online', 
-          'participant'
-        )
+      const videoParticipant = createParticipant(
+        participant.userId || participant.id || participant.name, 
+        participant.name, 
+        participant.avatar || null, 
+        'online', 
+        'participant'
       );
+      videoParticipant.isMuted = participant.isMuted || false;
+      videoParticipant.isSpeaking = participant.isSpeaking || false;
+      videoParticipantsList.push(videoParticipant);
     });
     
     console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
-  }, [participants, userId, userName]);
+  }, [participants, userId, userName, isMuted]);
 
 
   const handleClose = () => {
@@ -186,9 +198,7 @@ const VoiceCallView = ({
                         aria-label="Показать чат"
                         onClick={() => setShowChatPanel(!showChatPanel)}
                       >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 22a10 10 0 1 0-8.45-4.64c.13.19.11.44-.04.61l-2.06 2.37A1 1 0 0 0 2.2 22H12Z"/>
-                        </svg>
+                        <ChatIcon sx={{ fontSize: 24 }} />
                       </button>
                     </div>
                   </div>
@@ -210,17 +220,9 @@ const VoiceCallView = ({
                           onClick={toggleMute}
                         >
                           {isMuted ? (
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M6.7 11H5C5 12.19 5.34 13.3 5.9 14.28L7.13 13.05C6.86 12.43 6.7 11.74 6.7 11Z"/>
-                              <path d="M9.01 11.085C9.01 11.035 9.01 11.015 9.01 11C9.01 8.99 10.71 7.39 12.71 7.39C14.71 7.39 16.41 8.99 16.41 11C16.41 11.015 16.41 11.035 16.41 11.085L9.01 11.085Z"/>
-                              <path d="M11.7999 19.3101C13.7599 19.3101 15.3699 17.6201 15.6099 15.5401L11.7999 19.3101Z"/>
-                              <path d="M21 4.27L19.73 3L3 19.73L4.27 21L8.46 16.81C9.69 17.84 11.23 18.5 12.95 18.5C16.95 18.5 20.2 15.25 20.2 11.25H18.7C18.7 14.47 16.17 17 12.95 17C11.13 17 9.47 16.28 8.21 15.13L21 4.27Z"/>
-                            </svg>
+                            <MicOffIcon sx={{ fontSize: 24 }} />
                           ) : (
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 2C10.34 2 9 3.34 9 5V11C9 12.66 10.34 14 12 14C13.66 14 15 12.66 15 11V5C15 3.34 13.66 2 12 2Z"/>
-                              <path d="M19 11C19 14.53 16.39 17.44 13 17.93V21H11V17.93C7.61 17.44 5 14.53 5 11H7C7 13.76 9.24 16 12 16C14.76 16 17 13.76 17 11H19Z"/>
-                            </svg>
+                            <MicIcon sx={{ fontSize: 24 }} />
                           )}
                         </button>
                       </div>
@@ -232,10 +234,7 @@ const VoiceCallView = ({
                           type="button" 
                           aria-label="Включить камеру"
                         >
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M2 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v.5V6v.5V7v7a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5Z"/>
-                            <path d="M20.364 5.87a1 1 0 0 1 1.637.77v10.72a1 1 0 0 1-1.637.77l-2.727-2.18V8.05l2.727-2.18Z"/>
-                          </svg>
+                          <VideocamIcon sx={{ fontSize: 24 }} />
                         </button>
                       </div>
                     </div>
@@ -248,25 +247,8 @@ const VoiceCallView = ({
                           type="button" 
                           aria-label="Продемонстрируйте свой экран"
                         >
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h15A2.5 2.5 0 0 1 22 4.5v10a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 14.5v-10Z"/>
-                            <path d="M10.94 18.94 11.5 18h1l.56.94a1 1 0 1 0 1.71-1.02l-.98-1.64c-.1-.16-.26-.28-.44-.33L14 16a2 2 0 0 0 2-2H8a2 2 0 0 0 2 2l.65-.05a.86.86 0 0 0-.44.33l-.98 1.64a1 1 0 0 0 1.71 1.02Z"/>
-                          </svg>
+                          <ScreenShareIcon sx={{ fontSize: 24 }} />
                         </button>
-                      </div>
-
-                      {/* Activities */}
-                      <div className="button-container">
-                        <div className="attached-button-container">
-                          <button 
-                            className="center-button"
-                            type="button"
-                          >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                              <path fillRule="evenodd" d="M21 7a3 3 0 0 0-3-3h-1a1 1 0 0 0-1 1v1H8V5a1 1 0 0 0-1-1H6a3 3 0 0 0-3 3v11a4 4 0 0 0 4 4h10a4 4 0 0 0 4-4V7Z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
-                        </div>
                       </div>
 
                       {/* Audio Settings */}
@@ -276,9 +258,7 @@ const VoiceCallView = ({
                           type="button"
                           onClick={toggleAudio}
                         >
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M11.383 3.07904C11.009 2.92504 10.579 3.01004 10.293 3.29604L6 8.00004H3C2.45 8.00004 2 8.45004 2 9.00004V15C2 15.55 2.45 16 3 16H6L10.293 20.71C10.579 20.996 11.009 21.082 11.383 20.927C11.757 20.772 12 20.407 12 20V4.00004C12 3.59304 11.757 3.22804 11.383 3.07904ZM14 5.00004V7.00004C16.757 7.00004 19 9.24304 19 12C19 14.757 16.757 17 14 17V19C17.86 19 21 15.86 21 12C21 8.14004 17.86 5.00004 14 5.00004Z"/>
-                          </svg>
+                          <VolumeUpIcon sx={{ fontSize: 24 }} />
                         </button>
                       </div>
 
@@ -289,9 +269,7 @@ const VoiceCallView = ({
                           type="button" 
                           aria-label="Другие настройки"
                         >
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path fillRule="evenodd" d="M4 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10-2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm8 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" clipRule="evenodd"/>
-                          </svg>
+                          <MoreVertIcon sx={{ fontSize: 24 }} />
                         </button>
                       </div>
                     </div>
@@ -305,9 +283,7 @@ const VoiceCallView = ({
                           aria-label="Отключиться"
                           onClick={handleClose}
                         >
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
-                          </svg>
+                          <CallEndIcon sx={{ fontSize: 24 }} />
                         </button>
                       </div>
                     </div>

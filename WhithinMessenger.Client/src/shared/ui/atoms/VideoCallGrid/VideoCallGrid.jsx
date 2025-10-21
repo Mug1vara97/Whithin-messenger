@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useVideoCall } from '../../../../entities/video-call';
+import MicOffIcon from '@mui/icons-material/MicOff';
+import MicIcon from '@mui/icons-material/Mic';
+import SettingsIcon from '@mui/icons-material/Settings';
 import './VideoCallGrid.css';
 
 const VideoCallGrid = ({ 
@@ -11,7 +14,6 @@ const VideoCallGrid = ({
     focusedParticipantId,
     currentPage,
     bottomPage,
-    visibleBottomUsers,
     totalPages,
     totalBottomPages,
     currentParticipants,
@@ -69,17 +71,20 @@ const VideoCallGrid = ({
 
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
+    const isMuted = participant.isMuted || false;
+    const isSpeaking = participant.isSpeaking || false;
     
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''}`}
+        className={`video-tile ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
         onClick={() => handleParticipantClick(participant)}
       >
         <div className="tile-content">
-          <div className="user-avatar">
+          {/* Background with avatar or video */}
+          <div className="tile-background">
             {participant.avatar ? (
-              <img src={participant.avatar} alt={participant.name} />
+              <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (
               <div 
                 className="avatar-placeholder"
@@ -87,11 +92,10 @@ const VideoCallGrid = ({
                   backgroundColor: getAvatarColor(participant.name),
                   width: '100%',
                   height: '100%',
-                  borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: isSmall ? '20px' : '32px',
+                  fontSize: isSmall ? '40px' : '80px',
                   fontWeight: '600',
                   color: 'white'
                 }}
@@ -100,14 +104,30 @@ const VideoCallGrid = ({
               </div>
             )}
           </div>
-          <div className="user-info">
-            <div className="user-name">{participant.name}</div>
-            <div className="user-status">{participant.status}</div>
+
+          {/* Microphone status indicator - bottom left */}
+          <div className="mic-indicator">
+            <div className={`mic-icon-wrapper ${isMuted ? 'muted' : ''}`}>
+              {isMuted ? (
+                <MicOffIcon sx={{ fontSize: isSmall ? 14 : 16, color: 'white' }} />
+              ) : (
+                <MicIcon sx={{ fontSize: isSmall ? 14 : 16, color: 'white' }} />
+              )}
+            </div>
+          </div>
+
+          {/* User name - bottom left */}
+          <div className="user-name-overlay">
+            <span>{participant.name}</span>
           </div>
         </div>
+
+        {/* Settings button on hover - bottom right */}
         <div className="tile-overlay">
           <div className="overlay-controls">
-            <button className="control-btn">Настройки</button>
+            <button className="control-btn" onClick={(e) => { e.stopPropagation(); }}>
+              <SettingsIcon sx={{ fontSize: isSmall ? 16 : 20 }} />
+            </button>
           </div>
         </div>
       </div>
