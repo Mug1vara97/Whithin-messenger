@@ -3,12 +3,21 @@ import { useVideoCall } from '../../../../entities/video-call';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import SettingsIcon from '@mui/icons-material/Settings';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
 const VideoCallGrid = ({ 
   participants = [], 
   onParticipantClick,
-  className = '' 
+  className = '',
+  userVolumes = new Map(),
+  userMutedStates = new Map(),
+  showVolumeSliders = new Map(),
+  onToggleUserMute,
+  onChangeUserVolume,
+  onToggleVolumeSlider
 }) => {
   const {
     focusedParticipantId,
@@ -73,6 +82,31 @@ const VideoCallGrid = ({
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
+    const isAudioMuted = userMutedStates.get(participant.id) || false;
+    const volume = userVolumes.get(participant.id) || 100;
+    const showSlider = showVolumeSliders.get(participant.id) || false;
+    
+    const handleVolumeClick = (e) => {
+      e.stopPropagation();
+      if (onToggleUserMute) {
+        onToggleUserMute(participant.id);
+      }
+    };
+
+    const handleVolumeRightClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onToggleVolumeSlider) {
+        onToggleVolumeSlider(participant.id);
+      }
+    };
+
+    const handleSliderChange = (e, newValue) => {
+      e.stopPropagation();
+      if (onChangeUserVolume) {
+        onChangeUserVolume(participant.id, newValue);
+      }
+    };
     
     return (
       <div
@@ -117,9 +151,53 @@ const VideoCallGrid = ({
               </div>
               <span className="participant-name">{participant.name}</span>
             </div>
-            <button className="tile-settings-btn" onClick={(e) => { e.stopPropagation(); }}>
-              <SettingsIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-            </button>
+            
+            {/* Volume controls */}
+            <div className="tile-volume-controls">
+              <button 
+                className={`tile-volume-btn ${isAudioMuted ? 'muted' : ''}`}
+                onClick={handleVolumeClick}
+                onContextMenu={handleVolumeRightClick}
+                title="ЛКМ - мут, ПКМ - слайдер"
+              >
+                {isAudioMuted || volume === 0 ? (
+                  <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16, color: '#ed4245' }} />
+                ) : (
+                  <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+                )}
+              </button>
+
+              {/* Volume slider */}
+              {showSlider && (
+                <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
+                  <Slider
+                    value={volume}
+                    onChange={handleSliderChange}
+                    orientation="vertical"
+                    min={0}
+                    max={100}
+                    step={1}
+                    size="small"
+                    sx={{
+                      color: '#5865f2',
+                      height: '80px',
+                      '& .MuiSlider-track': {
+                        backgroundColor: '#5865f2',
+                      },
+                      '& .MuiSlider-thumb': {
+                        backgroundColor: '#fff',
+                        width: 12,
+                        height: 12,
+                        '&:hover': {
+                          boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
+                        },
+                      },
+                    }}
+                  />
+                  <span className="volume-percentage">{volume}%</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

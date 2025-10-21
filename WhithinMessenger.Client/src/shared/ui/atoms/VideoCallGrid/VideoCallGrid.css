@@ -190,6 +190,73 @@
   color: white;
 }
 
+/* Volume controls */
+.tile-volume-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.tile-volume-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.8);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #f2f3f5;
+  opacity: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.video-tile:hover .tile-volume-btn {
+  opacity: 1;
+}
+
+.tile-volume-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+}
+
+.tile-volume-btn.muted {
+  opacity: 1;
+  background: rgba(237, 66, 69, 0.15);
+}
+
+.tile-volume-btn.muted:hover {
+  background: rgba(237, 66, 69, 0.25);
+}
+
+/* Volume slider */
+.volume-slider-container {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 8px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.volume-percentage {
+  color: #f2f3f5;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
 /* ===== GRID LAYOUTS ===== */
 
 /* 1 user - centered large */

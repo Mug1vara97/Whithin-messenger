@@ -10,6 +10,7 @@ import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
@@ -26,19 +27,25 @@ const VoiceCallView = ({
   const {
     isConnected,
     isMuted,
-    isAudioEnabled,
     participants,
     audioBlocked,
     error,
     isNoiseSuppressed,
     noiseSuppressionMode,
+    userVolumes,
+    userMutedStates,
+    showVolumeSliders,
+    isGlobalAudioMuted,
     connect,
     disconnect,
     joinRoom,
     toggleMute,
-    toggleAudio,
     toggleNoiseSuppression,
-    changeNoiseSuppressionMode
+    changeNoiseSuppressionMode,
+    toggleUserMute,
+    changeUserVolume,
+    toggleVolumeSlider,
+    toggleGlobalAudio
   } = useVoiceCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
@@ -179,6 +186,12 @@ const VoiceCallView = ({
                       onParticipantClick={(participant) => {
                         console.log('Clicked participant:', participant);
                       }}
+                      userVolumes={userVolumes}
+                      userMutedStates={userMutedStates}
+                      showVolumeSliders={showVolumeSliders}
+                      onToggleUserMute={toggleUserMute}
+                      onChangeUserVolume={changeUserVolume}
+                      onToggleVolumeSlider={toggleVolumeSlider}
                     />
                   </div>
                 )}
@@ -270,15 +283,20 @@ const VoiceCallView = ({
                         </button>
                       </div>
 
-                      {/* Audio Settings */}
+                      {/* Global Audio Toggle */}
                       <div className="attached-button-container">
                         <button 
-                          className={`center-button ${!isAudioEnabled ? 'muted' : ''}`}
+                          className={`center-button ${isGlobalAudioMuted ? 'muted' : ''}`}
                           type="button"
-                          onClick={toggleAudio}
-                          aria-label={isAudioEnabled ? 'Выключить звук' : 'Включить звук'}
+                          onClick={toggleGlobalAudio}
+                          aria-label={isGlobalAudioMuted ? 'Включить звук всех' : 'Выключить звук всех'}
+                          title={isGlobalAudioMuted ? 'Звук всех участников выключен' : 'Звук всех участников включен'}
                         >
-                          <VolumeUpIcon sx={{ fontSize: 24 }} />
+                          {isGlobalAudioMuted ? (
+                            <VolumeOffIcon sx={{ fontSize: 24 }} />
+                          ) : (
+                            <VolumeUpIcon sx={{ fontSize: 24 }} />
+                          )}
                         </button>
                       </div>
 
