@@ -1,20 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
-  VIDEO_CALL_STATUS, 
-  VIDEO_CALL_MODE, 
-  PARTICIPANT_STATUS,
-  createParticipant,
   createVideoCall 
 } from '../model';
 
-export const useVideoCall = (initialParticipants = []) => {
+export const useVideoCall = (participants = []) => {
   const [videoCall, setVideoCall] = useState(() => 
-    createVideoCall('1', 'Video Call', initialParticipants)
+    createVideoCall('1', 'Video Call', [])
   );
   const [focusedParticipantId, setFocusedParticipantId] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [bottomPage, setBottomPage] = useState(0);
   const [visibleBottomUsers, setVisibleBottomUsers] = useState(6);
+
+  // Обновляем участников при изменении пропса participants
+  useEffect(() => {
+    setVideoCall(prev => ({
+      ...prev,
+      participants: participants
+    }));
+  }, [participants]);
 
   // Расчет количества видимых участников в нижней панели
   const calculateVisibleUsers = useCallback(() => {

@@ -25,35 +25,6 @@ const VideoCallGrid = ({
 
   const bottomGridRef = useRef(null);
 
-  // Расчет количества видимых участников
-  const calculateVisibleUsers = () => {
-    if (bottomGridRef.current) {
-      const containerWidth = bottomGridRef.current.parentElement?.offsetWidth || window.innerWidth;
-      const tileWidth = 200;
-      const gap = 10;
-      const arrowSpace = 120;
-      const containerPadding = 140;
-      const totalPadding = arrowSpace + containerPadding;
-      
-      const availableWidth = containerWidth - totalPadding;
-      const maxCount = Math.floor((availableWidth + gap) / (tileWidth + gap));
-      
-      setVisibleBottomUsers(Math.max(2, Math.min(6, maxCount)));
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      calculateVisibleUsers();
-    }, 100);
-    
-    window.addEventListener('resize', calculateVisibleUsers);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', calculateVisibleUsers);
-    };
-  }, []);
-
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
     onParticipantClick?.(participant);
@@ -75,6 +46,27 @@ const VideoCallGrid = ({
     goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
   };
 
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const words = name.trim().split(' ');
+    if (words.length === 1) {
+      return name.charAt(0).toUpperCase();
+    }
+    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+  };
+
+  const getAvatarColor = (name) => {
+    const colors = [
+      '#5865f2', '#3ba55d', '#faa81a', '#ed4245', '#eb459e',
+      '#57f287', '#fee75c', '#f26522', '#00d9ff', '#7289da'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     
@@ -86,7 +78,27 @@ const VideoCallGrid = ({
       >
         <div className="tile-content">
           <div className="user-avatar">
-            <img src={participant.avatar} alt={participant.name} />
+            {participant.avatar ? (
+              <img src={participant.avatar} alt={participant.name} />
+            ) : (
+              <div 
+                className="avatar-placeholder"
+                style={{ 
+                  backgroundColor: getAvatarColor(participant.name),
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: isSmall ? '20px' : '32px',
+                  fontWeight: '600',
+                  color: 'white'
+                }}
+              >
+                {getInitials(participant.name)}
+              </div>
+            )}
           </div>
           <div className="user-info">
             <div className="user-name">{participant.name}</div>

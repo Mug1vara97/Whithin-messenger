@@ -53,18 +53,20 @@ const VoiceCallView = ({
       createParticipant(userId, userName, null, 'online', 'host')
     ];
     
+    // Добавляем всех остальных участников
     participants.forEach(participant => {
       videoParticipantsList.push(
         createParticipant(
-          participant.id || participant.name, 
+          participant.userId || participant.id || participant.name, 
           participant.name, 
-          null, 
+          participant.avatar || null, 
           'online', 
           'participant'
         )
       );
     });
     
+    console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
   }, [participants, userId, userName]);
 
@@ -87,26 +89,6 @@ const VoiceCallView = ({
     }
   };
 
-  const getInitials = (name) => {
-    if (!name) return '?';
-    const words = name.trim().split(' ');
-    if (words.length === 1) {
-      return name.charAt(0).toUpperCase();
-    }
-    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
-  };
-
-  const getAvatarColor = (name) => {
-    const colors = [
-      '#5865f2', '#3ba55d', '#faa81a', '#ed4245', '#eb459e',
-      '#57f287', '#fee75c', '#f26522', '#00d9ff', '#7289da'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
 
   return (
     <div className="voice-call-container">
