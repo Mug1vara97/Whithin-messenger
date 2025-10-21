@@ -34,18 +34,15 @@ const VoiceCallView = ({
     toggleAudio
   } = useVoiceCall(userId, userName);
 
-  const [isConnecting, setIsConnecting] = useState(true);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [videoParticipants, setVideoParticipants] = useState([]);
 
   useEffect(() => {
     if (channelId && userId && userName) {
-      setIsConnecting(true);
       connect().then(() => {
         joinRoom(channelId);
-        setTimeout(() => setIsConnecting(false), 1000);
-      }).catch(() => {
-        setIsConnecting(false);
+      }).catch((err) => {
+        console.error('Connection error:', err);
       });
     }
   }, [channelId, userId, userName, connect, joinRoom]);
@@ -150,27 +147,6 @@ const VoiceCallView = ({
                   </div>
                 )}
 
-                {/* Empty State */}
-                {participants.length === 0 && !isConnecting && isConnected && (
-                  <div className="participants-row">
-                    <div className="tile-wrapper empty-tile">
-                      <div className="tile-sizer">
-                        <div className="single-user-root">
-                          <img className="empty-art" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='184' height='128' viewBox='0 0 184 128' fill='none'%3E%3Cg opacity='0.3'%3E%3Cpath d='M92 24C78.7452 24 68 34.7452 68 48V72C68 85.2548 78.7452 96 92 96C105.255 96 116 85.2548 116 72V48C116 34.7452 105.255 24 92 24Z' fill='%23949ba4'/%3E%3Cpath d='M60 64V72C60 89.6731 74.3269 104 92 104C109.673 104 124 89.6731 124 72V64H132V72C132 94.0914 114.091 112 92 112C69.9086 112 52 94.0914 52 72V64H60Z' fill='%23949ba4'/%3E%3Crect x='88' y='112' width='8' height='16' fill='%23949ba4'/%3E%3Crect x='72' y='120' width='40' height='8' rx='4' fill='%23949ba4'/%3E%3C/g%3E%3C/svg%3E"/>
-                          <div className="empty-stack">
-                            <button className="empty-button" type="button">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M13 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/>
-                                <path d="M3 5v-.75C3 3.56 3.56 3 4.25 3s1.24.56 1.33 1.25C6.12 8.65 9.46 12 13 12h1a8 8 0 0 1 8 8 2 2 0 0 1-2 2 .21.21 0 0 1-.2-.15 7.65 7.65 0 0 0-1.32-2.3c-.15-.2-.42-.06-.39.17l.25 2c.02.15-.1.28-.25.28H9a2 2 0 0 1-2-2v-2.22c0-1.57-.67-3.05-1.53-4.37A15.85 15.85 0 0 1 3 5Z"/>
-                              </svg>
-                              <span>Пригласить друзей</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
