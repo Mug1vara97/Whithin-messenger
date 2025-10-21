@@ -18,19 +18,19 @@
   overflow: hidden;
 }
 
-/* Сетка видео */
+/* Сетка видео - как в Discord */
 .video-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   width: 100%;
-  max-width: 1400px;
   height: 100%;
-  align-content: center;
-  justify-content: center;
+  padding: 0 8px;
+  align-content: flex-start;
+  justify-content: flex-start;
 }
 
-/* Базовые стили для тайлов - Discord style */
+/* Базовые стили для тайлов - точная копия Discord */
 .video-tile {
   position: relative;
   background: #1e1f22;
@@ -38,29 +38,39 @@
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 2px solid rgba(0, 0, 0, 0.3);
   aspect-ratio: 16 / 9;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.video-tile:hover {
-  border-color: rgba(88, 101, 242, 0.8);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+.video-tile .tile-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  pointer-events: none;
+  transition: border-color 0.2s ease;
 }
 
-/* Speaking animation - green border like Discord */
-.video-tile.speaking {
+.video-tile:hover .tile-border {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Speaking animation - точная копия Discord */
+.video-tile.speaking .tile-border {
   border-color: #23a55a;
-  box-shadow: 0 0 0 2px #23a55a, 0 0 12px rgba(35, 165, 90, 0.6);
-  animation: speaking-pulse 2s ease-in-out infinite;
+  animation: speaking-glow 2s ease-in-out infinite;
 }
 
-@keyframes speaking-pulse {
+@keyframes speaking-glow {
   0%, 100% {
-    box-shadow: 0 0 0 2px #23a55a, 0 0 12px rgba(35, 165, 90, 0.6);
+    border-color: #23a55a;
+    box-shadow: inset 0 0 8px rgba(35, 165, 90, 0.3);
   }
   50% {
-    box-shadow: 0 0 0 2px #23a55a, 0 0 20px rgba(35, 165, 90, 0.8);
+    border-color: #2dc770;
+    box-shadow: inset 0 0 12px rgba(35, 165, 90, 0.5);
   }
 }
 
@@ -100,279 +110,200 @@
   justify-content: center;
 }
 
-/* Microphone indicator - Discord style */
-.mic-indicator {
+/* Bottom overlay - точная копия Discord */
+.tile-bottom-overlay {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.5) 70%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
   z-index: 10;
 }
 
-.mic-icon-wrapper {
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 3px;
-  padding: 2px 4px;
+.video-tile:hover .tile-bottom-overlay {
+  opacity: 1;
+}
+
+.bottom-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mic-status {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10px);
-  min-width: 24px;
+  width: 20px;
   height: 20px;
-  transition: background-color 0.2s ease;
-}
-
-.mic-icon-wrapper.muted {
-  background: rgba(242, 63, 66, 0.9);
-}
-
-/* User name overlay - Discord style */
-.user-name-overlay {
-  position: absolute;
-  bottom: 8px;
-  left: 40px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.8);
   border-radius: 3px;
-  max-width: calc(100% - 120px);
-  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+  color: #f2f3f5;
 }
 
-.user-name-overlay span {
+.mic-status.muted {
+  background: #f23f42;
+  color: white;
+}
+
+.participant-name {
   color: #f2f3f5;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  line-height: 16px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Settings button on hover */
-.tile-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-
-.video-tile:hover .tile-overlay {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.overlay-controls {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-}
-
-.control-btn {
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  padding: 6px;
+.tile-settings-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.8);
+  border: none;
+  border-radius: 3px;
   cursor: pointer;
-  color: white;
-  backdrop-filter: blur(10px);
+  color: #f2f3f5;
+  opacity: 0;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.control-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  border-color: rgba(255, 255, 255, 0.2);
+.video-tile:hover .tile-settings-btn {
+  opacity: 1;
+}
+
+.tile-settings-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
 }
 
 /* ===== GRID LAYOUTS ===== */
 
-/* 1 user - centered large */
+/* 1 user - как в Discord */
 .video-grid[data-user-count="1"] {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 32px 8px 8px 8px;
 }
 
 .video-grid[data-user-count="1"] .video-tile {
   width: 100%;
-  max-width: 800px;
+  max-width: 584px;
   height: auto;
 }
 
-/* 2 users - horizontal on wide screens, vertical on narrow */
+/* 2 users - как в Discord */
 .video-grid[data-user-count="2"] {
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
+  padding: 32px 8px 8px 8px;
+  align-content: flex-start;
 }
 
 .video-grid[data-user-count="2"] .video-tile {
-  width: 100%;
-  max-width: 600px;
+  width: calc(50% - 4px);
+  max-width: 584px;
 }
 
-@media (min-width: 1600px) {
-  .video-grid[data-user-count="2"] {
-    flex-direction: row;
-  }
-  
-  .video-grid[data-user-count="2"] .video-tile {
-    width: calc(50% - 4px);
-    max-width: none;
-  }
-}
-
-/* 3 users - 2 top, 1 centered bottom */
+/* 3 users - как в Discord */
 .video-grid[data-user-count="3"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: center;
+  align-content: flex-start;
+  padding: 32px 8px 8px 8px;
 }
 
 .video-grid[data-user-count="3"] .video-tile {
   width: calc(50% - 4px);
+  max-width: 584px;
 }
 
 .video-grid[data-user-count="3"] .video-tile:nth-child(3) {
-  width: 50%;
+  width: calc(50% - 4px);
+  max-width: 584px;
 }
 
-/* 4 users - 2x2 grid */
+/* 4 users - как в Discord */
 .video-grid[data-user-count="4"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: center;
+  align-content: flex-start;
+  padding: 32px 8px 8px 8px;
 }
 
 .video-grid[data-user-count="4"] .video-tile {
   width: calc(50% - 4px);
+  max-width: 584px;
 }
 
-/* 5 users - 2-2-1 layout by default */
+/* 5 users - как в Discord */
 .video-grid[data-user-count="5"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: center;
-  padding: 0 20px;
-  max-width: 1000px;
-  margin: 0 auto;
+  align-content: flex-start;
+  padding: 32px 8px 8px 8px;
 }
 
 .video-grid[data-user-count="5"] .video-tile {
   width: calc(50% - 4px);
-}
-
-.video-grid[data-user-count="5"] .video-tile:nth-child(5) {
-  width: 50%;
+  max-width: 584px;
 }
 
 /* 5 users - 3-2 layout for wide screens */
 @media (min-width: 1660px) {
-  .video-grid[data-user-count="5"] {
-    max-width: 1400px;
-  }
-
   .video-grid[data-user-count="5"] .video-tile {
     width: calc(33.333% - 5.33px);
+    max-width: 584px;
   }
 
   .video-grid[data-user-count="5"] .video-tile:nth-child(4),
   .video-grid[data-user-count="5"] .video-tile:nth-child(5) {
     width: calc(50% - 4px);
+    max-width: 584px;
   }
 }
 
-/* 6 users - 3x2 grid */
-.video-grid[data-user-count="6"] {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-content: center;
-}
-
-.video-grid[data-user-count="6"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-@media (min-width: 1660px) {
-  .video-grid[data-user-count="6"] .video-tile {
-    width: calc(33.333% - 5.33px);
-  }
-}
-
-/* 7 users */
-.video-grid[data-user-count="7"] {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-content: center;
-  max-width: 1200px;
-}
-
-.video-grid[data-user-count="7"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-.video-grid[data-user-count="7"] .video-tile:nth-child(7) {
-  width: 50%;
-}
-
-@media (min-width: 1300px) {
-  .video-grid[data-user-count="7"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="7"] .video-tile {
-    width: calc(33.333% - 5.33px);
-  }
-
-  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
-    width: calc(33.333% - 5.33px);
-  }
-}
-
-/* 8 users */
-.video-grid[data-user-count="8"] {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-content: center;
-  max-width: 1200px;
-}
-
-.video-grid[data-user-count="8"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-@media (min-width: 1300px) {
-  .video-grid[data-user-count="8"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="8"] .video-tile {
-    width: calc(33.333% - 5.33px);
-  }
-
-  .video-grid[data-user-count="8"] .video-tile:nth-child(7),
-  .video-grid[data-user-count="8"] .video-tile:nth-child(8) {
-    width: calc(50% - 4px);
-  }
-}
-
-/* 9 users - 3x3 grid */
+/* 6-9 users - как в Discord */
+.video-grid[data-user-count="6"],
+.video-grid[data-user-count="7"],
+.video-grid[data-user-count="8"],
 .video-grid[data-user-count="9"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: center;
-  max-width: 1400px;
+  align-content: flex-start;
+  padding: 32px 8px 8px 8px;
 }
 
+.video-grid[data-user-count="6"] .video-tile,
+.video-grid[data-user-count="7"] .video-tile,
+.video-grid[data-user-count="8"] .video-tile,
 .video-grid[data-user-count="9"] .video-tile {
-  width: calc(33.333% - 5.33px);
+  width: calc(50% - 4px);
+  max-width: 584px;
+}
+
+@media (min-width: 1300px) {
+  .video-grid[data-user-count="6"] .video-tile,
+  .video-grid[data-user-count="7"] .video-tile,
+  .video-grid[data-user-count="8"] .video-tile,
+  .video-grid[data-user-count="9"] .video-tile {
+    width: calc(33.333% - 5.33px);
+    max-width: 584px;
+  }
 }
 
 /* Pagination arrows */
@@ -463,6 +394,8 @@
   padding: 8px 60px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .bottom-users-grid {
@@ -486,44 +419,29 @@
   aspect-ratio: 16 / 9;
   flex-shrink: 0;
   background: #1e1f22;
-  border: 2px solid rgba(0, 0, 0, 0.3);
-}
-
-.small-tile:hover {
-  border-color: rgba(88, 101, 242, 0.6);
 }
 
 .small-tile .tile-avatar-bg {
-  width: 60px;
-  height: 60px;
+  width: 48px;
+  height: 48px;
 }
 
-.small-tile .user-name-overlay {
-  font-size: 11px;
-  left: 30px;
-  padding: 2px 4px;
+.small-tile .tile-bottom-overlay {
+  padding: 6px;
 }
 
-.small-tile .user-name-overlay span {
-  font-size: 11px;
-  line-height: 14px;
-}
-
-.small-tile .mic-indicator {
-  bottom: 6px;
-  left: 6px;
-}
-
-.small-tile .mic-icon-wrapper {
-  padding: 1px 3px;
+.small-tile .mic-status {
+  width: 16px;
   height: 16px;
-  min-width: 20px;
 }
 
-.small-tile .control-btn {
-  padding: 4px;
-  width: 24px;
-  height: 24px;
+.small-tile .participant-name {
+  font-size: 11px;
+}
+
+.small-tile .tile-settings-btn {
+  width: 20px;
+  height: 20px;
 }
 
 /* Pagination arrows for bottom users */

@@ -105,31 +105,26 @@ const VideoCallGrid = ({
             )}
           </div>
 
-          {/* Microphone status indicator - bottom left */}
-          <div className="mic-indicator">
-            <div className={`mic-icon-wrapper ${isMuted ? 'muted' : ''}`}>
-              {isMuted ? (
-                <MicOffIcon sx={{ fontSize: isSmall ? 14 : 16, color: 'white' }} />
-              ) : (
-                <MicIcon sx={{ fontSize: isSmall ? 14 : 16, color: 'white' }} />
-              )}
+          {/* Bottom overlay with name and mic status */}
+          <div className="tile-bottom-overlay">
+            <div className="bottom-info">
+              <div className={`mic-status ${isMuted ? 'muted' : ''}`}>
+                {isMuted ? (
+                  <MicOffIcon sx={{ fontSize: isSmall ? 12 : 14 }} />
+                ) : (
+                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14 }} />
+                )}
+              </div>
+              <span className="participant-name">{participant.name}</span>
             </div>
-          </div>
-
-          {/* User name - bottom left */}
-          <div className="user-name-overlay">
-            <span>{participant.name}</span>
-          </div>
-        </div>
-
-        {/* Settings button on hover - bottom right */}
-        <div className="tile-overlay">
-          <div className="overlay-controls">
-            <button className="control-btn" onClick={(e) => { e.stopPropagation(); }}>
-              <SettingsIcon sx={{ fontSize: isSmall ? 16 : 20 }} />
+            <button className="tile-settings-btn" onClick={(e) => { e.stopPropagation(); }}>
+              <SettingsIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
             </button>
           </div>
         </div>
+
+        {/* Border for speaking/hover */}
+        <div className="tile-border"></div>
       </div>
     );
   };
