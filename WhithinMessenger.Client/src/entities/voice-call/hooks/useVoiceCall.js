@@ -44,10 +44,20 @@ export const useVoiceCall = (userId, userName) => {
   const noiseSuppressionRef = useRef(null);
   const audioContextRef = useRef(null);
   const createAudioStreamRef = useRef(null);
+  const connectingRef = useRef(false);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
     try {
+      // Предотвращаем множественные одновременные подключения
+      if (connectingRef.current) {
+        console.log('Connection already in progress, skipping');
+        return;
+      }
+      
+      connectingRef.current = true;
+      console.log('connect() called');
+      console.trace('connect() call stack');
       setError(null);
       
       // Очищаем старые обработчики перед регистрацией новых
@@ -99,9 +109,11 @@ export const useVoiceCall = (userId, userName) => {
       });
       
       setIsConnected(true);
+      connectingRef.current = false;
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
       setError(error.message);
+      connectingRef.current = false;
     }
   }, [userId, userName]);
 
@@ -153,9 +165,11 @@ export const useVoiceCall = (userId, userName) => {
       await voiceCallApi.disconnect();
       setIsConnected(false);
       setParticipants([]);
+      connectingRef.current = false;
       console.log('Disconnected from voice server');
     } catch (error) {
       console.error('Failed to disconnect:', error);
+      connectingRef.current = false;
     }
   }, []);
 
@@ -399,6 +413,8 @@ export const useVoiceCall = (userId, userName) => {
   // Присоединение к комнате
   const joinRoom = useCallback(async (roomId) => {
     try {
+      console.log('joinRoom called for roomId:', roomId);
+      console.trace('joinRoom call stack');
       const response = await voiceCallApi.joinRoom(roomId, userName, userId);
       
       if (response.routerRtpCapabilities) {
