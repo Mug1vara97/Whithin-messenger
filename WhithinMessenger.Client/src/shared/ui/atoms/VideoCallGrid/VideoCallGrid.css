@@ -2,7 +2,7 @@
 .video-call-container {
   width: 100%;
   height: 100%;
-  background: #1e1e1e;
+  background: #111214;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -33,32 +33,34 @@
 /* Базовые стили для тайлов - Discord style */
 .video-tile {
   position: relative;
-  background: #2b2d31;
+  background: #1e1f22;
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 2px solid rgba(0, 0, 0, 0.3);
   aspect-ratio: 16 / 9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .video-tile:hover {
-  border-color: #5865f2;
+  border-color: rgba(88, 101, 242, 0.8);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Speaking animation - green border like Discord */
 .video-tile.speaking {
-  border-color: #3ba55d;
-  box-shadow: 0 0 0 2px #3ba55d, 0 0 15px rgba(59, 165, 93, 0.5);
-  animation: speaking-pulse 1.5s ease-in-out infinite;
+  border-color: #23a55a;
+  box-shadow: 0 0 0 2px #23a55a, 0 0 12px rgba(35, 165, 90, 0.6);
+  animation: speaking-pulse 2s ease-in-out infinite;
 }
 
 @keyframes speaking-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 2px #3ba55d, 0 0 15px rgba(59, 165, 93, 0.5);
+    box-shadow: 0 0 0 2px #23a55a, 0 0 12px rgba(35, 165, 90, 0.6);
   }
   50% {
-    box-shadow: 0 0 0 2px #3ba55d, 0 0 25px rgba(59, 165, 93, 0.7);
+    box-shadow: 0 0 0 2px #23a55a, 0 0 20px rgba(35, 165, 90, 0.8);
   }
 }
 
@@ -80,7 +82,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2b2d31;
+  background: #1e1f22;
 }
 
 .tile-avatar-bg {
@@ -107,43 +109,45 @@
 }
 
 .mic-icon-wrapper {
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
-  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+  padding: 2px 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 24px;
+  height: 20px;
+  transition: background-color 0.2s ease;
 }
 
 .mic-icon-wrapper.muted {
-  background: rgba(237, 66, 69, 0.8);
-  border-color: rgba(237, 66, 69, 0.3);
+  background: rgba(242, 63, 66, 0.9);
 }
 
 /* User name overlay - Discord style */
 .user-name-overlay {
   position: absolute;
   bottom: 8px;
-  left: 44px;
+  left: 40px;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(10px);
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
   max-width: calc(100% - 120px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background-color 0.2s ease;
 }
 
 .user-name-overlay span {
-  color: white;
-  font-size: 14px;
+  color: #f2f3f5;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+  line-height: 16px;
 }
 
 /* Settings button on hover */
@@ -481,6 +485,12 @@
 .small-tile {
   aspect-ratio: 16 / 9;
   flex-shrink: 0;
+  background: #1e1f22;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.small-tile:hover {
+  border-color: rgba(88, 101, 242, 0.6);
 }
 
 .small-tile .tile-avatar-bg {
@@ -489,13 +499,14 @@
 }
 
 .small-tile .user-name-overlay {
-  font-size: 12px;
-  left: 36px;
-  padding: 3px 6px;
+  font-size: 11px;
+  left: 30px;
+  padding: 2px 4px;
 }
 
 .small-tile .user-name-overlay span {
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 14px;
 }
 
 .small-tile .mic-indicator {
@@ -504,11 +515,15 @@
 }
 
 .small-tile .mic-icon-wrapper {
-  padding: 3px 4px;
+  padding: 1px 3px;
+  height: 16px;
+  min-width: 20px;
 }
 
 .small-tile .control-btn {
   padding: 4px;
+  width: 24px;
+  height: 24px;
 }
 
 /* Pagination arrows for bottom users */

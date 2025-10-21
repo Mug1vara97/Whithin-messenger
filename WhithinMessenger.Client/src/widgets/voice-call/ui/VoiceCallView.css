@@ -557,8 +557,49 @@
   .control-button .attached-button-container {
     margin: 0;
   }
+
+  /* Attached Caret Button Container - Discord Style */
+  .attached-caret-button-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .attached-button {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+
+  .context-menu-caret {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 56px;
+    background: #3c3f45;
+    color: #f2f3f5;
+    cursor: pointer;
+    transition: background-color 0.17s ease;
+    border-top-right-radius: 28px;
+    border-bottom-right-radius: 28px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+
+  .context-menu-caret:hover {
+    background: #4e5058;
+  }
+
+  .context-menu-caret.muted {
+    background: #f23f42;
+    color: white;
+  }
+
+  .context-menu-caret.muted:hover {
+    background: #da373c;
+  }
   
-  /* Center Button */
+  /* Center Button - Discord Style */
   .center-button {
     display: flex;
     align-items: center;
@@ -566,24 +607,23 @@
     width: 56px;
     height: 56px;
     border: none;
-    background: #35373c;
-    color: #dbdee1;
+    background: #3c3f45;
+    color: #f2f3f5;
     border-radius: 50%;
     cursor: pointer;
-    transition: all 0.17s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    transition: background-color 0.17s ease, transform 0.17s ease, box-shadow 0.17s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
     position: relative;
   }
   
   .center-button:hover {
-    background: #3f4147;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
+    background: #4e5058;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
   
   .center-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    transform: scale(0.95);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
   
   .center-button.muted {
@@ -592,14 +632,14 @@
   }
   
   .center-button.muted:hover {
-    background: #d83537;
+    background: #da373c;
   }
   
   .center-button svg {
     flex-shrink: 0;
   }
   
-  /* Disconnect Button */
+  /* Disconnect Button - Discord Style */
   .disconnect-button-wrapper {
     position: relative;
   }
@@ -612,7 +652,12 @@
   }
   
   .center-button.disconnect:hover {
-    background: #d83537;
+    background: #da373c;
+    box-shadow: 0 4px 8px rgba(242, 63, 66, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+  
+  .center-button.disconnect:active {
+    transform: scale(0.95);
   }
   
   .center-button.disconnect svg {

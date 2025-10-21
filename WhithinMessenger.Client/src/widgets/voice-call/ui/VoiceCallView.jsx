@@ -10,6 +10,7 @@ import CallEndIcon from '@mui/icons-material/CallEnd';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import ChatIcon from '@mui/icons-material/Chat';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -211,10 +212,10 @@ const VoiceCallView = ({
                 <div className="center-controls">
                   <div className="wrapper">
                     <div className="button-section">
-                      {/* Microphone */}
-                      <div className="attached-button-container">
+                      {/* Microphone with dropdown */}
+                      <div className="attached-caret-button-container">
                         <button 
-                          className={`center-button ${isMuted ? 'muted' : ''}`}
+                          className={`center-button attached-button ${isMuted ? 'muted' : ''}`}
                           type="button" 
                           aria-label={isMuted ? 'Включить микрофон' : 'Заглушить'}
                           onClick={toggleMute}
@@ -225,17 +226,23 @@ const VoiceCallView = ({
                             <MicIcon sx={{ fontSize: 24 }} />
                           )}
                         </button>
+                        <div className={`context-menu-caret ${isMuted ? 'muted' : ''}`}>
+                          <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                        </div>
                       </div>
 
-                      {/* Camera */}
-                      <div className="attached-button-container">
+                      {/* Camera with dropdown */}
+                      <div className="attached-caret-button-container">
                         <button 
-                          className="center-button"
+                          className="center-button attached-button"
                           type="button" 
                           aria-label="Включить камеру"
                         >
                           <VideocamIcon sx={{ fontSize: 24 }} />
                         </button>
+                        <div className="context-menu-caret">
+                          <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                        </div>
                       </div>
                     </div>
 
