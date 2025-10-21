@@ -11,21 +11,40 @@
 .video-grid-wrapper {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px;
+  padding: 64px 8px 56px 8px;
   position: relative;
-  overflow: hidden;
+  overflow: hidden scroll;
 }
 
-/* Сетка видео - как в Discord */
+.video-grid-wrapper::-webkit-scrollbar {
+  width: 16px;
+}
+
+.video-grid-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.video-grid-wrapper::-webkit-scrollbar-thumb {
+  background: #1a1b1e;
+  border-radius: 8px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+
+.video-grid-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #2e3035;
+  background-clip: padding-box;
+}
+
+/* Сетка видео */
 .video-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   width: 100%;
-  height: 100%;
-  padding: 0 8px;
+  max-width: 1200px;
   align-content: flex-start;
   justify-content: flex-start;
 }
@@ -192,118 +211,185 @@
 
 /* ===== GRID LAYOUTS ===== */
 
-/* 1 user - как в Discord */
+/* 1 user - centered large */
 .video-grid[data-user-count="1"] {
   display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  padding: 32px 8px 8px 8px;
+  justify-content: center;
+  align-items: center;
 }
 
 .video-grid[data-user-count="1"] .video-tile {
   width: 100%;
-  max-width: 584px;
+  max-width: 800px;
   height: auto;
 }
 
-/* 2 users - как в Discord */
+/* 2 users - horizontal on wide screens, vertical on narrow */
 .video-grid[data-user-count="2"] {
-  flex-direction: row;
+  flex-direction: column;
   gap: 8px;
-  padding: 32px 8px 8px 8px;
-  align-content: flex-start;
 }
 
 .video-grid[data-user-count="2"] .video-tile {
-  width: calc(50% - 4px);
-  max-width: 584px;
+  width: 100%;
+  max-width: 600px;
 }
 
-/* 3 users - как в Discord */
+@media (min-width: 1600px) {
+  .video-grid[data-user-count="2"] {
+    flex-direction: row;
+  }
+  
+  .video-grid[data-user-count="2"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 3 users - 2 top, 1 centered bottom */
 .video-grid[data-user-count="3"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 32px 8px 8px 8px;
+  align-content: center;
 }
 
 .video-grid[data-user-count="3"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 584px;
 }
 
 .video-grid[data-user-count="3"] .video-tile:nth-child(3) {
-  width: calc(50% - 4px);
-  max-width: 584px;
+  width: 50%;
 }
 
-/* 4 users - как в Discord */
+/* 4 users - 2x2 grid */
 .video-grid[data-user-count="4"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 32px 8px 8px 8px;
+  align-content: center;
 }
 
 .video-grid[data-user-count="4"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 584px;
 }
 
-/* 5 users - как в Discord */
+/* 5 users - 2-2-1 layout by default */
 .video-grid[data-user-count="5"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 32px 8px 8px 8px;
+  align-content: center;
+  padding: 0 20px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="5"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 584px;
+}
+
+.video-grid[data-user-count="5"] .video-tile:nth-child(5) {
+  width: 50%;
 }
 
 /* 5 users - 3-2 layout for wide screens */
 @media (min-width: 1660px) {
+  .video-grid[data-user-count="5"] {
+    max-width: 1400px;
+  }
+
   .video-grid[data-user-count="5"] .video-tile {
     width: calc(33.333% - 5.33px);
-    max-width: 584px;
   }
 
   .video-grid[data-user-count="5"] .video-tile:nth-child(4),
   .video-grid[data-user-count="5"] .video-tile:nth-child(5) {
     width: calc(50% - 4px);
-    max-width: 584px;
   }
 }
 
-/* 6-9 users - как в Discord */
-.video-grid[data-user-count="6"],
-.video-grid[data-user-count="7"],
-.video-grid[data-user-count="8"],
-.video-grid[data-user-count="9"] {
+/* 6 users - 3x2 grid */
+.video-grid[data-user-count="6"] {
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 32px 8px 8px 8px;
+  align-content: center;
 }
 
-.video-grid[data-user-count="6"] .video-tile,
-.video-grid[data-user-count="7"] .video-tile,
-.video-grid[data-user-count="8"] .video-tile,
-.video-grid[data-user-count="9"] .video-tile {
+.video-grid[data-user-count="6"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 584px;
+}
+
+@media (min-width: 1660px) {
+  .video-grid[data-user-count="6"] .video-tile {
+    width: calc(33.333% - 5.33px);
+  }
+}
+
+/* 7 users */
+.video-grid[data-user-count="7"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: center;
+  max-width: 1200px;
+}
+
+.video-grid[data-user-count="7"] .video-tile {
+  width: calc(50% - 4px);
+}
+
+.video-grid[data-user-count="7"] .video-tile:nth-child(7) {
+  width: 50%;
 }
 
 @media (min-width: 1300px) {
-  .video-grid[data-user-count="6"] .video-tile,
-  .video-grid[data-user-count="7"] .video-tile,
-  .video-grid[data-user-count="8"] .video-tile,
-  .video-grid[data-user-count="9"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 584px;
+  .video-grid[data-user-count="7"] {
+    max-width: 1400px;
   }
+
+  .video-grid[data-user-count="7"] .video-tile {
+    width: calc(33.333% - 5.33px);
+  }
+
+  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
+    width: calc(33.333% - 5.33px);
+  }
+}
+
+/* 8 users */
+.video-grid[data-user-count="8"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: center;
+  max-width: 1200px;
+}
+
+.video-grid[data-user-count="8"] .video-tile {
+  width: calc(50% - 4px);
+}
+
+@media (min-width: 1300px) {
+  .video-grid[data-user-count="8"] {
+    max-width: 1400px;
+  }
+
+  .video-grid[data-user-count="8"] .video-tile {
+    width: calc(33.333% - 5.33px);
+  }
+
+  .video-grid[data-user-count="8"] .video-tile:nth-child(7),
+  .video-grid[data-user-count="8"] .video-tile:nth-child(8) {
+    width: calc(50% - 4px);
+  }
+}
+
+/* 9 users - 3x3 grid */
+.video-grid[data-user-count="9"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: center;
+  max-width: 1400px;
+}
+
+.video-grid[data-user-count="9"] .video-tile {
+  width: calc(33.333% - 5.33px);
 }
 
 /* Pagination arrows */
