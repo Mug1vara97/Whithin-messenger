@@ -317,18 +317,23 @@ export const useVoiceCall = (userId, userName) => {
       audioElement.style.display = 'none';
       document.body.appendChild(audioElement);
       
-      // Создаем Web Audio API chain: source -> gain -> destination
+      // Создаем Web Audio API chain: source -> gain
+      // НЕ подключаем к destination, чтобы избежать двойного воспроизведения!
+      // Воспроизведение идет только через HTML Audio элемент
       const source = audioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
       const gainNode = audioContextRef.current.createGain();
       
-      // Устанавливаем начальную громкость (100% = 4.0 gain для усиления)
+      // GainNode больше не используется для воспроизведения, только для отслеживания состояния
+      // Устанавливаем начальную громкость HTML Audio элемента
       const initialVolume = userVolumes.get(peerId) || 100;
       const isMuted = userMutedStates.get(peerId) || false;
       // Если глобально выключен звук, устанавливаем 0, иначе используем индивидуальную громкость
-      gainNode.gain.value = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0) * 4.0);
+      const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+      audioElement.volume = audioVolume;
       
+      // Подключаем source -> gain, но НЕ к destination (только для анализа)
       source.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
+      // gainNode.connect(audioContextRef.current.destination); // ОТКЛЮЧЕНО - используем только HTML Audio
       
       // Сохраняем ссылки
       gainNodesRef.current.set(peerId, gainNode);
@@ -559,8 +564,8 @@ export const useVoiceCall = (userId, userName) => {
 
   // Переключение мута для отдельного пользователя
   const toggleUserMute = useCallback((peerId) => {
-    const gainNode = gainNodesRef.current.get(peerId);
-    if (!gainNode) return;
+    const audioElement = audioElementsRef.current.get(peerId);
+    if (!audioElement) return;
 
     const isCurrentlyMuted = userMutedStates.get(peerId) || false;
     const newIsMuted = !isCurrentlyMuted;
@@ -571,7 +576,7 @@ export const useVoiceCall = (userId, userName) => {
       if (currentVolume > 0) {
         previousVolumesRef.current.set(peerId, currentVolume);
       }
-      gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+      audioElement.volume = 0;
       setUserVolumes(prev => {
         const newMap = new Map(prev);
         newMap.set(peerId, 0);
@@ -580,8 +585,8 @@ export const useVoiceCall = (userId, userName) => {
     } else {
       // Размутиваем - восстанавливаем предыдущую громкость, но только если глобально не замучено
       const previousVolume = previousVolumesRef.current.get(peerId) || 100;
-      const gainValue = isGlobalAudioMuted ? 0 : (previousVolume / 100.0) * 4.0;
-      gainNode.gain.setValueAtTime(gainValue, audioContextRef.current.currentTime);
+      const audioVolume = isGlobalAudioMuted ? 0 : (previousVolume / 100.0);
+      audioElement.volume = audioVolume;
       setUserVolumes(prev => {
         const newMap = new Map(prev);
         newMap.set(peerId, previousVolume);
@@ -600,12 +605,12 @@ export const useVoiceCall = (userId, userName) => {
 
   // Изменение громкости отдельного пользователя
   const changeUserVolume = useCallback((peerId, newVolume) => {
-    const gainNode = gainNodesRef.current.get(peerId);
-    if (!gainNode) return;
+    const audioElement = audioElementsRef.current.get(peerId);
+    if (!audioElement) return;
 
     // Если глобально замучено, применяем только состояние, но не звук
-    const gainValue = isGlobalAudioMuted ? 0 : (newVolume / 100.0) * 4.0;
-    gainNode.gain.setValueAtTime(gainValue, audioContextRef.current.currentTime);
+    const audioVolume = isGlobalAudioMuted ? 0 : (newVolume / 100.0);
+    audioElement.volume = audioVolume;
 
     setUserVolumes(prev => {
       const newMap = new Map(prev);
@@ -645,21 +650,23 @@ export const useVoiceCall = (userId, userName) => {
   const toggleGlobalAudio = useCallback(() => {
     const newMutedState = !isGlobalAudioMuted;
     
-    // Применяем ко всем GainNodes
-    gainNodesRef.current.forEach((gainNode) => {
-      if (newMutedState) {
-        // Мутим всех
-        gainNode.gain.setValueAtTime(0, audioContextRef.current?.currentTime || 0);
-      } else {
-        // Размутиваем всех с их индивидуальной громкостью
-        const peerId = Array.from(gainNodesRef.current.entries())
-          .find(([, node]) => node === gainNode)?.[0];
-        
-        if (peerId) {
+    console.log(`toggleGlobalAudio called, new state: ${newMutedState}`);
+    console.log(`Audio elements count: ${audioElementsRef.current.size}`);
+    
+    // Управляем только HTML Audio элементами (GainNode больше не используется для воспроизведения)
+    audioElementsRef.current.forEach((audioElement, peerId) => {
+      if (audioElement) {
+        if (newMutedState) {
+          // Мутим HTML Audio элемент
+          audioElement.volume = 0;
+          console.log(`HTML Audio muted for peer: ${peerId}`);
+        } else {
+          // Размутиваем с индивидуальной громкостью
           const volume = userVolumes.get(peerId) || 100;
           const isIndividuallyMuted = userMutedStates.get(peerId) || false;
-          const gainValue = isIndividuallyMuted ? 0 : (volume / 100.0) * 4.0;
-          gainNode.gain.setValueAtTime(gainValue, audioContextRef.current?.currentTime || 0);
+          const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
+          audioElement.volume = audioVolume;
+          console.log(`HTML Audio unmuted for peer: ${peerId}, volume: ${audioVolume}`);
         }
       }
     });
