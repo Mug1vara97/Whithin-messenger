@@ -1,0 +1,612 @@
+/* Основной контейнер */
+.video-call-container {
+  width: 100%;
+  height: 100vh;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-grid-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+}
+
+/* Сетка видео */
+.video-grid {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+}
+
+/* Базовые стили для тайлов */
+.video-tile {
+  position: relative;
+  background: #2c2c2c;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.video-tile:hover {
+  border-color: #5865f2;
+  transform: scale(1.02);
+}
+
+.tile-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-info {
+  text-align: center;
+  color: white;
+}
+
+.user-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.user-status {
+  font-size: 12px;
+  color: #b9bbbe;
+}
+
+.tile-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.video-tile:hover .tile-overlay {
+  opacity: 1;
+}
+
+.overlay-controls {
+  padding: 10px;
+}
+
+.control-btn {
+  background: #5865f2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* Адаптивная сетка для разного количества пользователей */
+
+/* 1 пользователь - большой блок по центру */
+.video-grid[data-user-count="1"] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="1"] .video-tile {
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 16 / 9;
+}
+
+/* 2 пользователя - вертикальная раскладка (как в 2.md) */
+.video-grid[data-user-count="2"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  max-width: 690px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="2"] .video-tile {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+/* 2 пользователя - большие экраны (>=1600px) - горизонтальная раскладка (как в 2.1.md) */
+@media (min-width: 1600px) {
+  .video-grid[data-user-count="2"] {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .video-grid[data-user-count="2"] .video-tile {
+    width: calc(50% - 10px);
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* 3 пользователя - 2 ряда: 2 сверху, 1 снизу по центру */
+.video-grid[data-user-count="3"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+}
+
+.video-grid[data-user-count="3"] .video-tile {
+  width: calc(50% - 10px);
+  aspect-ratio: 16 / 9;
+}
+
+.video-grid[data-user-count="3"] .video-tile:nth-child(3) {
+  width: calc(50% - 10px);
+}
+
+/* 4 пользователя - 2x2 сетка */
+.video-grid[data-user-count="4"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+}
+
+.video-grid[data-user-count="4"] .video-tile {
+  width: calc(50% - 10px);
+  aspect-ratio: 16 / 9;
+}
+
+/* 5 пользователей - 3 ряда: 2-2-1 (как в 5.md) */
+.video-grid[data-user-count="5"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  padding: 0 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="5"] .video-tile {
+  width: calc(50% - 10px);
+  aspect-ratio: 16 / 9;
+}
+
+.video-grid[data-user-count="5"] .video-tile:nth-child(5) {
+  width: calc(50% - 10px);
+}
+
+/* 5 пользователей - большие экраны (>1660px) - 3-2 сетка */
+@media (min-width: 1660px) {
+  .video-grid[data-user-count="5"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .video-grid[data-user-count="5"] .video-tile {
+    width: calc(33.333% - 14px);
+    aspect-ratio: 16 / 9;
+  }
+
+  .video-grid[data-user-count="5"] .video-tile:nth-child(n+4) {
+    width: calc(33.333% - 14px);
+  }
+}
+
+/* 6 пользователей - 3 ряда: 2-2-2 (как в 6.md) */
+.video-grid[data-user-count="6"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  padding: 0 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="6"] .video-tile {
+  width: calc(50% - 10px);
+  aspect-ratio: 16 / 9;
+}
+
+/* 6 пользователей - большие экраны (>1660px) - 3-3 сетка */
+@media (min-width: 1660px) {
+  .video-grid[data-user-count="6"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .video-grid[data-user-count="6"] .video-tile {
+    width: calc(33.333% - 14px);
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* 7 пользователей - 4 ряда: 2-2-2-1 (как в 7.md) */
+.video-grid[data-user-count="7"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  padding: 0 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="7"] .video-tile {
+  width: calc(50% - 10px);
+  max-height: calc((100vh - 120px) / 4 - 15px); /* 4 ряда с учетом gap */
+  aspect-ratio: 16 / 9;
+}
+
+.video-grid[data-user-count="7"] .video-tile:nth-child(7) {
+  width: calc(50% - 10px);
+  max-height: calc((100vh - 120px) / 4 - 15px);
+}
+
+/* 7 пользователей - большие экраны (>=1300px) - 3-3-1 сетка */
+@media (min-width: 1300px) {
+  .video-grid[data-user-count="7"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .video-grid[data-user-count="7"] .video-tile {
+    width: calc(33.333% - 14px);
+    aspect-ratio: 16 / 9;
+  }
+
+  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
+    width: calc(33.333% - 14px);
+  }
+}
+
+/* 8 пользователей - 4 ряда: 2-2-2-2 (как в 8.md) */
+.video-grid[data-user-count="8"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  padding: 0 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="8"] .video-tile {
+  width: calc(50% - 10px);
+  max-height: calc((100vh - 120px) / 4 - 15px); /* 4 ряда с учетом gap */
+  aspect-ratio: 16 / 9;
+}
+
+/* 8 пользователей - большие экраны (>=1300px) - 3-3-2 сетка */
+@media (min-width: 1300px) {
+  .video-grid[data-user-count="8"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .video-grid[data-user-count="8"] .video-tile {
+    width: calc(33.333% - 14px);
+    aspect-ratio: 16 / 9;
+  }
+
+  .video-grid[data-user-count="8"] .video-tile:nth-child(n+7) {
+    width: calc(33.333% - 14px);
+  }
+}
+
+/* 9 пользователей - 3 ряда: 3-3-3 (как в 9.md и 9.1.md) */
+.video-grid[data-user-count="9"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  max-width: 1400px;
+  padding: 0 20px;
+  margin: 0 auto;
+}
+
+.video-grid[data-user-count="9"] .video-tile {
+  width: calc(33.333% - 14px);
+  aspect-ratio: 16 / 9;
+}
+
+/* Стрелки пагинации */
+.pagination-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #5865f2;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.pagination-arrow:hover {
+  background: #5865f2;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.pagination-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.pagination-arrow-left {
+  left: 20px;
+}
+
+.pagination-arrow-right {
+  right: 20px;
+}
+
+/* Информация о пагинации */
+.pagination-info {
+  text-align: center;
+  padding: 10px;
+  color: #b9bbbe;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Режим фокусировки */
+.focused-mode {
+  display: flex;
+  flex-direction: column;
+}
+
+.focused-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+  overflow: hidden;
+  max-height: 100%;
+}
+
+.focused-user-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.focused-tile {
+  width: 100%;
+  max-width: 1125px;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+}
+
+.bottom-users-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px 60px;
+}
+
+.bottom-users-grid {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  max-width: 1300px;
+  overflow: hidden;
+}
+
+.bottom-users-grid .small-tile {
+  flex-shrink: 0;
+  width: 200px;
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.small-tile {
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+}
+
+.small-tile .user-avatar {
+  width: 60px;
+  height: 60px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.small-tile .user-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.small-tile .user-info {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.small-tile .user-name {
+  font-size: 14px;
+  color: white;
+  margin: 0;
+}
+
+.small-tile .user-status {
+  display: none;
+}
+
+.small-tile .tile-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.small-tile:hover .tile-overlay {
+  opacity: 1;
+}
+
+.small-tile .overlay-controls {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
+.small-tile .control-btn {
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: background-color 0.3s ease;
+}
+
+.small-tile .control-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.small-tile .control-btn::before {
+  content: "⚙";
+  font-size: 16px;
+}
+
+/* Стрелки пагинации для нижних блоков */
+.bottom-users-container .pagination-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #5865f2;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.bottom-users-container .pagination-arrow:hover {
+  background: #5865f2;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.bottom-users-container .pagination-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.bottom-users-container .pagination-arrow-left {
+  left: 10px;
+}
+
+.bottom-users-container .pagination-arrow-right {
+  right: 10px;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+  .video-grid {
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .video-tile {
+    min-height: 200px;
+  }
+  
+  .user-avatar {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .user-name {
+    font-size: 14px;
+  }
+}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useVoiceCall } from '../../../entities/voice-call/hooks';
+import { VideoCallGrid } from '../../../shared/ui/atoms';
+import { createParticipant } from '../../../entities/video-call';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -25,6 +27,7 @@ const VoiceCallView = ({
 
   const [isConnecting, setIsConnecting] = useState(true);
   const [showChatPanel, setShowChatPanel] = useState(false);
+  const [videoParticipants, setVideoParticipants] = useState([]);
 
   useEffect(() => {
     if (channelId && userId && userName) {
@@ -43,6 +46,27 @@ const VoiceCallView = ({
       disconnect();
     };
   }, [disconnect]);
+
+  // Преобразуем участников голосового звонка в формат для видеосетки
+  useEffect(() => {
+    const videoParticipantsList = [
+      createParticipant(userId, userName, null, 'online', 'host')
+    ];
+    
+    participants.forEach(participant => {
+      videoParticipantsList.push(
+        createParticipant(
+          participant.id || participant.name, 
+          participant.name, 
+          null, 
+          'online', 
+          'participant'
+        )
+      );
+    });
+    
+    setVideoParticipants(videoParticipantsList);
+  }, [participants, userId, userName]);
 
 
   const handleClose = () => {
@@ -119,111 +143,15 @@ const VoiceCallView = ({
                   </div>
                 )}
 
-                {/* Participants Grid */}
+                {/* Video Call Grid */}
                 {(participants.length > 0 || isConnected) && (
-                  <div className="participants-row">
-                    {/* Current User Tile */}
-                    <div className="tile-wrapper">
-                      <div className="tile-sizer">
-                        <div className="tile idle-tile">
-                          <div className="tile-child">
-                            <div className="voice-channel-effects">
-                              <div className="effects-wrapper">
-                                <div className="effects"></div>
-                              </div>
-                            </div>
-                            <div className="tile-content">
-                              <div className="tile-background">
-                                <div className="avatar-wrapper" role="img" aria-label={userName}>
-                                  <div 
-                                    className="avatar-stack"
-                                    style={{ 
-                                      backgroundColor: getAvatarColor(userName),
-                                      width: '80px',
-                                      height: '80px',
-                                      borderRadius: '50%',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '32px',
-                                      fontWeight: '600',
-                                      color: 'white'
-                                    }}
-                                  >
-                                    {getInitials(userName)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="tile-indicators"></div>
-                            <div className="tile-overlay-container">
-                              <div className="overlay-top"></div>
-                              <div className="overlay-bottom">
-                                <div className="overlay-title">{userName}</div>
-                                <div className="overlay-button-container">
-                                  <div className="overlay-button">
-                                    <button className="settings-button" type="button" aria-label="Настройки">
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                        <path fillRule="evenodd" d="M4 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10-2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm8 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" clipRule="evenodd"/>
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="tile-border"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Other Participants */}
-                    {participants.map((participant, index) => (
-                      <div key={index} className="tile-wrapper">
-                        <div className="tile-sizer">
-                          <div className="tile idle-tile">
-                            <div className="tile-child">
-                              <div className="voice-channel-effects">
-                                <div className="effects-wrapper">
-                                  <div className="effects"></div>
-                                </div>
-                              </div>
-                              <div className="tile-content">
-                                <div className="tile-background">
-                                  <div className="avatar-wrapper" role="img" aria-label={participant.name}>
-                                    <div 
-                                      className="avatar-stack"
-                                      style={{ 
-                                        backgroundColor: getAvatarColor(participant.name),
-                                        width: '80px',
-                                        height: '80px',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '32px',
-                                        fontWeight: '600',
-                                        color: 'white'
-                                      }}
-                                    >
-                                      {getInitials(participant.name)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="tile-indicators"></div>
-                              <div className="tile-overlay-container">
-                                <div className="overlay-top"></div>
-                                <div className="overlay-bottom">
-                                  <div className="overlay-title">{participant.name}</div>
-                                </div>
-                              </div>
-                              <div className="tile-border"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="video-call-grid-container">
+                    <VideoCallGrid 
+                      participants={videoParticipants}
+                      onParticipantClick={(participant) => {
+                        console.log('Clicked participant:', participant);
+                      }}
+                    />
                   </div>
                 )}
 
