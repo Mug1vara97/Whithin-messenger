@@ -43,22 +43,38 @@ export const useVoiceCall = (userId, userName) => {
   const handleNewProducerRef = useRef(null);
   const noiseSuppressionRef = useRef(null);
   const audioContextRef = useRef(null);
+  const createAudioStreamRef = useRef(null);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
     try {
       setError(null);
+      
+      // Очищаем старые обработчики перед регистрацией новых
+      voiceCallApi.off('peerJoined');
+      voiceCallApi.off('peerLeft');
+      voiceCallApi.off('newProducer');
+      voiceCallApi.off('producerClosed');
+      
       await voiceCallApi.connect(userId, userName);
       
       // Регистрируем обработчики событий СРАЗУ после подключения
       voiceCallApi.on('peerJoined', (peerData) => {
         console.log('Peer joined:', peerData);
-        setParticipants(prev => [...prev, {
-          userId: peerData.userId,
-          name: peerData.name,
-          isMuted: peerData.isMuted,
-          isSpeaking: false
-        }]);
+        // Проверяем, нет ли уже такого участника
+        setParticipants(prev => {
+          const exists = prev.some(p => p.userId === peerData.userId);
+          if (exists) {
+            console.log('Participant already exists, skipping:', peerData.userId);
+            return prev;
+          }
+          return [...prev, {
+            userId: peerData.userId,
+            name: peerData.name,
+            isMuted: peerData.isMuted,
+            isSpeaking: false
+          }];
+        });
       });
 
       voiceCallApi.on('peerLeft', (peerData) => {
@@ -92,6 +108,15 @@ export const useVoiceCall = (userId, userName) => {
   // Отключение от сервера
   const disconnect = useCallback(async () => {
     try {
+      console.log('Disconnecting from voice call...');
+      
+      // Очищаем обработчики событий
+      voiceCallApi.off('peerJoined');
+      voiceCallApi.off('peerLeft');
+      voiceCallApi.off('newProducer');
+      voiceCallApi.off('producerClosed');
+      console.log('Event handlers cleared');
+      
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
@@ -128,6 +153,7 @@ export const useVoiceCall = (userId, userName) => {
       await voiceCallApi.disconnect();
       setIsConnected(false);
       setParticipants([]);
+      console.log('Disconnected from voice server');
     } catch (error) {
       console.error('Failed to disconnect:', error);
     }
@@ -258,7 +284,35 @@ export const useVoiceCall = (userId, userName) => {
 
   // Создание аудио потока
   const createAudioStream = useCallback(async () => {
+    console.log('createAudioStream called with:', { isMuted, isNoiseSuppressed, noiseSuppressionMode });
     try {
+      console.log('Creating audio stream...');
+      
+      // Закрываем старые producers перед созданием нового
+      if (producersRef.current.size > 0) {
+        console.log('Closing existing producers:', producersRef.current.size);
+        producersRef.current.forEach(producer => {
+          try {
+            producer.close();
+          } catch (e) {
+            console.warn('Error closing producer:', e);
+          }
+        });
+        producersRef.current.clear();
+      }
+      
+      // Останавливаем старый поток если есть
+      if (localStreamRef.current) {
+        console.log('Stopping existing local stream');
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      // Очищаем старое шумоподавление
+      if (noiseSuppressionRef.current) {
+        console.log('Cleaning up existing noise suppression');
+        noiseSuppressionRef.current.cleanup();
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -272,6 +326,7 @@ export const useVoiceCall = (userId, userName) => {
       });
 
       localStreamRef.current = stream;
+      console.log('Got user media stream');
       
       // Инициализация audio context
       if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -279,11 +334,13 @@ export const useVoiceCall = (userId, userName) => {
           sampleRate: 48000,
           latencyHint: 'interactive'
         });
+        console.log('Created new AudioContext');
       }
       
       // Resume audio context if suspended
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
+        console.log('Resumed AudioContext');
       }
       
       // Инициализация шумоподавления
@@ -300,6 +357,7 @@ export const useVoiceCall = (userId, userName) => {
       
       // Применяем шумоподавление если оно было включено
       if (isNoiseSuppressed) {
+        console.log('Applying noise suppression:', noiseSuppressionMode);
         const enabled = await noiseSuppressionRef.current.enable(noiseSuppressionMode);
         if (!enabled) {
           console.warn('Failed to enable noise suppression, continuing without it');
@@ -308,6 +366,7 @@ export const useVoiceCall = (userId, userName) => {
       
       // Устанавливаем состояние микрофона
       audioTrack.enabled = !isMuted;
+      console.log('Audio track muted state:', !audioTrack.enabled);
       
       const producer = await sendTransportRef.current.produce({
         track: audioTrack,
@@ -315,6 +374,7 @@ export const useVoiceCall = (userId, userName) => {
       });
 
       producersRef.current.set(producer.id, producer);
+      console.log('Producer created with ID:', producer.id);
       
       // Устанавливаем producer в noise suppression manager
       if (noiseSuppressionRef.current) {
@@ -332,6 +392,9 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
     }
   }, [userId, userName, isMuted, isNoiseSuppressed, noiseSuppressionMode]);
+
+  // Обновляем ref при изменении createAudioStream
+  createAudioStreamRef.current = createAudioStream;
 
   // Присоединение к комнате
   const joinRoom = useCallback(async (roomId) => {
@@ -362,12 +425,15 @@ export const useVoiceCall = (userId, userName) => {
         }
       }
       
-      await createAudioStream();
+      // Используем ref вместо прямого вызова
+      if (createAudioStreamRef.current) {
+        await createAudioStreamRef.current();
+      }
     } catch (error) {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, createAudioStream, handleNewProducer]);
+  }, [userName, userId, initializeDevice, handleNewProducer]); // Убрали createAudioStream из зависимостей
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {

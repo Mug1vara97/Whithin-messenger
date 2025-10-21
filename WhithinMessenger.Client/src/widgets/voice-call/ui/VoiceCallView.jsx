@@ -47,13 +47,15 @@ const VoiceCallView = ({
 
   useEffect(() => {
     if (channelId && userId && userName) {
+      console.log('VoiceCallView: Connecting to voice call');
       connect().then(() => {
         joinRoom(channelId);
       }).catch((err) => {
         console.error('Connection error:', err);
       });
     }
-  }, [channelId, userId, userName, connect, joinRoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId, userId, userName]); // Убрали connect и joinRoom из зависимостей
 
   useEffect(() => {
     return () => {
