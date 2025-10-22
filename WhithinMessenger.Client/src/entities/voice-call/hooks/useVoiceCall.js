@@ -106,13 +106,64 @@ export const useVoiceCall = (userId, userName) => {
 
       voiceCallApi.on('peerLeft', (peerData) => {
         console.log('Peer left:', peerData);
-        // Удаляем маппинг
+        const userId = peerData.userId;
         const socketId = peerData.peerId || peerData.id;
+        
+        // Очищаем audio element
+        const audioElement = audioElementsRef.current.get(userId);
+        if (audioElement) {
+          console.log('Removing audio element for user:', userId);
+          audioElement.pause();
+          audioElement.srcObject = null;
+          if (audioElement.parentNode) {
+            audioElement.parentNode.removeChild(audioElement);
+          }
+          audioElementsRef.current.delete(userId);
+        }
+        
+        // Очищаем gain node
+        const gainNode = gainNodesRef.current.get(userId);
+        if (gainNode) {
+          console.log('Disconnecting gain node for user:', userId);
+          try {
+            gainNode.disconnect();
+          } catch (e) {
+            console.warn('Error disconnecting gain node:', e);
+          }
+          gainNodesRef.current.delete(userId);
+        }
+        
+        // Очищаем состояния громкости и мута
+        setUserVolumes(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(userId);
+          return newMap;
+        });
+        
+        setUserMutedStates(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(userId);
+          return newMap;
+        });
+        
+        setShowVolumeSliders(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(userId);
+          return newMap;
+        });
+        
+        // Очищаем предыдущие громкости
+        previousVolumesRef.current.delete(userId);
+        
+        // Удаляем маппинг socketId -> userId
         if (socketId) {
           peerIdToUserIdMapRef.current.delete(socketId);
           console.log('Removed peer mapping for:', socketId);
         }
-        setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
+        
+        // Удаляем участника из списка
+        setParticipants(prev => prev.filter(p => p.userId !== userId));
+        console.log('Peer cleanup completed for:', userId);
       });
 
       voiceCallApi.on('newProducer', async (producerData) => {
@@ -122,12 +173,70 @@ export const useVoiceCall = (userId, userName) => {
         }
       });
 
-      voiceCallApi.on('producerClosed', (producerId) => {
-        console.log('Producer closed:', producerId);
+      voiceCallApi.on('producerClosed', (data) => {
+        console.log('Producer closed:', data);
+        const producerId = data.producerId || data;
+        const producerSocketId = data.producerSocketId;
+        
+        // Закрываем consumer
         const consumer = consumersRef.current.get(producerId);
         if (consumer) {
           consumer.close();
           consumersRef.current.delete(producerId);
+        }
+        
+        // Если есть producerSocketId, получаем userId из маппинга
+        if (producerSocketId) {
+          const userId = peerIdToUserIdMapRef.current.get(producerSocketId);
+          console.log('Producer closed for socketId:', producerSocketId, 'userId:', userId);
+          
+          if (userId) {
+            // Очищаем audio element
+            const audioElement = audioElementsRef.current.get(userId);
+            if (audioElement) {
+              console.log('Removing audio element for user:', userId);
+              audioElement.pause();
+              audioElement.srcObject = null;
+              if (audioElement.parentNode) {
+                audioElement.parentNode.removeChild(audioElement);
+              }
+              audioElementsRef.current.delete(userId);
+            }
+            
+            // Очищаем gain node
+            const gainNode = gainNodesRef.current.get(userId);
+            if (gainNode) {
+              console.log('Disconnecting gain node for user:', userId);
+              try {
+                gainNode.disconnect();
+              } catch (e) {
+                console.warn('Error disconnecting gain node:', e);
+              }
+              gainNodesRef.current.delete(userId);
+            }
+            
+            // Очищаем состояния
+            setUserVolumes(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(userId);
+              return newMap;
+            });
+            
+            setUserMutedStates(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(userId);
+              return newMap;
+            });
+            
+            setShowVolumeSliders(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(userId);
+              return newMap;
+            });
+            
+            previousVolumesRef.current.delete(userId);
+            console.log('Audio cleanup completed for userId:', userId);
+          }
         }
       });
       
@@ -608,27 +717,17 @@ export const useVoiceCall = (userId, userName) => {
     const newIsMuted = !isCurrentlyMuted;
 
     if (newIsMuted) {
-      // Мутим - сохраняем текущую громкость и устанавливаем 0
+      // Мутим - устанавливаем 0, НЕ меняя ползунок (сохраняем текущее значение)
       const currentVolume = userVolumes.get(peerId) || 100;
-      if (currentVolume > 0) {
-        previousVolumesRef.current.set(peerId, currentVolume);
-      }
+      previousVolumesRef.current.set(peerId, currentVolume);
       audioElement.volume = 0;
-      setUserVolumes(prev => {
-        const newMap = new Map(prev);
-        newMap.set(peerId, 0);
-        return newMap;
-      });
+      // НЕ меняем userVolumes, чтобы ползунок остался на месте
     } else {
-      // Размутиваем - восстанавливаем предыдущую громкость, но только если глобально не замучено
-      const previousVolume = previousVolumesRef.current.get(peerId) || 100;
-      const audioVolume = isGlobalAudioMuted ? 0 : (previousVolume / 100.0);
+      // Размутиваем - восстанавливаем звук на текущую позицию ползунка
+      const currentVolume = userVolumes.get(peerId) || 100;
+      const audioVolume = isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
       audioElement.volume = audioVolume;
-      setUserVolumes(prev => {
-        const newMap = new Map(prev);
-        newMap.set(peerId, previousVolume);
-        return newMap;
-      });
+      // НЕ меняем userVolumes, ползунок уже на нужном месте
     }
 
     setUserMutedStates(prev => {
