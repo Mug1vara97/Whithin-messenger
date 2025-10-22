@@ -46,7 +46,7 @@ const VoiceCallView = ({
     changeUserVolume,
     toggleVolumeSlider,
     toggleGlobalAudio
-  } = useGlobalCall();
+  } = useGlobalCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [videoParticipants, setVideoParticipants] = useState([]);

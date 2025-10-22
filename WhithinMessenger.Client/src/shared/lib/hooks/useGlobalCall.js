@@ -5,9 +5,12 @@ import { useAuth } from './useAuth';
  * Хук для работы с глобальным состоянием звонков
  * Использует CallContext для доступа к глобальному состоянию звонков
  */
-export const useGlobalCall = () => {
+export const useGlobalCall = (userId = null, userName = null) => {
   const callContext = useCall();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+  
+  // Используем переданного пользователя или пользователя из auth
+  const user = userId && userName ? { id: userId, username: userName } : authUser;
 
   // Автоматическое подключение к звонку при наличии пользователя
   const startCall = async (roomId, roomName) => {
