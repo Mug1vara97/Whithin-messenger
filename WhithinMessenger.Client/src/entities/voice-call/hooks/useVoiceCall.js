@@ -283,12 +283,19 @@ export const useVoiceCall = (userId, userName) => {
       
       setIsConnected(true);
       connectingRef.current = false;
+      
+      // Отправляем начальные состояния на сервер
+      if (voiceCallApi.socket) {
+        voiceCallApi.socket.emit('muteState', { isMuted: isMuted });
+        voiceCallApi.socket.emit('audioState', { isEnabled: isAudioEnabled });
+        console.log('Initial states sent to server - muted:', isMuted, 'audio:', isAudioEnabled);
+      }
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
       setError(error.message);
       connectingRef.current = false;
     }
-  }, [userId, userName]);
+  }, [userId, userName, isMuted, isAudioEnabled]);
 
   // Отключение от сервера
   const disconnect = useCallback(async () => {
@@ -717,25 +724,40 @@ export const useVoiceCall = (userId, userName) => {
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {
+    const newMutedState = !isMuted;
+    
     if (noiseSuppressionRef.current) {
       const processedStream = noiseSuppressionRef.current.getProcessedStream();
       const audioTrack = processedStream?.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+        audioTrack.enabled = !newMutedState;
+        setIsMuted(newMutedState);
       }
     } else if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+        audioTrack.enabled = !newMutedState;
+        setIsMuted(newMutedState);
       }
     }
-  }, []);
+    
+    // Отправляем состояние мута на сервер
+    if (voiceCallApi.socket) {
+      voiceCallApi.socket.emit('muteState', { isMuted: newMutedState });
+      console.log('Mute state sent to server:', newMutedState);
+    }
+  }, [isMuted]);
 
-  // Переключение аудио
+  // Переключение аудио (наушников)
   const toggleAudio = useCallback(() => {
-    setIsAudioEnabled(!isAudioEnabled);
+    const newAudioState = !isAudioEnabled;
+    setIsAudioEnabled(newAudioState);
+    
+    // Отправляем состояние наушников на сервер
+    if (voiceCallApi.socket) {
+      voiceCallApi.socket.emit('audioState', { isEnabled: newAudioState });
+      console.log('Audio state sent to server:', newAudioState);
+    }
   }, [isAudioEnabled]);
 
   // Изменение громкости
