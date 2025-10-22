@@ -118,11 +118,12 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 12px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%);
+  -webkit-backdrop-filter: blur(10px); /* Added for Safari */
+  backdrop-filter: blur(10px);
 }
 
 .bottom-info {
@@ -131,57 +132,53 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
-  width: fit-content;
 }
 
 .mic-status {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
   flex-shrink: 0;
-  padding: 4px;
-  transition: all 0.2s ease;
+  color: #f2f3f5;
 }
 
 .mic-status.muted {
-  background: rgba(237, 66, 69, 0.1);
+  color: white;
 }
 
 .mic-status.speaking {
-  background: transparent;
+  background: rgba(59, 165, 92, 0.2);
+  color: #3ba55c;
 }
 
 .mic-status.silent {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.8);
+  color: #B5BAC1;
 }
 
 .headset-status {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: rgba(237, 66, 69, 0.1);
-  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
   flex-shrink: 0;
-  padding: 4px;
-  transition: all 0.2s ease;
 }
 
 .participant-name {
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
+  color: #f2f3f5;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .tile-settings-btn {
