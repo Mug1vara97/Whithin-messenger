@@ -342,8 +342,9 @@ const ChatRoom = ({
   };
 
   const handleStartCall = (e) => {
-    if (isPrivateChat && !isCallActiveInThisChat && !otherUserInCall) {
-      handleContextMenu(e, null, false, false, 'call');
+    if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !otherUserInCall) {
+      // Прямой старт звонка без уведомления
+      handleCallWithoutNotification();
     }
   };
 
@@ -546,7 +547,7 @@ const ChatRoom = ({
         </div>
         <div className="header-actions">
 
-          {(isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !otherUserInCall && (
+          {(isPrivateChat || isGroupChat) && !isCallActiveInThisChat && (
             <button
               onClick={handleStartCall}
               className="voice-call-button"

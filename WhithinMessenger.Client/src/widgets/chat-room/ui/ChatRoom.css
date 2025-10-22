@@ -146,12 +146,21 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: transparent;
+  background: #43b581;
   border: none;
-  color: #b9bbbe;
+  color: #ffffff;
   cursor: pointer;
   border-radius: 4px;
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color 0.2s, color 0.2s, transform 0.1s;
+}
+
+.voice-call-button:hover {
+  background: #3ca374;
+  transform: scale(1.05);
+}
+
+.voice-call-button:active {
+  transform: scale(0.95);
 }
 
 .voice-call-button svg {
