@@ -88,6 +88,7 @@ const VoiceCallView = ({
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled;
+    currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
     currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
     
     const videoParticipantsList = [currentUser];
@@ -103,6 +104,7 @@ const VoiceCallView = ({
       );
       videoParticipant.isMuted = participant.isMuted || false;
       videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
+      videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
       videoParticipant.isSpeaking = participant.isSpeaking || false;
       videoParticipantsList.push(videoParticipant);
     });
