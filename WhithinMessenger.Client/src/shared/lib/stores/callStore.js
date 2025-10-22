@@ -37,6 +37,7 @@ export const useCallStore = create(
       
       // Состояние аудио
       isMuted: false,
+      isAudioEnabled: true, // Добавляем isAudioEnabled
       isGlobalAudioMuted: false,
       isNoiseSuppressed: false,
       noiseSuppressionMode: 'rnnoise',
@@ -781,6 +782,9 @@ export const useCallStore = create(
           voiceCallApi.socket.emit('audioState', audioStateData);
         }
         
+        // Обновляем isAudioEnabled в соответствии с глобальным звуком
+        set({ isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState });
+        
         // Также отправляем отдельное событие для глобального звука
         if (voiceCallApi.socket) {
           console.log('Sending globalAudioState to server:', { 
@@ -806,8 +810,6 @@ export const useCallStore = create(
             }
           }
         });
-        
-        set({ isGlobalAudioMuted: newMutedState });
       },
       
       // Переключение шумоподавления

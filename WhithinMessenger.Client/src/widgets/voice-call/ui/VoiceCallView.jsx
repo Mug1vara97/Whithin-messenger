@@ -87,7 +87,7 @@ const VoiceCallView = ({
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
-    currentUser.isAudioEnabled = isAudioEnabled;
+    currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
     currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
     
