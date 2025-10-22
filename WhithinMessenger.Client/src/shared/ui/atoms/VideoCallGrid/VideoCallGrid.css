@@ -155,6 +155,17 @@
   color: white;
 }
 
+.headset-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 .participant-name {
   color: #f2f3f5;
   font-size: 13px;

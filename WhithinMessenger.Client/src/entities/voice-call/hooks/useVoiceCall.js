@@ -71,6 +71,8 @@ export const useVoiceCall = (userId, userName) => {
       // Очищаем старые обработчики перед регистрацией новых
       voiceCallApi.off('peerJoined');
       voiceCallApi.off('peerLeft');
+      voiceCallApi.off('peerMuteStateChanged');
+      voiceCallApi.off('peerAudioStateChanged');
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
       
@@ -98,7 +100,8 @@ export const useVoiceCall = (userId, userName) => {
           userId: peerData.userId,
           peerId: socketId, // Socket ID
           name: peerData.name,
-          isMuted: peerData.isMuted,
+          isMuted: peerData.isMuted || false,
+          isAudioEnabled: peerData.isAudioEnabled !== undefined ? peerData.isAudioEnabled : true,
           isSpeaking: false
           }];
         });
@@ -182,6 +185,26 @@ export const useVoiceCall = (userId, userName) => {
         });
         
         console.log('Peer cleanup completed for:', userId);
+      });
+
+      voiceCallApi.on('peerMuteStateChanged', ({ peerId, isMuted }) => {
+        console.log('Peer mute state changed:', { peerId, isMuted });
+        // peerId здесь может быть socketId, нужно найти userId
+        const userId = peerIdToUserIdMapRef.current.get(peerId) || peerId;
+        
+        setParticipants(prev => prev.map(p => 
+          p.userId === userId ? { ...p, isMuted: Boolean(isMuted), isSpeaking: isMuted ? false : p.isSpeaking } : p
+        ));
+      });
+
+      voiceCallApi.on('peerAudioStateChanged', ({ peerId, isAudioEnabled }) => {
+        console.log('Peer audio state changed:', { peerId, isAudioEnabled });
+        // peerId здесь может быть socketId, нужно найти userId
+        const userId = peerIdToUserIdMapRef.current.get(peerId) || peerId;
+        
+        setParticipants(prev => prev.map(p => 
+          p.userId === userId ? { ...p, isAudioEnabled: Boolean(isAudioEnabled) } : p
+        ));
       });
 
       voiceCallApi.on('newProducer', async (producerData) => {
@@ -275,6 +298,8 @@ export const useVoiceCall = (userId, userName) => {
       // Очищаем обработчики событий
       voiceCallApi.off('peerJoined');
       voiceCallApi.off('peerLeft');
+      voiceCallApi.off('peerMuteStateChanged');
+      voiceCallApi.off('peerAudioStateChanged');
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
       console.log('Event handlers cleared');
@@ -663,7 +688,8 @@ export const useVoiceCall = (userId, userName) => {
           userId: peer.userId,
           peerId: peer.peerId || peer.id,
           name: peer.name,
-          isMuted: peer.isMuted,
+          isMuted: peer.isMuted || false,
+          isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
           isSpeaking: false
         })));
       }

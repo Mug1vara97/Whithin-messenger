@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { useVideoCall } from '../../../../entities/video-call';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
+import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
@@ -81,6 +82,7 @@ const VideoCallGrid = ({
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
+    const isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
     const isSpeaking = participant.isSpeaking || false;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
@@ -149,6 +151,11 @@ const VideoCallGrid = ({
                   <MicIcon sx={{ fontSize: isSmall ? 12 : 14 }} />
                 )}
               </div>
+              {!isAudioEnabled && (
+                <div className="headset-status">
+                  <HeadsetOffIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#ed4245' }} />
+                </div>
+              )}
               <span className="participant-name">{participant.name}</span>
             </div>
             
