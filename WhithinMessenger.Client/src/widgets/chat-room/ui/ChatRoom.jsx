@@ -342,9 +342,14 @@ const ChatRoom = ({
   };
 
   const handleStartCall = (e) => {
-    if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !otherUserInCall) {
+    console.log('handleStartCall: clicked', { isPrivateChat, isGroupChat, isCallActiveInThisChat, otherUserInCall });
+    
+    if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat) {
+      console.log('handleStartCall: starting call without notification');
       // Прямой старт звонка без уведомления
       handleCallWithoutNotification();
+    } else {
+      console.log('handleStartCall: conditions not met for starting call');
     }
   };
 
@@ -369,6 +374,10 @@ const ChatRoom = ({
   };
 
   const handleCallWithoutNotification = () => {
+    console.log('handleCallWithoutNotification: called with data:', { 
+      chatId, groupName, username, userId, onJoinVoiceChannel 
+    });
+    
     const callData = {
       roomId: chatId.toString(),
       roomName: `Звонок с ${groupName}`,
@@ -378,10 +387,17 @@ const ChatRoom = ({
       chatId: chatId
     };
     
+    console.log('handleCallWithoutNotification: callData created:', callData);
+    
     if (onJoinVoiceChannel) {
+      console.log('handleCallWithoutNotification: calling onJoinVoiceChannel');
       onJoinVoiceChannel(callData);
+    } else {
+      console.log('handleCallWithoutNotification: onJoinVoiceChannel is not available');
     }
-    closeContextMenu();
+    
+    // Не вызываем closeContextMenu, так как мы не в контекстном меню
+    console.log('handleCallWithoutNotification: call started');
   };
 
 

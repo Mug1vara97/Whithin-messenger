@@ -38,6 +38,15 @@ const HomePage = () => {
   });
   const { createServer, servers, createConnection } = useServerContext();
 
+  // Функция для обработки звонков в чатах
+  const handleJoinVoiceChannel = useCallback((callData) => {
+    console.log('HomePage: handleJoinVoiceChannel called with:', callData);
+    
+    // Здесь можно добавить логику для обработки звонка
+    // Например, показать уведомление или обновить состояние
+    console.log('HomePage: Voice call started in chat:', callData.roomName);
+  }, []);
+
   React.useEffect(() => {
     if (user?.id) {
       console.log('HomePage: Creating server connection for user:', user.id);
@@ -337,6 +346,7 @@ const HomePage = () => {
                       isServerChat={selectedServer ? true : false}
                       chatTypeId={selectedChat.chatTypeId}
                       userId={user?.id}
+                      onJoinVoiceChannel={handleJoinVoiceChannel}
                     />
                   )}
                 </div>
