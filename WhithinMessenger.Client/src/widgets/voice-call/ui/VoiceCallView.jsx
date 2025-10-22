@@ -37,6 +37,9 @@ const VoiceCallView = ({
     userMutedStates,
     showVolumeSliders,
     isGlobalAudioMuted,
+    isInCall,
+    isCallMinimized,
+    currentRoomId,
     connect,
     disconnect,
     joinRoom,
@@ -44,6 +47,7 @@ const VoiceCallView = ({
     toggleNoiseSuppression,
     changeNoiseSuppressionMode,
     minimizeCall,
+    restoreCall,
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
@@ -56,6 +60,17 @@ const VoiceCallView = ({
 
   useEffect(() => {
     if (channelId && userId && userName) {
+      // Проверяем, не подключены ли мы уже к этому каналу
+      if (isInCall && currentRoomId === channelId) {
+        console.log('VoiceCallView: Already connected to this channel, just showing UI');
+        // Если звонок был минимизирован, восстанавливаем его
+        if (isCallMinimized) {
+          console.log('VoiceCallView: Restoring minimized call');
+          restoreCall();
+        }
+        return;
+      }
+      
       console.log('VoiceCallView: Connecting to voice call');
       connect().then(() => {
         joinRoom(channelId);
@@ -64,7 +79,7 @@ const VoiceCallView = ({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId, userId, userName]); // Убрали connect и joinRoom из зависимостей
+  }, [channelId, userId, userName, isInCall, currentRoomId, isCallMinimized, restoreCall]); // Добавили isCallMinimized и restoreCall
 
   // Убираем автоматическое отключение при размонтировании
   // disconnect() будет вызываться только при явном выходе из звонка

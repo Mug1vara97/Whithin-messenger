@@ -43,7 +43,9 @@ const useVoiceCallStore = create((set) => ({
   },
   
   restoreCall: () => {
+    console.log('voiceCallStore: restoreCall called');
     set({ isCallMinimized: false });
+    console.log('voiceCallStore: isCallMinimized set to false');
   },
   
   updateParticipants: (participants) => {
