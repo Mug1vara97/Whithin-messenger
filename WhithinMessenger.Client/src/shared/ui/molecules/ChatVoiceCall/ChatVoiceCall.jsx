@@ -125,43 +125,13 @@ const ChatVoiceCall = ({
   }
 
   return (
-    <div className="chat-voice-call">
-      {/* Заголовок звонка */}
-      <div className="call-header">
-        <div className="call-info">
-          <div className="call-title">
-            <span className="call-icon">📞</span>
-            <span className="call-name">{chatName}</span>
-          </div>
-          <div className="call-status">
-            {participants.length} участник{participants.length !== 1 ? 'ов' : ''}
-          </div>
-        </div>
-        <div className="call-controls-header">
-          <button 
-            className="control-btn settings-btn"
-            onClick={() => setShowSettings(!showSettings)}
-            title="Настройки"
-          >
-            ⚙️
-          </button>
-          <button 
-            className="control-btn minimize-btn"
-            onClick={() => setIsExpanded(!isExpanded)}
-            title={isExpanded ? "Свернуть" : "Развернуть"}
-          >
-            {isExpanded ? "−" : "+"}
-          </button>
-        </div>
-      </div>
-
-      {/* Основной контент */}
-      {isExpanded && (
-        <div className="call-content">
-          {/* Участники */}
-          <div className="participants-grid">
-            {displayParticipants.map((participant, index) => (
-              <div key={participant.id} className="participant-item">
+    <div className="voice-call-container">
+      {/* Основная область участников */}
+      <div className="voice-call-wrapper">
+        <div className="participants-container">
+          {displayParticipants.map((participant, index) => (
+            <div key={participant.id} className="participant-item">
+              <div className="participant-avatar-container">
                 <div className="participant-avatar">
                   <div className="avatar-circle">
                     {participant.name.charAt(0).toUpperCase()}
@@ -172,38 +142,86 @@ const ChatVoiceCall = ({
                     </div>
                   )}
                 </div>
-                <div className="participant-info">
-                  <div className="participant-name">{participant.name}</div>
-                  <div className="participant-status">
-                    {participant.isMuted ? 'Заглушен' : 'Говорит'}
-                  </div>
-                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-          {/* Панель управления */}
-          <div className="call-controls">
+      {/* Верхняя панель управления */}
+      <div className="top-controls">
+        <div className="call-header">
+          <div className="user-info">
+            <div className="user-avatar">
+              <div className="avatar-circle">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+              <div className="status-indicator online"></div>
+            </div>
+            <div className="user-details">
+              <h1 className="user-name">{chatName}</h1>
+            </div>
+          </div>
+          
+          <div className="header-actions">
+            <button className="action-btn" title="Закреплённые сообщения">
+              📌
+            </button>
+            <button className="action-btn" title="Добавить друзей в беседу">
+              👥
+            </button>
+            <button className="action-btn" title="Показать профиль пользователя">
+              👤
+            </button>
+            <div className="search-container">
+              <input 
+                type="text" 
+                placeholder={`Искать «${chatName}»`}
+                className="search-input"
+              />
+            </div>
+            <div className="region-selector">
+              <span>регион</span>
+              <span>Автоматический выбор</span>
+              <span>▼</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Нижняя панель управления */}
+      <div className="bottom-controls">
+        <div className="control-section">
+          <div className="main-controls">
+            {/* Микрофон */}
             <div className="control-group">
               <button 
-                className={`control-btn ${isMuted ? 'muted' : 'unmuted'}`}
+                className={`control-btn microphone-btn ${isMuted ? 'muted' : 'unmuted'}`}
                 onClick={handleToggleMute}
                 title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
               >
                 {isMuted ? <MicOffIcon /> : <MicIcon />}
               </button>
-              
+              <div className="control-dropdown">▼</div>
+            </div>
+
+            {/* Камера */}
+            <div className="control-group">
               <button 
-                className="control-btn video-btn disabled"
+                className="control-btn camera-btn disabled"
                 onClick={handleToggleVideo}
                 title="Камера недоступна"
                 disabled
               >
                 <VideocamIcon />
               </button>
-              
+              <div className="control-dropdown">▼</div>
+            </div>
+
+            {/* Демонстрация экрана */}
+            <div className="control-group">
               <button 
-                className="control-btn screen-btn"
+                className="control-btn screen-share-btn"
                 onClick={handleScreenShare}
                 title="Поделиться экраном"
               >
@@ -211,24 +229,27 @@ const ChatVoiceCall = ({
               </button>
             </div>
 
+            {/* Активности */}
             <div className="control-group">
               <button 
-                className={`control-btn ${isNoiseSuppressed ? 'active' : ''}`}
-                onClick={handleToggleNoiseSuppression}
-                title={isNoiseSuppressed ? 'Отключить шумоподавление' : 'Включить шумоподавление'}
+                className="control-btn activity-btn"
+                title="Начать активность"
               >
-                {isNoiseSuppressed ? <NoiseAwareIcon /> : <NoiseControlOffIcon />}
-              </button>
-              
-              <button 
-                className={`control-btn ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
-                onClick={toggleGlobalAudio}
-                title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
-              >
-                {isGlobalAudioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+                🎮
               </button>
             </div>
 
+            {/* Настройки */}
+            <div className="control-group">
+              <button 
+                className="control-btn settings-btn"
+                title="Другие настройки"
+              >
+                ⋯
+              </button>
+            </div>
+
+            {/* Завершить звонок */}
             <button 
               className="control-btn end-call-btn"
               onClick={handleEndCall}
@@ -237,31 +258,8 @@ const ChatVoiceCall = ({
               <CallEndIcon />
             </button>
           </div>
-
-          {/* Настройки */}
-          {showSettings && (
-            <div className="call-settings">
-              <div className="settings-section">
-                <h4>Шумоподавление</h4>
-                <div className="noise-controls">
-                  <button 
-                    className={`noise-btn ${noiseSuppressionMode === 'rnnoise' ? 'active' : ''}`}
-                    onClick={() => changeNoiseSuppressionMode('rnnoise')}
-                  >
-                    RNNoise
-                  </button>
-                  <button 
-                    className={`noise-btn ${noiseSuppressionMode === 'speex' ? 'active' : ''}`}
-                    onClick={() => changeNoiseSuppressionMode('speex')}
-                  >
-                    Speex
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      )}
+      </div>
 
       {/* Ошибки */}
       {error && (
