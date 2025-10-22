@@ -7,7 +7,7 @@ import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
-import { MinimizedCallWidget } from '../../../widgets/voice-call/ui/MinimizedCallWidget';
+import MinimizedCallWidget from '../../../widgets/voice-call/ui/MinimizedCallWidget';
 import { useServer } from '../../../entities/server/hooks';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
