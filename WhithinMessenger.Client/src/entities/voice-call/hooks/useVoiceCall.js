@@ -27,7 +27,9 @@ export const useVoiceCall = (userId, userName) => {
     isCallMinimized,
     currentRoomId,
     minimizeCall,
-    restoreCall
+    restoreCall,
+    joinCall,
+    leaveCall
   } = useVoiceCallStore();
 
   const [isConnected, setIsConnected] = useState(false);
@@ -399,12 +401,16 @@ export const useVoiceCall = (userId, userName) => {
       setUserMutedStates(new Map());
       setShowVolumeSliders(new Map());
       connectingRef.current = false;
+      
+      // Обновляем состояние в store
+      leaveCall();
+      
       console.log('Disconnected from voice server');
     } catch (error) {
       console.error('Failed to disconnect:', error);
       connectingRef.current = false;
     }
-  }, []);
+  }, [leaveCall]);
 
   // Создание транспортов
   const createTransports = useCallback(async () => {
@@ -696,6 +702,10 @@ export const useVoiceCall = (userId, userName) => {
     try {
       console.log('joinRoom called for roomId:', roomId);
       console.trace('joinRoom call stack');
+      
+      // Обновляем состояние в store
+      joinCall(roomId);
+      
       const response = await voiceCallApi.joinRoom(roomId, userName, userId);
       
       if (response.routerRtpCapabilities) {
@@ -743,7 +753,7 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, handleNewProducer]); // Убрали createAudioStream из зависимостей
+  }, [userName, userId, initializeDevice, handleNewProducer, joinCall]); // Убрали createAudioStream из зависимостей
 
   // Переключение микрофона
   const toggleMute = useCallback(() => {

@@ -16,11 +16,13 @@ const useVoiceCallStore = create((set) => ({
   
   // Действия
   joinCall: (roomId) => {
+    console.log('voiceCallStore: joinCall called with roomId:', roomId);
     set({ 
       isInCall: true, 
       currentRoomId: roomId,
       isCallMinimized: false 
     });
+    console.log('voiceCallStore: isInCall set to true');
   },
   
   leaveCall: () => {
@@ -33,7 +35,9 @@ const useVoiceCallStore = create((set) => ({
   },
   
   minimizeCall: () => {
+    console.log('voiceCallStore: minimizeCall called');
     set({ isCallMinimized: true });
+    console.log('voiceCallStore: isCallMinimized set to true');
   },
   
   restoreCall: () => {
