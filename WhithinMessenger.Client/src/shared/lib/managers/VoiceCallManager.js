@@ -1,4 +1,4 @@
-import { voiceCallApi } from '../../entities/voice-call/api/voiceCallApi';
+import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import useVoiceCallStore from '../stores/voiceCallStore';
 
 class VoiceCallManager {
