@@ -37,6 +37,7 @@ const VoiceCallView = ({
     userMutedStates,
     showVolumeSliders,
     isGlobalAudioMuted,
+    currentCall,
     startCall,
     endCall,
     toggleMute,
@@ -55,6 +56,12 @@ const VoiceCallView = ({
   useEffect(() => {
     console.log('VoiceCallView: useEffect triggered with:', { channelId, userId, userName, channelName });
     if (channelId && userId && userName) {
+      // Проверяем, не активен ли уже звонок в этом канале
+      if (isConnected && currentCall?.channelId === channelId) {
+        console.log('VoiceCallView: Call already active in this channel, skipping start');
+        return;
+      }
+      
       console.log('VoiceCallView: Starting voice call');
       startCall(channelId, channelName).catch((err) => {
         console.error('Call start error:', err);
