@@ -71,6 +71,20 @@ const VoiceCallView = ({
         return;
       }
       
+      // Проверяем, не подключены ли мы к другому каналу
+      if (isInCall && currentRoomId && currentRoomId !== channelId) {
+        console.log('VoiceCallView: Switching to different channel, disconnecting from current');
+        disconnect().then(() => {
+          console.log('VoiceCallView: Connecting to new channel');
+          connect().then(() => {
+            joinRoom(channelId);
+          }).catch((err) => {
+            console.error('Connection error:', err);
+          });
+        });
+        return;
+      }
+      
       console.log('VoiceCallView: Connecting to voice call');
       connect().then(() => {
         joinRoom(channelId);
@@ -79,7 +93,7 @@ const VoiceCallView = ({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId, userId, userName, isInCall, currentRoomId, isCallMinimized, restoreCall]); // Добавили isCallMinimized и restoreCall
+  }, [channelId, userId, userName, isInCall, currentRoomId, isCallMinimized, restoreCall, disconnect]); // Добавили disconnect
 
   // Убираем автоматическое отключение при размонтировании
   // disconnect() будет вызываться только при явном выходе из звонка

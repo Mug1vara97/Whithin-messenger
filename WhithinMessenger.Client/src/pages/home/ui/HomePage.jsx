@@ -23,7 +23,7 @@ const HomePage = () => {
   const { user } = useAuthContext();
   
   // Состояние минимизированного звонка
-  const { isInCall, isCallMinimized } = useVoiceCallStore();
+  const { isInCall, isCallMinimized, currentRoomId, joinCall } = useVoiceCallStore();
   
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -151,6 +151,14 @@ const HomePage = () => {
           console.log('HomePage: Setting selectedChat to:', channelData);
           setSelectedChat(channelData);
           
+          // Автоматически входим в голосовой канал
+          if (channelData.chatType === 4 || channelData.typeId === 4 || channelData.TypeId === 4 || channelData.typeId === "44444444-4444-4444-4444-444444444444") {
+            if (!isInCall) {
+              console.log('HomePage: Auto-joining voice channel');
+              joinCall(channelData.chatId || channelData.chat_id);
+            }
+          }
+          
         } else {
           console.log('HomePage: Channel not found, setting selectedChat to null');
           setSelectedChat(null);
@@ -158,7 +166,7 @@ const HomePage = () => {
         }
       }
     }
-  }, [serverId, channelId, serverData, serverDataFromPanel, navigate]);
+  }, [serverId, channelId, serverData, serverDataFromPanel, navigate, isInCall, joinCall]);
 
   useEffect(() => {
     if (chatId && chats && chats.length > 0) {
@@ -318,17 +326,15 @@ const HomePage = () => {
                 />
               ) : selectedChat ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {/* Check if it's a voice channel */}
+                  {/* Check if it's a voice channel - но не показываем VoiceCallView здесь */}
                   {(selectedChat.chatType === 4 || 
                     selectedChat.typeId === 4 || 
                     selectedChat.TypeId === 4 ||
                     selectedChat.typeId === "44444444-4444-4444-4444-444444444444") ? (
-                    <VoiceCallView
-                      channelId={selectedChat.chatId || selectedChat.chat_id}
-                      channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
-                      userId={user?.id}
-                      userName={user?.username}
-                    />
+                    <div className="voice-channel-placeholder">
+                      <h3>Голосовой канал: {selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}</h3>
+                      <p>Звонок активен. Используйте минимизированный виджет для управления.</p>
+                    </div>
                   ) : (
                     <ChatRoom
                       chatId={selectedChat.chatId || selectedChat.chat_id}
@@ -358,6 +364,16 @@ const HomePage = () => {
 
       {/* Минимизированный звонок - отображается когда звонок активен но минимизирован */}
       {isInCall && isCallMinimized && <MinimizedCallWidget />}
+      
+      {/* Полный интерфейс звонка - отображается когда звонок активен и не минимизирован */}
+      {isInCall && !isCallMinimized && (
+        <VoiceCallView
+          channelId={currentRoomId}
+          channelName="Голосовой канал"
+          userId={user?.id}
+          userName={user?.username}
+        />
+      )}
 
       {showCreateServerModal && (
         <div 
