@@ -110,14 +110,13 @@ const ChatVoiceCall = ({
 
   // Создаем участников для отображения
   const displayParticipants = participants.map(participant => 
-    createParticipant({
-      id: participant.userId,
-      name: participant.name,
-      isMuted: participant.isMuted,
-      isSpeaking: participant.isSpeaking,
-      isVideoEnabled: false, // Голосовые звонки без видео
-      volume: userVolumes.get(participant.userId) || 100
-    })
+    createParticipant(
+      participant.userId || participant.id,
+      participant.name || 'Unknown',
+      null, // avatar
+      'online', // status
+      'participant' // role
+    )
   );
 
   if (!isConnected) {
@@ -134,7 +133,7 @@ const ChatVoiceCall = ({
               <div className="participant-avatar-container">
                 <div className="participant-avatar">
                   <div className="avatar-circle">
-                    {participant.name.charAt(0).toUpperCase()}
+                    {(participant.name || 'U').charAt(0).toUpperCase()}
                   </div>
                   {participant.isMuted && (
                     <div className="mute-indicator">
@@ -154,7 +153,7 @@ const ChatVoiceCall = ({
           <div className="user-info">
             <div className="user-avatar">
               <div className="avatar-circle">
-                {userName.charAt(0).toUpperCase()}
+                {(userName || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="status-indicator online"></div>
             </div>
@@ -176,7 +175,7 @@ const ChatVoiceCall = ({
             <div className="search-container">
               <input 
                 type="text" 
-                placeholder={`Искать «${chatName}»`}
+                placeholder={`Искать «${chatName || 'чат'}»`}
                 className="search-input"
               />
             </div>
