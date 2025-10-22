@@ -196,14 +196,28 @@ export const useVoiceCall = (userId, userName) => {
         ));
       });
 
-      voiceCallApi.on('peerAudioStateChanged', ({ peerId, isAudioEnabled }) => {
-        console.log('Peer audio state changed:', { peerId, isAudioEnabled });
+      voiceCallApi.on('peerAudioStateChanged', (data) => {
+        console.log('Peer audio state changed - RAW DATA:', data);
+        const { peerId, isAudioEnabled, isEnabled } = data;
+        // Поддержка обоих форматов: isAudioEnabled и isEnabled
+        const audioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : isEnabled;
+        console.log('Peer audio state changed:', { peerId, audioEnabled, isAudioEnabled, isEnabled });
+        
         // peerId здесь может быть socketId, нужно найти userId
         const userId = peerIdToUserIdMapRef.current.get(peerId) || peerId;
+        console.log('Mapping peerId to userId:', { peerId, userId });
         
-        setParticipants(prev => prev.map(p => 
-          p.userId === userId ? { ...p, isAudioEnabled: Boolean(isAudioEnabled) } : p
-        ));
+        setParticipants(prev => {
+          const updated = prev.map(p => {
+            if (p.userId === userId) {
+              console.log(`Updating participant ${p.userId} audio state to:`, audioEnabled);
+              return { ...p, isAudioEnabled: Boolean(audioEnabled) };
+            }
+            return p;
+          });
+          console.log('Updated participants:', updated);
+          return updated;
+        });
       });
 
       voiceCallApi.on('newProducer', async (producerData) => {
