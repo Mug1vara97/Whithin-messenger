@@ -106,8 +106,21 @@ export const useVoiceCall = (userId, userName) => {
 
       voiceCallApi.on('peerLeft', (peerData) => {
         console.log('Peer left:', peerData);
-        const userId = peerData.userId;
         const socketId = peerData.peerId || peerData.id;
+        
+        // Получаем userId из маппинга, т.к. в peerData может не быть userId
+        const userId = peerData.userId || peerIdToUserIdMapRef.current.get(socketId);
+        
+        console.log('Peer left - socketId:', socketId, 'userId:', userId);
+        
+        if (!userId) {
+          console.warn('Cannot cleanup peer: userId not found for socketId:', socketId);
+          // Все равно удаляем маппинг
+          if (socketId) {
+            peerIdToUserIdMapRef.current.delete(socketId);
+          }
+          return;
+        }
         
         // Очищаем audio element
         const audioElement = audioElementsRef.current.get(userId);
@@ -162,7 +175,12 @@ export const useVoiceCall = (userId, userName) => {
         }
         
         // Удаляем участника из списка
-        setParticipants(prev => prev.filter(p => p.userId !== userId));
+        setParticipants(prev => {
+          const filtered = prev.filter(p => p.userId !== userId);
+          console.log('Participants after removal:', filtered);
+          return filtered;
+        });
+        
         console.log('Peer cleanup completed for:', userId);
       });
 
