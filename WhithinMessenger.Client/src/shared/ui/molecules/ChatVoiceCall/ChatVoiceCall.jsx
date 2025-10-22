@@ -109,40 +109,28 @@ const ChatVoiceCall = ({
     handleDisconnect();
   };
 
-  // Создаем участников для отображения, включая текущего пользователя
-  const currentUser = {
-    ...createParticipant(
-      userId,
-      userName || 'You',
-      null, // avatar
-      'online', // status
-      'participant' // role
-    ),
-    isMuted: isMuted,
-    isGlobalAudioMuted: isGlobalAudioMuted
-  };
-
-  const otherParticipants = participants.map(participant => ({
-    ...createParticipant(
-      participant.userId || participant.id,
-      participant.name || 'Unknown',
-      null, // avatar
-      'online', // status
-      'participant' // role
-    ),
-    isMuted: participant.isMuted || false,
-    isGlobalAudioMuted: participant.isGlobalAudioMuted || false
-  }));
-
-  // Обновляем статус глобального звука для всех участников
-  const updateGlobalAudioStatus = (userId, isMuted) => {
-    // Здесь должна быть логика синхронизации с сервером
-    // Пока что просто обновляем локальное состояние
-    console.log(`Global audio status updated for user ${userId}: ${isMuted ? 'muted' : 'unmuted'}`);
-  };
-
-  // Объединяем текущего пользователя с другими участниками
-  const displayParticipants = [currentUser, ...otherParticipants];
+  // Создаем участников для отображения, как в VoiceCallView.jsx
+  const currentUser = createParticipant(userId, userName || 'You', null, 'online', 'host');
+  currentUser.isMuted = isMuted;
+  currentUser.isGlobalAudioMuted = isGlobalAudioMuted;
+  currentUser.isSpeaking = false;
+  
+  const displayParticipants = [currentUser];
+  
+  // Добавляем всех остальных участников из глобального состояния
+  participants.forEach(participant => {
+    const videoParticipant = createParticipant(
+      participant.userId || participant.id || participant.name, 
+      participant.name, 
+      participant.avatar || null, 
+      'online', 
+      'participant'
+    );
+    videoParticipant.isMuted = participant.isMuted || false;
+    videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
+    videoParticipant.isSpeaking = participant.isSpeaking || false;
+    displayParticipants.push(videoParticipant);
+  });
 
   if (!isConnected) {
     return null;

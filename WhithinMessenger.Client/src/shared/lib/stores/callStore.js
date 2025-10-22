@@ -182,14 +182,23 @@ export const useCallStore = create(
           });
 
           voiceCallApi.on('peerAudioStateChanged', (data) => {
-            const { peerId, isAudioEnabled, isEnabled } = data;
+            const { peerId, isAudioEnabled, isEnabled, isGlobalAudioMuted, userId: dataUserId } = data;
             const audioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : isEnabled;
-            const userId = get().peerIdToUserIdMap.get(peerId) || peerId;
+            const userId = dataUserId || get().peerIdToUserIdMap.get(peerId) || peerId;
+            
+            console.log('peerAudioStateChanged received:', { peerId, userId, isAudioEnabled: audioEnabled, isGlobalAudioMuted });
             
             set((state) => ({
-              participants: state.participants.map(p => 
-                p.userId === userId ? { ...p, isAudioEnabled: Boolean(audioEnabled) } : p
-              )
+              participants: state.participants.map(p => {
+                if (p.userId === userId) {
+                  const updated = { ...p, isAudioEnabled: Boolean(audioEnabled) };
+                  if (isGlobalAudioMuted !== undefined) {
+                    updated.isGlobalAudioMuted = isGlobalAudioMuted;
+                  }
+                  return updated;
+                }
+                return p;
+              })
             }));
           });
 
@@ -268,12 +277,15 @@ export const useCallStore = create(
           voiceCallApi.on('globalAudioStateChanged', (data) => {
             const { userId, isGlobalAudioMuted } = data;
             console.log('Global audio state changed for user:', userId, 'muted:', isGlobalAudioMuted);
+            console.log('Current participants before update:', get().participants);
             
-            set((state) => ({
-              participants: state.participants.map(p => 
+            set((state) => {
+              const updatedParticipants = state.participants.map(p => 
                 p.userId === userId ? { ...p, isGlobalAudioMuted } : p
-              )
-            }));
+              );
+              console.log('Updated participants:', updatedParticipants);
+              return { participants: updatedParticipants };
+            });
           });
           
           set({ isConnected: true, connecting: false });
@@ -729,11 +741,19 @@ export const useCallStore = create(
         
         // Отправляем состояние наушников на сервер
         if (voiceCallApi.socket) {
-          voiceCallApi.socket.emit('audioState', { isEnabled: !newMutedState });
+          voiceCallApi.socket.emit('audioState', { 
+            isEnabled: !newMutedState,
+            isGlobalAudioMuted: newMutedState,
+            userId: state.currentUserId
+          });
         }
         
-        // Отправляем статус глобального звука другим участникам
+        // Также отправляем отдельное событие для глобального звука
         if (voiceCallApi.socket) {
+          console.log('Sending globalAudioState to server:', { 
+            userId: state.currentUserId,
+            isGlobalAudioMuted: newMutedState 
+          });
           voiceCallApi.socket.emit('globalAudioState', { 
             userId: state.currentUserId,
             isGlobalAudioMuted: newMutedState 
