@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveCallBar } from '../../molecules';
+// import { ActiveCallBar } from '../../molecules';
 
 /**
  * Глобальный менеджер звонков
@@ -10,7 +10,7 @@ const GlobalCallManager = () => {
   return (
     <>
       {/* Активная панель звонка - показывается только когда звонок активен */}
-      <ActiveCallBar />
+      {/* <ActiveCallBar /> */}
     </>
   );
 };
