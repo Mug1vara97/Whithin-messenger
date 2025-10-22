@@ -79,10 +79,13 @@ export const useVoiceCall = (userId, userName) => {
       // Регистрируем обработчики событий СРАЗУ после подключения
       voiceCallApi.on('peerJoined', (peerData) => {
         console.log('Peer joined:', peerData);
-        // Сохраняем маппинг socketId -> userId (peerData.id - это socket ID)
-        if (peerData.id && peerData.userId) {
-          peerIdToUserIdMapRef.current.set(peerData.id, peerData.userId);
-          console.log('Updated peer mapping:', peerData.id, '->', peerData.userId);
+        // Сохраняем маппинг socketId -> userId
+        // peerData.peerId - это socket ID, peerData.userId - это реальный userId
+        const socketId = peerData.peerId || peerData.id;
+        if (socketId && peerData.userId) {
+          peerIdToUserIdMapRef.current.set(socketId, peerData.userId);
+          console.log('Updated peer mapping:', socketId, '->', peerData.userId);
+          console.log('Current mapping:', Array.from(peerIdToUserIdMapRef.current.entries()));
         }
         // Проверяем, нет ли уже такого участника
         setParticipants(prev => {
@@ -93,7 +96,7 @@ export const useVoiceCall = (userId, userName) => {
           }
           return [...prev, {
           userId: peerData.userId,
-          peerId: peerData.id, // Socket ID
+          peerId: socketId, // Socket ID
           name: peerData.name,
           isMuted: peerData.isMuted,
           isSpeaking: false
@@ -104,8 +107,10 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.on('peerLeft', (peerData) => {
         console.log('Peer left:', peerData);
         // Удаляем маппинг
-        if (peerData.id) {
-          peerIdToUserIdMapRef.current.delete(peerData.id);
+        const socketId = peerData.peerId || peerData.id;
+        if (socketId) {
+          peerIdToUserIdMapRef.current.delete(socketId);
+          console.log('Removed peer mapping for:', socketId);
         }
         setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
       });
@@ -518,14 +523,18 @@ export const useVoiceCall = (userId, userName) => {
       if (response.existingPeers) {
         // Сохраняем маппинг для существующих пиров
         response.existingPeers.forEach(peer => {
-          if (peer.id && peer.userId) {
-            peerIdToUserIdMapRef.current.set(peer.id, peer.userId);
+          const socketId = peer.peerId || peer.id;
+          if (socketId && peer.userId) {
+            peerIdToUserIdMapRef.current.set(socketId, peer.userId);
+            console.log('Updated existing peer mapping:', socketId, '->', peer.userId);
           }
         });
         
+        console.log('All peer mappings after loading existing peers:', Array.from(peerIdToUserIdMapRef.current.entries()));
+        
         setParticipants(response.existingPeers.map(peer => ({
           userId: peer.userId,
-          peerId: peer.id,
+          peerId: peer.peerId || peer.id,
           name: peer.name,
           isMuted: peer.isMuted,
           isSpeaking: false
