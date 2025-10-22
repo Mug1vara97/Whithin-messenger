@@ -368,6 +368,16 @@ const HomePage = () => {
           userName={user?.username}
         />
       )}
+      
+      {/* Голосовой канал - отображается когда выбран голосовой канал но звонок не активен */}
+      {selectedChat && (selectedChat.chatType === 4 || selectedChat.typeId === 4 || selectedChat.TypeId === 4 || selectedChat.typeId === "44444444-4444-4444-4444-444444444444") && !isInCall && (
+        <VoiceCallView
+          channelId={selectedChat.chatId || selectedChat.chat_id}
+          channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
+          userId={user?.id}
+          userName={user?.username}
+        />
+      )}
 
       {showCreateServerModal && (
         <div 
