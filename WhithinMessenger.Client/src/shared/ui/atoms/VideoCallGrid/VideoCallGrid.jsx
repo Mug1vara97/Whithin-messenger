@@ -144,11 +144,13 @@ const VideoCallGrid = ({
           {/* Bottom overlay with name and mic status */}
           <div className="tile-bottom-overlay">
             <div className="bottom-info">
-              <div className={`mic-status ${isMuted ? 'muted' : ''}`}>
+              <div className={`mic-status ${isMuted ? 'muted' : isSpeaking ? 'speaking' : 'silent'}`}>
                 {isMuted ? (
-                  <MicOffIcon sx={{ fontSize: isSmall ? 12 : 14 }} />
+                  <MicOffIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#ed4245' }} />
+                ) : isSpeaking ? (
+                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#3ba55c' }} />
                 ) : (
-                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14 }} />
+                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#B5BAC1' }} />
                 )}
               </div>
               {!isAudioEnabled && (

@@ -111,23 +111,20 @@
 }
 
 /* Bottom overlay - точная копия Discord */
+
+
 .tile-bottom-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.5) 70%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 10;
-}
-
-.video-tile:hover .tile-bottom-overlay {
-  opacity: 1;
+  -webkit-backdrop-filter: blur(10px); /* Added for Safari */
+  backdrop-filter: blur(10px);
 }
 
 .bottom-info {
@@ -153,6 +150,16 @@
 .mic-status.muted {
   background: #f23f42;
   color: white;
+}
+
+.mic-status.speaking {
+  background: rgba(59, 165, 92, 0.2);
+  color: #3ba55c;
+}
+
+.mic-status.silent {
+  background: rgba(0, 0, 0, 0.8);
+  color: #B5BAC1;
 }
 
 .headset-status {
@@ -220,13 +227,9 @@
   border-radius: 3px;
   cursor: pointer;
   color: #f2f3f5;
-  opacity: 0;
+  opacity: 1;
   transition: all 0.2s ease;
   flex-shrink: 0;
-}
-
-.video-tile:hover .tile-volume-btn {
-  opacity: 1;
 }
 
 .tile-volume-btn:hover {
