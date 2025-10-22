@@ -4,6 +4,7 @@ import { createParticipant } from '../../../../entities/video-call/model/types';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
+import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';

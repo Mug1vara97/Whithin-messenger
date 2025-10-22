@@ -15,7 +15,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
-import styles from './VoiceCallView.module.css';
+import './VoiceCallView.css';
 
 const VoiceCallView = ({
   channelId,
@@ -160,18 +160,18 @@ const VoiceCallView = ({
 
 
   return (
-    <div className={styles.voiceCallContainer}>
+    <div className="voice-call-container">
       {/* Main Wrapper */}
-      <div className={styles.callContainer}>
-        <div className={styles.rootIdle}>
-          <div className={styles.videoGridWrapper}>
+      <div className="call-container">
+        <div className="root-idle">
+          <div className="video-grid-wrapper">
             {/* Scroller */}
-            <div className={styles.scroller}>
-              <div className={styles.listItems}>
+            <div className="scroller">
+              <div className="list-items">
 
                 {/* Error Banner */}
                 {error && (
-                  <div className={styles.errorBanner}>
+                  <div className="error-banner">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                     </svg>
@@ -181,14 +181,14 @@ const VoiceCallView = ({
 
                 {/* Audio Blocked Banner */}
                 {audioBlocked && (
-                  <div className={styles.audioBlockedBanner}>
+                  <div className="audio-blocked-banner">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                     </svg>
-                    <div className={styles.audioBlockedText}>
+                    <div className="audio-blocked-text">
                       <strong>Браузер заблокировал автовоспроизведение</strong>
                       <span>Нажмите кнопку ниже, чтобы разрешить воспроизведение звука</span>
-                      <button className={styles.enableAudioBtn} onClick={enableAudioPlayback}>
+                      <button className="enable-audio-btn" onClick={enableAudioPlayback}>
                         Разрешить воспроизведение
                       </button>
                     </div>
@@ -197,7 +197,7 @@ const VoiceCallView = ({
 
                 {/* Video Call Grid */}
                 {(participants.length > 0 || isConnected) && (
-                  <div className={styles.videoCallGridContainer}>
+                  <div className="video-call-grid-container">
                     <VideoCallGrid 
                       participants={videoParticipants}
                       onParticipantClick={(participant) => {
@@ -217,16 +217,16 @@ const VoiceCallView = ({
             </div>
 
             {/* Voice Controls */}
-            <div className={styles.videoControls}>
-              <div className={styles.gradientTop}></div>
-              <div className={styles.gradientBottom}></div>
+            <div className="video-controls">
+              <div className="gradient-top"></div>
+              <div className="gradient-bottom"></div>
               
               {/* Top Controls */}
-              <div className={styles.topControls}>
-                <div className={styles.headerWrapper}>
-                  <div className={styles.headerBar}>
-                    <div className={styles.headerChildren}>
-                      <div className={styles.channelTitle}>
+              <div className="top-controls">
+                <div className="header-wrapper">
+                  <div className="header-bar">
+                    <div className="header-children">
+                      <div className="channel-title">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 3a1 1 0 0 0-1-1h-.06a1 1 0 0 0-.74.32L5.92 7H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2.92l4.28 4.68a1 1 0 0 0 .74.32H11a1 1 0 0 0 1-1V3ZM15.1 20.75c-.58.14-1.1-.33-1.1-.92v-.03c0-.5.37-.92.85-1.05a7 7 0 0 0 0-13.5A1.11 1.11 0 0 1 14 4.2v-.03c0-.6.52-1.06 1.1-.92a9 9 0 0 1 0 17.5Z"/>
                           <path d="M15.16 16.51c-.57.28-1.16-.2-1.16-.83v-.14c0-.43.28-.8.63-1.02a3 3 0 0 0 0-5.04c-.35-.23-.63-.6-.63-1.02v-.14c0-.63.59-1.1 1.16-.83a5 5 0 0 1 0 9.02Z"/>
@@ -234,9 +234,9 @@ const VoiceCallView = ({
                         <span>{channelName}</span>
                       </div>
                     </div>
-                    <div className={styles.toolbar}>
+                    <div className="toolbar">
                       <button 
-                        className={styles.toolbarButton} 
+                        className="toolbar-button" 
                         type="button" 
                         aria-label="Показать чат"
                         onClick={() => setShowChatPanel(!showChatPanel)}
@@ -249,15 +249,15 @@ const VoiceCallView = ({
               </div>
 
               {/* Bottom Controls */}
-              <div className={styles.bottomControls}>
-                <div className={`${styles.edgeControls} left`}></div>
-                <div className={styles.centerControls}>
-                  <div className={styles.wrapper}>
-                    <div className={styles.buttonSection}>
+              <div className="bottom-controls">
+                <div className="edge-controls left"></div>
+                <div className="center-controls">
+                  <div className="wrapper">
+                    <div className="button-section">
                       {/* Microphone with dropdown */}
-                      <div className={styles.attachedCaretButtonContainer}>
+                      <div className="attached-caret-button-container">
                         <button 
-                          className={`${styles.centerButton} ${styles.attachedButton} ${isMuted ? 'muted' : ''}`}
+                          className={`center-button attached-button ${isMuted ? 'muted' : ''}`}
                           type="button" 
                           aria-label={isMuted ? 'Включить микрофон' : 'Заглушить'}
                           onClick={toggleMute}
@@ -268,31 +268,31 @@ const VoiceCallView = ({
                             <MicIcon sx={{ fontSize: 24 }} />
                           )}
                         </button>
-                        <div className={`${styles.contextMenuCaret} ${isMuted ? 'muted' : ''}`}>
+                        <div className={`context-menu-caret ${isMuted ? 'muted' : ''}`}>
                           <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
                         </div>
                       </div>
 
                       {/* Camera with dropdown */}
-                      <div className={styles.attachedCaretButtonContainer}>
+                      <div className="attached-caret-button-container">
                         <button 
-                          className={`${styles.centerButton} ${styles.attachedButton}`}
+                          className="center-button attached-button"
                           type="button" 
                           aria-label="Включить камеру"
                         >
                           <VideocamIcon sx={{ fontSize: 24 }} />
                         </button>
-                        <div className={styles.contextMenuCaret}>
+                        <div className="context-menu-caret">
                           <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
                         </div>
                       </div>
                     </div>
 
-                    <div className={styles.buttonSection}>
+                    <div className="button-section">
                       {/* Screen Share */}
-                      <div className={`${styles.attachedButtonContainer} ${styles.controlButton}`}>
+                      <div className="attached-button-container control-button">
                         <button 
-                          className={styles.centerButton}
+                          className="center-button"
                           type="button" 
                           aria-label="Продемонстрируйте свой экран"
                         >
@@ -301,9 +301,9 @@ const VoiceCallView = ({
                       </div>
 
                       {/* Global Audio Toggle */}
-                      <div className={styles.attachedButtonContainer}>
+                      <div className="attached-button-container">
                         <button 
-                          className={`${styles.centerButton} ${isGlobalAudioMuted ? 'muted' : ''}`}
+                          className={`center-button ${isGlobalAudioMuted ? 'muted' : ''}`}
                           type="button"
                           onClick={toggleGlobalAudio}
                           aria-label={isGlobalAudioMuted ? 'Включить звук всех' : 'Выключить звук всех'}
@@ -318,9 +318,9 @@ const VoiceCallView = ({
                       </div>
 
                       {/* Noise Suppression with dropdown */}
-                      <div className={styles.attachedCaretButtonContainer}>
+                      <div className="attached-caret-button-container">
                         <button 
-                          className={`${styles.centerButton} ${styles.attachedButton} ${isNoiseSuppressed ? '' : 'muted'}`}
+                          className={`center-button attached-button ${isNoiseSuppressed ? '' : 'muted'}`}
                           type="button"
                           onClick={handleToggleNoiseSuppression}
                           aria-label={isNoiseSuppressed ? `Выключить шумоподавление (${noiseSuppressionMode})` : 'Включить шумоподавление'}
@@ -333,7 +333,7 @@ const VoiceCallView = ({
                           )}
                         </button>
                         <div 
-                          className={`${styles.contextMenuCaret} ${isNoiseSuppressed ? '' : 'muted'}`}
+                          className={`context-menu-caret ${isNoiseSuppressed ? '' : 'muted'}`}
                           onClick={(e) => setNoiseSuppressMenuAnchor(e.currentTarget)}
                           title="Выбрать режим шумоподавления"
                           style={{ cursor: 'pointer' }}
@@ -343,9 +343,9 @@ const VoiceCallView = ({
                       </div>
 
                       {/* More Options */}
-                      <div className={styles.attachedButtonContainer}>
+                      <div className="attached-button-container">
                         <button 
-                          className={styles.centerButton}
+                          className="center-button"
                           type="button" 
                           aria-label="Другие настройки"
                         >
@@ -355,10 +355,10 @@ const VoiceCallView = ({
                     </div>
 
                     {/* Disconnect Button */}
-                    <div className={styles.disconnectButtonWrapper}>
-                      <div className={styles.attachedButtonContainer}>
+                    <div className="disconnect-button-wrapper">
+                      <div className="attached-button-container">
                         <button 
-                          className={`${styles.centerButton} ${styles.disconnect}`}
+                          className="center-button disconnect"
                           type="button" 
                           aria-label="Завершить звонок"
                           onClick={async () => {
@@ -372,14 +372,14 @@ const VoiceCallView = ({
                     </div>
                   </div>
                 </div>
-                <div className={`${styles.edgeControls} right`}>
-                  <button className={styles.rightTrayIcon} type="button" aria-label="В отдельном окне">
+                <div className="edge-controls right">
+                  <button className="right-tray-icon" type="button" aria-label="В отдельном окне">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M15 2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V4.41l-4.3 4.3a1 1 0 1 1-1.4-1.42L19.58 3H16a1 1 0 0 1-1-1Z"/>
                       <path d="M5 2a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-6a1 1 0 1 0-2 0v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h6a1 1 0 1 0 0-2H5Z"/>
                     </svg>
                   </button>
-                  <button className={styles.rightTrayIcon} type="button" aria-label="Полноэкранный режим">
+                  <button className="right-tray-icon" type="button" aria-label="Полноэкранный режим">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M4 6c0-1.1.9-2 2-2h3a1 1 0 0 0 0-2H6a4 4 0 0 0-4 4v3a1 1 0 0 0 2 0V6ZM4 18c0 1.1.9 2 2 2h3a1 1 0 1 1 0 2H6a4 4 0 0 1-4-4v-3a1 1 0 1 1 2 0v3ZM18 4a2 2 0 0 1 2 2v3a1 1 0 1 0 2 0V6a4 4 0 0 0-4-4h-3a1 1 0 1 0 0 2h3ZM20 18a2 2 0 0 1-2 2h-3a1 1 0 1 0 0 2h3a4 4 0 0 0 4-4v-3a1 1 0 1 0-2 0v3Z"/>
                     </svg>

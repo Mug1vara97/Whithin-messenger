@@ -1,4 +1,4 @@
-/* Voice Call Container */
+/* Voice Call Container
 .voice-call-container {
   position: relative;
   width: 100%;
@@ -14,16 +14,16 @@
 }
 
 /* Voice Call Wrapper */
-.voice-call-wrapper {
+/* .voice-call-wrapper {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 20px 100px 20px; /* Добавляем отступ снизу для кнопок */
+  padding: 20px 20px 100px 20px; /* Добавляем отступ снизу для кнопок 
   position: relative;
-}
+} */
 
-.participants-container {
+/* .participants-container {
   display: flex;
   gap: 20px;
   align-items: center;
@@ -89,12 +89,12 @@
 
 .audio-muted-indicator {
   background: #f39c12;
-}
+} */
 
 /* Удалены стили для верхней панели */
 
 /* Bottom Controls */
-.bottom-controls {
+/* .bottom-controls {
   position: absolute;
   bottom: 20px;
   left: 50%;
@@ -189,10 +189,10 @@
 
 .control-dropdown:hover {
   background: #40444b;
-}
+} */
 
 /* Error Banner */
-.error-banner {
+/* .error-banner {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -203,10 +203,10 @@
   border-radius: 8px;
   font-size: 14px;
   z-index: 20;
-}
+} */
 
 /* Responsive Design */
-@media (max-width: 768px) {
+/* @media (max-width: 768px) {
   .participants-container {
     gap: 12px;
   }
@@ -242,47 +242,47 @@
   .header-actions {
     gap: 8px;
   }
-}
+} */
 
 /* Анимации */
-@keyframes pulse {
+/* @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
-}
+} */
 
-.participant-item.speaking {
+/* .participant-item.speaking {
   animation: pulse 1.5s infinite;
 }
 
 .participant-item.speaking .avatar-circle {
   background: #43b581;
   box-shadow: 0 0 20px rgba(67, 181, 129, 0.5);
-}
+} */
 
 /* Hover эффекты */
-.control-btn:hover:not(.disabled) {
+/* .control-btn:hover:not(.disabled) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .control-btn.end-call-btn:hover {
   box-shadow: 0 6px 16px rgba(240, 71, 71, 0.4);
-}
+} */
 
 /* Фокус для доступности */
-.control-btn:focus,
+/* .control-btn:focus,
 .action-btn:focus,
 .search-input:focus {
   outline: 2px solid #5865f2;
   outline-offset: 2px;
-}
+} */
 
 /* Темная тема */
-.voice-call-container {
-  color-scheme: dark;
-}
+  .voice-call-container {
+    color-scheme: dark;
+  }
 
 /* Плавные переходы */
-* {
+/* {
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
+} */
