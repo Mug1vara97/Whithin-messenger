@@ -133,6 +133,13 @@ const ChatVoiceCall = ({
     isGlobalAudioMuted: participant.isGlobalAudioMuted || false
   }));
 
+  // Обновляем статус глобального звука для всех участников
+  const updateGlobalAudioStatus = (userId, isMuted) => {
+    // Здесь должна быть логика синхронизации с сервером
+    // Пока что просто обновляем локальное состояние
+    console.log(`Global audio status updated for user ${userId}: ${isMuted ? 'muted' : 'unmuted'}`);
+  };
+
   // Объединяем текущего пользователя с другими участниками
   const displayParticipants = [currentUser, ...otherParticipants];
 

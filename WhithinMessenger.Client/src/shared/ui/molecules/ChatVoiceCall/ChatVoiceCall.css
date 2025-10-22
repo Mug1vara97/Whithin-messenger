@@ -19,7 +19,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 20px 20px 100px 20px; /* Добавляем отступ снизу для кнопок */
   position: relative;
 }
 
@@ -96,13 +96,15 @@
 /* Bottom Controls */
 .bottom-controls {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   background: rgba(24, 25, 28, 0.9);
   backdrop-filter: blur(10px);
-  border-top: 1px solid #40444b;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid #40444b;
 }
 
 .control-section {
