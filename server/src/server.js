@@ -312,11 +312,15 @@ io.on('connection', async (socket) => {
             const existingPeers = [];
             room.peers.forEach((existingPeer) => {
                 if (existingPeer.id !== socket.id) {
+                    // Получаем реальное состояние пользователя из глобального хранилища
+                    const userState = getUserVoiceState(existingPeer.userId);
+                    
                     existingPeers.push({
                         id: existingPeer.id,
                         name: existingPeer.name,
                         isMuted: existingPeer.isMuted(),
                         isAudioEnabled: existingPeer.isAudioEnabled(),
+                        isGlobalAudioMuted: userState.isAudioDisabled || false, // Добавляем статус глобального звука
                         userId: existingPeer.userId // Добавляем userId для загрузки аватара
                     });
                 }
