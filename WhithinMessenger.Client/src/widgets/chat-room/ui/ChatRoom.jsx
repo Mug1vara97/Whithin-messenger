@@ -16,6 +16,7 @@ import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
+import { ChatVoiceCall } from '../../../shared/ui/molecules';
 import { Call, Mic, Stop, AttachFile } from '@mui/icons-material';
 import './ChatRoom.css';
 
@@ -573,31 +574,16 @@ const ChatRoom = ({
       </div>
 
       {isCallActiveInThisChat && (
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          height: '400px',
-          backgroundColor: '#18191c',
-          borderBottom: '1px solid #202225',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}>
-          <div style={{ 
-            flex: 1, 
-            position: 'relative', 
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#8e9297'
-          }}>
-            <div id="voice-chat-container-private" style={{ 
-              width: '100%', 
-              height: '100%'
-            }} />
-          </div>
-        </div>
+        <ChatVoiceCall
+          chatId={chatId}
+          chatName={groupName}
+          userId={userId}
+          userName={username}
+          onClose={() => {
+            // Логика закрытия звонка
+            console.log('ChatVoiceCall: Call closed');
+          }}
+        />
       )}
 
       <div className="messages">

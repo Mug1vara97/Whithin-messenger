@@ -18,3 +18,4 @@ export * from './FriendRequestItem';
 // export { default as ActiveCallBar } from './ActiveCallBar';
 export { default as CallButton } from './CallButton';
 export { default as VoiceChannelSelector } from './VoiceChannelSelector';
+export { default as ChatVoiceCall } from './ChatVoiceCall';
