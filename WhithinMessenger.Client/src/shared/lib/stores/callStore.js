@@ -781,6 +781,16 @@ export const useCallStore = create(
         // Обновляем isAudioEnabled в соответствии с глобальным звуком
         set({ isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState });
         
+        // Также обновляем локального пользователя в списке участников
+        set((state) => ({
+          participants: state.participants.map(p => {
+            if (p.userId === state.currentUserId) {
+              return { ...p, isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState };
+            }
+            return p;
+          })
+        }));
+        
         // Также отправляем отдельное событие для глобального звука
         if (voiceCallApi.socket) {
           console.log('Sending globalAudioState to server:', { 
