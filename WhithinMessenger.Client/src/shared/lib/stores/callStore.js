@@ -90,6 +90,11 @@ export const useCallStore = create(
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
           
+          // Очищаем socket обработчики
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.off('globalAudioState');
+          }
+          
           await voiceCallApi.connect(userId, userName);
           
           // Регистрируем обработчики событий
@@ -198,6 +203,12 @@ export const useCallStore = create(
                     console.log('Updated participant with global audio state:', updated);
                   } else {
                     console.log('isGlobalAudioMuted is undefined, not updating global audio state');
+                    // Временное решение: если isGlobalAudioMuted не передается,
+                    // попробуем определить по isAudioEnabled
+                    if (audioEnabled === false) {
+                      console.log('Trying to infer global audio state from audioEnabled:', audioEnabled);
+                      // Не устанавливаем isGlobalAudioMuted, так как это может быть обычный mute
+                    }
                   }
                   return updated;
                 }
@@ -291,6 +302,22 @@ export const useCallStore = create(
               return { participants: updatedParticipants };
             });
           });
+
+          // Временное решение: слушаем событие globalAudioState от сервера
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.on('globalAudioState', (data) => {
+              console.log('Received globalAudioState from server:', data);
+              const { userId, isGlobalAudioMuted } = data;
+              
+              set((state) => {
+                const updatedParticipants = state.participants.map(p => 
+                  p.userId === userId ? { ...p, isGlobalAudioMuted } : p
+                );
+                console.log('Updated participants with globalAudioState:', updatedParticipants);
+                return { participants: updatedParticipants };
+              });
+            });
+          }
           
           set({ isConnected: true, connecting: false });
           
@@ -780,7 +807,15 @@ export const useCallStore = create(
           }
         });
         
-        set({ isGlobalAudioMuted: newMutedState });
+        // Обновляем своё собственное состояние в participants
+        set((state) => ({
+          isGlobalAudioMuted: newMutedState,
+          participants: state.participants.map(p => 
+            p.userId === state.currentUserId 
+              ? { ...p, isGlobalAudioMuted: newMutedState } 
+              : p
+          )
+        }));
       },
       
       // Переключение шумоподавления
@@ -879,6 +914,11 @@ export const useCallStore = create(
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
+          
+          // Очищаем socket обработчики
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.off('globalAudioState');
+          }
           
           if (state.localStream) {
             state.localStream.getTracks().forEach(track => track.stop());
