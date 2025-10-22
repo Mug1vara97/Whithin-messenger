@@ -108,8 +108,16 @@ const ChatVoiceCall = ({
     handleDisconnect();
   };
 
-  // Создаем участников для отображения
-  const displayParticipants = participants.map(participant => 
+  // Создаем участников для отображения, включая текущего пользователя
+  const currentUser = createParticipant(
+    userId,
+    userName || 'You',
+    null, // avatar
+    'online', // status
+    'participant' // role
+  );
+
+  const otherParticipants = participants.map(participant => 
     createParticipant(
       participant.userId || participant.id,
       participant.name || 'Unknown',
@@ -118,6 +126,9 @@ const ChatVoiceCall = ({
       'participant' // role
     )
   );
+
+  // Объединяем текущего пользователя с другими участниками
+  const displayParticipants = [currentUser, ...otherParticipants];
 
   if (!isConnected) {
     return null;
@@ -147,46 +158,6 @@ const ChatVoiceCall = ({
         </div>
       </div>
 
-      {/* Верхняя панель управления */}
-      <div className="top-controls">
-        <div className="call-header">
-          <div className="user-info">
-            <div className="user-avatar">
-              <div className="avatar-circle">
-                {(userName || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div className="status-indicator online"></div>
-            </div>
-            <div className="user-details">
-              <h1 className="user-name">{chatName}</h1>
-            </div>
-          </div>
-          
-          <div className="header-actions">
-            <button className="action-btn" title="Закреплённые сообщения">
-              📌
-            </button>
-            <button className="action-btn" title="Добавить друзей в беседу">
-              👥
-            </button>
-            <button className="action-btn" title="Показать профиль пользователя">
-              👤
-            </button>
-            <div className="search-container">
-              <input 
-                type="text" 
-                placeholder={`Искать «${chatName || 'чат'}»`}
-                className="search-input"
-              />
-            </div>
-            <div className="region-selector">
-              <span>регион</span>
-              <span>Автоматический выбор</span>
-              <span>▼</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Нижняя панель управления */}
       <div className="bottom-controls">
