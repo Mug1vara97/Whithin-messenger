@@ -164,13 +164,19 @@ const VideoCallGrid = ({
             {/* Volume controls */}
             <div className="tile-volume-controls">
               <button 
-                className={`tile-volume-btn ${isAudioMuted ? 'muted' : ''}`}
+                className={`tile-volume-btn ${
+                  isAudioMuted || volume === 0
+                    ? 'muted'
+                    : isSpeaking
+                    ? 'speaking'
+                    : 'silent'
+                }`}
                 onClick={handleVolumeClick}
                 onContextMenu={handleVolumeRightClick}
                 title="ЛКМ - мут, ПКМ - слайдер"
               >
                 {isAudioMuted || volume === 0 ? (
-                  <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16, color: '#ed4245' }} />
+                  <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
                 ) : (
                   <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
                 )}

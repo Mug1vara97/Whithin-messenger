@@ -220,28 +220,50 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.5);
   border: none;
-  border-radius: 3px;
+  border-radius: 50%;
   cursor: pointer;
   color: #f2f3f5;
   opacity: 1;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  padding: 4px;
 }
 
 .tile-volume-btn:hover {
-  background: rgba(0, 0, 0, 0.95);
-  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
 }
 
 .tile-volume-btn.muted {
-  opacity: 1;
-  background: rgba(237, 66, 69, 0.15);
+  background: rgba(237, 66, 69, 0.1) !important;
+  animation: mutePulse 2s infinite;
 }
 
 .tile-volume-btn.muted:hover {
-  background: rgba(237, 66, 69, 0.25);
+  background: rgba(237, 66, 69, 0.2) !important;
+  transform: scale(1.1);
+}
+
+.tile-volume-btn.muted svg {
+  color: #ed4245;
+}
+
+.tile-volume-btn.speaking {
+  background: transparent;
+}
+
+.tile-volume-btn.speaking svg {
+  color: #3ba55c;
+}
+
+.tile-volume-btn.silent {
+  background: transparent;
+}
+
+.tile-volume-btn.silent svg {
+  color: #B5BAC1;
 }
 
 /* Volume control button (from old project) */
