@@ -53,11 +53,14 @@ const VoiceCallView = ({
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
 
   useEffect(() => {
+    console.log('VoiceCallView: useEffect triggered with:', { channelId, userId, userName, channelName });
     if (channelId && userId && userName) {
       console.log('VoiceCallView: Starting voice call');
       startCall(channelId, channelName).catch((err) => {
         console.error('Call start error:', err);
       });
+    } else {
+      console.log('VoiceCallView: Missing required parameters:', { channelId, userId, userName });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, channelName, userId, userName]); // Убрали startCall из зависимостей

@@ -311,18 +311,19 @@ const HomePage = () => {
                   onServerSelected={handleServerSelected}
                   onClose={() => setShowDiscovery(false)}
                 />
-              ) : selectedChat ? (
+                  ) : selectedChat ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {/* Check if it's a voice channel */}
                   {(selectedChat.chatType === 4 || 
                     selectedChat.typeId === 4 || 
                     selectedChat.TypeId === 4 ||
                     selectedChat.typeId === "44444444-4444-4444-4444-444444444444") ? (
+                    console.log('HomePage: Rendering VoiceCallView with user:', user, 'selectedChat:', selectedChat),
                     <VoiceCallView
                       channelId={selectedChat.chatId || selectedChat.chat_id}
                       channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
-                      userId={user?.id}
-                      userName={user?.username}
+                      userId={user?.id || user?.userId}
+                      userName={user?.username || user?.name}
                       onClose={() => {
                         setSelectedChat(null);
                         navigate(selectedServer ? `/server/${selectedServer.serverId}` : '/channels/@me');
