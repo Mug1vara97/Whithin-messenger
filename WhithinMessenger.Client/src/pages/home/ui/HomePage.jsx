@@ -328,10 +328,6 @@ const HomePage = () => {
                       channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
                       userId={user?.id}
                       userName={user?.username}
-                      onClose={() => {
-                        setSelectedChat(null);
-                        navigate(selectedServer ? `/server/${selectedServer.serverId}` : '/channels/@me');
-                      }}
                     />
                   ) : (
                     <ChatRoom

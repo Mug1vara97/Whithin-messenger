@@ -22,8 +22,7 @@ const VoiceCallView = ({
   channelId,
   channelName,
   userId,
-  userName,
-  onClose
+  userName
 }) => {
   const {
     isConnected,
@@ -67,11 +66,8 @@ const VoiceCallView = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, userId, userName]); // Убрали connect и joinRoom из зависимостей
 
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
+  // Убираем автоматическое отключение при размонтировании
+  // disconnect() будет вызываться только при явном выходе из звонка
 
   // Преобразуем участников голосового звонка в формат для видеосетки
   useEffect(() => {
@@ -103,11 +99,10 @@ const VoiceCallView = ({
   }, [participants, userId, userName, isMuted, isAudioEnabled]);
 
 
-  const handleClose = () => {
+  // Обработчик для кнопки "Покинуть звонок"
+  const handleLeaveCall = () => {
     disconnect();
-    if (onClose) {
-      onClose();
-    }
+    // Не вызываем onClose, так как это внутренний выход из звонка
   };
 
   const enableAudioPlayback = async () => {
@@ -349,7 +344,7 @@ const VoiceCallView = ({
                           className="center-button disconnect"
                           type="button" 
                           aria-label="Отключиться"
-                          onClick={handleClose}
+                          onClick={handleLeaveCall}
                         >
                           <CallEndIcon sx={{ fontSize: 24 }} />
                         </button>

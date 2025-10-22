@@ -26,12 +26,14 @@ const useVoiceCallStore = create((set) => ({
   },
   
   leaveCall: () => {
+    console.log('voiceCallStore: leaveCall called');
     set({ 
       isInCall: false, 
       currentRoomId: null,
       isCallMinimized: false,
       participants: []
     });
+    console.log('voiceCallStore: isInCall set to false');
   },
   
   minimizeCall: () => {
