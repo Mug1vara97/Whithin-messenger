@@ -63,20 +63,32 @@
   border: 3px solid #2f3136;
 }
 
-.mute-indicator {
+.status-indicators {
   position: absolute;
   bottom: -5px;
   right: -5px;
-  width: 24px;
-  height: 24px;
-  background: #f04747;
+  display: flex;
+  gap: 4px;
+}
+
+.status-indicator {
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 10px;
   border: 2px solid #2f3136;
+}
+
+.mute-indicator {
+  background: #f04747;
+}
+
+.audio-muted-indicator {
+  background: #f39c12;
 }
 
 /* Удалены стили для верхней панели */
@@ -145,11 +157,19 @@
   opacity: 0.5;
 }
 
-.control-btn.screen-share-btn,
-.control-btn.activity-btn,
-.control-btn.settings-btn {
+.control-btn.global-audio-btn {
   background: #40444b;
   color: #b9bbbe;
+}
+
+.control-btn.global-audio-btn.muted {
+  background: #f39c12;
+  color: #ffffff;
+}
+
+.control-btn.global-audio-btn.unmuted {
+  background: #43b581;
+  color: #ffffff;
 }
 
 .control-btn.end-call-btn {

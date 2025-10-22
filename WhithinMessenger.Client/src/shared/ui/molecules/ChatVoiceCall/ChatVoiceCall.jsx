@@ -109,23 +109,29 @@ const ChatVoiceCall = ({
   };
 
   // Создаем участников для отображения, включая текущего пользователя
-  const currentUser = createParticipant(
-    userId,
-    userName || 'You',
-    null, // avatar
-    'online', // status
-    'participant' // role
-  );
+  const currentUser = {
+    ...createParticipant(
+      userId,
+      userName || 'You',
+      null, // avatar
+      'online', // status
+      'participant' // role
+    ),
+    isMuted: isMuted,
+    isGlobalAudioMuted: isGlobalAudioMuted
+  };
 
-  const otherParticipants = participants.map(participant => 
-    createParticipant(
+  const otherParticipants = participants.map(participant => ({
+    ...createParticipant(
       participant.userId || participant.id,
       participant.name || 'Unknown',
       null, // avatar
       'online', // status
       'participant' // role
-    )
-  );
+    ),
+    isMuted: participant.isMuted || false,
+    isGlobalAudioMuted: participant.isGlobalAudioMuted || false
+  }));
 
   // Объединяем текущего пользователя с другими участниками
   const displayParticipants = [currentUser, ...otherParticipants];
@@ -146,11 +152,19 @@ const ChatVoiceCall = ({
                   <div className="avatar-circle">
                     {(participant.name || 'U').charAt(0).toUpperCase()}
                   </div>
-                  {participant.isMuted && (
-                    <div className="mute-indicator">
-                      <MicOffIcon />
-                    </div>
-                  )}
+                  {/* Индикаторы статуса */}
+                  <div className="status-indicators">
+                    {participant.isMuted && (
+                      <div className="status-indicator mute-indicator">
+                        <MicOffIcon />
+                      </div>
+                    )}
+                    {participant.isGlobalAudioMuted && (
+                      <div className="status-indicator audio-muted-indicator">
+                        <VolumeOffIcon />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -188,35 +202,16 @@ const ChatVoiceCall = ({
               <div className="control-dropdown">▼</div>
             </div>
 
-            {/* Демонстрация экрана */}
+            {/* Глобальный звук */}
             <div className="control-group">
               <button 
-                className="control-btn screen-share-btn"
-                onClick={handleScreenShare}
-                title="Поделиться экраном"
+                className={`control-btn global-audio-btn ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
+                onClick={toggleGlobalAudio}
+                title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
               >
-                <ScreenShareIcon />
+                {isGlobalAudioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
               </button>
-            </div>
-
-            {/* Активности */}
-            <div className="control-group">
-              <button 
-                className="control-btn activity-btn"
-                title="Начать активность"
-              >
-                🎮
-              </button>
-            </div>
-
-            {/* Настройки */}
-            <div className="control-group">
-              <button 
-                className="control-btn settings-btn"
-                title="Другие настройки"
-              >
-                ⋯
-              </button>
+              <div className="control-dropdown">▼</div>
             </div>
 
             {/* Завершить звонок */}
