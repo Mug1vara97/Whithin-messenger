@@ -468,6 +468,7 @@
   color: white;
   transition: all 0.3s ease;
   z-index: 100;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 

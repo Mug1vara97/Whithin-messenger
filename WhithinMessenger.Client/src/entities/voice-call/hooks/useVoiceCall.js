@@ -747,11 +747,6 @@ export const useVoiceCall = (userId, userName) => {
     }
   }, [isMuted]);
 
-  // Переключение аудио (DEPRECATED - используйте toggleGlobalAudio)
-  const toggleAudio = useCallback(() => {
-    console.warn('toggleAudio is deprecated, use toggleGlobalAudio instead');
-    toggleGlobalAudio();
-  }, [toggleGlobalAudio]);
 
   // Изменение громкости
   const handleVolumeChange = useCallback((newVolume) => {
@@ -1021,7 +1016,6 @@ export const useVoiceCall = (userId, userName) => {
     disconnect,
     joinRoom,
     toggleMute,
-    toggleAudio,
     handleVolumeChange,
     toggleNoiseSuppression,
     changeNoiseSuppressionMode,
