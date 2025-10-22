@@ -55,6 +55,8 @@ const VoiceCallView = ({
 
   useEffect(() => {
     console.log('VoiceCallView: useEffect triggered with:', { channelId, userId, userName, channelName });
+    console.log('VoiceCallView: Current call state:', { isConnected, currentCall });
+    
     if (channelId && userId && userName) {
       // Проверяем, не активен ли уже звонок в этом канале
       if (isConnected && currentCall?.channelId === channelId) {

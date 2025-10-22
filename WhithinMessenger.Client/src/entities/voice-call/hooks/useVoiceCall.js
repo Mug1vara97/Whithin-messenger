@@ -36,6 +36,7 @@ export const useVoiceCall = (userId, userName) => {
   const [userMutedStates, setUserMutedStates] = useState(new Map()); // Состояние мута для каждого пользователя
   const [showVolumeSliders, setShowVolumeSliders] = useState(new Map()); // Показать слайдер для пользователя
   const [isGlobalAudioMuted, setIsGlobalAudioMuted] = useState(false); // Глобальное отключение звука
+  const [currentCall, setCurrentCall] = useState(null); // Текущий активный звонок
 
   const deviceRef = useRef(null);
   const sendTransportRef = useRef(null);
@@ -384,6 +385,7 @@ export const useVoiceCall = (userId, userName) => {
       
       await voiceCallApi.disconnect();
       setIsConnected(false);
+      setCurrentCall(null); // Очищаем текущий звонок
       setParticipants([]);
       setUserVolumes(new Map());
       setUserMutedStates(new Map());
@@ -729,6 +731,10 @@ export const useVoiceCall = (userId, userName) => {
       if (createAudioStreamRef.current) {
         await createAudioStreamRef.current();
       }
+      
+      // Обновляем текущий звонок
+      setCurrentCall({ channelId: roomId, channelName: roomId });
+      console.log('Current call set to:', { channelId: roomId, channelName: roomId });
     } catch (error) {
       console.error('Failed to join room:', error);
       setError(error.message);
@@ -1024,6 +1030,7 @@ export const useVoiceCall = (userId, userName) => {
     userMutedStates,
     showVolumeSliders,
     isGlobalAudioMuted,
+    currentCall,
     
     // Методы
     connect,
