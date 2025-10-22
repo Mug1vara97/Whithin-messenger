@@ -150,6 +150,7 @@ const HomePage = () => {
           };
           console.log('HomePage: Setting selectedChat to:', channelData);
           setSelectedChat(channelData);
+          
         } else {
           console.log('HomePage: Channel not found, setting selectedChat to null');
           setSelectedChat(null);
@@ -167,6 +168,7 @@ const HomePage = () => {
       if (foundChat) {
         setSelectedChat(foundChat);
         setSelectedServer(null);
+        
       } else {
         setSelectedChat(null);
         setSelectedServer(null);
@@ -358,7 +360,7 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Минимизированный звонок - отображается над панелью пользователя */}
+      {/* Минимизированный звонок - отображается когда звонок активен но минимизирован */}
       {isInCall && isCallMinimized && <MinimizedCallWidget />}
 
       {showCreateServerModal && (
