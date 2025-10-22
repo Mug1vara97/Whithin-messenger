@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
+import useVoiceCallStore from '../../../shared/lib/stores/voiceCallStore';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -20,6 +21,15 @@ const ICE_SERVERS = [
 ];
 
 export const useVoiceCall = (userId, userName) => {
+  // Глобальное состояние звонка
+  const {
+    isInCall,
+    isCallMinimized,
+    currentRoomId,
+    minimizeCall,
+    restoreCall
+  } = useVoiceCallStore();
+
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking] = useState(false);
@@ -1025,6 +1035,11 @@ export const useVoiceCall = (userId, userName) => {
     showVolumeSliders,
     isGlobalAudioMuted,
     
+    // Глобальное состояние звонка
+    isInCall,
+    isCallMinimized,
+    currentRoomId,
+    
     // Методы
     connect,
     disconnect,
@@ -1036,6 +1051,10 @@ export const useVoiceCall = (userId, userName) => {
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
-    toggleGlobalAudio
+    toggleGlobalAudio,
+    
+    // Методы минимизации
+    minimizeCall,
+    restoreCall
   };
 };

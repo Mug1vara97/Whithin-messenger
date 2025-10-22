@@ -15,6 +15,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
+import MinimizeIcon from '@mui/icons-material/Minimize';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -43,6 +44,7 @@ const VoiceCallView = ({
     toggleMute,
     toggleNoiseSuppression,
     changeNoiseSuppressionMode,
+    minimizeCall,
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
@@ -356,6 +358,14 @@ const VoiceCallView = ({
                   </div>
                 </div>
                 <div className="edge-controls right">
+                  <button 
+                    className="right-tray-icon" 
+                    type="button" 
+                    aria-label="Минимизировать звонок"
+                    onClick={minimizeCall}
+                  >
+                    <MinimizeIcon sx={{ fontSize: 24 }} />
+                  </button>
                   <button className="right-tray-icon" type="button" aria-label="В отдельном окне">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M15 2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V4.41l-4.3 4.3a1 1 0 1 1-1.4-1.42L19.58 3H16a1 1 0 0 1-1-1Z"/>
