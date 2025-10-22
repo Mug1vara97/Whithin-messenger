@@ -187,6 +187,7 @@ export const useCallStore = create(
             const userId = dataUserId || get().peerIdToUserIdMap.get(peerId) || peerId;
             
             console.log('peerAudioStateChanged received:', { peerId, userId, isAudioEnabled: audioEnabled, isGlobalAudioMuted });
+            console.log('Full data received:', data);
             
             set((state) => ({
               participants: state.participants.map(p => {
@@ -194,6 +195,9 @@ export const useCallStore = create(
                   const updated = { ...p, isAudioEnabled: Boolean(audioEnabled) };
                   if (isGlobalAudioMuted !== undefined) {
                     updated.isGlobalAudioMuted = isGlobalAudioMuted;
+                    console.log('Updated participant with global audio state:', updated);
+                  } else {
+                    console.log('isGlobalAudioMuted is undefined, not updating global audio state');
                   }
                   return updated;
                 }
@@ -741,11 +745,13 @@ export const useCallStore = create(
         
         // Отправляем состояние наушников на сервер
         if (voiceCallApi.socket) {
-          voiceCallApi.socket.emit('audioState', { 
+          const audioStateData = { 
             isEnabled: !newMutedState,
             isGlobalAudioMuted: newMutedState,
             userId: state.currentUserId
-          });
+          };
+          console.log('Sending audioState to server:', audioStateData);
+          voiceCallApi.socket.emit('audioState', audioStateData);
         }
         
         // Также отправляем отдельное событие для глобального звука
