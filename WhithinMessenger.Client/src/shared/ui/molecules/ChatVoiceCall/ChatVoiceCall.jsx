@@ -10,7 +10,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
-import './ChatVoiceCall.css';
+import styles from './ChatVoiceCall.module.css';
 
 const ChatVoiceCall = ({
   chatId,
@@ -148,26 +148,26 @@ const ChatVoiceCall = ({
   }
 
   return (
-    <div className="voice-call-container">
+    <div className={styles.voiceCallContainer}>
       {/* Основная область участников */}
-      <div className="voice-call-wrapper">
-        <div className="participants-container">
+      <div className={styles.voiceCallWrapper}>
+        <div className={styles.participantsContainer}>
           {displayParticipants.map((participant, index) => (
-            <div key={participant.id} className="participant-item">
-              <div className="participant-avatar-container">
-                <div className="participant-avatar">
-                  <div className="avatar-circle">
+            <div key={participant.id} className={styles.participantItem}>
+              <div className={styles.participantAvatarContainer}>
+                <div className={styles.participantAvatar}>
+                  <div className={styles.avatarCircle}>
                     {(participant.name || 'U').charAt(0).toUpperCase()}
                   </div>
                   {/* Индикаторы статуса */}
-                  <div className="status-indicators">
+                  <div className={styles.statusIndicators}>
                     {participant.isMuted && (
-                      <div className="status-indicator mute-indicator">
+                      <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
                         <MicOffIcon />
                       </div>
                     )}
                     {participant.isGlobalAudioMuted && (
-                      <div className="status-indicator audio-muted-indicator">
+                      <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
                         <VolumeOffIcon />
                       </div>
                     )}
@@ -181,49 +181,40 @@ const ChatVoiceCall = ({
 
 
       {/* Нижняя панель управления */}
-      <div className="bottom-controls">
-        <div className="control-section">
-          <div className="main-controls">
+      <div className={styles.bottomControls}>
+        <div className={styles.controlSection}>
+          <div className={styles.mainControls}>
             {/* Микрофон */}
-            <div className="control-group">
-              <button 
-                className={`control-btn microphone-btn ${isMuted ? 'muted' : 'unmuted'}`}
-                onClick={handleToggleMute}
-                title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
-              >
-                {isMuted ? <MicOffIcon /> : <MicIcon />}
-              </button>
-              <div className="control-dropdown">▼</div>
-            </div>
+            <button 
+              className={`${styles.controlBtn} ${styles.microphoneBtn} ${isMuted ? 'muted' : 'unmuted'}`}
+              onClick={handleToggleMute}
+              title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+            >
+              {isMuted ? <MicOffIcon /> : <MicIcon />}
+            </button>
 
             {/* Камера */}
-            <div className="control-group">
-              <button 
-                className="control-btn camera-btn disabled"
-                onClick={handleToggleVideo}
-                title="Камера недоступна"
-                disabled
-              >
-                <VideocamIcon />
-              </button>
-              <div className="control-dropdown">▼</div>
-            </div>
+            <button 
+              className={`${styles.controlBtn} ${styles.cameraBtn} disabled`}
+              onClick={handleToggleVideo}
+              title="Камера недоступна"
+              disabled
+            >
+              <VideocamOffIcon />
+            </button>
 
             {/* Глобальный звук */}
-            <div className="control-group">
-              <button 
-                className={`control-btn global-audio-btn ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
-                onClick={toggleGlobalAudio}
-                title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
-              >
-                {isGlobalAudioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
-              </button>
-              <div className="control-dropdown">▼</div>
-            </div>
+            <button 
+              className={`${styles.controlBtn} ${styles.globalAudioBtn} ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
+              onClick={toggleGlobalAudio}
+              title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
+            >
+              {isGlobalAudioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+            </button>
 
             {/* Завершить звонок */}
             <button 
-              className="control-btn end-call-btn"
+              className={`${styles.controlBtn} ${styles.endCallBtn}`}
               onClick={handleEndCall}
               title="Завершить звонок"
             >
@@ -235,7 +226,7 @@ const ChatVoiceCall = ({
 
       {/* Ошибки */}
       {error && (
-        <div className="error-banner">
+        <div className={styles.errorBanner}>
           <span>Ошибка: {error}</span>
         </div>
       )}

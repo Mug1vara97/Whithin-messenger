@@ -88,6 +88,7 @@ export const useCallStore = create(
           voiceCallApi.off('peerAudioStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
+          voiceCallApi.off('globalAudioStateChanged');
           
           await voiceCallApi.connect(userId, userName);
           
@@ -261,6 +262,18 @@ export const useCallStore = create(
                 });
               }
             }
+          });
+
+          // Обработчик для синхронизации статуса глобального звука
+          voiceCallApi.on('globalAudioStateChanged', (data) => {
+            const { userId, isGlobalAudioMuted } = data;
+            console.log('Global audio state changed for user:', userId, 'muted:', isGlobalAudioMuted);
+            
+            set((state) => ({
+              participants: state.participants.map(p => 
+                p.userId === userId ? { ...p, isGlobalAudioMuted } : p
+              )
+            }));
           });
           
           set({ isConnected: true, connecting: false });
@@ -719,6 +732,14 @@ export const useCallStore = create(
           voiceCallApi.socket.emit('audioState', { isEnabled: !newMutedState });
         }
         
+        // Отправляем статус глобального звука другим участникам
+        if (voiceCallApi.socket) {
+          voiceCallApi.socket.emit('globalAudioState', { 
+            userId: state.currentUserId,
+            isGlobalAudioMuted: newMutedState 
+          });
+        }
+        
         // Управляем HTML Audio элементами
         state.audioElements.forEach((audioElement, peerId) => {
           if (audioElement) {
@@ -831,6 +852,7 @@ export const useCallStore = create(
           voiceCallApi.off('peerAudioStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
+          voiceCallApi.off('globalAudioStateChanged');
           
           if (state.localStream) {
             state.localStream.getTracks().forEach(track => track.stop());

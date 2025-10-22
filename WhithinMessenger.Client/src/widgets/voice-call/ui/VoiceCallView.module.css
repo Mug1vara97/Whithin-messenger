@@ -1,0 +1,421 @@
+/* Voice Call Container */
+.voiceCallContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #18191c;
+  display: flex;
+  flex-direction: column;
+  min-height: 230px;
+  max-height: 556px;
+  height: 326px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Call Container */
+.callContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.rootIdle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.videoGridWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroller {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.listItems {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Error Banner */
+.errorBanner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f04747;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Audio Blocked Banner */
+.audioBlockedBanner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f04747;
+  color: #ffffff;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.audioBlockedText {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.audioBlockedText strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.audioBlockedText span {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.enableAudioBtn {
+  background: #ffffff;
+  color: #f04747;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.enableAudioBtn:hover {
+  background: #f0f0f0;
+  transform: translateY(-1px);
+}
+
+/* Video Call Grid Container */
+.videoCallGridContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Video Controls */
+.videoControls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: rgba(24, 25, 28, 0.9);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #40444b;
+}
+
+.gradientTop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, rgba(24, 25, 28, 0.9), transparent);
+  pointer-events: none;
+}
+
+.gradientBottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to top, rgba(24, 25, 28, 0.9), transparent);
+  pointer-events: none;
+}
+
+/* Top Controls */
+.topControls {
+  position: relative;
+  padding: 16px;
+  border-bottom: 1px solid #40444b;
+}
+
+.headerWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.headerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.headerChildren {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.channelTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarButton {
+  background: transparent;
+  border: none;
+  color: #b9bbbe;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbarButton:hover {
+  background: #40444b;
+  color: #ffffff;
+}
+
+/* Bottom Controls */
+.bottomControls {
+  position: relative;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.edgeControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.centerControls {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.buttonSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachedCaretButtonContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.attachedButtonContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.centerButton {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 20px;
+  position: relative;
+  background: #40444b;
+  color: #b9bbbe;
+}
+
+.centerButton:hover {
+  transform: scale(1.05);
+}
+
+.centerButton:active {
+  transform: scale(0.95);
+}
+
+.centerButton.muted {
+  background: #f04747;
+  color: #ffffff;
+}
+
+.centerButton.disconnect {
+  background: #f04747;
+  color: #ffffff;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+.centerButton.disconnect:hover {
+  box-shadow: 0 6px 16px rgba(240, 71, 71, 0.4);
+}
+
+.attachedButton {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.contextMenuCaret {
+  width: 24px;
+  height: 48px;
+  background: #40444b;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 18px;
+  color: #b9bbbe;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-left: 1px solid #2f3136;
+}
+
+.contextMenuCaret:hover {
+  background: #4f545c;
+  color: #ffffff;
+}
+
+.contextMenuCaret.muted {
+  background: #f04747;
+  color: #ffffff;
+}
+
+.controlButton {
+  background: #40444b;
+  color: #b9bbbe;
+}
+
+.disconnectButtonWrapper {
+  margin-left: 16px;
+}
+
+.rightTrayIcon {
+  background: transparent;
+  border: none;
+  color: #b9bbbe;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rightTrayIcon:hover {
+  background: #40444b;
+  color: #ffffff;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .wrapper {
+    gap: 12px;
+  }
+  
+  .centerButton {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .centerButton.disconnect {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .contextMenuCaret {
+    width: 20px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+
+/* Анимации */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.centerButton:hover:not(.disabled) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Фокус для доступности */
+.centerButton:focus,
+.toolbarButton:focus,
+.rightTrayIcon:focus {
+  outline: 2px solid #5865f2;
+  outline-offset: 2px;
+}
+
+/* Темная тема */
+.voiceCallContainer {
+  color-scheme: dark;
+}
+
+/* Плавные переходы */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
