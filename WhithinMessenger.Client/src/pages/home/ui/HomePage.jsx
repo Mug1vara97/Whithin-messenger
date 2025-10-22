@@ -357,7 +357,12 @@ const HomePage = () => {
       </div>
 
       {/* Минимизированный звонок - отображается когда звонок активен но минимизирован */}
-      {isInCall && isCallMinimized && <MinimizedCallWidget />}
+      {isInCall && isCallMinimized && (
+        <MinimizedCallWidget 
+          userId={user?.id} 
+          userName={user?.username} 
+        />
+      )}
 
       {showCreateServerModal && (
         <div 

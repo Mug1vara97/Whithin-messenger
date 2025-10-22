@@ -57,14 +57,21 @@ const VoiceCallView = ({
   useEffect(() => {
     if (channelId && userId && userName) {
       console.log('VoiceCallView: Connecting to voice call');
-      connect().then(() => {
+      
+      // Проверяем, нужно ли подключаться
+      if (!isConnected) {
+        connect().then(() => {
+          joinRoom(channelId);
+        }).catch((err) => {
+          console.error('Connection error:', err);
+        });
+      } else {
+        // Если уже подключены, просто присоединяемся к комнате
         joinRoom(channelId);
-      }).catch((err) => {
-        console.error('Connection error:', err);
-      });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId, userId, userName]); // Убрали connect и joinRoom из зависимостей
+  }, [channelId, userId, userName, isConnected]); // Добавили isConnected в зависимости
 
   // Убираем автоматическое отключение при размонтировании
   // disconnect() будет вызываться только при явном выходе из звонка

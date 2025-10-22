@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
 import useVoiceCallStore from '../../../shared/lib/stores/voiceCallStore';
+import voiceCallManager from '../../../shared/lib/managers/VoiceCallManager';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -21,15 +22,24 @@ const ICE_SERVERS = [
 ];
 
 export const useVoiceCall = (userId, userName) => {
+  // Инициализируем менеджер при первом использовании
+  useEffect(() => {
+    if (userId && userName && !voiceCallManager.isInitialized) {
+      voiceCallManager.initialize(userId, userName);
+    }
+  }, [userId, userName]);
+
   // Глобальное состояние звонка
   const {
     isInCall,
     isCallMinimized,
     currentRoomId,
+    isVoiceServerConnected,
     minimizeCall,
     restoreCall,
     joinCall,
-    leaveCall
+    leaveCall,
+    setVoiceServerConnected
   } = useVoiceCallStore();
 
   const [isConnected, setIsConnected] = useState(false);
@@ -68,15 +78,9 @@ export const useVoiceCall = (userId, userName) => {
   // Подключение к серверу
   const connect = useCallback(async () => {
     try {
-      // Предотвращаем множественные одновременные подключения
-      if (connectingRef.current) {
-        console.log('Connection already in progress, skipping');
-        return;
-      }
-      
-      connectingRef.current = true;
-      console.log('connect() called');
-      console.trace('connect() call stack');
+      // Используем глобальный менеджер для подключения
+      await voiceCallManager.connect();
+      setIsConnected(true);
       setError(null);
       
       // Очищаем старые обработчики перед регистрацией новых
@@ -86,8 +90,6 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('peerAudioStateChanged');
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
-      
-      await voiceCallApi.connect(userId, userName);
       
       // Регистрируем обработчики событий СРАЗУ после подключения
       voiceCallApi.on('peerJoined', (peerData) => {
@@ -307,6 +309,7 @@ export const useVoiceCall = (userId, userName) => {
       });
       
       setIsConnected(true);
+      setVoiceServerConnected(true);
       connectingRef.current = false;
       
       // Отправляем начальные состояния на сервер
@@ -320,7 +323,7 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
       connectingRef.current = false;
     }
-  }, [userId, userName, isMuted, isGlobalAudioMuted]);
+  }, [userId, userName, isMuted, isGlobalAudioMuted, isVoiceServerConnected]);
 
   // Отключение от сервера
   const disconnect = useCallback(async () => {
@@ -335,6 +338,9 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
       console.log('Event handlers cleared');
+      
+      // Используем глобальный менеджер для отключения
+      await voiceCallManager.disconnect();
       
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
@@ -394,7 +400,6 @@ export const useVoiceCall = (userId, userName) => {
       previousVolumesRef.current.clear();
       peerIdToUserIdMapRef.current.clear();
       
-      await voiceCallApi.disconnect();
       setIsConnected(false);
       setParticipants([]);
       setUserVolumes(new Map());
@@ -402,15 +407,12 @@ export const useVoiceCall = (userId, userName) => {
       setShowVolumeSliders(new Map());
       connectingRef.current = false;
       
-      // Обновляем состояние в store
-      leaveCall();
-      
       console.log('Disconnected from voice server');
     } catch (error) {
       console.error('Failed to disconnect:', error);
       connectingRef.current = false;
     }
-  }, [leaveCall]);
+  }, []);
 
   // Создание транспортов
   const createTransports = useCallback(async () => {
@@ -703,10 +705,8 @@ export const useVoiceCall = (userId, userName) => {
       console.log('joinRoom called for roomId:', roomId);
       console.trace('joinRoom call stack');
       
-      // Обновляем состояние в store
-      joinCall(roomId);
-      
-      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
+      // Используем глобальный менеджер для присоединения к комнате
+      const response = await voiceCallManager.joinRoom(roomId);
       
       if (response.routerRtpCapabilities) {
         await initializeDevice(response.routerRtpCapabilities);

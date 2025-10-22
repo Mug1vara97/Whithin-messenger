@@ -14,6 +14,9 @@ const useVoiceCallStore = create((set) => ({
   // Состояние видео
   isVideoEnabled: false,
   
+  // Глобальное состояние подключения к голосовому серверу
+  isVoiceServerConnected: false,
+  
   // Действия
   joinCall: (roomId) => {
     console.log('voiceCallStore: joinCall called with roomId:', roomId);
@@ -60,6 +63,10 @@ const useVoiceCallStore = create((set) => ({
   
   toggleVideo: () => {
     set((state) => ({ isVideoEnabled: !state.isVideoEnabled }));
+  },
+  
+  setVoiceServerConnected: (connected) => {
+    set({ isVoiceServerConnected: connected });
   },
 }));
 

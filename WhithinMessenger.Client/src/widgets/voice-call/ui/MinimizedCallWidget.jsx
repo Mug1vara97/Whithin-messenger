@@ -10,22 +10,28 @@ import {
   ExpandMore
 } from '@mui/icons-material';
 import useVoiceCallStore from '../../../shared/lib/stores/voiceCallStore';
+import { useVoiceCall } from '../../../entities/voice-call/hooks';
 import './MinimizedCallWidget.css';
 
-const MinimizedCallWidget = () => {
+const MinimizedCallWidget = ({ userId, userName }) => {
   const {
     isInCall,
     isCallMinimized,
     participants,
+    restoreCall,
+    leaveCall
+  } = useVoiceCallStore();
+
+  // Используем реальный голосовой API для управления
+  const {
     isMuted,
     isGlobalAudioMuted,
     isVideoEnabled,
-    restoreCall,
-    leaveCall,
     toggleMute,
     toggleGlobalAudio,
-    toggleVideo
-  } = useVoiceCallStore();
+    toggleVideo,
+    disconnect
+  } = useVoiceCall(userId, userName);
 
   if (!isInCall || !isCallMinimized) {
     return null;
@@ -77,7 +83,10 @@ const MinimizedCallWidget = () => {
         
         <button 
           className="control-btn leave-btn"
-          onClick={leaveCall}
+          onClick={() => {
+            disconnect();
+            leaveCall();
+          }}
           title="Покинуть звонок"
         >
           <Phone />
