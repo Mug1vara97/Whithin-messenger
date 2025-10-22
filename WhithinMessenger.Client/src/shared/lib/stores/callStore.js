@@ -199,17 +199,13 @@ export const useCallStore = create(
               participants: state.participants.map(p => {
                 if (p.userId === userId) {
                   const updated = { ...p, isAudioEnabled: Boolean(audioEnabled) };
+                  // Если сервер передает isGlobalAudioMuted, используем его
                   if (isGlobalAudioMuted !== undefined) {
                     updated.isGlobalAudioMuted = isGlobalAudioMuted;
                     console.log('Updated participant with global audio state:', updated);
                   } else {
-                    console.log('isGlobalAudioMuted is undefined, not updating global audio state');
-                    // Временное решение: если isGlobalAudioMuted не передается,
-                    // попробуем определить по isAudioEnabled
-                    if (audioEnabled === false) {
-                      console.log('Trying to infer global audio state from audioEnabled:', audioEnabled);
-                      // Не устанавливаем isGlobalAudioMuted, так как это может быть обычный mute
-                    }
+                    console.log('isGlobalAudioMuted not provided by server, keeping existing state');
+                    // Не изменяем isGlobalAudioMuted, если сервер его не передает
                   }
                   return updated;
                 }
@@ -771,12 +767,10 @@ export const useCallStore = create(
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
         
-        // Отправляем состояние наушников на сервер
+        // Отправляем состояние наушников на сервер (как в старом клиенте)
         if (voiceCallApi.socket) {
           const audioStateData = { 
-            isEnabled: !newMutedState,
-            isGlobalAudioMuted: newMutedState,
-            userId: state.currentUserId
+            isEnabled: !newMutedState
           };
           console.log('Sending audioState to server:', audioStateData);
           voiceCallApi.socket.emit('audioState', audioStateData);
