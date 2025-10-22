@@ -138,8 +138,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   background: rgba(0, 0, 0, 0.8);
   border-radius: 3px;
   flex-shrink: 0;
@@ -164,8 +164,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   background: rgba(0, 0, 0, 0.8);
   border-radius: 3px;
   flex-shrink: 0;
@@ -218,8 +218,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 35px;
+  height: 35px;
   background: rgba(0, 0, 0, 0.5);
   border: none;
   border-radius: 50%;
@@ -256,10 +256,6 @@
 
 .tile-volume-btn.speaking svg {
   color: #3ba55c;
-}
-
-.tile-volume-btn.silent {
-  background: transparent;
 }
 
 .tile-volume-btn.silent svg {
