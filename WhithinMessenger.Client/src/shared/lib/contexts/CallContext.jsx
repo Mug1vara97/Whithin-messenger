@@ -24,7 +24,8 @@ export const CallProvider = ({ children }) => {
           const isNoiseSuppressed = JSON.parse(savedNoiseSuppression);
           if (isNoiseSuppressed) {
             // Устанавливаем состояние, но не включаем шумоподавление до создания потока
-            callStore.setState({ isNoiseSuppressed: true });
+            // Устанавливаем состояние через прямое обновление store
+            useCallStore.setState({ isNoiseSuppressed: true });
           }
         } catch (error) {
           console.warn('Failed to parse noise suppression setting:', error);
@@ -38,13 +39,14 @@ export const CallProvider = ({ children }) => {
   useEffect(() => {
     const handleNoiseSuppressionChanged = (event) => {
       const { enabled } = event.detail;
-      callStore.setState({ isNoiseSuppressed: enabled });
+      useCallStore.setState({ isNoiseSuppressed: enabled });
       
       // Если шумоподавление включено и у нас есть поток, включаем его
-      if (enabled && callStore.getState().noiseSuppressionManager) {
-        callStore.getState().noiseSuppressionManager.enable(callStore.getState().noiseSuppressionMode);
-      } else if (!enabled && callStore.getState().noiseSuppressionManager) {
-        callStore.getState().noiseSuppressionManager.disable();
+      const state = useCallStore.getState();
+      if (enabled && state.noiseSuppressionManager) {
+        state.noiseSuppressionManager.enable(state.noiseSuppressionMode);
+      } else if (!enabled && state.noiseSuppressionManager) {
+        state.noiseSuppressionManager.disable();
       }
     };
 

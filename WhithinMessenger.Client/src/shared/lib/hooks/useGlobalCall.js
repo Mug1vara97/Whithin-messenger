@@ -11,6 +11,7 @@ export const useGlobalCall = () => {
 
   // Автоматическое подключение к звонку при наличии пользователя
   const startCall = async (roomId, roomName) => {
+    console.log('useGlobalCall: startCall called with user:', user);
     if (!user) {
       console.error('User not authenticated');
       return false;
@@ -19,7 +20,7 @@ export const useGlobalCall = () => {
     try {
       // Инициализируем звонок если еще не подключены
       if (!callContext.isConnected) {
-        await callContext.initializeCall(user.id, user.name);
+        await callContext.initializeCall(user.id || user.userId, user.username || user.name);
       }
 
       // Присоединяемся к комнате
