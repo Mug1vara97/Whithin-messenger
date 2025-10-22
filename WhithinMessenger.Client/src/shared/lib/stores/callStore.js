@@ -807,15 +807,7 @@ export const useCallStore = create(
           }
         });
         
-        // Обновляем своё собственное состояние в participants
-        set((state) => ({
-          isGlobalAudioMuted: newMutedState,
-          participants: state.participants.map(p => 
-            p.userId === state.currentUserId 
-              ? { ...p, isGlobalAudioMuted: newMutedState } 
-              : p
-          )
-        }));
+        set({ isGlobalAudioMuted: newMutedState });
       },
       
       // Переключение шумоподавления

@@ -112,8 +112,8 @@ const ChatVoiceCall = ({
   // Создаем участников для отображения, как в VoiceCallView.jsx
   const currentUser = createParticipant(userId, userName || 'You', null, 'online', 'host');
   currentUser.isMuted = isMuted;
-  currentUser.isAudioEnabled = isAudioEnabled; // Добавляем isAudioEnabled
-  currentUser.isGlobalAudioMuted = isGlobalAudioMuted;
+  currentUser.isAudioEnabled = isAudioEnabled;
+  currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
   currentUser.isSpeaking = false;
   
   const displayParticipants = [currentUser];
