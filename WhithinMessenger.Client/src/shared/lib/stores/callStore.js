@@ -770,7 +770,9 @@ export const useCallStore = create(
         // Отправляем состояние наушников на сервер (как в старом клиенте)
         if (voiceCallApi.socket) {
           const audioStateData = { 
-            isEnabled: !newMutedState
+            isEnabled: !newMutedState,
+            isGlobalAudioMuted: newMutedState,
+            userId: get().currentUserId
           };
           console.log('Sending audioState to server:', audioStateData);
           voiceCallApi.socket.emit('audioState', audioStateData);
