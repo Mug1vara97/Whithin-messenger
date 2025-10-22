@@ -37,6 +37,7 @@ export const useCallStore = create(
       
       // Состояние аудио
       isMuted: false,
+      isAudioEnabled: true, // Добавляем isAudioEnabled
       isGlobalAudioMuted: false,
       isNoiseSuppressed: false,
       noiseSuppressionMode: 'rnnoise',
@@ -88,6 +89,12 @@ export const useCallStore = create(
           voiceCallApi.off('peerAudioStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
+          voiceCallApi.off('globalAudioStateChanged');
+          
+          // Очищаем socket обработчики
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.off('globalAudioState');
+          }
           
           await voiceCallApi.connect(userId, userName);
           
@@ -181,14 +188,29 @@ export const useCallStore = create(
           });
 
           voiceCallApi.on('peerAudioStateChanged', (data) => {
-            const { peerId, isAudioEnabled, isEnabled } = data;
+            const { peerId, isAudioEnabled, isEnabled, isGlobalAudioMuted, userId: dataUserId } = data;
             const audioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : isEnabled;
-            const userId = get().peerIdToUserIdMap.get(peerId) || peerId;
+            const userId = dataUserId || get().peerIdToUserIdMap.get(peerId) || peerId;
+            
+            console.log('peerAudioStateChanged received:', { peerId, userId, isAudioEnabled: audioEnabled, isGlobalAudioMuted });
+            console.log('Full data received:', data);
             
             set((state) => ({
-              participants: state.participants.map(p => 
-                p.userId === userId ? { ...p, isAudioEnabled: Boolean(audioEnabled) } : p
-              )
+              participants: state.participants.map(p => {
+                if (p.userId === userId) {
+                  const updated = { ...p, isAudioEnabled: Boolean(audioEnabled) };
+                  // Если сервер передает isGlobalAudioMuted, используем его
+                  if (isGlobalAudioMuted !== undefined) {
+                    updated.isGlobalAudioMuted = isGlobalAudioMuted;
+                    console.log('Updated participant with global audio state:', updated);
+                  } else {
+                    console.log('isGlobalAudioMuted not provided by server, keeping existing state');
+                    // Не изменяем isGlobalAudioMuted, если сервер его не передает
+                  }
+                  return updated;
+                }
+                return p;
+              })
             }));
           });
 
@@ -262,6 +284,37 @@ export const useCallStore = create(
               }
             }
           });
+
+          // Обработчик для синхронизации статуса глобального звука
+          voiceCallApi.on('globalAudioStateChanged', (data) => {
+            const { userId, isGlobalAudioMuted } = data;
+            console.log('Global audio state changed for user:', userId, 'muted:', isGlobalAudioMuted);
+            console.log('Current participants before update:', get().participants);
+            
+            set((state) => {
+              const updatedParticipants = state.participants.map(p => 
+                p.userId === userId ? { ...p, isGlobalAudioMuted } : p
+              );
+              console.log('Updated participants:', updatedParticipants);
+              return { participants: updatedParticipants };
+            });
+          });
+
+          // Временное решение: слушаем событие globalAudioState от сервера
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.on('globalAudioState', (data) => {
+              console.log('Received globalAudioState from server:', data);
+              const { userId, isGlobalAudioMuted } = data;
+              
+              set((state) => {
+                const updatedParticipants = state.participants.map(p => 
+                  p.userId === userId ? { ...p, isGlobalAudioMuted } : p
+                );
+                console.log('Updated participants with globalAudioState:', updatedParticipants);
+                return { participants: updatedParticipants };
+              });
+            });
+          }
           
           set({ isConnected: true, connecting: false });
           
@@ -714,9 +767,28 @@ export const useCallStore = create(
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
         
-        // Отправляем состояние наушников на сервер
+        // Отправляем состояние наушников на сервер (как в старом клиенте)
         if (voiceCallApi.socket) {
-          voiceCallApi.socket.emit('audioState', { isEnabled: !newMutedState });
+          const audioStateData = { 
+            isEnabled: !newMutedState
+          };
+          console.log('Sending audioState to server:', audioStateData);
+          voiceCallApi.socket.emit('audioState', audioStateData);
+        }
+        
+        // Обновляем isAudioEnabled в соответствии с глобальным звуком
+        set({ isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState });
+        
+        // Также отправляем отдельное событие для глобального звука
+        if (voiceCallApi.socket) {
+          console.log('Sending globalAudioState to server:', { 
+            userId: state.currentUserId,
+            isGlobalAudioMuted: newMutedState 
+          });
+          voiceCallApi.socket.emit('globalAudioState', { 
+            userId: state.currentUserId,
+            isGlobalAudioMuted: newMutedState 
+          });
         }
         
         // Управляем HTML Audio элементами
@@ -732,8 +804,6 @@ export const useCallStore = create(
             }
           }
         });
-        
-        set({ isGlobalAudioMuted: newMutedState });
       },
       
       // Переключение шумоподавления
@@ -831,6 +901,12 @@ export const useCallStore = create(
           voiceCallApi.off('peerAudioStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
+          voiceCallApi.off('globalAudioStateChanged');
+          
+          // Очищаем socket обработчики
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.off('globalAudioState');
+          }
           
           if (state.localStream) {
             state.localStream.getTracks().forEach(track => track.stop());

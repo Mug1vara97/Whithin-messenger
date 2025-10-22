@@ -1098,16 +1098,23 @@ io.on('connection', async (socket) => {
     });
 
     // Add audio state handling
-    socket.on('audioState', ({ isEnabled }) => {
+    socket.on('audioState', ({ isEnabled, isGlobalAudioMuted, userId }) => {
         const peer = peers.get(socket.id);
         if (peer) {
             // Update peer's audio state
             peer.setAudioEnabled(isEnabled);
             
+            // Update global user voice state if provided
+            if (userId && isGlobalAudioMuted !== undefined) {
+                updateUserVoiceState(userId, { isAudioDisabled: isGlobalAudioMuted });
+            }
+            
             // Broadcast to all peers in the room except sender
             socket.to(peer.roomId).emit('peerAudioStateChanged', {
                 peerId: socket.id,
-                isEnabled
+                isEnabled,
+                isGlobalAudioMuted,
+                userId: userId || peer.userId
             });
         }
     });
