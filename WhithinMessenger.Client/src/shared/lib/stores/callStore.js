@@ -115,6 +115,7 @@ export const useCallStore = create(
                 name: peerData.name,
                 isMuted: peerData.isMuted || false,
                 isAudioEnabled: peerData.isAudioEnabled !== undefined ? peerData.isAudioEnabled : true,
+                isGlobalAudioMuted: peerData.isGlobalAudioMuted || false, // Добавляем статус глобального звука
                 isSpeaking: false
               }]
             }));

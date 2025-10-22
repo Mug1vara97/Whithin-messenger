@@ -287,6 +287,14 @@ io.on('connection', async (socket) => {
             peer.setMuted(initialMuted); // Use initial mute state
             peer.setAudioEnabled(initialAudioEnabled); // Use initial audio state
             
+            // Обновляем глобальное состояние пользователя при подключении к комнате
+            updateUserVoiceState(userId, { 
+                channelId: roomId, 
+                userName: name, 
+                isMuted: initialMuted, 
+                isAudioDisabled: !initialAudioEnabled 
+            });
+            
             console.log('Peer created with userId:', {
                 socketId: socket.id,
                 peerId: peer.id,
@@ -327,12 +335,16 @@ io.on('connection', async (socket) => {
                 }
             });
 
+            // Получаем реальное состояние пользователя из глобального хранилища
+            const userState = getUserVoiceState(peer.userId);
+            
             // Notify other peers about the new peer BEFORE sending callback
             socket.to(roomId).emit('peerJoined', {
                 peerId: peer.id,
                 name: peer.name,
                 isMuted: peer.isMuted(),
                 isAudioEnabled: Boolean(peer.isAudioEnabled()),
+                isGlobalAudioMuted: userState.isAudioDisabled || false, // Используем реальное состояние
                 userId: peer.userId // Добавляем userId для загрузки аватара
             });
 
