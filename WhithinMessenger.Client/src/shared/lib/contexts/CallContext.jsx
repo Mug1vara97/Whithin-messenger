@@ -71,6 +71,7 @@ export const CallProvider = ({ children }) => {
     currentRoomId: callStore.currentRoomId,
     currentUserId: callStore.currentUserId,
     currentUserName: callStore.currentUserName,
+    currentCall: callStore.currentCall,
     participants: callStore.participants,
     isMuted: callStore.isMuted,
     isGlobalAudioMuted: callStore.isGlobalAudioMuted,

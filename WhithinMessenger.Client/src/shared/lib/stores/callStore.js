@@ -29,6 +29,7 @@ export const useCallStore = create(
       currentRoomId: null,
       currentUserId: null,
       currentUserName: null,
+      currentCall: null,
       
       // Состояние участников
       participants: [],
@@ -327,7 +328,7 @@ export const useCallStore = create(
           // Создаем аудио поток
           await state.createAudioStream();
           
-          set({ currentRoomId: roomId, isInCall: true });
+          set({ currentRoomId: roomId, isInCall: true, currentCall: { channelId: roomId, channelName: roomId } });
         } catch (error) {
           console.error('Failed to join room:', error);
           set({ error: error.message });
@@ -883,6 +884,7 @@ export const useCallStore = create(
             isConnected: false,
             isInCall: false,
             currentRoomId: null,
+            currentCall: null,
             participants: [],
             userVolumes: new Map(),
             userMutedStates: new Map(),
