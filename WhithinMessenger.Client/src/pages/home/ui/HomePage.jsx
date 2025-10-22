@@ -38,13 +38,28 @@ const HomePage = () => {
   });
   const { createServer, servers, createConnection } = useServerContext();
 
+  // Состояние для активного звонка в чате
+  const [activeChatCall, setActiveChatCall] = useState(null);
+
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
     console.log('HomePage: handleJoinVoiceChannel called with:', callData);
     
-    // Здесь можно добавить логику для обработки звонка
-    // Например, показать уведомление или обновить состояние
+    // Устанавливаем активный звонок в чате
+    setActiveChatCall({
+      chatId: callData.chatId,
+      chatName: callData.roomName,
+      userId: callData.userId,
+      userName: callData.userName
+    });
+    
     console.log('HomePage: Voice call started in chat:', callData.roomName);
+  }, []);
+
+  // Функция для завершения звонка в чате
+  const handleEndChatCall = useCallback(() => {
+    console.log('HomePage: Ending chat call');
+    setActiveChatCall(null);
   }, []);
 
   React.useEffect(() => {
@@ -347,6 +362,8 @@ const HomePage = () => {
                       chatTypeId={selectedChat.chatTypeId}
                       userId={user?.id}
                       onJoinVoiceChannel={handleJoinVoiceChannel}
+                      activeChatCall={activeChatCall}
+                      onEndChatCall={handleEndChatCall}
                     />
                   )}
                 </div>

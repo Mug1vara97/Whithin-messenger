@@ -27,7 +27,9 @@ const ChatRoom = ({
   isGroupChat = false, 
   onJoinVoiceChannel,
   chatTypeId,
-  activePrivateCall 
+  activePrivateCall,
+  activeChatCall,
+  onEndChatCall
 }) => {
   const { user } = useAuthContext();
   const navigate = useNavigate();
@@ -258,9 +260,10 @@ const ChatRoom = ({
     setIsPrivateChat(chatTypeId === 1 || (!isGroupChat && !isServerChat));
   }, [chatTypeId, isGroupChat, isServerChat]);
 
-  const isCallActiveInThisChat = activePrivateCall && 
+  const isCallActiveInThisChat = (activePrivateCall && 
     String(activePrivateCall.chatId) === String(chatId) && 
-    isPrivateChat;
+    isPrivateChat) || (activeChatCall && 
+    String(activeChatCall.chatId) === String(chatId));
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -593,12 +596,15 @@ const ChatRoom = ({
       {isCallActiveInThisChat && (
         <ChatVoiceCall
           chatId={chatId}
-          chatName={groupName}
-          userId={userId}
-          userName={username}
+          chatName={activeChatCall?.chatName || groupName}
+          userId={activeChatCall?.userId || userId}
+          userName={activeChatCall?.userName || username}
           onClose={() => {
             // Логика закрытия звонка
             console.log('ChatVoiceCall: Call closed');
+            if (onEndChatCall) {
+              onEndChatCall();
+            }
           }}
         />
       )}
