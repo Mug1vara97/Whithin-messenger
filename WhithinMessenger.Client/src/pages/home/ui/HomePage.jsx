@@ -23,7 +23,7 @@ const HomePage = () => {
   const { user } = useAuthContext();
   
   // Состояние минимизированного звонка
-  const { isInCall, isCallMinimized, currentRoomId, joinCall } = useVoiceCallStore();
+  const { isInCall, isCallMinimized, currentRoomId } = useVoiceCallStore();
   
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -151,13 +151,7 @@ const HomePage = () => {
           console.log('HomePage: Setting selectedChat to:', channelData);
           setSelectedChat(channelData);
           
-          // Автоматически входим в голосовой канал
-          if (channelData.chatType === 4 || channelData.typeId === 4 || channelData.TypeId === 4 || channelData.typeId === "44444444-4444-4444-4444-444444444444") {
-            if (!isInCall) {
-              console.log('HomePage: Auto-joining voice channel');
-              joinCall(channelData.chatId || channelData.chat_id);
-            }
-          }
+          // Не вызываем joinCall автоматически - пусть VoiceCallView сам подключится
           
         } else {
           console.log('HomePage: Channel not found, setting selectedChat to null');
@@ -166,7 +160,7 @@ const HomePage = () => {
         }
       }
     }
-  }, [serverId, channelId, serverData, serverDataFromPanel, navigate, isInCall, joinCall]);
+  }, [serverId, channelId, serverData, serverDataFromPanel, navigate]);
 
   useEffect(() => {
     if (chatId && chats && chats.length > 0) {
