@@ -7,13 +7,12 @@ import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
-import MinimizedCallWidget from '../../../widgets/voice-call/ui/MinimizedCallWidget';
 import { useServer } from '../../../entities/server/hooks';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { SettingsModal } from '../../../shared/ui/organisms';
-import useVoiceCallStore from '../../../shared/lib/stores/voiceCallStore';
+// import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
 const HomePage = () => {
@@ -21,9 +20,6 @@ const HomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
-  
-  // Состояние минимизированного звонка
-  const { isInCall, isCallMinimized } = useVoiceCallStore();
   
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -36,6 +32,7 @@ const HomePage = () => {
   const showFriends = location.pathname === '/channels/@me/friends';
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
+  const [createdServerData, setCreatedServerData] = useState(null);
   const { chats, createPrivateChat } = useChatList(user?.id || null, (chatId) => {
     navigate(`/channels/@me/${chatId}`);
   });
@@ -126,7 +123,7 @@ const HomePage = () => {
         console.log('HomePage: Selected server is in servers list, keeping selection');
       }
     }
-  }, [selectedServer, servers, serverId, navigate, selectedChat]);
+  }, [selectedServer, servers, serverId, navigate]);
 
   useEffect(() => {
     if (serverId && channelId) {
@@ -150,7 +147,6 @@ const HomePage = () => {
           };
           console.log('HomePage: Setting selectedChat to:', channelData);
           setSelectedChat(channelData);
-          
         } else {
           console.log('HomePage: Channel not found, setting selectedChat to null');
           setSelectedChat(null);
@@ -168,7 +164,6 @@ const HomePage = () => {
       if (foundChat) {
         setSelectedChat(foundChat);
         setSelectedServer(null);
-        
       } else {
         setSelectedChat(null);
         setSelectedServer(null);
@@ -328,6 +323,10 @@ const HomePage = () => {
                       channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
                       userId={user?.id}
                       userName={user?.username}
+                      onClose={() => {
+                        setSelectedChat(null);
+                        navigate(selectedServer ? `/server/${selectedServer.serverId}` : '/channels/@me');
+                      }}
                     />
                   ) : (
                     <ChatRoom
@@ -355,14 +354,6 @@ const HomePage = () => {
           </div>
         </div>
       </div>
-
-      {/* Минимизированный звонок - отображается когда звонок активен но минимизирован */}
-      {isInCall && isCallMinimized && (
-        <MinimizedCallWidget 
-          userId={user?.id} 
-          userName={user?.username} 
-        />
-      )}
 
       {showCreateServerModal && (
         <div 

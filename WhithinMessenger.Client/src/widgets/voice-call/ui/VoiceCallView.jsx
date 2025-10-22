@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useVoiceCall } from '../../../entities/voice-call/hooks';
+import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
-import { createParticipant } from '../../../entities/video-call';
+import { createParticipant } from '../../../entities/video-call/model/types';
 import { Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
@@ -15,14 +15,14 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
-import MinimizeIcon from '@mui/icons-material/Minimize';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
   channelId,
   channelName,
   userId,
-  userName
+  userName,
+  onClose
 }) => {
   const {
     isConnected,
@@ -37,18 +37,16 @@ const VoiceCallView = ({
     userMutedStates,
     showVolumeSliders,
     isGlobalAudioMuted,
-    connect,
-    disconnect,
-    joinRoom,
+    startCall,
+    endCall,
     toggleMute,
     toggleNoiseSuppression,
     changeNoiseSuppressionMode,
-    minimizeCall,
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
     toggleGlobalAudio
-  } = useVoiceCall(userId, userName);
+  } = useGlobalCall();
 
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [videoParticipants, setVideoParticipants] = useState([]);
@@ -56,25 +54,21 @@ const VoiceCallView = ({
 
   useEffect(() => {
     if (channelId && userId && userName) {
-      console.log('VoiceCallView: Connecting to voice call');
-      
-      // Проверяем, нужно ли подключаться
-      if (!isConnected) {
-        connect().then(() => {
-          joinRoom(channelId);
-        }).catch((err) => {
-          console.error('Connection error:', err);
-        });
-      } else {
-        // Если уже подключены, просто присоединяемся к комнате
-        joinRoom(channelId);
-      }
+      console.log('VoiceCallView: Starting voice call');
+      startCall(channelId, channelName).catch((err) => {
+        console.error('Call start error:', err);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId, userId, userName, isConnected]); // Добавили isConnected в зависимости
+  }, [channelId, channelName, userId, userName]); // Убрали startCall из зависимостей
 
-  // Убираем автоматическое отключение при размонтировании
-  // disconnect() будет вызываться только при явном выходе из звонка
+  useEffect(() => {
+    return () => {
+      // НЕ завершаем звонок при размонтировании компонента
+      // Звонок должен продолжать работать в фоне
+      console.log('VoiceCallView: Component unmounted, but call continues in background');
+    };
+  }, []);
 
   // Преобразуем участников голосового звонка в формат для видеосетки
   useEffect(() => {
@@ -106,10 +100,13 @@ const VoiceCallView = ({
   }, [participants, userId, userName, isMuted, isAudioEnabled]);
 
 
-  // Обработчик для кнопки "Покинуть звонок"
-  const handleLeaveCall = () => {
-    disconnect();
-    // Не вызываем onClose, так как это внутренний выход из звонка
+  const handleClose = () => {
+    // НЕ завершаем звонок, только скрываем интерфейс
+    // Звонок продолжает работать в фоне
+    console.log('VoiceCallView: Interface closed, but call continues in background');
+    if (onClose) {
+      onClose();
+    }
   };
 
   const enableAudioPlayback = async () => {
@@ -159,6 +156,19 @@ const VoiceCallView = ({
             {/* Scroller */}
             <div className="scroller">
               <div className="list-items">
+                {/* Background Call Info */}
+                <div className="background-call-info">
+                  <div className="info-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                  </div>
+                  <div className="info-text">
+                    <strong>Звонок работает в фоне</strong>
+                    <span>При переключении страниц звонок продолжится. Управление доступно в нижней панели.</span>
+                  </div>
+                </div>
+
                 {/* Error Banner */}
                 {error && (
                   <div className="error-banner">
@@ -350,8 +360,11 @@ const VoiceCallView = ({
                         <button 
                           className="center-button disconnect"
                           type="button" 
-                          aria-label="Отключиться"
-                          onClick={handleLeaveCall}
+                          aria-label="Завершить звонок"
+                          onClick={async () => {
+                            await endCall();
+                            handleClose();
+                          }}
                         >
                           <CallEndIcon sx={{ fontSize: 24 }} />
                         </button>
@@ -360,14 +373,6 @@ const VoiceCallView = ({
                   </div>
                 </div>
                 <div className="edge-controls right">
-                  <button 
-                    className="right-tray-icon" 
-                    type="button" 
-                    aria-label="Минимизировать звонок"
-                    onClick={minimizeCall}
-                  >
-                    <MinimizeIcon sx={{ fontSize: 24 }} />
-                  </button>
                   <button className="right-tray-icon" type="button" aria-label="В отдельном окне">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M15 2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V4.41l-4.3 4.3a1 1 0 1 1-1.4-1.42L19.58 3H16a1 1 0 0 1-1-1Z"/>

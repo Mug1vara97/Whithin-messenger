@@ -1,3 +1,38 @@
+  /* Background Call Info */
+.background-call-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%);
+  color: white;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3);
+}
+
+.background-call-info .info-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.background-call-info .info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.background-call-info strong {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.background-call-info span {
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
   /* Main Container */
 .voice-call-container {
     width: 100%;

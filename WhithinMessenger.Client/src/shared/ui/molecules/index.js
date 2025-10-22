@@ -13,3 +13,8 @@ export * from './ChannelItem';
 export * from './UserPanel';
 export * from './FriendItem';
 export * from './FriendRequestItem';
+
+// Default exports
+export { default as ActiveCallBar } from './ActiveCallBar';
+export { default as CallButton } from './CallButton';
+export { default as VoiceChannelSelector } from './VoiceChannelSelector';

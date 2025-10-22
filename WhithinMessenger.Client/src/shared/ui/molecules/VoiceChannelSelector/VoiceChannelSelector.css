@@ -1,0 +1,270 @@
+.voice-channel-selector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  background: linear-gradient(135deg, #1e1f22 0%, #2c2f33 100%);
+  border-radius: 12px;
+  margin: 20px;
+}
+
+.voice-channel-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.voice-channel-header h3 {
+  color: #f2f3f5;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.voice-channel-header p {
+  color: #8e9297;
+  font-size: 16px;
+  margin: 0;
+}
+
+.system-options {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
+}
+
+.system-option {
+  background: rgba(47, 49, 54, 0.6);
+  border: 1px solid #40444b;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.system-option:hover {
+  border-color: #5865f2;
+  background: rgba(88, 101, 242, 0.1);
+}
+
+.system-option.new-system {
+  border-color: #00d166;
+  background: rgba(0, 209, 102, 0.05);
+}
+
+.system-option.old-system {
+  border-color: #8e9297;
+  background: rgba(142, 146, 151, 0.05);
+}
+
+.option-header h4 {
+  color: #f2f3f5;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.option-header p {
+  color: #8e9297;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+}
+
+.option-features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+}
+
+.option-features li {
+  color: #b5bac1;
+  font-size: 14px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classic-call-button {
+  width: 100%;
+  padding: 12px 24px;
+  background: #40444b;
+  color: #f2f3f5;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.classic-call-button:hover {
+  background: #4f545c;
+  transform: translateY(-1px);
+}
+
+.classic-call-button:active {
+  transform: translateY(0);
+}
+
+.system-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 8px 0;
+}
+
+.system-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #40444b;
+}
+
+.system-divider span {
+  background: #1e1f22;
+  color: #8e9297;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.system-toggle {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #40444b;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: #b5bac1;
+  font-size: 14px;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #5865f2;
+  cursor: pointer;
+}
+
+.voice-channel-active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  background: linear-gradient(135deg, #1e1f22 0%, #2c2f33 100%);
+  border-radius: 12px;
+  margin: 20px;
+}
+
+.active-call-info {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.active-call-info h3 {
+  color: #00d166;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.active-call-info p {
+  color: #b5bac1;
+  font-size: 16px;
+  margin: 0 0 8px 0;
+}
+
+.participants-count {
+  color: #5865f2 !important;
+  font-weight: 500;
+}
+
+.voice-channel-old-system {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.old-system-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #2c2f33;
+  border-bottom: 1px solid #40444b;
+}
+
+.back-button {
+  background: #40444b;
+  color: #f2f3f5;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background: #4f545c;
+}
+
+.old-system-header h3 {
+  color: #f2f3f5;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .voice-channel-selector,
+  .voice-channel-active {
+    margin: 10px;
+    padding: 16px;
+  }
+  
+  .voice-channel-header h3 {
+    font-size: 24px;
+  }
+  
+  .system-option {
+    padding: 16px;
+  }
+  
+  .option-header h4 {
+    font-size: 18px;
+  }
+  
+  .option-features li {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .voice-channel-selector,
+  .voice-channel-active {
+    margin: 5px;
+    padding: 12px;
+  }
+  
+  .voice-channel-header h3 {
+    font-size: 20px;
+  }
+  
+  .system-option {
+    padding: 12px;
+  }
+  
+  .option-header h4 {
+    font-size: 16px;
+  }
+}

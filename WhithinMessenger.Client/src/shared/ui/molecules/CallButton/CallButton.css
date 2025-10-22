@@ -1,0 +1,204 @@
+.call-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.call-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.call-button.loading {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.call-button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.call-button-text {
+  font-size: inherit;
+}
+
+/* Размеры */
+.call-button.small {
+  padding: 6px 12px;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.call-button.small .call-button-icon {
+  font-size: 16px;
+}
+
+.call-button.medium {
+  padding: 8px 16px;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.call-button.large {
+  padding: 12px 20px;
+  font-size: 16px;
+  gap: 10px;
+}
+
+.call-button.large .call-button-icon {
+  font-size: 20px;
+}
+
+/* Варианты */
+.call-button.primary {
+  background: #5865f2;
+  color: white;
+}
+
+.call-button.primary:hover:not(:disabled) {
+  background: #4752c4;
+  transform: translateY(-1px);
+}
+
+.call-button.primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.call-button.secondary {
+  background: #40444b;
+  color: #f2f3f5;
+}
+
+.call-button.secondary:hover:not(:disabled) {
+  background: #4f545c;
+  transform: translateY(-1px);
+}
+
+.call-button.secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.call-button.success {
+  background: #00d166;
+  color: white;
+}
+
+.call-button.success:hover:not(:disabled) {
+  background: #00b359;
+  transform: translateY(-1px);
+}
+
+.call-button.success:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.call-button.danger {
+  background: #f04747;
+  color: white;
+}
+
+.call-button.danger:hover:not(:disabled) {
+  background: #d63d3d;
+  transform: translateY(-1px);
+}
+
+.call-button.danger:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Активное состояние */
+.call-button.active {
+  background: #f04747;
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+.call-button.active:hover:not(:disabled) {
+  background: #d63d3d;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(240, 71, 71, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(240, 71, 71, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 71, 71, 0);
+  }
+}
+
+/* Состояние загрузки */
+.call-button.loading .call-button-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .call-button {
+    padding: 6px 12px;
+    font-size: 13px;
+    gap: 6px;
+  }
+  
+  .call-button .call-button-icon {
+    font-size: 16px;
+  }
+  
+  .call-button.large {
+    padding: 10px 16px;
+    font-size: 15px;
+    gap: 8px;
+  }
+  
+  .call-button.large .call-button-icon {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .call-button {
+    padding: 5px 10px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  
+  .call-button .call-button-icon {
+    font-size: 14px;
+  }
+  
+  .call-button.large {
+    padding: 8px 14px;
+    font-size: 14px;
+    gap: 6px;
+  }
+  
+  .call-button.large .call-button-icon {
+    font-size: 16px;
+  }
+}
