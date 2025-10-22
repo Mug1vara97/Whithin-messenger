@@ -153,7 +153,7 @@ const VideoCallGrid = ({
                   <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
                 )}
               </div>
-              {!isAudioEnabled && (
+              {participant.isGlobalAudioMuted && (
                 <div className="headset-status">
                   <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
                 </div>
