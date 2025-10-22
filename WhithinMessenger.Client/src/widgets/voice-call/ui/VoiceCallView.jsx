@@ -27,6 +27,7 @@ const VoiceCallView = ({
   const {
     isConnected,
     isMuted,
+    isAudioEnabled,
     participants,
     audioBlocked,
     error,
@@ -75,6 +76,7 @@ const VoiceCallView = ({
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
+    currentUser.isAudioEnabled = isAudioEnabled;
     currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
     
     const videoParticipantsList = [currentUser];
@@ -89,13 +91,14 @@ const VoiceCallView = ({
         'participant'
       );
       videoParticipant.isMuted = participant.isMuted || false;
+      videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
       videoParticipant.isSpeaking = participant.isSpeaking || false;
       videoParticipantsList.push(videoParticipant);
     });
     
     console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
-  }, [participants, userId, userName, isMuted]);
+  }, [participants, userId, userName, isMuted, isAudioEnabled]);
 
 
   const handleClose = () => {

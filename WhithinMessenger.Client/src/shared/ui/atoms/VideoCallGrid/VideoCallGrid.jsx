@@ -88,6 +88,11 @@ const VideoCallGrid = ({
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
     
+    // Debug logging
+    if (participant.name) {
+      console.log(`Participant ${participant.name}: isMuted=${isMuted}, isAudioEnabled=${isAudioEnabled}`);
+    }
+    
     const handleVolumeClick = (e) => {
       e.stopPropagation();
       if (onToggleUserMute) {
