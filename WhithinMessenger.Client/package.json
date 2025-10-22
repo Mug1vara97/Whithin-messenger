@@ -35,7 +35,8 @@
     "socket.io-client": "^4.8.1",
     "styled-components": "^6.1.19",
     "tone": "^15.1.22",
-    "wavesurfer.js": "^7.10.1"
+    "wavesurfer.js": "^7.10.1",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
