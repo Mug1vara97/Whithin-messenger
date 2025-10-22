@@ -146,16 +146,16 @@ const VideoCallGrid = ({
             <div className="bottom-info">
               <div className={`mic-status ${isMuted ? 'muted' : isSpeaking ? 'speaking' : 'silent'}`}>
                 {isMuted ? (
-                  <MicOffIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#ed4245' }} />
+                  <MicOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
                 ) : isSpeaking ? (
-                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#3ba55c' }} />
+                  <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#3ba55c' }} />
                 ) : (
-                  <MicIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#B5BAC1' }} />
+                  <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
                 )}
               </div>
               {!isAudioEnabled && (
                 <div className="headset-status">
-                  <HeadsetOffIcon sx={{ fontSize: isSmall ? 12 : 14, color: '#ed4245' }} />
+                  <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
                 </div>
               )}
               <span className="participant-name">{participant.name}</span>
