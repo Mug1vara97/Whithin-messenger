@@ -52,6 +52,7 @@ export const useVoiceCall = (userId, userName) => {
   const gainNodesRef = useRef(new Map()); // GainNode для каждого пользователя
   const audioElementsRef = useRef(new Map()); // Audio elements для каждого пользователя
   const previousVolumesRef = useRef(new Map()); // Предыдущая громкость перед мутом
+  const peerIdToUserIdMapRef = useRef(new Map()); // Маппинг producerSocketId -> userId
 
   // Подключение к серверу
   const connect = useCallback(async () => {
@@ -78,6 +79,11 @@ export const useVoiceCall = (userId, userName) => {
       // Регистрируем обработчики событий СРАЗУ после подключения
       voiceCallApi.on('peerJoined', (peerData) => {
         console.log('Peer joined:', peerData);
+        // Сохраняем маппинг socketId -> userId (peerData.id - это socket ID)
+        if (peerData.id && peerData.userId) {
+          peerIdToUserIdMapRef.current.set(peerData.id, peerData.userId);
+          console.log('Updated peer mapping:', peerData.id, '->', peerData.userId);
+        }
         // Проверяем, нет ли уже такого участника
         setParticipants(prev => {
           const exists = prev.some(p => p.userId === peerData.userId);
@@ -87,6 +93,7 @@ export const useVoiceCall = (userId, userName) => {
           }
           return [...prev, {
           userId: peerData.userId,
+          peerId: peerData.id, // Socket ID
           name: peerData.name,
           isMuted: peerData.isMuted,
           isSpeaking: false
@@ -96,6 +103,10 @@ export const useVoiceCall = (userId, userName) => {
 
       voiceCallApi.on('peerLeft', (peerData) => {
         console.log('Peer left:', peerData);
+        // Удаляем маппинг
+        if (peerData.id) {
+          peerIdToUserIdMapRef.current.delete(peerData.id);
+        }
         setParticipants(prev => prev.filter(p => p.userId !== peerData.userId));
       });
 
@@ -192,6 +203,7 @@ export const useVoiceCall = (userId, userName) => {
       });
       audioElementsRef.current.clear();
       previousVolumesRef.current.clear();
+      peerIdToUserIdMapRef.current.clear();
       
       await voiceCallApi.disconnect();
       setIsConnected(false);
@@ -293,7 +305,10 @@ export const useVoiceCall = (userId, userName) => {
 
       consumersRef.current.set(consumerData.id, consumer);
       
-      const peerId = producerData.producerSocketId;
+      // Используем userId вместо producerSocketId для ключей
+      const socketId = producerData.producerSocketId;
+      const userId = peerIdToUserIdMapRef.current.get(socketId) || socketId;
+      console.log('handleNewProducer: socketId=', socketId, 'userId=', userId);
       
       // Инициализируем AudioContext если еще не создан
       if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -325,8 +340,8 @@ export const useVoiceCall = (userId, userName) => {
       
       // GainNode больше не используется для воспроизведения, только для отслеживания состояния
       // Устанавливаем начальную громкость HTML Audio элемента
-      const initialVolume = userVolumes.get(peerId) || 100;
-      const isMuted = userMutedStates.get(peerId) || false;
+      const initialVolume = userVolumes.get(userId) || 100;
+      const isMuted = userMutedStates.get(userId) || false;
       // Если глобально выключен звук, устанавливаем 0, иначе используем индивидуальную громкость
       const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
       audioElement.volume = audioVolume;
@@ -336,21 +351,21 @@ export const useVoiceCall = (userId, userName) => {
       // gainNode.connect(audioContextRef.current.destination); // ОТКЛЮЧЕНО - используем только HTML Audio
       
       // Сохраняем ссылки
-      gainNodesRef.current.set(peerId, gainNode);
-      audioElementsRef.current.set(peerId, audioElement);
+      gainNodesRef.current.set(userId, gainNode);
+      audioElementsRef.current.set(userId, audioElement);
       
       // Инициализируем громкость в состоянии если еще не установлена
-      if (!userVolumes.has(peerId)) {
+      if (!userVolumes.has(userId)) {
         setUserVolumes(prev => {
           const newMap = new Map(prev);
-          newMap.set(peerId, 100);
+          newMap.set(userId, 100);
           return newMap;
         });
       }
 
       try {
         await audioElement.play();
-        console.log('Audio playback started for peer:', peerId);
+        console.log('Audio playback started for peer:', userId);
         setAudioBlocked(false);
       } catch (error) {
         console.log('Auto-play blocked, user interaction required:', error);
@@ -501,8 +516,16 @@ export const useVoiceCall = (userId, userName) => {
       }
       
       if (response.existingPeers) {
+        // Сохраняем маппинг для существующих пиров
+        response.existingPeers.forEach(peer => {
+          if (peer.id && peer.userId) {
+            peerIdToUserIdMapRef.current.set(peer.id, peer.userId);
+          }
+        });
+        
         setParticipants(response.existingPeers.map(peer => ({
           userId: peer.userId,
+          peerId: peer.id,
           name: peer.name,
           isMuted: peer.isMuted,
           isSpeaking: false
@@ -564,8 +587,13 @@ export const useVoiceCall = (userId, userName) => {
 
   // Переключение мута для отдельного пользователя
   const toggleUserMute = useCallback((peerId) => {
+    console.log('toggleUserMute called for:', peerId);
+    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
     const audioElement = audioElementsRef.current.get(peerId);
-    if (!audioElement) return;
+    if (!audioElement) {
+      console.error('Audio element not found for peer:', peerId);
+      return;
+    }
 
     const isCurrentlyMuted = userMutedStates.get(peerId) || false;
     const newIsMuted = !isCurrentlyMuted;
@@ -605,8 +633,13 @@ export const useVoiceCall = (userId, userName) => {
 
   // Изменение громкости отдельного пользователя
   const changeUserVolume = useCallback((peerId, newVolume) => {
+    console.log('changeUserVolume called for:', peerId, 'newVolume:', newVolume);
+    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
     const audioElement = audioElementsRef.current.get(peerId);
-    if (!audioElement) return;
+    if (!audioElement) {
+      console.error('Audio element not found for peer:', peerId);
+      return;
+    }
 
     // Если глобально замучено, применяем только состояние, но не звук
     const audioVolume = isGlobalAudioMuted ? 0 : (newVolume / 100.0);
