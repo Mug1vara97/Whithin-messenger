@@ -22,7 +22,6 @@ const ICE_SERVERS = [
 export const useVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isSpeaking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [volume, setVolume] = useState(1.0);
@@ -287,15 +286,15 @@ export const useVoiceCall = (userId, userName) => {
       // Отправляем начальные состояния на сервер
       if (voiceCallApi.socket) {
         voiceCallApi.socket.emit('muteState', { isMuted: isMuted });
-        voiceCallApi.socket.emit('audioState', { isEnabled: isAudioEnabled });
-        console.log('Initial states sent to server - muted:', isMuted, 'audio:', isAudioEnabled);
+        voiceCallApi.socket.emit('audioState', { isEnabled: !isGlobalAudioMuted });
+        console.log('Initial states sent to server - muted:', isMuted, 'audio (headphones on):', !isGlobalAudioMuted);
       }
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
       setError(error.message);
       connectingRef.current = false;
     }
-  }, [userId, userName, isMuted, isAudioEnabled]);
+  }, [userId, userName, isMuted, isGlobalAudioMuted]);
 
   // Отключение от сервера
   const disconnect = useCallback(async () => {
@@ -748,17 +747,11 @@ export const useVoiceCall = (userId, userName) => {
     }
   }, [isMuted]);
 
-  // Переключение аудио (наушников)
+  // Переключение аудио (DEPRECATED - используйте toggleGlobalAudio)
   const toggleAudio = useCallback(() => {
-    const newAudioState = !isAudioEnabled;
-    setIsAudioEnabled(newAudioState);
-    
-    // Отправляем состояние наушников на сервер
-    if (voiceCallApi.socket) {
-      voiceCallApi.socket.emit('audioState', { isEnabled: newAudioState });
-      console.log('Audio state sent to server:', newAudioState);
-    }
-  }, [isAudioEnabled]);
+    console.warn('toggleAudio is deprecated, use toggleGlobalAudio instead');
+    toggleGlobalAudio();
+  }, [toggleGlobalAudio]);
 
   // Изменение громкости
   const handleVolumeChange = useCallback((newVolume) => {
@@ -853,12 +846,19 @@ export const useVoiceCall = (userId, userName) => {
     });
   }, []);
 
-  // Глобальное отключение/включение звука всех участников
+  // Глобальное отключение/включение звука всех участников (наушники)
   const toggleGlobalAudio = useCallback(() => {
     const newMutedState = !isGlobalAudioMuted;
     
     console.log(`toggleGlobalAudio called, new state: ${newMutedState}`);
     console.log(`Audio elements count: ${audioElementsRef.current.size}`);
+    
+    // Отправляем состояние наушников на сервер
+    // isGlobalAudioMuted=true означает isAudioEnabled=false
+    if (voiceCallApi.socket) {
+      voiceCallApi.socket.emit('audioState', { isEnabled: !newMutedState });
+      console.log('Audio state (headphones) sent to server, isEnabled:', !newMutedState);
+    }
     
     // Управляем только HTML Audio элементами (GainNode больше не используется для воспроизведения)
     audioElementsRef.current.forEach((audioElement, peerId) => {
@@ -1003,7 +1003,7 @@ export const useVoiceCall = (userId, userName) => {
     // Состояние
     isConnected,
     isMuted,
-    isAudioEnabled,
+    isAudioEnabled: !isGlobalAudioMuted, // Для обратной совместимости: isAudioEnabled означает "наушники включены"
     isSpeaking,
     participants,
     volume,
