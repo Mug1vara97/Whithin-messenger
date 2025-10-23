@@ -83,6 +83,8 @@ export const CallProvider = ({ children }) => {
     error: callStore.error,
     audioBlocked: callStore.audioBlocked,
     connecting: callStore.connecting,
+    isScreenSharing: callStore.isScreenSharing,
+    screenShareStream: callStore.screenShareStream,
     
     // Методы
     initializeCall: callStore.initializeCall,
@@ -98,6 +100,9 @@ export const CallProvider = ({ children }) => {
     setError: callStore.setError,
     clearError: callStore.clearError,
     setAudioBlocked: callStore.setAudioBlocked,
+    startScreenShare: callStore.startScreenShare,
+    stopScreenShare: callStore.stopScreenShare,
+    toggleScreenShare: callStore.toggleScreenShare,
     
     // Прямой доступ к store для расширенного использования
     store: callStore

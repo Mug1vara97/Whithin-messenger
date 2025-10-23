@@ -307,7 +307,10 @@ const VoiceCallView = ({
                           className={`center-button ${isScreenSharing ? 'active' : ''}`}
                           type="button" 
                           aria-label="Продемонстрируйте свой экран"
-                          onClick={toggleScreenShare}
+                          onClick={() => {
+                            console.log('Screen share button clicked, isScreenSharing:', isScreenSharing);
+                            toggleScreenShare();
+                          }}
                         >
                           <ScreenShareIcon sx={{ fontSize: 24 }} />
                         </button>

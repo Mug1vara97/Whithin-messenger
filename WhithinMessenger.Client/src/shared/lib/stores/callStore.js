@@ -49,6 +49,10 @@ export const useCallStore = create(
       error: null,
       audioBlocked: false,
       
+      // Состояние демонстрации экрана
+      isScreenSharing: false,
+      screenShareStream: null,
+      
       // WebRTC соединения (хранятся глобально)
       device: null,
       sendTransport: null,
@@ -998,6 +1002,157 @@ export const useCallStore = create(
         } catch (error) {
           console.error('Failed to end call:', error);
           set({ error: error.message });
+        }
+      },
+      
+      // Демонстрация экрана
+      startScreenShare: async () => {
+        try {
+          const state = get();
+          if (!state.sendTransport) {
+            throw new Error('Transport not ready');
+          }
+
+          // Останавливаем существующую демонстрацию экрана, если есть
+          if (state.isScreenSharing) {
+            await get().stopScreenShare();
+          }
+
+          console.log('Requesting screen sharing access...');
+          const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              cursor: 'always',
+              frameRate: { ideal: 60, max: 60 },
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              aspectRatio: 16/9,
+              displaySurface: 'monitor',
+              resizeMode: 'crop-and-scale'
+            },
+            audio: false
+          });
+
+          console.log('Screen sharing access granted');
+
+          // Обработка остановки потока пользователем
+          stream.getVideoTracks()[0].onended = () => {
+            console.log('Screen sharing stopped by user');
+            get().stopScreenShare();
+          };
+
+          // Устанавливаем поток
+          set({ screenShareStream: stream });
+
+          const videoTrack = stream.getVideoTracks()[0];
+          if (!videoTrack) {
+            throw new Error('No video track available');
+          }
+
+          console.log('Creating screen sharing producer...');
+          const producer = await state.sendTransport.produce({
+            track: videoTrack,
+            encodings: [
+              {
+                scaleResolutionDownBy: 1,
+                maxBitrate: 5000000, // 5 Mbps для Full HD
+                maxFramerate: 60
+              }
+            ],
+            codecOptions: {
+              videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
+              videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
+            },
+            appData: {
+              mediaType: 'screen',
+              userId: state.currentUserId,
+              userName: state.currentUserName,
+              width: videoTrack.getSettings().width,
+              height: videoTrack.getSettings().height,
+              frameRate: videoTrack.getSettings().frameRate
+            }
+          });
+
+          console.log('Screen sharing producer created:', producer.id);
+
+          // Сохраняем producer
+          const newProducers = new Map(state.producers);
+          newProducers.set('screen', producer);
+          set({ 
+            producers: newProducers,
+            isScreenSharing: true 
+          });
+
+          // Обработка событий producer
+          producer.on('transportclose', () => {
+            console.log('Screen sharing transport closed');
+            get().stopScreenShare();
+          });
+
+          producer.on('trackended', () => {
+            console.log('Screen sharing track ended');
+            get().stopScreenShare();
+          });
+
+        } catch (error) {
+          console.error('Error starting screen share:', error);
+          // Очищаем при ошибке
+          const currentState = get();
+          if (currentState.screenShareStream) {
+            currentState.screenShareStream.getTracks().forEach(track => track.stop());
+          }
+          set({ 
+            screenShareStream: null,
+            isScreenSharing: false,
+            error: 'Failed to start screen sharing: ' + error.message 
+          });
+        }
+      },
+
+      stopScreenShare: async () => {
+        console.log('Stopping screen sharing...');
+
+        try {
+          const state = get();
+          
+          // Уведомляем сервер об остановке демонстрации экрана
+          const screenProducer = state.producers.get('screen');
+          if (screenProducer && voiceCallApi.socket) {
+            await voiceCallApi.stopScreenSharing(screenProducer.id);
+          }
+
+          // Останавливаем поток
+          if (state.screenShareStream) {
+            state.screenShareStream.getTracks().forEach(track => track.stop());
+          }
+
+          // Удаляем producer
+          const newProducers = new Map(state.producers);
+          newProducers.delete('screen');
+
+          // Очищаем состояние
+          set({
+            screenShareStream: null,
+            isScreenSharing: false,
+            producers: newProducers
+          });
+
+          console.log('Screen sharing stopped successfully');
+        } catch (error) {
+          console.error('Error stopping screen share:', error);
+          set({ error: 'Failed to stop screen sharing: ' + error.message });
+        }
+      },
+
+      toggleScreenShare: async () => {
+        console.log('toggleScreenShare called');
+        const state = get();
+        console.log('Current state:', { isScreenSharing: state.isScreenSharing, sendTransport: !!state.sendTransport });
+        if (state.isScreenSharing) {
+          console.log('Stopping screen share...');
+          await get().stopScreenShare();
+        } else {
+          console.log('Starting screen share...');
+          await get().startScreenShare();
         }
       }
     }),
