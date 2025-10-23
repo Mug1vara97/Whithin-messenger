@@ -1013,10 +1013,13 @@ export const useCallStore = create(
           // Запрашиваем доступ к экрану
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
-              mediaSource: 'screen',
+              cursor: 'always',
+              frameRate: { ideal: 60, max: 60 },
               width: { ideal: 1920, max: 1920 },
               height: { ideal: 1080, max: 1080 },
-              frameRate: { ideal: 30, max: 60 }
+              aspectRatio: 16/9,
+              displaySurface: 'monitor',
+              resizeMode: 'crop-and-scale'
             },
             audio: false // Демонстрация экрана без звука
           });
@@ -1045,7 +1048,7 @@ export const useCallStore = create(
               userId: state.currentUserId,
               userName: state.currentUserName
             }
-          });
+          }, videoTrack);
 
           if (!producer) {
             throw new Error('Failed to create screen share producer');

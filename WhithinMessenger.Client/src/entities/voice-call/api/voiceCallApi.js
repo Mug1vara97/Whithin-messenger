@@ -203,13 +203,15 @@ class VoiceCallApi {
   }
 
   // Метод для создания producer с треком
-  async produceWithTrack(options) {
+  async produceWithTrack(options, track) {
     return new Promise((resolve, reject) => {
-      // В mediasoup RTP параметры создаются автоматически при передаче трека
-      // Отправляем только базовые параметры, сервер создаст RTP параметры
+      // Создаем RTP параметры для трека
+      const rtpParameters = this.device.createRtpParameters(track);
+      
       this.socket.emit('produce', {
         transportId: options.transportId,
         kind: options.kind,
+        rtpParameters: rtpParameters,
         appData: options.appData
       }, (response) => {
         if (response && response.error) {
