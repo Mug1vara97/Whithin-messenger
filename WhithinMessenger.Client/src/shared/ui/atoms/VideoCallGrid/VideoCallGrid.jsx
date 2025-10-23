@@ -51,13 +51,13 @@ const VideoCallGrid = ({
   const createScreenShareParticipants = useCallback(() => {
     const screenShareParticipants = [];
     
-    console.log('createScreenShareParticipants:', { 
-      isScreenSharing, 
-      hasScreenShareStream: !!screenShareStream, 
-      screenShareParticipant,
-      remoteScreenSharesSize: remoteScreenShares.size,
-      remoteScreenShares: Array.from(remoteScreenShares.values()).map(s => ({ producerId: s.producerId, userName: s.userName }))
-    });
+    // console.log('createScreenShareParticipants:', { 
+    //   isScreenSharing, 
+    //   hasScreenShareStream: !!screenShareStream, 
+    //   screenShareParticipant,
+    //   remoteScreenSharesSize: remoteScreenShares.size,
+    //   remoteScreenShares: Array.from(remoteScreenShares.values()).map(s => ({ producerId: s.producerId, userName: s.userName }))
+    // });
     
     // Локальная демонстрация экрана убрана - показывается только в сетке
     
@@ -73,21 +73,21 @@ const VideoCallGrid = ({
       });
     });
     
-    console.log('Screen share participants created:', screenShareParticipants.length, screenShareParticipants.map(p => ({ id: p.id, name: p.name })));
+    // console.log('Screen share participants created:', screenShareParticipants.length, screenShareParticipants.map(p => ({ id: p.id, name: p.name })));
     return screenShareParticipants;
-  }, [remoteScreenShares, isScreenSharing, screenShareStream, screenShareParticipant]);
+  }, [remoteScreenShares]);
 
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
-    const screenShareParticipants = createScreenShareParticipants();
-    const extended = [...participants, ...screenShareParticipants];
+    // Демонстрации экрана убраны из extendedParticipants - показываются только в нижней панели
+    const extended = [...participants];
     // console.log('Extended participants:', { 
     //   participantsCount: participants.length, 
-    //   screenShareCount: screenShareParticipants.length,
+    //   screenShareCount: 0,
     //   totalCount: extended.length 
     // });
     return extended;
-  }, [participants, createScreenShareParticipants]);
+  }, [participants]);
 
   const {
     focusedParticipantId,
