@@ -180,7 +180,12 @@ const VideoCallGrid = ({
                 ref={(video) => {
                   if (video && participant.stream) {
                     video.srcObject = participant.stream;
-                    video.play();
+                    video.play().catch(error => {
+                      // Игнорируем ошибки воспроизведения (AbortError)
+                      if (error.name !== 'AbortError') {
+                        console.warn('Video play error:', error);
+                      }
+                    });
                   }
                 }}
                 className="tile-video"
@@ -390,7 +395,11 @@ const VideoCallGrid = ({
                   ref={(video) => {
                     if (video && screenShareStream) {
                       video.srcObject = screenShareStream;
-                      video.play();
+                      video.play().catch(error => {
+                        if (error.name !== 'AbortError') {
+                          console.warn('Video play error:', error);
+                        }
+                      });
                     }
                   }}
                   className="tile-video"
@@ -422,7 +431,11 @@ const VideoCallGrid = ({
                   ref={(video) => {
                     if (video && screenShare.stream) {
                       video.srcObject = screenShare.stream;
-                      video.play();
+                      video.play().catch(error => {
+                        if (error.name !== 'AbortError') {
+                          console.warn('Video play error:', error);
+                        }
+                      });
                     }
                   }}
                   className="tile-video"

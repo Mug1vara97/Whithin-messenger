@@ -513,10 +513,16 @@ export const useCallStore = create(
           
           // Проверяем, является ли это демонстрацией экрана
           const isScreenShare = producerData.appData?.mediaType === 'screen';
-          console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind);
+          console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind, 'userId=', userId, 'currentUserId=', state.currentUserId);
           
           // Для демонстрации экрана не создаем AudioContext, но сохраняем информацию
           if (isScreenShare) {
+            // Проверяем, что это не наша собственная демонстрация экрана
+            if (userId === state.currentUserId) {
+              console.log('Skipping own screen share producer in handleNewProducer');
+              return;
+            }
+            
             console.log('Screen share producer detected in callStore, storing remote screen share info');
             
             // Создаем MediaStream из consumer track для отображения
