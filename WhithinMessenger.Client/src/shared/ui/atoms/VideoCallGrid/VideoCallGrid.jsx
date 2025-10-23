@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import { useVideoCall } from '../../../../entities/video-call';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
@@ -22,8 +22,7 @@ const VideoCallGrid = ({
   screenShareStream = null,
   isScreenSharing = false,
   screenShareParticipant = null,
-  remoteScreenShares = new Map(),
-  onStopScreenShare = null
+  remoteScreenShares = new Map()
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -49,7 +48,7 @@ const VideoCallGrid = ({
   };
 
   // Создаем участников демонстрации экрана для фокуса
-  const createScreenShareParticipants = () => {
+  const createScreenShareParticipants = useCallback(() => {
     const screenShareParticipants = [];
     
     // console.log('createScreenShareParticipants:', { 
@@ -84,7 +83,7 @@ const VideoCallGrid = ({
     
     // console.log('Screen share participants created:', screenShareParticipants.length);
     return screenShareParticipants;
-  };
+  }, [isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
@@ -96,7 +95,7 @@ const VideoCallGrid = ({
     //   totalCount: extended.length 
     // });
     return extended;
-  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
+  }, [participants, createScreenShareParticipants]);
 
   const {
     focusedParticipantId,
@@ -137,7 +136,6 @@ const VideoCallGrid = ({
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
-    const isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
     const isSpeaking = participant.isSpeaking || false;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
@@ -374,78 +372,8 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0) + remoteScreenShares.size}>
-          {/* Локальная демонстрация экрана */}
-          {isScreenSharing && screenShareStream && (
-            <div className="video-tile screen-share-tile">
-              <div className="tile-border"></div>
-              <div className="tile-content">
-                <video
-                  ref={(video) => {
-                    if (video && screenShareStream) {
-                      video.srcObject = screenShareStream;
-                      video.play().catch(error => {
-                        if (error.name !== 'AbortError') {
-                          console.warn('Video play error:', error);
-                        }
-                      });
-                    }
-                  }}
-                  className="tile-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                <div className="tile-overlay">
-                  <div className="tile-info">
-                    <div className="tile-name">
-                      {screenShareParticipant?.name || 'Unknown'}
-                    </div>
-                    <div className="tile-status screen-share-status">
-                      <span className="status-indicator screen-share-indicator"></span>
-                      Демонстрация экрана
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Удаленные демонстрации экрана */}
-          {Array.from(remoteScreenShares.values()).map((screenShare) => (
-            <div key={screenShare.producerId} className="video-tile screen-share-tile">
-              <div className="tile-border"></div>
-              <div className="tile-content">
-                <video
-                  ref={(video) => {
-                    if (video && screenShare.stream) {
-                      video.srcObject = screenShare.stream;
-                      video.play().catch(error => {
-                        if (error.name !== 'AbortError') {
-                          console.warn('Video play error:', error);
-                        }
-                      });
-                    }
-                  }}
-                  className="tile-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                <div className="tile-overlay">
-                  <div className="tile-info">
-                    <div className="tile-name">
-                      {screenShare.userName || 'Unknown'}
-                    </div>
-                    <div className="tile-status screen-share-status">
-                      <span className="status-indicator screen-share-indicator"></span>
-                      Демонстрация экрана
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="video-grid" data-user-count={currentParticipants.length}>
+          {/* Демонстрации экрана убраны из отдельных блоков - показываются только в фокусе */}
 
           {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
