@@ -18,7 +18,10 @@ const VideoCallGrid = ({
   showVolumeSliders = new Map(),
   onToggleUserMute,
   onChangeUserVolume,
-  onToggleVolumeSlider
+  onToggleVolumeSlider,
+  screenShareStream = null,
+  isScreenSharing = false,
+  screenShareParticipant = null
 }) => {
   const {
     focusedParticipantId,
@@ -279,6 +282,30 @@ const VideoCallGrid = ({
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
+        )}
+
+        {/* Блок демонстрации экрана */}
+        {isScreenSharing && screenShareStream && (
+          <div className="screen-share-container">
+            <div className="screen-share-header">
+              <span className="screen-share-label">Демонстрация экрана</span>
+              {screenShareParticipant && (
+                <span className="screen-share-user">{screenShareParticipant.name}</span>
+              )}
+            </div>
+            <video
+              ref={(video) => {
+                if (video && screenShareStream) {
+                  video.srcObject = screenShareStream;
+                  video.play();
+                }
+              }}
+              className="screen-share-video"
+              autoPlay
+              muted
+              playsInline
+            />
+          </div>
         )}
 
         <div className="video-grid" data-user-count={currentParticipants.length}>

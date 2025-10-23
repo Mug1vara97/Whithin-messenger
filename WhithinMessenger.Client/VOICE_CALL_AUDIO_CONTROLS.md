@@ -118,3 +118,4 @@ const otherParticipants = participants.map(participant => ({
 Интерфейс стал более функциональным и информативным! 🎉
 
 
+

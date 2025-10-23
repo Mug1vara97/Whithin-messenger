@@ -107,3 +107,4 @@ const displayParticipants = [currentUser, ...otherParticipants];
 Интерфейс стал более чистым и функциональным! 🎉
 
 
+

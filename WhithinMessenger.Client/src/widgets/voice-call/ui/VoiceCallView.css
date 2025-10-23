@@ -637,6 +637,15 @@
     background: #da373c;
   }
   
+  .center-button.active {
+    background: #5865f2;
+    color: white;
+  }
+  
+  .center-button.active:hover {
+    background: #4752c4;
+  }
+  
   .center-button svg {
     flex-shrink: 0;
   }

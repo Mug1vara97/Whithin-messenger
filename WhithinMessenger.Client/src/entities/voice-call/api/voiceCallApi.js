@@ -186,6 +186,21 @@ class VoiceCallApi {
       this.socket.off(event, callback);
     }
   }
+
+  // Метод для остановки демонстрации экрана
+  async stopScreenSharing(producerId) {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('stopScreenSharing', {
+        producerId
+      }, (response) => {
+        if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
 }
 
 export const voiceCallApi = new VoiceCallApi();

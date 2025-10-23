@@ -38,6 +38,8 @@ const VoiceCallView = ({
     showVolumeSliders,
     isGlobalAudioMuted,
     currentCall,
+    isScreenSharing,
+    screenShareStream,
     startCall,
     endCall,
     toggleMute,
@@ -46,7 +48,8 @@ const VoiceCallView = ({
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
-    toggleGlobalAudio
+    toggleGlobalAudio,
+    toggleScreenShare
   } = useGlobalCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
@@ -111,7 +114,7 @@ const VoiceCallView = ({
     
     console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
-  }, [participants, userId, userName, isMuted, isAudioEnabled]);
+  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted]);
 
 
   const handleClose = () => {
@@ -211,6 +214,13 @@ const VoiceCallView = ({
                       onToggleUserMute={toggleUserMute}
                       onChangeUserVolume={changeUserVolume}
                       onToggleVolumeSlider={toggleVolumeSlider}
+                      screenShareStream={screenShareStream}
+                      isScreenSharing={isScreenSharing}
+                      screenShareParticipant={isScreenSharing ? {
+                        id: userId,
+                        name: userName,
+                        isScreenSharing: true
+                      } : null}
                     />
                   </div>
                 )}
@@ -294,9 +304,10 @@ const VoiceCallView = ({
                       {/* Screen Share */}
                       <div className="attached-button-container control-button">
                         <button 
-                          className="center-button"
+                          className={`center-button ${isScreenSharing ? 'active' : ''}`}
                           type="button" 
                           aria-label="Продемонстрируйте свой экран"
+                          onClick={toggleScreenShare}
                         >
                           <ScreenShareIcon sx={{ fontSize: 24 }} />
                         </button>
