@@ -52,7 +52,7 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       screenShareStream: null,
-      remoteScreenShare: null, // Демонстрация экрана от других пользователей
+      remoteScreenShares: new Map(), // Демонстрации экрана от других пользователей (producerId -> data)
       
       // WebRTC соединения (хранятся глобально)
       device: null,
@@ -230,6 +230,21 @@ export const useCallStore = create(
           voiceCallApi.on('producerClosed', (data) => {
             const producerId = data.producerId || data;
             const producerSocketId = data.producerSocketId;
+            
+            // Проверяем, является ли это демонстрацией экрана
+            const state = get();
+            const screenShare = state.remoteScreenShares.get(producerId);
+            if (screenShare) {
+              console.log('Screen share producer closed:', producerId);
+              // Останавливаем поток
+              if (screenShare.stream) {
+                screenShare.stream.getTracks().forEach(track => track.stop());
+              }
+              // Удаляем из Map
+              const newRemoteScreenShares = new Map(state.remoteScreenShares);
+              newRemoteScreenShares.delete(producerId);
+              set({ remoteScreenShares: newRemoteScreenShares });
+            }
             
             const consumer = get().consumers.get(producerId);
             if (consumer) {
@@ -507,15 +522,17 @@ export const useCallStore = create(
             // Создаем MediaStream из consumer track для отображения
             const screenStream = new MediaStream([consumer.track]);
             
-            set({
-              remoteScreenShare: {
-                stream: screenStream,
-                producerId: producerData.producerId,
-                userId: userId,
-                userName: producerData.appData?.userName || 'Unknown',
-                socketId: socketId
-              }
+            const state = get();
+            const newRemoteScreenShares = new Map(state.remoteScreenShares);
+            newRemoteScreenShares.set(producerData.producerId, {
+              stream: screenStream,
+              producerId: producerData.producerId,
+              userId: userId,
+              userName: producerData.appData?.userName || 'Unknown',
+              socketId: socketId
             });
+            
+            set({ remoteScreenShares: newRemoteScreenShares });
             
             return;
           }

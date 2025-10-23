@@ -40,7 +40,7 @@ const VoiceCallView = ({
     currentCall,
     isScreenSharing,
     screenShareStream,
-    remoteScreenShare,
+    remoteScreenShares,
     startCall,
     endCall,
     toggleMute,
@@ -222,7 +222,7 @@ const VoiceCallView = ({
                         name: userName,
                         isScreenSharing: true
                       } : null}
-                      remoteScreenShare={remoteScreenShare}
+                      remoteScreenShares={remoteScreenShares}
                     />
                   </div>
                 )}

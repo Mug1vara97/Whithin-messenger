@@ -22,7 +22,7 @@ const VideoCallGrid = ({
   screenShareStream = null,
   isScreenSharing = false,
   screenShareParticipant = null,
-  remoteScreenShare = null
+  remoteScreenShares = new Map()
 }) => {
   const {
     focusedParticipantId,
@@ -285,20 +285,17 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) || remoteScreenShare ? 1 : 0)}>
-          {/* Демонстрация экрана как отдельный блок в сетке */}
-          {(isScreenSharing && screenShareStream) || remoteScreenShare ? (
+        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0) + remoteScreenShares.size}>
+          {/* Локальная демонстрация экрана */}
+          {isScreenSharing && screenShareStream && (
             <div className="video-tile screen-share-tile">
               <div className="tile-border"></div>
               <div className="tile-content">
                 <video
                   ref={(video) => {
-                    if (video) {
-                      const stream = isScreenSharing ? screenShareStream : remoteScreenShare?.stream;
-                      if (stream) {
-                        video.srcObject = stream;
-                        video.play();
-                      }
+                    if (video && screenShareStream) {
+                      video.srcObject = screenShareStream;
+                      video.play();
                     }
                   }}
                   className="tile-video"
@@ -309,10 +306,7 @@ const VideoCallGrid = ({
                 <div className="tile-overlay">
                   <div className="tile-info">
                     <div className="tile-name">
-                      {isScreenSharing && screenShareParticipant 
-                        ? screenShareParticipant.name 
-                        : remoteScreenShare?.userName || 'Unknown'
-                      }
+                      {screenShareParticipant?.name || 'Unknown'}
                     </div>
                     <div className="tile-status screen-share-status">
                       <span className="status-indicator screen-share-indicator"></span>
@@ -322,7 +316,39 @@ const VideoCallGrid = ({
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
+          
+          {/* Удаленные демонстрации экрана */}
+          {Array.from(remoteScreenShares.values()).map((screenShare) => (
+            <div key={screenShare.producerId} className="video-tile screen-share-tile">
+              <div className="tile-border"></div>
+              <div className="tile-content">
+                <video
+                  ref={(video) => {
+                    if (video && screenShare.stream) {
+                      video.srcObject = screenShare.stream;
+                      video.play();
+                    }
+                  }}
+                  className="tile-video"
+                  autoPlay
+                  muted
+                  playsInline
+                />
+                <div className="tile-overlay">
+                  <div className="tile-info">
+                    <div className="tile-name">
+                      {screenShare.userName || 'Unknown'}
+                    </div>
+                    <div className="tile-status screen-share-status">
+                      <span className="status-indicator screen-share-indicator"></span>
+                      Демонстрация экрана
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
           
           {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
