@@ -79,15 +79,15 @@ const VideoCallGrid = ({
 
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
-    // Демонстрации экрана убраны из extendedParticipants - показываются только в нижней панели
-    const extended = [...participants];
+    const screenShareParticipants = createScreenShareParticipants();
+    const extended = [...participants, ...screenShareParticipants];
     // console.log('Extended participants:', { 
     //   participantsCount: participants.length, 
-    //   screenShareCount: 0,
+    //   screenShareCount: screenShareParticipants.length,
     //   totalCount: extended.length 
     // });
     return extended;
-  }, [participants]);
+  }, [participants, createScreenShareParticipants]);
 
   const {
     focusedParticipantId,
@@ -364,7 +364,7 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0)}>
+        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0) + remoteScreenShares.size}>
           {/* Локальная демонстрация экрана */}
           {isScreenSharing && screenShareStream && (
             <div className="video-tile screen-share-tile">
@@ -400,6 +400,42 @@ const VideoCallGrid = ({
               </div>
             </div>
           )}
+          
+          {/* Удаленные демонстрации экрана */}
+          {Array.from(remoteScreenShares.values()).map((screenShare) => (
+            <div key={screenShare.producerId} className="video-tile screen-share-tile">
+              <div className="tile-border"></div>
+              <div className="tile-content">
+                <video
+                  ref={(video) => {
+                    if (video && screenShare.stream) {
+                      video.srcObject = screenShare.stream;
+                      video.play().catch(error => {
+                        if (error.name !== 'AbortError') {
+                          console.warn('Video play error:', error);
+                        }
+                      });
+                    }
+                  }}
+                  className="tile-video"
+                  autoPlay
+                  muted
+                  playsInline
+                />
+                <div className="tile-overlay">
+                  <div className="tile-info">
+                    <div className="tile-name">
+                      {screenShare.userName || 'Unknown'}
+                    </div>
+                    <div className="tile-status screen-share-status">
+                      <span className="status-indicator screen-share-indicator"></span>
+                      Демонстрация экрана
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
 
           {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
