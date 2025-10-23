@@ -1032,70 +1032,14 @@ export const useCallStore = create(
             throw new Error('No video track found in screen share stream');
           }
 
-          // Создаем transport для демонстрации экрана через mediasoup Device
-          const transportParams = await voiceCallApi.createWebRtcTransport();
-          if (!transportParams) {
-            throw new Error('Failed to create transport for screen share');
-          }
-
-          // Получаем device из voiceCallApi и инициализируем если нужно
-          let device = voiceCallApi.device;
-          if (!device) {
-            console.log('Device not initialized, initializing...');
-            const { Device } = await import('mediasoup-client');
-            device = new Device();
-            voiceCallApi.device = device;
-          }
-          
-          if (!device.loaded) {
-            console.log('Device not loaded, loading capabilities...');
-            // Получаем RTP capabilities с сервера
-            const rtpCapabilities = await voiceCallApi.getRtpCapabilities();
-            await device.load({ routerRtpCapabilities: rtpCapabilities });
-          }
-
-          // Создаем mediasoup transport напрямую, как в старом клиенте
-          const transport = device.createSendTransport({
-            ...transportParams,
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
-            ],
-            iceTransportPolicy: 'all',
-            iceCandidatePoolSize: 10
-          });
-
-          // Добавляем обработчики событий transport, как в старом клиенте
-          transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
-            try {
-              console.log('Screen share transport connect event');
-              await voiceCallApi.connectTransport(transport.id, dtlsParameters);
-              callback();
-            } catch (error) {
-              console.error('Screen share transport connect error:', error);
-              errback(error);
-            }
-          });
-
-          transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-            try {
-              console.log('Screen share transport produce event');
-              const response = await voiceCallApi.produce({
-                transportId: transport.id,
-                kind,
-                rtpParameters,
-                appData
-              });
-              callback({ id: response.id });
-            } catch (error) {
-              console.error('Screen share transport produce error:', error);
-              errback(error);
-            }
-          });
-
-          // Создаем producer напрямую через transport, как в старом клиенте
+          // Используем существующий transport, как в старом клиенте
           const state = get();
-          const producer = await transport.produce({
+          if (!state.producerTransport) {
+            throw new Error('Transport not ready');
+          }
+
+          // Создаем producer напрямую через существующий transport, как в старом клиенте
+          const producer = await state.producerTransport.produce({
             track: videoTrack,
             encodings: [
               {
