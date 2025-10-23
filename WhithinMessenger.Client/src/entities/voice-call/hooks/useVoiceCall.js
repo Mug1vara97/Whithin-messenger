@@ -1059,7 +1059,7 @@ export const useVoiceCall = (userId, userName) => {
           userId: userId,
           userName: userName
         }
-      }, videoTrack);
+      });
 
       if (!producer) {
         throw new Error('Failed to create screen share producer');
