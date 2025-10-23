@@ -519,7 +519,7 @@ export const useCallStore = create(
           if (isScreenShare) {
             // Проверяем, что это не наша собственная демонстрация экрана
             const producerUserId = producerData.appData?.userId;
-            if (userId === state.currentUserId || producerUserId === state.currentUserId) {
+            if (producerUserId === state.currentUserId) {
               console.log('Skipping own screen share producer in handleNewProducer', { userId, currentUserId: state.currentUserId, producerUserId });
               return;
             }
