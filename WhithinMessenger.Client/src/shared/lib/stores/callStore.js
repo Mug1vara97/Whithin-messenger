@@ -1038,8 +1038,24 @@ export const useCallStore = create(
             throw new Error('Failed to create transport for screen share');
           }
 
+          // Получаем device из voiceCallApi и инициализируем если нужно
+          let device = voiceCallApi.device;
+          if (!device) {
+            console.log('Device not initialized, initializing...');
+            const { Device } = await import('mediasoup-client');
+            device = new Device();
+            voiceCallApi.device = device;
+          }
+          
+          if (!device.loaded) {
+            console.log('Device not loaded, loading capabilities...');
+            // Получаем RTP capabilities с сервера
+            const rtpCapabilities = await voiceCallApi.getRtpCapabilities();
+            await device.load({ routerRtpCapabilities: rtpCapabilities });
+          }
+
           // Создаем mediasoup transport напрямую, как в старом клиенте
-          const transport = voiceCallApi.device.createSendTransport({
+          const transport = device.createSendTransport({
             ...transportParams,
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },

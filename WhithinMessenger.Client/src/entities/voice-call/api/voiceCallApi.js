@@ -94,6 +94,18 @@ class VoiceCallApi {
     });
   }
 
+  async getRtpCapabilities() {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('getRouterRtpCapabilities', {}, (response) => {
+        if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
 
   async consume(rtpCapabilities, remoteProducerId, transportId) {
     return new Promise((resolve, reject) => {
