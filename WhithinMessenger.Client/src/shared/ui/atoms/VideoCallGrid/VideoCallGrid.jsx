@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useVideoCall } from '../../../../entities/video-call';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
@@ -25,6 +25,18 @@ const VideoCallGrid = ({
   remoteScreenShares = new Map(),
   onStopScreenShare = null
 }) => {
+  // Создаем расширенный список участников, включая демонстрации экрана
+  const extendedParticipants = useMemo(() => {
+    const screenShareParticipants = createScreenShareParticipants();
+    const extended = [...participants, ...screenShareParticipants];
+    console.log('Extended participants:', { 
+      participantsCount: participants.length, 
+      screenShareCount: screenShareParticipants.length,
+      totalCount: extended.length 
+    });
+    return extended;
+  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
+
   const {
     focusedParticipantId,
     currentPage,
@@ -38,7 +50,7 @@ const VideoCallGrid = ({
     goToBottomPage,
     isFocusedMode,
     focusedParticipant
-  } = useVideoCall(participants);
+  } = useVideoCall(extendedParticipants);
 
   const bottomGridRef = useRef(null);
 
@@ -88,6 +100,13 @@ const VideoCallGrid = ({
   const createScreenShareParticipants = () => {
     const screenShareParticipants = [];
     
+    console.log('createScreenShareParticipants:', { 
+      isScreenSharing, 
+      hasScreenShareStream: !!screenShareStream, 
+      screenShareParticipant,
+      remoteScreenSharesSize: remoteScreenShares.size 
+    });
+    
     // Локальная демонстрация экрана
     if (isScreenSharing && screenShareStream && screenShareParticipant) {
       screenShareParticipants.push({
@@ -111,6 +130,7 @@ const VideoCallGrid = ({
       });
     });
     
+    console.log('Screen share participants created:', screenShareParticipants.length);
     return screenShareParticipants;
   };
 
@@ -294,6 +314,12 @@ const VideoCallGrid = ({
 
   // Режим фокусировки
   if (isFocusedMode) {
+    console.log('Focused mode:', { 
+      focusedParticipantId, 
+      focusedParticipant,
+      isScreenShare: focusedParticipant?.isScreenShare 
+    });
+    
     return (
       <div className={`video-call-container focused-mode ${className}`}>
         <div className="focused-view">

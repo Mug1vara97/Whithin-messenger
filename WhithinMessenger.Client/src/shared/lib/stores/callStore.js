@@ -1179,6 +1179,10 @@ export const useCallStore = create(
           });
 
           console.log('Screen sharing stopped successfully');
+          console.log('State after stop:', { 
+            isScreenSharing: get().isScreenSharing, 
+            screenShareStream: get().screenShareStream 
+          });
         } catch (error) {
           console.error('Error stopping screen share:', error);
           set({ error: 'Failed to stop screen sharing: ' + error.message });
@@ -1192,6 +1196,10 @@ export const useCallStore = create(
         if (state.isScreenSharing) {
           console.log('Stopping screen share...');
           await get().stopScreenShare();
+          console.log('After stopScreenShare, state:', { 
+            isScreenSharing: get().isScreenSharing, 
+            screenShareStream: get().screenShareStream 
+          });
         } else {
           console.log('Starting screen share...');
           await get().startScreenShare();

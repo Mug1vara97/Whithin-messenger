@@ -57,6 +57,13 @@ const VoiceCallView = ({
   const [videoParticipants, setVideoParticipants] = useState([]);
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
 
+  // Логирование состояния демонстрации экрана
+  console.log('VoiceCallView screen share state:', { 
+    isScreenSharing, 
+    hasScreenShareStream: !!screenShareStream, 
+    remoteScreenSharesSize: remoteScreenShares.size 
+  });
+
   useEffect(() => {
     console.log('VoiceCallView: useEffect triggered with:', { channelId, userId, userName, channelName });
     console.log('VoiceCallView: Current call state:', { isConnected, currentCall });
