@@ -21,7 +21,8 @@ const VideoCallGrid = ({
   onToggleVolumeSlider,
   screenShareStream = null,
   isScreenSharing = false,
-  screenShareParticipant = null
+  screenShareParticipant = null,
+  remoteScreenShare = null
 }) => {
   const {
     focusedParticipantId,
@@ -285,19 +286,25 @@ const VideoCallGrid = ({
         )}
 
         {/* Блок демонстрации экрана */}
-        {isScreenSharing && screenShareStream && (
+        {(isScreenSharing && screenShareStream) || remoteScreenShare ? (
           <div className="screen-share-container">
             <div className="screen-share-header">
               <span className="screen-share-label">Демонстрация экрана</span>
-              {screenShareParticipant && (
-                <span className="screen-share-user">{screenShareParticipant.name}</span>
-              )}
+              <span className="screen-share-user">
+                {isScreenSharing && screenShareParticipant 
+                  ? screenShareParticipant.name 
+                  : remoteScreenShare?.userName || 'Unknown'
+                }
+              </span>
             </div>
             <video
               ref={(video) => {
-                if (video && screenShareStream) {
-                  video.srcObject = screenShareStream;
-                  video.play();
+                if (video) {
+                  const stream = isScreenSharing ? screenShareStream : remoteScreenShare?.stream;
+                  if (stream) {
+                    video.srcObject = stream;
+                    video.play();
+                  }
                 }
               }}
               className="screen-share-video"
@@ -306,7 +313,7 @@ const VideoCallGrid = ({
               playsInline
             />
           </div>
-        )}
+        ) : null}
 
         <div className="video-grid" data-user-count={currentParticipants.length}>
           {currentParticipants.map((participant) => renderParticipantTile(participant, false))}

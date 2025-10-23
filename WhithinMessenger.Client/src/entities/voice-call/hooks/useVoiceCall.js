@@ -492,7 +492,17 @@ export const useVoiceCall = (userId, userName) => {
       const userId = peerIdToUserIdMapRef.current.get(socketId) || socketId;
       console.log('handleNewProducer: socketId=', socketId, 'userId=', userId);
       
-      // Инициализируем AudioContext если еще не создан
+      // Проверяем, является ли это демонстрацией экрана
+      const isScreenShare = producerData.appData?.mediaType === 'screen';
+      console.log('handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind);
+      
+      // Для демонстрации экрана не создаем AudioContext
+      if (isScreenShare) {
+        console.log('Screen share producer detected, skipping audio processing');
+        return;
+      }
+      
+      // Инициализируем AudioContext если еще не создан (только для аудио)
       if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
           sampleRate: 48000,

@@ -52,6 +52,7 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       screenShareStream: null,
+      remoteScreenShare: null, // Демонстрация экрана от других пользователей
       
       // WebRTC соединения (хранятся глобально)
       device: null,
@@ -494,6 +495,30 @@ export const useCallStore = create(
           
           const socketId = producerData.producerSocketId;
           const userId = state.peerIdToUserIdMap.get(socketId) || socketId;
+          
+          // Проверяем, является ли это демонстрацией экрана
+          const isScreenShare = producerData.appData?.mediaType === 'screen';
+          console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind);
+          
+          // Для демонстрации экрана не создаем AudioContext, но сохраняем информацию
+          if (isScreenShare) {
+            console.log('Screen share producer detected in callStore, storing remote screen share info');
+            
+            // Создаем MediaStream из consumer track для отображения
+            const screenStream = new MediaStream([consumer.track]);
+            
+            set({
+              remoteScreenShare: {
+                stream: screenStream,
+                producerId: producerData.producerId,
+                userId: userId,
+                userName: producerData.appData?.userName || 'Unknown',
+                socketId: socketId
+              }
+            });
+            
+            return;
+          }
           
           // Инициализируем AudioContext если еще не создан
           let audioContext = state.audioContext;

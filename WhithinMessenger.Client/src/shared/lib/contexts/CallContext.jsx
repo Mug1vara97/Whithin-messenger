@@ -85,6 +85,7 @@ export const CallProvider = ({ children }) => {
     connecting: callStore.connecting,
     isScreenSharing: callStore.isScreenSharing,
     screenShareStream: callStore.screenShareStream,
+    remoteScreenShare: callStore.remoteScreenShare,
     
     // Методы
     initializeCall: callStore.initializeCall,
