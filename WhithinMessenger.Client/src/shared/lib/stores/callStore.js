@@ -1179,6 +1179,12 @@ export const useCallStore = create(
           newProducers.delete('screen');
 
           // Очищаем состояние
+          console.log('About to call set() with:', {
+            screenShareStream: null,
+            isScreenSharing: false,
+            producersSize: newProducers.size
+          });
+          
           set({
             screenShareStream: null,
             isScreenSharing: false,
