@@ -59,16 +59,7 @@ const VideoCallGrid = ({
     //   remoteScreenSharesSize: remoteScreenShares.size 
     // });
     
-    // Локальная демонстрация экрана для фокуса
-    if (isScreenSharing && screenShareStream && screenShareParticipant) {
-      screenShareParticipants.push({
-        id: `screen-share-local-${screenShareParticipant.id}`,
-        name: screenShareParticipant.name,
-        isScreenShare: true,
-        isLocal: true,
-        stream: screenShareStream
-      });
-    }
+    // Локальная демонстрация экрана убрана из extendedParticipants - показывается только в отдельном блоке
     
     // Удаленные демонстрации экрана для фокуса
     Array.from(remoteScreenShares.values()).forEach((screenShare) => {
@@ -374,8 +365,42 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length}>
-          {/* Демонстрации экрана убраны из отдельных блоков - показываются только в фокусе */}
+        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0)}>
+          {/* Локальная демонстрация экрана */}
+          {isScreenSharing && screenShareStream && (
+            <div className="video-tile screen-share-tile">
+              <div className="tile-border"></div>
+              <div className="tile-content">
+                <video
+                  ref={(video) => {
+                    if (video && screenShareStream) {
+                      video.srcObject = screenShareStream;
+                      video.play().catch(error => {
+                        if (error.name !== 'AbortError') {
+                          console.warn('Video play error:', error);
+                        }
+                      });
+                    }
+                  }}
+                  className="tile-video"
+                  autoPlay
+                  muted
+                  playsInline
+                />
+                <div className="tile-overlay">
+                  <div className="tile-info">
+                    <div className="tile-name">
+                      {screenShareParticipant?.name || 'Unknown'}
+                    </div>
+                    <div className="tile-status screen-share-status">
+                      <span className="status-indicator screen-share-indicator"></span>
+                      Демонстрация экрана
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
