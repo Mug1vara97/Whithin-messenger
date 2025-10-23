@@ -59,19 +59,18 @@ const VideoCallGrid = ({
     //   remoteScreenSharesSize: remoteScreenShares.size 
     // });
     
-    // Локальная демонстрация экрана убрана из extendedParticipants - показывается только в отдельном блоке
-    
-    // Удаленные демонстрации экрана
-    Array.from(remoteScreenShares.values()).forEach((screenShare) => {
+    // Локальная демонстрация экрана для фокуса (только для демонстрирующего пользователя)
+    if (isScreenSharing && screenShareStream && screenShareParticipant) {
       screenShareParticipants.push({
-        id: `screen-share-remote-${screenShare.producerId}`,
-        name: screenShare.userName,
+        id: `screen-share-local-${screenShareParticipant.id}`,
+        name: screenShareParticipant.name,
         isScreenShare: true,
-        isLocal: false,
-        stream: screenShare.stream,
-        producerId: screenShare.producerId
+        isLocal: true,
+        stream: screenShareStream
       });
-    });
+    }
+    
+    // Удаленные демонстрации экрана убраны из extendedParticipants - показываются только в отдельных блоках
     
     // console.log('Screen share participants created:', screenShareParticipants.length);
     return screenShareParticipants;
@@ -365,42 +364,8 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0) + remoteScreenShares.size}>
-          {/* Локальная демонстрация экрана */}
-          {isScreenSharing && screenShareStream && (
-            <div className="video-tile screen-share-tile">
-              <div className="tile-border"></div>
-              <div className="tile-content">
-                <video
-                  ref={(video) => {
-                    if (video && screenShareStream) {
-                      video.srcObject = screenShareStream;
-                      video.play().catch(error => {
-                        if (error.name !== 'AbortError') {
-                          console.warn('Video play error:', error);
-                        }
-                      });
-                    }
-                  }}
-                  className="tile-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                <div className="tile-overlay">
-                  <div className="tile-info">
-                    <div className="tile-name">
-                      {screenShareParticipant?.name || 'Unknown'}
-                    </div>
-                    <div className="tile-status screen-share-status">
-                      <span className="status-indicator screen-share-indicator"></span>
-                      Демонстрация экрана
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="video-grid" data-user-count={currentParticipants.length + remoteScreenShares.size}>
+          {/* Локальная демонстрация экрана убрана - показывается только в фокусе */}
           
           {/* Удаленные демонстрации экрана */}
           {Array.from(remoteScreenShares.values()).map((screenShare) => (
