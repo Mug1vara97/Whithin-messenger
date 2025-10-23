@@ -25,55 +25,7 @@ const VideoCallGrid = ({
   remoteScreenShares = new Map(),
   onStopScreenShare = null
 }) => {
-  // Создаем расширенный список участников, включая демонстрации экрана
-  const extendedParticipants = useMemo(() => {
-    const screenShareParticipants = createScreenShareParticipants();
-    const extended = [...participants, ...screenShareParticipants];
-    console.log('Extended participants:', { 
-      participantsCount: participants.length, 
-      screenShareCount: screenShareParticipants.length,
-      totalCount: extended.length 
-    });
-    return extended;
-  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
-
-  const {
-    focusedParticipantId,
-    currentPage,
-    bottomPage,
-    totalPages,
-    totalBottomPages,
-    currentParticipants,
-    currentBottomParticipants,
-    focusParticipant,
-    goToPage,
-    goToBottomPage,
-    isFocusedMode,
-    focusedParticipant
-  } = useVideoCall(extendedParticipants);
-
   const bottomGridRef = useRef(null);
-
-  const handleParticipantClick = (participant) => {
-    focusParticipant(participant.id);
-    onParticipantClick?.(participant);
-  };
-
-  const handlePrevPage = () => {
-    goToPage(Math.max(0, currentPage - 1));
-  };
-
-  const handleNextPage = () => {
-    goToPage(Math.min(totalPages - 1, currentPage + 1));
-  };
-
-  const handlePrevBottomPage = () => {
-    goToBottomPage(Math.max(0, bottomPage - 1));
-  };
-
-  const handleNextBottomPage = () => {
-    goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
-  };
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -100,12 +52,12 @@ const VideoCallGrid = ({
   const createScreenShareParticipants = () => {
     const screenShareParticipants = [];
     
-    console.log('createScreenShareParticipants:', { 
-      isScreenSharing, 
-      hasScreenShareStream: !!screenShareStream, 
-      screenShareParticipant,
-      remoteScreenSharesSize: remoteScreenShares.size 
-    });
+    // console.log('createScreenShareParticipants:', { 
+    //   isScreenSharing, 
+    //   hasScreenShareStream: !!screenShareStream, 
+    //   screenShareParticipant,
+    //   remoteScreenSharesSize: remoteScreenShares.size 
+    // });
     
     // Локальная демонстрация экрана
     if (isScreenSharing && screenShareStream && screenShareParticipant) {
@@ -130,8 +82,56 @@ const VideoCallGrid = ({
       });
     });
     
-    console.log('Screen share participants created:', screenShareParticipants.length);
+    // console.log('Screen share participants created:', screenShareParticipants.length);
     return screenShareParticipants;
+  };
+
+  // Создаем расширенный список участников, включая демонстрации экрана
+  const extendedParticipants = useMemo(() => {
+    const screenShareParticipants = createScreenShareParticipants();
+    const extended = [...participants, ...screenShareParticipants];
+    // console.log('Extended participants:', { 
+    //   participantsCount: participants.length, 
+    //   screenShareCount: screenShareParticipants.length,
+    //   totalCount: extended.length 
+    // });
+    return extended;
+  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
+
+  const {
+    focusedParticipantId,
+    currentPage,
+    bottomPage,
+    totalPages,
+    totalBottomPages,
+    currentParticipants,
+    currentBottomParticipants,
+    focusParticipant,
+    goToPage,
+    goToBottomPage,
+    isFocusedMode,
+    focusedParticipant
+  } = useVideoCall(extendedParticipants);
+
+  const handleParticipantClick = (participant) => {
+    focusParticipant(participant.id);
+    onParticipantClick?.(participant);
+  };
+
+  const handlePrevPage = () => {
+    goToPage(Math.max(0, currentPage - 1));
+  };
+
+  const handleNextPage = () => {
+    goToPage(Math.min(totalPages - 1, currentPage + 1));
+  };
+
+  const handlePrevBottomPage = () => {
+    goToBottomPage(Math.max(0, bottomPage - 1));
+  };
+
+  const handleNextBottomPage = () => {
+    goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
   };
 
   const renderParticipantTile = (participant, isSmall = false) => {
@@ -314,11 +314,11 @@ const VideoCallGrid = ({
 
   // Режим фокусировки
   if (isFocusedMode) {
-    console.log('Focused mode:', { 
-      focusedParticipantId, 
-      focusedParticipant,
-      isScreenShare: focusedParticipant?.isScreenShare 
-    });
+    // console.log('Focused mode:', { 
+    //   focusedParticipantId, 
+    //   focusedParticipant,
+    //   isScreenShare: focusedParticipant?.isScreenShare 
+    // });
     
     return (
       <div className={`video-call-container focused-mode ${className}`}>
