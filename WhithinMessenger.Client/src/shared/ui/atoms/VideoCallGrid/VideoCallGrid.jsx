@@ -18,10 +18,7 @@ const VideoCallGrid = ({
   showVolumeSliders = new Map(),
   onToggleUserMute,
   onChangeUserVolume,
-  onToggleVolumeSlider,
-  screenShareStream = null,
-  isScreenSharing = false,
-  screenShareParticipant = null
+  onToggleVolumeSlider
 }) => {
   const {
     focusedParticipantId,
@@ -229,35 +226,6 @@ const VideoCallGrid = ({
   if (isFocusedMode) {
     return (
       <div className={`video-call-container focused-mode ${className}`}>
-        {/* Screen Share Block */}
-        {isScreenSharing && screenShareStream && (
-          <div className="screen-share-container">
-            <div className="screen-share-header">
-              <span>Демонстрация экрана</span>
-              {screenShareParticipant && (
-                <span className="screen-share-user">{screenShareParticipant.name}</span>
-              )}
-            </div>
-            <div className="screen-share-video">
-              <video 
-                autoPlay 
-                muted 
-                playsInline
-                ref={(video) => {
-                  if (video && screenShareStream) {
-                    video.srcObject = screenShareStream;
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              />
-            </div>
-          </div>
-        )}
-        
         <div className="focused-view">
           <div className="focused-user-wrapper">
             {focusedParticipant && renderParticipantTile(focusedParticipant, false)}
@@ -300,35 +268,6 @@ const VideoCallGrid = ({
   // Обычный режим (сетка)
   return (
     <div className={`video-call-container ${className}`}>
-      {/* Screen Share Block */}
-      {isScreenSharing && screenShareStream && (
-        <div className="screen-share-container">
-          <div className="screen-share-header">
-            <span>Демонстрация экрана</span>
-            {screenShareParticipant && (
-              <span className="screen-share-user">{screenShareParticipant.name}</span>
-            )}
-          </div>
-          <div className="screen-share-video">
-            <video 
-              autoPlay 
-              muted 
-              playsInline
-              ref={(video) => {
-                if (video && screenShareStream) {
-                  video.srcObject = screenShareStream;
-                }
-              }}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              }}
-            />
-          </div>
-        </div>
-      )}
-      
       <div className="video-grid-wrapper">
         {totalPages > 1 && currentPage > 0 && (
           <button 

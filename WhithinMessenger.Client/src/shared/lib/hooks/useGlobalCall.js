@@ -83,9 +83,6 @@ export const useGlobalCall = (userId = null, userName = null) => {
     toggleGlobalAudio: callContext.toggleGlobalAudio,
     toggleNoiseSuppression: callContext.toggleNoiseSuppression,
     changeNoiseSuppressionMode: callContext.changeNoiseSuppressionMode,
-    startScreenShare: callContext.startScreenShare,
-    stopScreenShare: callContext.stopScreenShare,
-    toggleScreenShare: callContext.toggleScreenShare,
     setError: callContext.setError,
     clearError: callContext.clearError,
     setAudioBlocked: callContext.setAudioBlocked

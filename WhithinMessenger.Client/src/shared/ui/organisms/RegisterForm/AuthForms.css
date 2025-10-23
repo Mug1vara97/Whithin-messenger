@@ -9,11 +9,10 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   min-height: 100vh;
-  /* background-color: #2f3136; */
-  padding-left: 50px;
+  background-color: #2f3136;
 }
 
 .auth-box {
@@ -115,10 +114,6 @@ body {
 
 /* Responsive design */
 @media (max-width: 480px) {
-  .auth-container {
-    padding-left: 20px;
-  }
-  
   .auth-box {
     padding: 20px;
     margin: 20px;
