@@ -1045,7 +1045,7 @@ export const useCallStore = create(
               userId: state.currentUserId,
               userName: state.currentUserName
             }
-          }, videoTrack);
+          });
 
           if (!producer) {
             throw new Error('Failed to create screen share producer');

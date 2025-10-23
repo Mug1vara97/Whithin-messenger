@@ -20,7 +20,8 @@ const VideoCallGrid = ({
   onChangeUserVolume,
   onToggleVolumeSlider,
   screenShareStream = null,
-  isScreenSharing = false
+  isScreenSharing = false,
+  screenShareParticipant = null
 }) => {
   const {
     focusedParticipantId,
@@ -121,24 +122,7 @@ const VideoCallGrid = ({
         <div className="tile-content">
           {/* Background with avatar or video */}
           <div className="tile-background">
-            {/* Screen share video */}
-            {participant.isScreenSharing && screenShareStream ? (
-              <video 
-                autoPlay 
-                muted 
-                playsInline
-                ref={(video) => {
-                  if (video && screenShareStream) {
-                    video.srcObject = screenShareStream;
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : participant.avatar ? (
+            {participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (
               <div 
@@ -245,6 +229,35 @@ const VideoCallGrid = ({
   if (isFocusedMode) {
     return (
       <div className={`video-call-container focused-mode ${className}`}>
+        {/* Screen Share Block */}
+        {isScreenSharing && screenShareStream && (
+          <div className="screen-share-container">
+            <div className="screen-share-header">
+              <span>Демонстрация экрана</span>
+              {screenShareParticipant && (
+                <span className="screen-share-user">{screenShareParticipant.name}</span>
+              )}
+            </div>
+            <div className="screen-share-video">
+              <video 
+                autoPlay 
+                muted 
+                playsInline
+                ref={(video) => {
+                  if (video && screenShareStream) {
+                    video.srcObject = screenShareStream;
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+              />
+            </div>
+          </div>
+        )}
+        
         <div className="focused-view">
           <div className="focused-user-wrapper">
             {focusedParticipant && renderParticipantTile(focusedParticipant, false)}
@@ -287,6 +300,35 @@ const VideoCallGrid = ({
   // Обычный режим (сетка)
   return (
     <div className={`video-call-container ${className}`}>
+      {/* Screen Share Block */}
+      {isScreenSharing && screenShareStream && (
+        <div className="screen-share-container">
+          <div className="screen-share-header">
+            <span>Демонстрация экрана</span>
+            {screenShareParticipant && (
+              <span className="screen-share-user">{screenShareParticipant.name}</span>
+            )}
+          </div>
+          <div className="screen-share-video">
+            <video 
+              autoPlay 
+              muted 
+              playsInline
+              ref={(video) => {
+                if (video && screenShareStream) {
+                  video.srcObject = screenShareStream;
+                }
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
       <div className="video-grid-wrapper">
         {totalPages > 1 && currentPage > 0 && (
           <button 

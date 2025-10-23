@@ -218,6 +218,7 @@ const VoiceCallView = ({
                       onToggleVolumeSlider={toggleVolumeSlider}
                       screenShareStream={screenShareStream}
                       isScreenSharing={isScreenSharing}
+                      screenShareParticipant={isScreenSharing ? { name: userName, id: userId } : null}
                     />
                   </div>
                 )}
