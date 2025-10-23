@@ -189,13 +189,18 @@ class VoiceCallApi {
 
   // Метод для остановки демонстрации экрана
   async stopScreenSharing(producerId) {
+    console.log('voiceCallApi.stopScreenSharing called with producerId:', producerId);
     return new Promise((resolve, reject) => {
+      console.log('voiceCallApi.stopScreenSharing: Emitting stopScreenSharing event...');
       this.socket.emit('stopScreenSharing', {
         producerId
       }, (response) => {
+        console.log('voiceCallApi.stopScreenSharing: Received response:', response);
         if (response && response.error) {
+          console.log('voiceCallApi.stopScreenSharing: Error in response:', response.error);
           reject(new Error(response.error));
         } else {
+          console.log('voiceCallApi.stopScreenSharing: Success, resolving...');
           resolve(response);
         }
       });
