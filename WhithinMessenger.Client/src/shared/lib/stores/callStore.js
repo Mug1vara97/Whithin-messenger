@@ -1038,15 +1038,28 @@ export const useCallStore = create(
             throw new Error('Failed to create transport for screen share');
           }
 
-          // Создаем producer с метаданными для демонстрации экрана
+          // Создаем producer напрямую через transport, как в старом клиенте
           const state = get();
-          const producer = await voiceCallApi.produceWithTrack({
-            transportId: transport.id,
-            kind: 'video',
+          const producer = await transport.produce({
+            track: videoTrack,
+            encodings: [
+              {
+                scaleResolutionDownBy: 1,
+                maxBitrate: 5000000, // 5 Mbps для Full HD
+                maxFramerate: 60
+              }
+            ],
+            codecOptions: {
+              videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
+              videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
+            },
             appData: {
               mediaType: 'screen',
               userId: state.currentUserId,
-              userName: state.currentUserName
+              userName: state.currentUserName,
+              width: videoTrack.getSettings().width,
+              height: videoTrack.getSettings().height,
+              frameRate: videoTrack.getSettings().frameRate
             }
           });
 
