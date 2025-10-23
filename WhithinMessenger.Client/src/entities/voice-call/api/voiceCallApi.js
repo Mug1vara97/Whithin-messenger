@@ -192,9 +192,17 @@ class VoiceCallApi {
     console.log('voiceCallApi.stopScreenSharing called with producerId:', producerId);
     return new Promise((resolve, reject) => {
       console.log('voiceCallApi.stopScreenSharing: Emitting stopScreenSharing event...');
+      
+      // Добавляем таймаут на случай, если сервер не отвечает
+      const timeout = setTimeout(() => {
+        console.log('voiceCallApi.stopScreenSharing: Timeout - server did not respond');
+        resolve({ success: true }); // Разрешаем промис, чтобы не блокировать UI
+      }, 5000); // 5 секунд таймаут
+      
       this.socket.emit('stopScreenSharing', {
         producerId
       }, (response) => {
+        clearTimeout(timeout);
         console.log('voiceCallApi.stopScreenSharing: Received response:', response);
         if (response && response.error) {
           console.log('voiceCallApi.stopScreenSharing: Error in response:', response.error);
