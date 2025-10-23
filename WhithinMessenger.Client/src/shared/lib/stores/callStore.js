@@ -1162,11 +1162,16 @@ export const useCallStore = create(
 
         try {
           const state = get();
+          console.log('stopScreenShare: Got state, checking for screen producer...');
           
           // Уведомляем сервер об остановке демонстрации экрана
           const screenProducer = state.producers.get('screen');
+          console.log('stopScreenShare: Screen producer found:', !!screenProducer, 'Socket available:', !!voiceCallApi.socket);
+          
           if (screenProducer && voiceCallApi.socket) {
+            console.log('stopScreenShare: Calling voiceCallApi.stopScreenSharing...');
             await voiceCallApi.stopScreenSharing(screenProducer.id);
+            console.log('stopScreenShare: voiceCallApi.stopScreenSharing completed');
           }
 
           // Останавливаем поток
