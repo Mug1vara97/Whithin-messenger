@@ -513,13 +513,14 @@ export const useCallStore = create(
           
           // Проверяем, является ли это демонстрацией экрана
           const isScreenShare = producerData.appData?.mediaType === 'screen';
-          console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind, 'userId=', userId, 'currentUserId=', state.currentUserId);
+          console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind, 'userId=', userId, 'currentUserId=', state.currentUserId, 'producerUserId=', producerData.appData?.userId);
           
           // Для демонстрации экрана не создаем AudioContext, но сохраняем информацию
           if (isScreenShare) {
             // Проверяем, что это не наша собственная демонстрация экрана
-            if (userId === state.currentUserId) {
-              console.log('Skipping own screen share producer in handleNewProducer');
+            const producerUserId = producerData.appData?.userId;
+            if (userId === state.currentUserId || producerUserId === state.currentUserId) {
+              console.log('Skipping own screen share producer in handleNewProducer', { userId, currentUserId: state.currentUserId, producerUserId });
               return;
             }
             
@@ -528,8 +529,8 @@ export const useCallStore = create(
             // Создаем MediaStream из consumer track для отображения
             const screenStream = new MediaStream([consumer.track]);
             
-            const state = get();
-            const newRemoteScreenShares = new Map(state.remoteScreenShares);
+            const currentState = get();
+            const newRemoteScreenShares = new Map(currentState.remoteScreenShares);
             newRemoteScreenShares.set(producerData.producerId, {
               stream: screenStream,
               producerId: producerData.producerId,

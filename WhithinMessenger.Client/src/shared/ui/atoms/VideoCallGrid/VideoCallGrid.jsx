@@ -222,18 +222,7 @@ const VideoCallGrid = ({
                 <div className="screen-share-status">
                   <span className="status-indicator screen-share-indicator"></span>
                   <span className="status-text">Демонстрация экрана</span>
-                  {participant.isLocal && onStopScreenShare && (
-                    <button 
-                      className="close-screen-share-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStopScreenShare();
-                      }}
-                      title="Остановить демонстрацию экрана"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  {/* Кнопка закрытия убрана по требованию пользователя */}
                 </div>
               ) : (
                 <>
