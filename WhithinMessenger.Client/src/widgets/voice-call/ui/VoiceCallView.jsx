@@ -223,6 +223,7 @@ const VoiceCallView = ({
                         isScreenSharing: true
                       } : null}
                       remoteScreenShares={remoteScreenShares}
+                      onStopScreenShare={toggleScreenShare}
                     />
                   </div>
                 )}

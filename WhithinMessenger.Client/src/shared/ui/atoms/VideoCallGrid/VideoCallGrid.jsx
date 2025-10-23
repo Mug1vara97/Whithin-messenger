@@ -22,7 +22,8 @@ const VideoCallGrid = ({
   screenShareStream = null,
   isScreenSharing = false,
   screenShareParticipant = null,
-  remoteScreenShares = new Map()
+  remoteScreenShares = new Map(),
+  onStopScreenShare = null
 }) => {
   const {
     focusedParticipantId,
@@ -83,6 +84,36 @@ const VideoCallGrid = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Создаем участников демонстрации экрана для фокуса
+  const createScreenShareParticipants = () => {
+    const screenShareParticipants = [];
+    
+    // Локальная демонстрация экрана
+    if (isScreenSharing && screenShareStream && screenShareParticipant) {
+      screenShareParticipants.push({
+        id: `screen-share-local-${screenShareParticipant.id}`,
+        name: screenShareParticipant.name,
+        isScreenShare: true,
+        isLocal: true,
+        stream: screenShareStream
+      });
+    }
+    
+    // Удаленные демонстрации экрана
+    Array.from(remoteScreenShares.values()).forEach((screenShare) => {
+      screenShareParticipants.push({
+        id: `screen-share-remote-${screenShare.producerId}`,
+        name: screenShare.userName,
+        isScreenShare: true,
+        isLocal: false,
+        stream: screenShare.stream,
+        producerId: screenShare.producerId
+      });
+    });
+    
+    return screenShareParticipants;
+  };
+
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
@@ -91,6 +122,7 @@ const VideoCallGrid = ({
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
+    const isScreenShare = participant.isScreenShare || false;
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
@@ -120,10 +152,23 @@ const VideoCallGrid = ({
         className={`video-tile ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
         onClick={() => handleParticipantClick(participant)}
       >
-        <div className="tile-content">
-          {/* Background with avatar or video */}
+        <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
+          {/* Background with avatar, video, or screen share */}
           <div className="tile-background">
-            {participant.avatar ? (
+            {isScreenShare ? (
+              <video
+                ref={(video) => {
+                  if (video && participant.stream) {
+                    video.srcObject = participant.stream;
+                    video.play();
+                  }
+                }}
+                className="tile-video"
+                autoPlay
+                muted
+                playsInline
+              />
+            ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (
               <div 
@@ -145,22 +190,43 @@ const VideoCallGrid = ({
             )}
           </div>
 
-          {/* Bottom overlay with name and mic status */}
+          {/* Bottom overlay with name and status */}
           <div className="tile-bottom-overlay">
             <div className="bottom-info">
-              <div className={`mic-status ${isMuted ? 'muted' : isSpeaking ? 'speaking' : 'silent'}`}>
-                {isMuted ? (
-                  <MicOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
-                ) : isSpeaking ? (
-                  <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#3ba55c' }} />
-                ) : (
-                  <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
-                )}
-              </div>
-              {participant.isGlobalAudioMuted && (
-                <div className="headset-status">
-                  <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
+              {isScreenShare ? (
+                <div className="screen-share-status">
+                  <span className="status-indicator screen-share-indicator"></span>
+                  <span className="status-text">Демонстрация экрана</span>
+                  {participant.isLocal && onStopScreenShare && (
+                    <button 
+                      className="close-screen-share-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStopScreenShare();
+                      }}
+                      title="Остановить демонстрацию экрана"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className={`mic-status ${isMuted ? 'muted' : isSpeaking ? 'speaking' : 'silent'}`}>
+                    {isMuted ? (
+                      <MicOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
+                    ) : isSpeaking ? (
+                      <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#3ba55c' }} />
+                    ) : (
+                      <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
+                    )}
+                  </div>
+                  {participant.isGlobalAudioMuted && (
+                    <div className="headset-status">
+                      <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
+                    </div>
+                  )}
+                </>
               )}
               <span className="participant-name">{participant.name}</span>
             </div>
@@ -249,6 +315,9 @@ const VideoCallGrid = ({
             )}
 
             <div className="bottom-users-grid" ref={bottomGridRef}>
+              {/* Демонстрации экрана в нижней панели */}
+              {createScreenShareParticipants().map((participant) => renderParticipantTile(participant, true))}
+              {/* Обычные участники */}
               {currentBottomParticipants.map((participant) => renderParticipantTile(participant, true))}
             </div>
 
