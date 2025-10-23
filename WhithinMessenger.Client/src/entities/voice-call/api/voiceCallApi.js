@@ -94,37 +94,6 @@ class VoiceCallApi {
     });
   }
 
-  async connectTransport(transportId, dtlsParameters) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('connectTransport', {
-        transportId,
-        dtlsParameters
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  async produce(transportId, kind, rtpParameters, appData) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('produce', {
-        transportId,
-        kind,
-        rtpParameters,
-        appData
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
 
   async consume(rtpCapabilities, remoteProducerId, transportId) {
     return new Promise((resolve, reject) => {
@@ -202,14 +171,29 @@ class VoiceCallApi {
     });
   }
 
-  // Метод для создания producer с треком
-  async produceWithTrack(options) {
+  // Метод для подключения transport
+  async connectTransport(transportId, dtlsParameters) {
     return new Promise((resolve, reject) => {
-      // В mediasoup RTP параметры создаются на сервере
-      // Отправляем только базовые параметры
+      this.socket.emit('connectTransport', {
+        transportId,
+        dtlsParameters
+      }, (response) => {
+        if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  // Метод для создания producer
+  async produce(options) {
+    return new Promise((resolve, reject) => {
       this.socket.emit('produce', {
         transportId: options.transportId,
         kind: options.kind,
+        rtpParameters: options.rtpParameters,
         appData: options.appData
       }, (response) => {
         if (response && response.error) {
@@ -220,6 +204,7 @@ class VoiceCallApi {
       });
     });
   }
+
 }
 
 export const voiceCallApi = new VoiceCallApi();

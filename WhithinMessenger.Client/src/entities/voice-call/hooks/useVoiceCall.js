@@ -1044,11 +1044,50 @@ export const useVoiceCall = (userId, userName) => {
         throw new Error('No video track found in screen share stream');
       }
 
-      // Создаем transport для демонстрации экрана
-      const transport = await voiceCallApi.createWebRtcTransport();
-      if (!transport) {
+      // Создаем transport для демонстрации экрана через mediasoup Device
+      const transportParams = await voiceCallApi.createWebRtcTransport();
+      if (!transportParams) {
         throw new Error('Failed to create transport for screen share');
       }
+
+      // Создаем mediasoup transport напрямую, как в старом клиенте
+      const transport = voiceCallApi.device.createSendTransport({
+        ...transportParams,
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ],
+        iceTransportPolicy: 'all',
+        iceCandidatePoolSize: 10
+      });
+
+      // Добавляем обработчики событий transport, как в старом клиенте
+      transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+        try {
+          console.log('Screen share transport connect event');
+          await voiceCallApi.connectTransport(transport.id, dtlsParameters);
+          callback();
+        } catch (error) {
+          console.error('Screen share transport connect error:', error);
+          errback(error);
+        }
+      });
+
+      transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+        try {
+          console.log('Screen share transport produce event');
+          const response = await voiceCallApi.produce({
+            transportId: transport.id,
+            kind,
+            rtpParameters,
+            appData
+          });
+          callback({ id: response.id });
+        } catch (error) {
+          console.error('Screen share transport produce error:', error);
+          errback(error);
+        }
+      });
 
       // Создаем producer напрямую через transport, как в старом клиенте
       const producer = await transport.produce({
