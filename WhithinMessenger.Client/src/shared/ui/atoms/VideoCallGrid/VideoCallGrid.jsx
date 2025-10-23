@@ -51,6 +51,13 @@ const VideoCallGrid = ({
   const extendedParticipants = useMemo(() => {
     const screenShareParticipants = [];
     
+    console.log('extendedParticipants useMemo:', { 
+      isScreenSharing, 
+      hasScreenShareStream: !!screenShareStream, 
+      screenShareParticipant,
+      remoteScreenSharesSize: remoteScreenShares.size 
+    });
+    
     // Локальная демонстрация экрана
     if (isScreenSharing && screenShareStream && screenShareParticipant) {
       screenShareParticipants.push({
@@ -75,11 +82,12 @@ const VideoCallGrid = ({
     });
     
     const extended = [...participants, ...screenShareParticipants];
-    // console.log('Extended participants:', { 
-    //   participantsCount: participants.length, 
-    //   screenShareCount: screenShareParticipants.length,
-    //   totalCount: extended.length 
-    // });
+    console.log('Extended participants result:', { 
+      participantsCount: participants.length, 
+      screenShareCount: screenShareParticipants.length,
+      totalCount: extended.length,
+      screenShareIds: screenShareParticipants.map(p => p.id)
+    });
     return extended;
   }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
