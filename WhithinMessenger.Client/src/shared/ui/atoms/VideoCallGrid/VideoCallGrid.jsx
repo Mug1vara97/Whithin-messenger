@@ -51,12 +51,13 @@ const VideoCallGrid = ({
   const createScreenShareParticipants = useCallback(() => {
     const screenShareParticipants = [];
     
-    // console.log('createScreenShareParticipants:', { 
-    //   isScreenSharing, 
-    //   hasScreenShareStream: !!screenShareStream, 
-    //   screenShareParticipant,
-    //   remoteScreenSharesSize: remoteScreenShares.size 
-    // });
+    console.log('createScreenShareParticipants:', { 
+      isScreenSharing, 
+      hasScreenShareStream: !!screenShareStream, 
+      screenShareParticipant,
+      remoteScreenSharesSize: remoteScreenShares.size,
+      remoteScreenShares: Array.from(remoteScreenShares.values()).map(s => ({ producerId: s.producerId, userName: s.userName }))
+    });
     
     // Локальная демонстрация экрана убрана - показывается только в сетке
     
@@ -72,9 +73,9 @@ const VideoCallGrid = ({
       });
     });
     
-    // console.log('Screen share participants created:', screenShareParticipants.length);
+    console.log('Screen share participants created:', screenShareParticipants.length, screenShareParticipants.map(p => ({ id: p.id, name: p.name })));
     return screenShareParticipants;
-  }, [remoteScreenShares]);
+  }, [remoteScreenShares, isScreenSharing, screenShareStream, screenShareParticipant]);
 
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
