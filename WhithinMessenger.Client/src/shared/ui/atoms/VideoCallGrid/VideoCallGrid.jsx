@@ -18,7 +18,9 @@ const VideoCallGrid = ({
   showVolumeSliders = new Map(),
   onToggleUserMute,
   onChangeUserVolume,
-  onToggleVolumeSlider
+  onToggleVolumeSlider,
+  screenShareStream = null,
+  isScreenSharing = false
 }) => {
   const {
     focusedParticipantId,
@@ -119,7 +121,24 @@ const VideoCallGrid = ({
         <div className="tile-content">
           {/* Background with avatar or video */}
           <div className="tile-background">
-            {participant.avatar ? (
+            {/* Screen share video */}
+            {participant.isScreenSharing && screenShareStream ? (
+              <video 
+                autoPlay 
+                muted 
+                playsInline
+                ref={(video) => {
+                  if (video && screenShareStream) {
+                    video.srcObject = screenShareStream;
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (
               <div 

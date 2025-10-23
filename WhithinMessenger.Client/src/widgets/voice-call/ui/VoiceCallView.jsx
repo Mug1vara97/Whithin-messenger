@@ -38,6 +38,8 @@ const VoiceCallView = ({
     showVolumeSliders,
     isGlobalAudioMuted,
     currentCall,
+    isScreenSharing,
+    screenShareStream,
     startCall,
     endCall,
     toggleMute,
@@ -46,7 +48,8 @@ const VoiceCallView = ({
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
-    toggleGlobalAudio
+    toggleGlobalAudio,
+    toggleScreenShare
   } = useGlobalCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
@@ -90,6 +93,7 @@ const VoiceCallView = ({
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
     currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    currentUser.isScreenSharing = isScreenSharing; // Добавляем статус демонстрации экрана
     
     const videoParticipantsList = [currentUser];
     
@@ -106,12 +110,13 @@ const VoiceCallView = ({
       videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
       videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
       videoParticipant.isSpeaking = participant.isSpeaking || false;
+      videoParticipant.isScreenSharing = participant.isScreenSharing || false; // Добавляем статус демонстрации экрана
       videoParticipantsList.push(videoParticipant);
     });
     
     console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
-  }, [participants, userId, userName, isMuted, isAudioEnabled]);
+  }, [participants, userId, userName, isMuted, isAudioEnabled, isScreenSharing, isGlobalAudioMuted]);
 
 
   const handleClose = () => {
@@ -211,6 +216,8 @@ const VoiceCallView = ({
                       onToggleUserMute={toggleUserMute}
                       onChangeUserVolume={changeUserVolume}
                       onToggleVolumeSlider={toggleVolumeSlider}
+                      screenShareStream={screenShareStream}
+                      isScreenSharing={isScreenSharing}
                     />
                   </div>
                 )}
@@ -294,9 +301,11 @@ const VoiceCallView = ({
                       {/* Screen Share */}
                       <div className="attached-button-container control-button">
                         <button 
-                          className="center-button"
+                          className={`center-button ${isScreenSharing ? 'active' : ''}`}
                           type="button" 
-                          aria-label="Продемонстрируйте свой экран"
+                          onClick={toggleScreenShare}
+                          aria-label={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Продемонстрируйте свой экран'}
+                          title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Начать демонстрацию экрана'}
                         >
                           <ScreenShareIcon sx={{ fontSize: 24 }} />
                         </button>

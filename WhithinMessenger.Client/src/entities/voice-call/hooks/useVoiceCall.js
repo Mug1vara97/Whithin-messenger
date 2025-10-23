@@ -37,6 +37,8 @@ export const useVoiceCall = (userId, userName) => {
   const [showVolumeSliders, setShowVolumeSliders] = useState(new Map()); // Показать слайдер для пользователя
   const [isGlobalAudioMuted, setIsGlobalAudioMuted] = useState(false); // Глобальное отключение звука
   const [currentCall, setCurrentCall] = useState(null); // Текущий активный звонок
+  const [isScreenSharing, setIsScreenSharing] = useState(false); // Состояние демонстрации экрана
+  const [screenShareStream, setScreenShareStream] = useState(null); // Поток демонстрации экрана
 
   const deviceRef = useRef(null);
   const sendTransportRef = useRef(null);
@@ -1014,6 +1016,107 @@ export const useVoiceCall = (userId, userName) => {
     };
   }, [noiseSuppressionMode]);
 
+  // Функция для начала демонстрации экрана
+  const startScreenShare = useCallback(async () => {
+    try {
+      console.log('Starting screen share...');
+      
+      // Запрашиваем доступ к экрану
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          mediaSource: 'screen',
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
+          frameRate: { ideal: 30, max: 60 }
+        },
+        audio: false // Демонстрация экрана без звука
+      });
+
+      setScreenShareStream(stream);
+      setIsScreenSharing(true);
+
+      // Создаем producer для демонстрации экрана
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) {
+        throw new Error('No video track found in screen share stream');
+      }
+
+      // Создаем transport для демонстрации экрана
+      const transport = await voiceCallApi.createWebRtcTransport();
+      if (!transport) {
+        throw new Error('Failed to create transport for screen share');
+      }
+
+      // Создаем producer с метаданными для демонстрации экрана
+      const producer = await voiceCallApi.produceWithTrack({
+        transportId: transport.id,
+        kind: 'video',
+        appData: {
+          mediaType: 'screen',
+          userId: userId,
+          userName: userName
+        }
+      }, videoTrack);
+
+      if (!producer) {
+        throw new Error('Failed to create screen share producer');
+      }
+
+      // Сохраняем producer для демонстрации экрана
+      producersRef.current.set('screen', producer);
+
+      // Обработчик завершения демонстрации экрана
+      stream.getVideoTracks()[0].onended = () => {
+        console.log('Screen share ended by user');
+        stopScreenShare();
+      };
+
+      console.log('Screen share started successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to start screen share:', error);
+      setError(`Ошибка демонстрации экрана: ${error.message}`);
+      return false;
+    }
+  }, [userId, userName, stopScreenShare]);
+
+  // Функция для остановки демонстрации экрана
+  const stopScreenShare = useCallback(async () => {
+    try {
+      console.log('Stopping screen share...');
+      
+      // Останавливаем поток
+      if (screenShareStream) {
+        screenShareStream.getTracks().forEach(track => track.stop());
+        setScreenShareStream(null);
+      }
+
+      // Закрываем producer
+      const screenProducer = producersRef.current.get('screen');
+      if (screenProducer) {
+        await voiceCallApi.stopScreenSharing(screenProducer.id);
+        producersRef.current.delete('screen');
+      }
+
+      setIsScreenSharing(false);
+      console.log('Screen share stopped successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to stop screen share:', error);
+      setError(`Ошибка остановки демонстрации экрана: ${error.message}`);
+      return false;
+    }
+  }, [screenShareStream]);
+
+  // Функция для переключения демонстрации экрана
+  const toggleScreenShare = useCallback(async () => {
+    if (isScreenSharing) {
+      return await stopScreenShare();
+    } else {
+      return await startScreenShare();
+    }
+  }, [isScreenSharing, startScreenShare, stopScreenShare]);
+
   return {
     // Состояние
     isConnected,
@@ -1031,6 +1134,8 @@ export const useVoiceCall = (userId, userName) => {
     showVolumeSliders,
     isGlobalAudioMuted,
     currentCall,
+    isScreenSharing,
+    screenShareStream,
     
     // Методы
     connect,
@@ -1043,6 +1148,9 @@ export const useVoiceCall = (userId, userName) => {
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
-    toggleGlobalAudio
+    toggleGlobalAudio,
+    startScreenShare,
+    stopScreenShare,
+    toggleScreenShare
   };
 };

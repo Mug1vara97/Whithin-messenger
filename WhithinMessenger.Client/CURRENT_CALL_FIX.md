@@ -59,3 +59,5 @@ VoiceCallView: Call already active in this channel, skipping start
 5. **Если не совпадает** → Создается новый звонок
 
 ## ✅ **Статус:** ГОТОВО К ТЕСТИРОВАНИЮ
+
+

@@ -1,8 +1,14 @@
 import React from 'react';
 import { RegisterForm } from '../../../shared/ui/organisms/RegisterForm';
+import { GhostBackground } from '../../../shared/ui/atoms/GhostBackground';
 
 const RegisterPage = () => {
-  return <RegisterForm />;
+  return (
+    <>
+      <GhostBackground />
+      <RegisterForm />
+    </>
+  );
 };
 
 export default RegisterPage;
