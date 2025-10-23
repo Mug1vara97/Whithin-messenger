@@ -1162,16 +1162,16 @@ export const useCallStore = create(
 
         try {
           const state = get();
-          console.log('stopScreenShare: Got state, checking for screen producer...');
-          
           // Уведомляем сервер об остановке демонстрации экрана
           const screenProducer = state.producers.get('screen');
-          console.log('stopScreenShare: Screen producer found:', !!screenProducer, 'Socket available:', !!voiceCallApi.socket);
           
           if (screenProducer && voiceCallApi.socket) {
-            console.log('stopScreenShare: Calling voiceCallApi.stopScreenSharing...');
-            await voiceCallApi.stopScreenSharing(screenProducer.id);
-            console.log('stopScreenShare: voiceCallApi.stopScreenSharing completed');
+            try {
+              await voiceCallApi.stopScreenSharing(screenProducer.id);
+            } catch (error) {
+              console.log('stopScreenShare: voiceCallApi.stopScreenSharing failed:', error.message);
+              // Продолжаем выполнение даже если сервер не ответил
+            }
           }
 
           // Останавливаем поток
@@ -1184,12 +1184,6 @@ export const useCallStore = create(
           newProducers.delete('screen');
 
           // Очищаем состояние
-          console.log('About to call set() with:', {
-            screenShareStream: null,
-            isScreenSharing: false,
-            producersSize: newProducers.size
-          });
-          
           set({
             screenShareStream: null,
             isScreenSharing: false,
@@ -1197,10 +1191,6 @@ export const useCallStore = create(
           });
 
           console.log('Screen sharing stopped successfully');
-          console.log('State after stop:', { 
-            isScreenSharing: get().isScreenSharing, 
-            screenShareStream: get().screenShareStream 
-          });
         } catch (error) {
           console.error('Error stopping screen share:', error);
           set({ error: 'Failed to stop screen sharing: ' + error.message });
