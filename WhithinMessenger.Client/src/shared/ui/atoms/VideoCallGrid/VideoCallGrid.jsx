@@ -59,7 +59,16 @@ const VideoCallGrid = ({
     //   remoteScreenShares: Array.from(remoteScreenShares.values()).map(s => ({ producerId: s.producerId, userName: s.userName }))
     // });
     
-    // Локальная демонстрация экрана убрана - показывается только в сетке
+    // Локальная демонстрация экрана для фокуса
+    if (isScreenSharing && screenShareStream && screenShareParticipant) {
+      screenShareParticipants.push({
+        id: `screen-share-local-${screenShareParticipant.id}`,
+        name: screenShareParticipant.name,
+        isScreenShare: true,
+        isLocal: true,
+        stream: screenShareStream
+      });
+    }
     
     // Удаленные демонстрации экрана для фокуса
     Array.from(remoteScreenShares.values()).forEach((screenShare) => {
@@ -75,7 +84,7 @@ const VideoCallGrid = ({
     
     // console.log('Screen share participants created:', screenShareParticipants.length, screenShareParticipants.map(p => ({ id: p.id, name: p.name })));
     return screenShareParticipants;
-  }, [remoteScreenShares]);
+  }, [isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
@@ -95,7 +104,6 @@ const VideoCallGrid = ({
     bottomPage,
     totalPages,
     totalBottomPages,
-    currentParticipants,
     currentBottomParticipants,
     focusParticipant,
     goToPage,
@@ -364,80 +372,10 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={currentParticipants.length + ((isScreenSharing && screenShareStream) ? 1 : 0) + remoteScreenShares.size}>
-          {/* Локальная демонстрация экрана */}
-          {isScreenSharing && screenShareStream && (
-            <div className="video-tile screen-share-tile">
-              <div className="tile-border"></div>
-              <div className="tile-content">
-                <video
-                  ref={(video) => {
-                    if (video && screenShareStream) {
-                      video.srcObject = screenShareStream;
-                      video.play().catch(error => {
-                        if (error.name !== 'AbortError') {
-                          console.warn('Video play error:', error);
-                        }
-                      });
-                    }
-                  }}
-                  className="tile-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                <div className="tile-overlay">
-                  <div className="tile-info">
-                    <div className="tile-name">
-                      {screenShareParticipant?.name || 'Unknown'}
-                    </div>
-                    <div className="tile-status screen-share-status">
-                      <span className="status-indicator screen-share-indicator"></span>
-                      Демонстрация экрана
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Удаленные демонстрации экрана */}
-          {Array.from(remoteScreenShares.values()).map((screenShare) => (
-            <div key={screenShare.producerId} className="video-tile screen-share-tile">
-              <div className="tile-border"></div>
-              <div className="tile-content">
-                <video
-                  ref={(video) => {
-                    if (video && screenShare.stream) {
-                      video.srcObject = screenShare.stream;
-                      video.play().catch(error => {
-                        if (error.name !== 'AbortError') {
-                          console.warn('Video play error:', error);
-                        }
-                      });
-                    }
-                  }}
-                  className="tile-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                <div className="tile-overlay">
-                  <div className="tile-info">
-                    <div className="tile-name">
-                      {screenShare.userName || 'Unknown'}
-                    </div>
-                    <div className="tile-status screen-share-status">
-                      <span className="status-indicator screen-share-indicator"></span>
-                      Демонстрация экрана
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="video-grid" data-user-count={extendedParticipants.length}>
+          {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
 
-          {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
+          {extendedParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
 
         {totalPages > 1 && currentPage < totalPages - 1 && (
