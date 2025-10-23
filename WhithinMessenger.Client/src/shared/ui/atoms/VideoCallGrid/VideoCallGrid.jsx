@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useVideoCall } from '../../../../entities/video-call';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
@@ -47,19 +47,11 @@ const VideoCallGrid = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Создаем участников демонстрации экрана для фокуса
-  const createScreenShareParticipants = useCallback(() => {
+  // Создаем расширенный список участников, включая демонстрации экрана
+  const extendedParticipants = useMemo(() => {
     const screenShareParticipants = [];
     
-    // console.log('createScreenShareParticipants:', { 
-    //   isScreenSharing, 
-    //   hasScreenShareStream: !!screenShareStream, 
-    //   screenShareParticipant,
-    //   remoteScreenSharesSize: remoteScreenShares.size,
-    //   remoteScreenShares: Array.from(remoteScreenShares.values()).map(s => ({ producerId: s.producerId, userName: s.userName }))
-    // });
-    
-    // Локальная демонстрация экрана для фокуса
+    // Локальная демонстрация экрана
     if (isScreenSharing && screenShareStream && screenShareParticipant) {
       screenShareParticipants.push({
         id: `screen-share-local-${screenShareParticipant.id}`,
@@ -70,7 +62,7 @@ const VideoCallGrid = ({
       });
     }
     
-    // Удаленные демонстрации экрана для фокуса
+    // Удаленные демонстрации экрана
     Array.from(remoteScreenShares.values()).forEach((screenShare) => {
       screenShareParticipants.push({
         id: `screen-share-remote-${screenShare.producerId}`,
@@ -82,13 +74,6 @@ const VideoCallGrid = ({
       });
     });
     
-    // console.log('Screen share participants created:', screenShareParticipants.length, screenShareParticipants.map(p => ({ id: p.id, name: p.name })));
-    return screenShareParticipants;
-  }, [isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
-
-  // Создаем расширенный список участников, включая демонстрации экрана
-  const extendedParticipants = useMemo(() => {
-    const screenShareParticipants = createScreenShareParticipants();
     const extended = [...participants, ...screenShareParticipants];
     // console.log('Extended participants:', { 
     //   participantsCount: participants.length, 
@@ -96,7 +81,7 @@ const VideoCallGrid = ({
     //   totalCount: extended.length 
     // });
     return extended;
-  }, [participants, createScreenShareParticipants]);
+  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
   const {
     focusedParticipantId,
@@ -104,7 +89,6 @@ const VideoCallGrid = ({
     bottomPage,
     totalPages,
     totalBottomPages,
-    currentBottomParticipants,
     focusParticipant,
     goToPage,
     goToBottomPage,
@@ -333,10 +317,8 @@ const VideoCallGrid = ({
             )}
 
             <div className="bottom-users-grid" ref={bottomGridRef}>
-              {/* Демонстрации экрана в нижней панели */}
-              {createScreenShareParticipants().map((participant) => renderParticipantTile(participant, true))}
-              {/* Обычные участники */}
-              {currentBottomParticipants.map((participant) => renderParticipantTile(participant, true))}
+              {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
+              {extendedParticipants.map((participant) => renderParticipantTile(participant, true))}
             </div>
 
             {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
