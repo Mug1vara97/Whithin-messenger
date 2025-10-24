@@ -45,6 +45,7 @@ const LoginForm = () => {
         <div className="auth-header">
           <h2>Welcome back!</h2>
           <p>We're so excited to see you again!</p>
+          <p style={{color: 'red', fontSize: '20px', fontWeight: 'bold'}}>ПРИВЕТ!</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
