@@ -151,12 +151,47 @@ const ChatVoiceCall = ({
           {(() => {
             console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing);
             return isScreenSharing ? (
-              /* При демонстрации экрана показываем фокус вместо кружков пользователей */
+              /* При демонстрации экрана показываем фокус с видео экрана */
               <div className={styles.screenShareFocus}>
-                <div className={styles.focusIndicator}>
-                  <ScreenShareIcon className={styles.focusIcon} />
-                  <span className={styles.focusText}>Демонстрация экрана</span>
-                </div>
+                {screenShareStream ? (
+                  <div className={styles.screenShareVideoContainer}>
+                    <video
+                      ref={(video) => {
+                        if (video && screenShareStream) {
+                          video.srcObject = screenShareStream;
+                          video.play().catch(error => {
+                            if (error.name !== 'AbortError') {
+                              console.warn('Screen share video play error:', error);
+                            }
+                          });
+                        }
+                      }}
+                      className={styles.screenShareVideo}
+                      autoPlay
+                      muted
+                      playsInline
+                    />
+                    <div className={styles.screenShareOverlay}>
+                      <div className={styles.screenShareInfo}>
+                        <ScreenShareIcon className={styles.focusIcon} />
+                        <span className={styles.focusText}>Демонстрация экрана</span>
+                        <button 
+                          className={styles.stopScreenShareBtn}
+                          onClick={handleScreenShare}
+                          title="Остановить демонстрацию экрана"
+                        >
+                          <StopScreenShareIcon className={styles.stopIcon} />
+                          Остановить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.focusIndicator}>
+                    <ScreenShareIcon className={styles.focusIcon} />
+                    <span className={styles.focusText}>Демонстрация экрана</span>
+                  </div>
+                )}
               </div>
             ) : (
             /* Обычное отображение кружков пользователей */
