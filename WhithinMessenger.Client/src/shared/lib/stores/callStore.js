@@ -233,12 +233,14 @@ export const useCallStore = create(
           });
 
           voiceCallApi.on('producerClosed', (data) => {
+            console.log('🎥 Producer closed event received:', data);
+            
             const producerId = data.producerId || data;
             const producerSocketId = data.producerSocketId;
             const producerKind = data.kind; // video или audio
             const mediaType = data.mediaType; // screen или camera
             
-            console.log('🎥 Producer closed:', { producerId, producerSocketId, producerKind, mediaType });
+            console.log('🎥 Producer closed parsed:', { producerId, producerSocketId, producerKind, mediaType });
             
             // Проверяем, является ли это демонстрацией экрана
             const state = get();
@@ -257,7 +259,21 @@ export const useCallStore = create(
             
             // Проверяем, является ли это вебкамерой (video producer с mediaType camera)
             const userId = state.peerIdToUserIdMap.get(producerSocketId) || producerSocketId;
-            if (userId && userId !== state.currentUserId && producerKind === 'video' && mediaType === 'camera') {
+            
+            // Если параметры kind и mediaType не приходят, проверяем по участникам
+            let isVideoProducer = false;
+            if (producerKind === 'video' && mediaType === 'camera') {
+              isVideoProducer = true;
+            } else if (!producerKind && !mediaType) {
+              // Альтернативная проверка: если у участника есть isVideoEnabled, то это может быть video producer
+              const participant = state.participants.find(p => p.userId === userId);
+              if (participant && participant.isVideoEnabled) {
+                console.log('🎥 Detected video producer by participant state:', userId);
+                isVideoProducer = true;
+              }
+            }
+            
+            if (userId && userId !== state.currentUserId && isVideoProducer) {
               console.log('🎥 Camera video producer closed for user:', userId);
               // Обновляем участника - отключаем вебкамеру
               set((state) => {
