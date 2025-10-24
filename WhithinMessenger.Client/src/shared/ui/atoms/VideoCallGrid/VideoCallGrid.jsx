@@ -22,7 +22,8 @@ const VideoCallGrid = ({
   screenShareStream = null,
   isScreenSharing = false,
   screenShareParticipant = null,
-  remoteScreenShares = new Map()
+  remoteScreenShares = new Map(),
+  forceGridMode = false
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -283,8 +284,8 @@ const VideoCallGrid = ({
     );
   };
 
-  // Режим фокусировки
-  if (isFocusedMode) {
+  // Режим фокусировки (но не принудительная сетка)
+  if (isFocusedMode && !forceGridMode) {
     // console.log('Focused mode:', { 
     //   focusedParticipantId, 
     //   focusedParticipant,

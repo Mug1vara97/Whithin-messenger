@@ -261,6 +261,14 @@
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
+/* Screen Share Container */
+.screenShareContainer {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  position: relative;
+}
+
 /* Screen Share Focus */
 .screenShareFocus {
   display: flex;
