@@ -1588,13 +1588,19 @@ export const useCallStore = create(
           console.log('🎥 Consumers after video stop:', Array.from(finalState.consumers.keys()));
           console.log('🎥 Consumers count:', finalState.consumers.size);
           finalState.consumers.forEach((consumer, id) => {
-            console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused);
+            console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
           });
 
           // Проверяем audio elements
           console.log('🎥 Audio elements count:', finalState.audioElements.size);
           finalState.audioElements.forEach((audioElement, userId) => {
-            console.log('🎥 Audio element for user:', userId, 'srcObject:', !!audioElement.srcObject, 'paused:', audioElement.paused, 'muted:', audioElement.muted);
+            console.log('🎥 Audio element for user:', userId, 'srcObject:', !!audioElement.srcObject, 'paused:', audioElement.paused, 'muted:', audioElement.muted, 'currentTime:', audioElement.currentTime, 'duration:', audioElement.duration);
+            if (audioElement.srcObject) {
+              console.log('🎥 Audio element srcObject tracks:', audioElement.srcObject.getTracks().length);
+              audioElement.srcObject.getTracks().forEach(track => {
+                console.log('🎥 Audio track:', track.label, 'kind:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+              });
+            }
           });
 
           // Проверяем gain nodes
