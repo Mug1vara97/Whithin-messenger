@@ -209,6 +209,12 @@ const ChatVoiceCall = ({
     videoParticipant.isSpeaking = participant.isSpeaking || false;
     videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
     videoParticipant.videoStream = participant.videoStream || null;
+    console.log('🎥 Creating display participant:', {
+      id: videoParticipant.id,
+      name: videoParticipant.name,
+      isVideoEnabled: videoParticipant.isVideoEnabled,
+      hasVideoStream: !!videoParticipant.videoStream
+    });
     displayParticipants.push(videoParticipant);
   });
 

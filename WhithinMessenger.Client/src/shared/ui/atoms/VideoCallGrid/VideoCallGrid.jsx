@@ -238,6 +238,7 @@ const VideoCallGrid = ({
               <video
                 ref={(video) => {
                   if (video && participant.videoStream) {
+                    console.log('🎥 Rendering camera video in grid for participant:', participant.id, 'isCurrentUser:', participant.isCurrentUser);
                     video.srcObject = participant.videoStream;
                     video.play().catch(error => {
                       if (error.name !== 'AbortError') {
