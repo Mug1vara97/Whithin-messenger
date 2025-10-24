@@ -171,19 +171,30 @@ const ChatVoiceCall = ({
                       muted
                       playsInline
                     />
-                    <div className={styles.screenShareOverlay}>
-                      <div className={styles.screenShareInfo}>
-                        <ScreenShareIcon className={styles.focusIcon} />
-                        <span className={styles.focusText}>Демонстрация экрана</span>
-                        <button 
-                          className={styles.stopScreenShareBtn}
-                          onClick={handleScreenShare}
-                          title="Остановить демонстрацию экрана"
-                        >
-                          <StopScreenShareIcon className={styles.stopIcon} />
-                          Остановить
-                        </button>
-                      </div>
+                    {/* Маленькие блоки пользователей внизу */}
+                    <div className={styles.screenShareParticipants}>
+                      {displayParticipants.map((participant) => (
+                        <div key={participant.id} className={styles.screenShareParticipant}>
+                          <div className={styles.screenShareParticipantAvatar}>
+                            <div className={styles.screenShareAvatarCircle}>
+                              {(participant.name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            {/* Индикаторы статуса */}
+                            <div className={styles.screenShareStatusIndicators}>
+                              {participant.isMuted && (
+                                <div className={`${styles.screenShareStatusIndicator} ${styles.screenShareMuteIndicator}`}>
+                                  <MicOffIcon />
+                                </div>
+                              )}
+                              {participant.isGlobalAudioMuted && (
+                                <div className={`${styles.screenShareStatusIndicator} ${styles.screenShareAudioMutedIndicator}`}>
+                                  <VolumeOffIcon />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : (
