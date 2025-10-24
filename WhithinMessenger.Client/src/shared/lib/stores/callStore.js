@@ -1431,7 +1431,7 @@ export const useCallStore = create(
               frameRate: { ideal: 30, max: 60 },
               facingMode: 'user'
             },
-            audio: false // Явно отключаем аудио для вебкамеры
+            audio: false // Только видео для вебкамеры, аудио отдельно
           });
 
           console.log('Camera access granted');
@@ -1519,6 +1519,7 @@ export const useCallStore = create(
             console.log('🎥 No video producer to close');
           }
 
+
           // Останавливаем поток вебкамеры (он содержит только видео треки)
           if (state.cameraStream) {
             console.log('🎥 Stopping camera stream tracks');
@@ -1538,27 +1539,12 @@ export const useCallStore = create(
           set({
             isVideoEnabled: false,
             videoProducer: null,
-            cameraStream: null
+            cameraStream: null,
+            cameraAudioProducer: null
           });
           console.log('🎥 Video state cleared');
           
           console.log('🎥 Video stopped, but audio should continue working');
-          
-          // Принудительно переподключаем audio consumers к audio producers
-          const audioConsumers = Array.from(get().consumers.values()).filter(c => c.kind === 'audio');
-          audioConsumers.forEach(consumer => {
-            if (!consumer.closed) {
-              console.log('🎥 Reconnecting audio consumer:', consumer.id);
-              // Принудительно возобновляем consumer
-              if (consumer.paused) {
-                consumer.resume();
-              }
-              // Принудительно переподключаем к producer
-              if (consumer.producer && consumer.producer.paused) {
-                consumer.producer.resume();
-              }
-            }
-          });
           
           // Проверяем, что основной аудио producer не затронут
           const currentState = get();
