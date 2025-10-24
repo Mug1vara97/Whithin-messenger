@@ -7,20 +7,40 @@
   display: flex;
   flex-direction: column;
   min-height: 230px;
-  max-height: 556px;
-  height: 326px;
+  max-height: 80vh; /* Ограничиваем максимальную высоту */
   border-radius: 8px;
   overflow: hidden;
+  resize: both; /* Позволяет изменять размер */
+  cursor: nw-resize; /* Курсор для изменения размера */
+}
+
+/* Индикатор изменения размера */
+.voiceCallContainer::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(-45deg, transparent 0%, transparent 30%, #5865f2 30%, #5865f2 40%, transparent 40%, transparent 70%, #5865f2 70%, #5865f2 80%, transparent 80%);
+  cursor: nw-resize;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.voiceCallContainer:hover::after {
+  opacity: 1;
 }
 
 /* Voice Call Wrapper */
 .voiceCallWrapper {
   flex: 1;
-  /* display: flex; */
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px 20px 100px 20px; /* Добавляем отступ снизу для кнопок */
   position: relative;
+  min-height: 0; /* Позволяет flex-элементам сжиматься */
 }
 
 .participantsContainer {
@@ -30,6 +50,8 @@
   justify-content: center;
   flex: 1;
   width: 100%;
+  max-height: calc(100vh - 200px); /* Ограничиваем высоту */
+  overflow: hidden; /* Предотвращаем переполнение */
 }
 
 .participantItem {
@@ -267,17 +289,20 @@
 .screenShareContainer {
   width: 100%;
   height: 100%;
-  min-height: 400px;
+  max-height: calc(100vh - 200px); /* Ограничиваем высоту */
   position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Предотвращаем переполнение */
 }
 
 .screenShareContainer .video-call-container {
   width: 100%;
   height: 100%;
   flex: 1;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /* Screen Share Focus */
