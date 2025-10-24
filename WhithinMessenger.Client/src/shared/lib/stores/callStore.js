@@ -1105,7 +1105,7 @@ export const useCallStore = create(
           }
 
           console.log('Creating screen sharing producer...');
-          const producer = await state.sendTransport.produce({
+          const videoProducer = await state.sendTransport.produce({
             track: videoTrack,
             encodings: [
               {
@@ -1120,6 +1120,7 @@ export const useCallStore = create(
             },
             appData: {
               mediaType: 'screen',
+              trackType: 'video',
               userId: state.currentUserId,
               userName: state.currentUserName,
               width: videoTrack.getSettings().width,
@@ -1128,23 +1129,46 @@ export const useCallStore = create(
             }
           });
 
-          console.log('Screen sharing producer created:', producer.id);
+          console.log('Screen sharing video producer created:', videoProducer.id);
 
-          // Сохраняем producer
+          // Создаем отдельный audio producer для демонстрации экрана
+          const audioTrack = stream.getAudioTracks()[0];
+          let audioProducer = null;
+          
+          if (audioTrack) {
+            console.log('Creating screen sharing audio producer...');
+            audioProducer = await state.sendTransport.produce({
+              track: audioTrack,
+              appData: {
+                mediaType: 'screen',
+                trackType: 'audio',
+                userId: state.currentUserId,
+                userName: state.currentUserName
+              }
+            });
+            console.log('Screen sharing audio producer created:', audioProducer.id);
+          } else {
+            console.log('No audio track in screen share stream');
+          }
+
+          // Сохраняем producers
           const newProducers = new Map(state.producers);
-          newProducers.set('screen', producer);
+          newProducers.set('screen-video', videoProducer);
+          if (audioProducer) {
+            newProducers.set('screen-audio', audioProducer);
+          }
           set({ 
             producers: newProducers,
             isScreenSharing: true 
           });
 
-          // Обработка событий producer
-          producer.on('transportclose', () => {
-            console.log('Screen sharing transport closed');
+          // Обработка событий video producer
+          videoProducer.on('transportclose', () => {
+            console.log('Screen sharing video transport closed');
             get().stopScreenShare();
           });
 
-          producer.on('trackended', () => {
+          videoProducer.on('trackended', () => {
             console.log('Screen sharing track ended');
             get().stopScreenShare();
           });
@@ -1170,11 +1194,12 @@ export const useCallStore = create(
         try {
           const state = get();
           // Уведомляем сервер об остановке демонстрации экрана
-          const screenProducer = state.producers.get('screen');
+          const videoProducer = state.producers.get('screen-video');
+          const audioProducer = state.producers.get('screen-audio');
           
-          if (screenProducer && voiceCallApi.socket) {
+          if (videoProducer && voiceCallApi.socket) {
             try {
-              await voiceCallApi.stopScreenSharing(screenProducer.id);
+              await voiceCallApi.stopScreenSharing(videoProducer.id);
             } catch (error) {
               console.log('stopScreenShare: voiceCallApi.stopScreenSharing failed:', error.message);
               // Продолжаем выполнение даже если сервер не ответил
@@ -1186,9 +1211,10 @@ export const useCallStore = create(
             state.screenShareStream.getTracks().forEach(track => track.stop());
           }
 
-          // Удаляем producer
+          // Удаляем producers
           const newProducers = new Map(state.producers);
-          newProducers.delete('screen');
+          newProducers.delete('screen-video');
+          newProducers.delete('screen-audio');
 
           // Очищаем состояние
           set({
