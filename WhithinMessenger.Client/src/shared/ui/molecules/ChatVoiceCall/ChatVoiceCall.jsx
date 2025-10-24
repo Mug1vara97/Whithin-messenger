@@ -90,9 +90,21 @@ const ChatVoiceCall = ({
     if (shouldAutoFocus) {
       // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
       const timer = setTimeout(() => {
-        const screenShareTile = document.querySelector('.screen-share-content');
-        if (screenShareTile) {
-          screenShareTile.click();
+        // Сначала пробуем найти screen share tile
+        let targetTile = document.querySelector('.screen-share-content');
+        
+        // Если screen share не найден, ищем video tile (вебкамера)
+        if (!targetTile) {
+          targetTile = document.querySelector('.video-tile');
+        }
+        
+        // Если все еще не найден, ищем любой tile с видео
+        if (!targetTile) {
+          targetTile = document.querySelector('[data-participant-id]');
+        }
+        
+        if (targetTile) {
+          targetTile.click();
           console.log('ChatVoiceCall: Auto-focused on screen share or video');
         }
       }, 100);
@@ -160,6 +172,7 @@ const ChatVoiceCall = ({
   currentUser.isSpeaking = false;
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = videoStream;
+  currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
   
   const displayParticipants = [currentUser];
   
@@ -219,6 +232,8 @@ const ChatVoiceCall = ({
                   onStopScreenShare={handleScreenShare}
                   forceGridMode={false}
                   hideBottomUsers={true}
+                  isVideoEnabled={isVideoEnabled}
+                  videoStream={videoStream}
                 />
               </div>
             ) : (

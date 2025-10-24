@@ -1,5 +1,4 @@
-import React, { useRef, useMemo } from 'react';
-import { useVideoCall } from '../../../../entities/video-call/hooks/useVideoCall';
+import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -24,7 +23,9 @@ const VideoCallGrid = ({
   screenShareParticipant = null,
   remoteScreenShares = new Map(),
   forceGridMode = false,
-  hideBottomUsers = false
+  hideBottomUsers = false,
+  isVideoEnabled = false,
+  videoStream = null
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -80,18 +81,51 @@ const VideoCallGrid = ({
     return extended;
   }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
-  const {
-    focusedParticipantId,
-    currentPage,
-    bottomPage,
-    totalPages,
-    totalBottomPages,
-    focusParticipant,
-    goToPage,
-    goToBottomPage,
-    isFocusedMode,
-    focusedParticipant
-  } = useVideoCall(extendedParticipants);
+  // Локальная логика вместо useVideoCall
+  const [focusedParticipantId, setFocusedParticipantId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [bottomPage, setBottomPage] = useState(0);
+  const [visibleBottomUsers] = useState(6);
+
+  const isFocusedMode = focusedParticipantId !== null;
+  const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
+
+  // Вычисляемые значения
+  const totalPages = Math.ceil(extendedParticipants.length / 6);
+  const totalBottomPages = Math.ceil(extendedParticipants.length / visibleBottomUsers);
+  
+  // const currentParticipants = extendedParticipants.slice(currentPage * 6, (currentPage + 1) * 6);
+
+  // Действия
+  const focusParticipant = useCallback((participantId) => {
+    if (focusedParticipantId === participantId) {
+      setFocusedParticipantId(null);
+      setBottomPage(0);
+    } else {
+      setFocusedParticipantId(participantId);
+      setBottomPage(0);
+    }
+  }, [focusedParticipantId]);
+
+  const goToPage = (page) => {
+    setCurrentPage(page);
+  };
+
+  const goToBottomPage = (page) => {
+    setBottomPage(page);
+  };
+
+  // Автоматический фокус на вебкамеру пользователя
+  useEffect(() => {
+    if (isVideoEnabled && videoStream && !isFocusedMode) {
+      // Находим участника с включенной вебкамерой
+      const videoParticipant = extendedParticipants.find(p => p.isVideoEnabled && p.videoStream);
+      if (videoParticipant) {
+        console.log('VideoCallGrid: Auto-focusing on video participant:', videoParticipant.id);
+        focusParticipant(videoParticipant.id);
+      }
+    }
+  }, [isVideoEnabled, videoStream, extendedParticipants, isFocusedMode, focusParticipant]);
 
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
@@ -184,7 +218,7 @@ const VideoCallGrid = ({
                     });
                   }
                 }}
-                className="tile-video"
+                className={`tile-video ${participant.isCurrentUser ? 'tile-video-mirrored' : ''}`}
                 autoPlay
                 muted
                 playsInline

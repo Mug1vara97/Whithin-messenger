@@ -759,6 +759,11 @@
   background: #000000;
 }
 
+/* Отражение вебкамеры пользователя (не зеркально) */
+.tile-video-mirrored {
+  transform: scaleX(-1);
+}
+
 .screen-share-tile .tile-overlay {
   position: absolute;
   bottom: 0;
