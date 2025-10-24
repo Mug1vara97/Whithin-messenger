@@ -93,9 +93,17 @@ const ChatVoiceCall = ({
         // Сначала пробуем найти screen share tile
         let targetTile = document.querySelector('.screen-share-content');
         
-        // Если screen share не найден, ищем video tile (вебкамера)
+        // Если screen share не найден, ищем video tile (вебкамера) удаленного пользователя
         if (!targetTile) {
-          targetTile = document.querySelector('.video-tile');
+          // Ищем tile с видео, но не текущего пользователя
+          const allVideoTiles = document.querySelectorAll('.video-tile, [data-participant-id]');
+          for (const tile of allVideoTiles) {
+            const participantId = tile.getAttribute('data-participant-id');
+            if (participantId && participantId !== userId) {
+              targetTile = tile;
+              break;
+            }
+          }
         }
         
         // Если все еще не найден, ищем любой tile с видео
@@ -111,7 +119,7 @@ const ChatVoiceCall = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, participants]);
+  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, participants, userId]);
 
   // Очистка при размонтировании
   useEffect(() => {

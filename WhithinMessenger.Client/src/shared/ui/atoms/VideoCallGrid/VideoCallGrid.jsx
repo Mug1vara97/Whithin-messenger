@@ -23,9 +23,7 @@ const VideoCallGrid = ({
   screenShareParticipant = null,
   remoteScreenShares = new Map(),
   forceGridMode = false,
-  hideBottomUsers = false,
-  isVideoEnabled = false,
-  videoStream = null
+  hideBottomUsers = false
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -115,17 +113,19 @@ const VideoCallGrid = ({
     setBottomPage(page);
   };
 
-  // Автоматический фокус на вебкамеру пользователя
+  // Автоматический фокус на вебкамеру собеседника
   useEffect(() => {
-    if (isVideoEnabled && videoStream && !isFocusedMode) {
-      // Находим участника с включенной вебкамерой
-      const videoParticipant = extendedParticipants.find(p => p.isVideoEnabled && p.videoStream);
+    if (!isFocusedMode) {
+      // Находим участника с включенной вебкамерой (не текущего пользователя)
+      const videoParticipant = extendedParticipants.find(p => 
+        p.isVideoEnabled && p.videoStream && !p.isCurrentUser
+      );
       if (videoParticipant) {
-        console.log('VideoCallGrid: Auto-focusing on video participant:', videoParticipant.id);
+        console.log('VideoCallGrid: Auto-focusing on remote video participant:', videoParticipant.id);
         focusParticipant(videoParticipant.id);
       }
     }
-  }, [isVideoEnabled, videoStream, extendedParticipants, isFocusedMode, focusParticipant]);
+  }, [extendedParticipants, isFocusedMode, focusParticipant]);
 
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
