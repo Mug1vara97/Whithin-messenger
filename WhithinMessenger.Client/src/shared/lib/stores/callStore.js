@@ -1398,7 +1398,8 @@ export const useCallStore = create(
               height: { ideal: 720, max: 1080 },
               frameRate: { ideal: 30, max: 60 },
               facingMode: 'user'
-            }
+            },
+            audio: false // Явно отключаем аудио для вебкамеры
           });
 
           console.log('Camera access granted');
@@ -1473,15 +1474,23 @@ export const useCallStore = create(
             }
           }
 
-          // Останавливаем только видео треки
+          // Останавливаем только видео треки, НЕ трогаем аудио треки
           if (state.videoStream) {
-            state.videoStream.getTracks().forEach(track => {
-              if (track.kind === 'video') {
-                console.log('🎥 Stopping video track:', track.label);
-                track.stop();
-              } else {
-                console.log('🎥 Keeping audio track:', track.label);
-              }
+            const videoTracks = state.videoStream.getVideoTracks();
+            const audioTracks = state.videoStream.getAudioTracks();
+            
+            console.log('🎥 Video tracks to stop:', videoTracks.length);
+            console.log('🎥 Audio tracks to keep:', audioTracks.length);
+            
+            // Останавливаем только видео треки
+            videoTracks.forEach(track => {
+              console.log('🎥 Stopping video track:', track.label);
+              track.stop();
+            });
+            
+            // НЕ останавливаем аудио треки - они могут использоваться для голоса
+            audioTracks.forEach(track => {
+              console.log('🎥 Keeping audio track for voice:', track.label);
             });
           }
 
