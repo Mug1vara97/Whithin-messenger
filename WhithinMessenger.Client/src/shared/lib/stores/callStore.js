@@ -621,6 +621,13 @@ export const useCallStore = create(
             console.log('🎥 Camera video producer detected, updating participant video stream');
             console.log('🎥 Producer data:', { userId, producerUserId: producerData.appData?.userId, currentUserId: state.currentUserId });
             
+            // Проверяем, есть ли уже videoStream у участника
+            const existingParticipant = state.participants.find(p => p.userId === userId);
+            if (existingParticipant && existingParticipant.videoStream) {
+              console.log('🎥 Participant already has video stream, skipping creation');
+              return;
+            }
+            
             // Создаем MediaStream из consumer track
             const videoStream = new MediaStream([consumer.track]);
             console.log('🎥 Created video stream:', videoStream);

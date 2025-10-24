@@ -8,6 +8,33 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
+// Компонент для управления video элементом
+const VideoElement = ({ stream, isCurrentUser, participantId }) => {
+  const videoRef = useRef(null);
+  
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      console.log('🎥 VideoElement: Setting stream for participant:', participantId, 'isCurrentUser:', isCurrentUser);
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(error => {
+        if (error.name !== 'AbortError') {
+          console.warn('Camera video play error:', error);
+        }
+      });
+    }
+  }, [stream, participantId, isCurrentUser]);
+  
+  return (
+    <video
+      ref={videoRef}
+      className={`tile-video ${isCurrentUser ? 'tile-video-mirrored' : ''}`}
+      autoPlay
+      muted
+      playsInline
+    />
+  );
+};
+
 const VideoCallGrid = ({ 
   participants = [], 
   onParticipantClick,
@@ -235,22 +262,10 @@ const VideoCallGrid = ({
                 playsInline
               />
             ) : participant.isVideoEnabled && participant.videoStream ? (
-              <video
-                ref={(video) => {
-                  if (video && participant.videoStream) {
-                    console.log('🎥 Rendering camera video in grid for participant:', participant.id, 'isCurrentUser:', participant.isCurrentUser);
-                    video.srcObject = participant.videoStream;
-                    video.play().catch(error => {
-                      if (error.name !== 'AbortError') {
-                        console.warn('Camera video play error:', error);
-                      }
-                    });
-                  }
-                }}
-                className={`tile-video ${participant.isCurrentUser ? 'tile-video-mirrored' : ''}`}
-                autoPlay
-                muted
-                playsInline
+              <VideoElement 
+                stream={participant.videoStream}
+                isCurrentUser={participant.isCurrentUser}
+                participantId={participant.id}
               />
             ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
