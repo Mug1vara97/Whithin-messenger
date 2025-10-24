@@ -496,9 +496,44 @@ export const useVoiceCall = (userId, userName) => {
       const isScreenShare = producerData.appData?.mediaType === 'screen';
       console.log('handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind);
       
-      // Для демонстрации экрана не создаем AudioContext
-      if (isScreenShare) {
-        console.log('Screen share producer detected, skipping audio processing');
+      // Для демонстрации экрана обрабатываем только видео (аудио обрабатывается отдельно)
+      if (isScreenShare && producerData.kind === 'video') {
+        console.log('Screen share video producer detected, skipping audio processing');
+        return;
+      }
+      
+      // Для аудио демонстрации экрана создаем отдельный AudioContext
+      if (isScreenShare && producerData.kind === 'audio') {
+        console.log('Screen share audio producer detected, creating separate audio processing');
+        
+        // Создаем отдельный AudioContext для демонстрации экрана
+        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 48000,
+            latencyHint: 'playback' // Для демонстрации экрана используем playback
+          });
+        }
+        
+        // Resume audio context if suspended
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+        
+        // Создаем audio element для демонстрации экрана
+        const audioElement = document.createElement('audio');
+        audioElement.srcObject = new MediaStream([consumer.track]);
+        audioElement.autoplay = true;
+        audioElement.volume = 1.0; // Полная громкость для демонстрации экрана
+        audioElement.muted = false;
+        
+        // Добавляем в DOM для воспроизведения
+        document.body.appendChild(audioElement);
+        
+        // Сохраняем audio element для демонстрации экрана
+        const screenShareAudioKey = `screen-share-${userId}`;
+        audioElementsRef.current.set(screenShareAudioKey, audioElement);
+        
+        console.log('Screen share audio consumer created:', consumerData.id);
         return;
       }
       
@@ -1050,7 +1085,14 @@ export const useVoiceCall = (userId, userName) => {
           displaySurface: 'monitor',
           resizeMode: 'crop-and-scale'
         },
-        audio: false
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 2,
+          sampleSize: 16
+        }
       });
 
       console.log('Screen sharing access granted');
@@ -1065,12 +1107,16 @@ export const useVoiceCall = (userId, userName) => {
       setScreenShareStream(stream);
 
       const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      
       if (!videoTrack) {
         throw new Error('No video track available');
       }
 
-      console.log('Creating screen sharing producer...');
-      const producer = await sendTransportRef.current.produce({
+      console.log('Creating screen sharing producers...');
+      
+      // Создаем video producer для демонстрации экрана
+      const videoProducer = await sendTransportRef.current.produce({
         track: videoTrack,
         encodings: [
           {
@@ -1085,6 +1131,7 @@ export const useVoiceCall = (userId, userName) => {
         },
         appData: {
           mediaType: 'screen',
+          trackType: 'video',
           userId: userId,
           userName: userName,
           width: videoTrack.getSettings().width,
@@ -1093,22 +1140,82 @@ export const useVoiceCall = (userId, userName) => {
         }
       });
 
-      console.log('Screen sharing producer created:', producer.id);
+      console.log('Screen sharing video producer created:', videoProducer.id);
 
-      // Сохраняем producer
-      screenProducerRef.current = producer;
+      // Создаем audio producer для демонстрации экрана, если есть аудио трек
+      let audioProducer = null;
+      if (audioTrack) {
+        audioProducer = await sendTransportRef.current.produce({
+          track: audioTrack,
+          encodings: [
+            {
+              ssrc: Math.floor(Math.random() * 4294967296),
+              dtx: true,
+              maxBitrate: 128000, // 128 kbps для аудио демонстрации экрана
+              scalabilityMode: 'S1T1',
+              numberOfChannels: 2
+            }
+          ],
+          codecOptions: {
+            opusStereo: true,
+            opusDtx: true,
+            opusFec: true,
+            opusNack: true,
+            channelsCount: 2,
+            sampleRate: 48000,
+            opusMaxAverageBitrate: 128000,
+            opusMaxPlaybackRate: 48000,
+            opusPtime: 20,
+            opusApplication: 'music', // Для демонстрации экрана используем music вместо voip
+            opusCbr: false,
+            opusUseinbandfec: true
+          },
+          appData: {
+            mediaType: 'screen',
+            trackType: 'audio',
+            userId: userId,
+            userName: userName,
+            audioProcessing: {
+              echoCancellation: false, // Отключаем для демонстрации экрана
+              noiseSuppression: false,
+              autoGainControl: false,
+              highpassFilter: false,
+              typingNoiseDetection: false,
+              monoAudio: false
+            }
+          }
+        });
+
+        console.log('Screen sharing audio producer created:', audioProducer.id);
+      }
+
+      // Сохраняем producers
+      screenProducerRef.current = { video: videoProducer, audio: audioProducer };
       setIsScreenSharing(true);
 
-      // Обработка событий producer
-      producer.on('transportclose', () => {
-        console.log('Screen sharing transport closed');
+      // Обработка событий video producer
+      videoProducer.on('transportclose', () => {
+        console.log('Screen sharing video transport closed');
         stopScreenShare();
       });
 
-      producer.on('trackended', () => {
-        console.log('Screen sharing track ended');
+      videoProducer.on('trackended', () => {
+        console.log('Screen sharing video track ended');
         stopScreenShare();
       });
+
+      // Обработка событий audio producer, если он есть
+      if (audioProducer) {
+        audioProducer.on('transportclose', () => {
+          console.log('Screen sharing audio transport closed');
+          stopScreenShare();
+        });
+
+        audioProducer.on('trackended', () => {
+          console.log('Screen sharing audio track ended');
+          stopScreenShare();
+        });
+      }
 
     } catch (error) {
       console.error('Error starting screen share:', error);
@@ -1129,12 +1236,32 @@ export const useVoiceCall = (userId, userName) => {
     try {
       // Уведомляем сервер об остановке демонстрации экрана
       if (screenProducerRef.current && voiceCallApi.socket) {
-        await voiceCallApi.stopScreenSharing(screenProducerRef.current.id);
+        // Останавливаем video producer
+        if (screenProducerRef.current.video) {
+          await voiceCallApi.stopScreenSharing(screenProducerRef.current.video.id);
+        }
+        // Останавливаем audio producer, если есть
+        if (screenProducerRef.current.audio) {
+          await voiceCallApi.stopScreenSharing(screenProducerRef.current.audio.id);
+        }
       }
 
       // Останавливаем поток
       if (screenShareStream) {
         screenShareStream.getTracks().forEach(track => track.stop());
+      }
+
+      // Очищаем audio elements для демонстрации экрана
+      const screenShareAudioKey = `screen-share-${userId}`;
+      const screenShareAudioElement = audioElementsRef.current.get(screenShareAudioKey);
+      if (screenShareAudioElement) {
+        console.log('Removing screen share audio element for user:', userId);
+        screenShareAudioElement.pause();
+        screenShareAudioElement.srcObject = null;
+        if (screenShareAudioElement.parentNode) {
+          screenShareAudioElement.parentNode.removeChild(screenShareAudioElement);
+        }
+        audioElementsRef.current.delete(screenShareAudioKey);
       }
 
       // Очищаем состояние
@@ -1147,7 +1274,7 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Error stopping screen share:', error);
       setError('Failed to stop screen sharing: ' + error.message);
     }
-  }, [screenShareStream]);
+  }, [screenShareStream, userId]);
 
   const toggleScreenShare = useCallback(async () => {
     if (isScreenSharing) {

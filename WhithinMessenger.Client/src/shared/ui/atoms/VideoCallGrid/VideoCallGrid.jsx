@@ -201,6 +201,10 @@ const VideoCallGrid = ({
                 <div className="screen-share-status">
                   <span className="status-indicator screen-share-indicator"></span>
                   <span className="status-text">Демонстрация экрана</span>
+                  {/* Показываем индикатор звука для демонстрации экрана */}
+                  <div className="screen-share-audio-indicator">
+                    <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16, color: '#5865f2' }} />
+                  </div>
                   {/* Кнопка закрытия убрана по требованию пользователя */}
                 </div>
               ) : (

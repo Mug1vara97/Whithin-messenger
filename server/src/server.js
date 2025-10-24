@@ -456,12 +456,8 @@ io.on('connection', async (socket) => {
 
             // Check if this is a screen sharing producer
             if (appData?.mediaType === 'screen') {
-                // Only allow video for screen sharing
-                if (kind === 'audio') {
-                    console.log('Ignoring audio track for screen sharing');
-                    callback({ id: null });
-                    return;
-                }
+                // Allow both video and audio for screen sharing
+                console.log('Creating screen sharing producer:', { kind, appData });
 
                 // For video stream, check if peer is already sharing screen
                 if (kind === 'video' && room.isPeerSharingScreen(socket.id)) {
@@ -470,26 +466,73 @@ io.on('connection', async (socket) => {
                 
                 console.log('Creating screen sharing producer:', { kind, appData });
 
-                const producerOptions = {
+                let producerOptions = {
                     kind,
                     rtpParameters,
-                    appData,
-                    // Optimize encoding parameters for Full HD screen sharing
-                                    encodings: [
-                        {
-                            maxBitrate: 5000000, // 5 Mbps для Full HD
-                            scaleResolutionDownBy: 1, // Без уменьшения разрешения
-                            maxFramerate: 60
-                        }
-                ],
-                // Add codec preferences for better quality
-                codecOptions: {
-                        videoGoogleStartBitrate: 3000,
-                    videoGoogleMinBitrate: 1000,
-                        videoGoogleMaxBitrate: 5000
-                },
-                    keyFrameRequestDelay: 2000
+                    appData
                 };
+
+                // Настройки для video producer демонстрации экрана
+                if (kind === 'video') {
+                    producerOptions = {
+                        ...producerOptions,
+                        // Optimize encoding parameters for Full HD screen sharing
+                        encodings: [
+                            {
+                                maxBitrate: 5000000, // 5 Mbps для Full HD
+                                scaleResolutionDownBy: 1, // Без уменьшения разрешения
+                                maxFramerate: 60
+                            }
+                        ],
+                        // Add codec preferences for better quality
+                        codecOptions: {
+                            videoGoogleStartBitrate: 3000,
+                            videoGoogleMinBitrate: 1000,
+                            videoGoogleMaxBitrate: 5000
+                        },
+                        keyFrameRequestDelay: 2000
+                    };
+                }
+                // Настройки для audio producer демонстрации экрана
+                else if (kind === 'audio') {
+                    producerOptions = {
+                        ...producerOptions,
+                        codecOptions: {
+                            opusStereo: true,
+                            opusDtx: true,
+                            opusFec: true,
+                            opusNack: true,
+                            channelsCount: 2,
+                            sampleRate: 48000,
+                            opusMaxAverageBitrate: 128000,
+                            opusMaxPlaybackRate: 48000,
+                            opusPtime: 20,
+                            opusApplication: 'music', // Для демонстрации экрана используем music
+                            opusCbr: false,
+                            opusUseinbandfec: true
+                        },
+                        encodings: [
+                            {
+                                ssrc: Math.floor(Math.random() * 4294967296),
+                                dtx: true,
+                                maxBitrate: 128000,
+                                scalabilityMode: 'S1T1',
+                                numberOfChannels: 2
+                            }
+                        ],
+                        appData: {
+                            ...appData,
+                            audioProcessing: {
+                                echoCancellation: false, // Отключаем для демонстрации экрана
+                                noiseSuppression: false,
+                                autoGainControl: false,
+                                highpassFilter: false,
+                                typingNoiseDetection: false,
+                                monoAudio: false
+                            }
+                        }
+                    };
+                }
 
                 producerOptions.appData = {
                     ...producerOptions.appData,
@@ -628,32 +671,56 @@ io.on('connection', async (socket) => {
                 };
 
                 // Modify RTP parameters for better audio quality
-                if (rtpParameters.codecs) {
+                if (rtpParameters.codecs && kind === 'audio') {
                     rtpParameters.codecs.forEach(codec => {
                         if (codec.mimeType.toLowerCase() === 'audio/opus') {
-                            codec.parameters = {
-                                ...codec.parameters,
-                                maxaveragebitrate: 64000,
-                                maxplaybackrate: 48000,
-                                application: 'voip',
-                                useinbandfec: 1,
-                                'x-google-min-bitrate': 8,
-                                'x-google-max-bitrate': 64,
-                                'x-google-start-bitrate': 32,
-                                'x-google-echo-cancellation': 1,
-                                'x-google-noise-suppression': 1,
-                                'x-google-noise-suppression-level': 2,
-                                'x-google-auto-gain-control': 1,
-                                'x-google-experimental-echo-cancellation': 1,
-                                'x-google-experimental-noise-suppression': 1,
-                                'x-google-experimental-auto-gain-control': 1,
-                                'x-google-typing-noise-detection': 1,
-                                'x-google-conference-mode': 1,
-                                'x-google-hardware-echo-cancellation': 1,
-                                'x-google-highpass-filter': 1,
-                                'x-google-mono-audio': 1,
-                                channels: 1
-                            };
+                            // Для демонстрации экрана используем другие настройки
+                            if (appData?.mediaType === 'screen') {
+                                codec.parameters = {
+                                    ...codec.parameters,
+                                    maxaveragebitrate: 128000,
+                                    maxplaybackrate: 48000,
+                                    application: 'music', // Для демонстрации экрана
+                                    useinbandfec: 1,
+                                    'x-google-min-bitrate': 32,
+                                    'x-google-max-bitrate': 128,
+                                    'x-google-start-bitrate': 64,
+                                    'x-google-echo-cancellation': 0, // Отключаем для демонстрации экрана
+                                    'x-google-noise-suppression': 0,
+                                    'x-google-auto-gain-control': 0,
+                                    'x-google-typing-noise-detection': 0,
+                                    'x-google-conference-mode': 0,
+                                    'x-google-hardware-echo-cancellation': 0,
+                                    'x-google-highpass-filter': 0,
+                                    'x-google-mono-audio': 0,
+                                    channels: 2 // Стерео для демонстрации экрана
+                                };
+                            } else {
+                                // Обычные настройки для голоса
+                                codec.parameters = {
+                                    ...codec.parameters,
+                                    maxaveragebitrate: 64000,
+                                    maxplaybackrate: 48000,
+                                    application: 'voip',
+                                    useinbandfec: 1,
+                                    'x-google-min-bitrate': 8,
+                                    'x-google-max-bitrate': 64,
+                                    'x-google-start-bitrate': 32,
+                                    'x-google-echo-cancellation': 1,
+                                    'x-google-noise-suppression': 1,
+                                    'x-google-noise-suppression-level': 2,
+                                    'x-google-auto-gain-control': 1,
+                                    'x-google-experimental-echo-cancellation': 1,
+                                    'x-google-experimental-noise-suppression': 1,
+                                    'x-google-experimental-auto-gain-control': 1,
+                                    'x-google-typing-noise-detection': 1,
+                                    'x-google-conference-mode': 1,
+                                    'x-google-hardware-echo-cancellation': 1,
+                                    'x-google-highpass-filter': 1,
+                                    'x-google-mono-audio': 1,
+                                    channels: 1
+                                };
+                            }
                         }
                     });
                     producerOptions.rtpParameters = rtpParameters;

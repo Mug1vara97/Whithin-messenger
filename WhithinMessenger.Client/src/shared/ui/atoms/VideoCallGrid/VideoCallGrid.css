@@ -842,6 +842,18 @@
   color: #b9bbbe;
 }
 
+.screen-share-audio-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(88, 101, 242, 0.2);
+  border-radius: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
 .close-screen-share-btn {
   background: #ed4245;
   color: white;
