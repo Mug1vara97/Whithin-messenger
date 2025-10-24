@@ -1,6 +1,57 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
+// import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
+
+// Временная заглушка для voiceCallApi
+const voiceCallApi = {
+  socket: null,
+  isConnected: false,
+  roomId: null,
+  userId: null,
+  userName: null,
+  
+  async connect(userId, userName) {
+    console.log('voiceCallApi.connect called with:', { userId, userName });
+    this.userId = userId;
+    this.userName = userName;
+    this.isConnected = true;
+    return true;
+  },
+  
+  async disconnect() {
+    console.log('voiceCallApi.disconnect called');
+    this.isConnected = false;
+    this.socket = null;
+    return true;
+  },
+  
+  async joinRoom(roomId) {
+    console.log('voiceCallApi.joinRoom called with:', roomId);
+    this.roomId = roomId;
+    return true;
+  },
+  
+  async leaveRoom() {
+    console.log('voiceCallApi.leaveRoom called');
+    this.roomId = null;
+    return true;
+  },
+  
+  on(event) {
+    console.log('voiceCallApi.on called with:', event);
+    // Заглушка - не делаем ничего
+  },
+  
+  off(event) {
+    console.log('voiceCallApi.off called with:', event);
+    // Заглушка - не делаем ничего
+  },
+  
+  emit(event, data) {
+    console.log('voiceCallApi.emit called with:', event, data);
+    // Заглушка - не делаем ничего
+  }
+};
 // import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 
 // Временная заглушка для NoiseSuppressionManager
@@ -9,8 +60,7 @@ class NoiseSuppressionManager {
     this.initialized = false;
   }
   
-  async initialize(stream, _audioContext) {
-    // eslint-disable-next-line no-unused-vars
+  async initialize(stream) {
     this.initialized = true;
     return stream;
   }
@@ -19,8 +69,7 @@ class NoiseSuppressionManager {
     return this.initialized;
   }
   
-  async enable(_mode) {
-    // eslint-disable-next-line no-unused-vars
+  async enable() {
     // Заглушка - mode не используется
     return true;
   }
@@ -33,8 +82,7 @@ class NoiseSuppressionManager {
     return null;
   }
   
-  setProducer(_producer) {
-    // eslint-disable-next-line no-unused-vars
+  setProducer() {
     // Заглушка - producer не используется
   }
   
