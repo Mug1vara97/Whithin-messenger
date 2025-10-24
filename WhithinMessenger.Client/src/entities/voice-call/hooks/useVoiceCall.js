@@ -1064,18 +1064,20 @@ export const useVoiceCall = (userId, userName) => {
   }, [noiseSuppressionMode]);
 
   // Демонстрация экрана
-  const startScreenShare = useCallback(async () => {
-    try {
-      if (!sendTransportRef.current) {
-        throw new Error('Transport not ready');
-      }
+    const startScreenShare = useCallback(async () => {
+      try {
+        console.log('🚀🚀🚀 STARTING SCREEN SHARE FUNCTION CALLED 🚀🚀🚀');
+        
+        if (!sendTransportRef.current) {
+          throw new Error('Transport not ready');
+        }
 
-      // Останавливаем существующую демонстрацию экрана, если есть
-      if (isScreenSharing) {
-        await stopScreenShare();
-      }
+        // Останавливаем существующую демонстрацию экрана, если есть
+        if (isScreenSharing) {
+          await stopScreenShare();
+        }
 
-      console.log('=== STARTING SCREEN SHARE ===');
+        console.log('=== STARTING SCREEN SHARE ===');
       console.log('Requesting screen sharing access...');
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
@@ -1299,6 +1301,7 @@ export const useVoiceCall = (userId, userName) => {
   }, [screenShareStream, userId]);
 
   const toggleScreenShare = useCallback(async () => {
+    console.log('🎯🎯🎯 TOGGLE SCREEN SHARE CALLED 🎯🎯🎯', { isScreenSharing });
     if (isScreenSharing) {
       await stopScreenShare();
     } else {
