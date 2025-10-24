@@ -1126,9 +1126,9 @@ io.on('connection', async (socket) => {
                 console.log('🎥 Sending producerClosed event with data:', eventData);
                 io.to(room.id).emit('producerClosed', eventData);
                 
-                // НЕ удаляем producer из комнаты - это может нарушить связь с audio producers
-                // Вместо этого просто закрываем producer локально
-                console.log('🎥 Closing video producer locally without removing from room');
+                // Правильно удаляем только video producer из комнаты
+                console.log('🎥 Removing video producer from room:', producerId);
+                room.removeProducer(producerId);
                 
                 // Удаляем producer из пира
                 peer.removeProducer(producerId);
@@ -1138,17 +1138,27 @@ io.on('connection', async (socket) => {
                     producer.close();
                 }
 
-                // Проверяем состояние audio producer после остановки video
+                // Принудительно возобновляем audio producers после остановки video
                 const audioProducers = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
                 console.log('🎥 Audio producers after video stop:', audioProducers.length);
                 audioProducers.forEach(ap => {
                     console.log('🎥 Audio producer:', ap.id, 'paused:', ap.paused, 'closed:', ap.closed);
+                    // Принудительно возобновляем audio producer
+                    if (!ap.closed && ap.paused) {
+                        console.log('🎥 Resuming audio producer:', ap.id);
+                        ap.resume();
+                    }
                 });
 
-                // Проверяем состояние consumers в комнате
+                // Принудительно возобновляем audio consumers в комнате
                 console.log('🎥 Consumers in room after video stop:', Array.from(room.consumers.keys()));
                 room.consumers.forEach((consumer, id) => {
                     console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
+                    // Принудительно возобновляем audio consumers
+                    if (consumer.kind === 'audio' && !consumer.closed && consumer.paused) {
+                        console.log('🎥 Resuming audio consumer:', id);
+                        consumer.resume();
+                    }
                 });
 
                 console.log('🎥 Video stopped successfully:', { 

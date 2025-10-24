@@ -1544,6 +1544,22 @@ export const useCallStore = create(
           
           console.log('🎥 Video stopped, but audio should continue working');
           
+          // Принудительно переподключаем audio consumers к audio producers
+          const audioConsumers = Array.from(get().consumers.values()).filter(c => c.kind === 'audio');
+          audioConsumers.forEach(consumer => {
+            if (!consumer.closed) {
+              console.log('🎥 Reconnecting audio consumer:', consumer.id);
+              // Принудительно возобновляем consumer
+              if (consumer.paused) {
+                consumer.resume();
+              }
+              // Принудительно переподключаем к producer
+              if (consumer.producer && consumer.producer.paused) {
+                consumer.producer.resume();
+              }
+            }
+          });
+          
           // Проверяем, что основной аудио producer не затронут
           const currentState = get();
           console.log('🎥 Final state after stop:', {
