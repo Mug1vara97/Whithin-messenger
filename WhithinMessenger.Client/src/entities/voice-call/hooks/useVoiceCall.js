@@ -505,6 +505,7 @@ export const useVoiceCall = (userId, userName) => {
       // Для аудио демонстрации экрана создаем отдельный AudioContext
       if (isScreenShare && producerData.kind === 'audio') {
         console.log('Screen share audio producer detected, creating separate audio processing');
+        console.log('Screen share audio producer data:', producerData);
         
         // Создаем отдельный AudioContext для демонстрации экрана
         if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -1074,6 +1075,7 @@ export const useVoiceCall = (userId, userName) => {
         await stopScreenShare();
       }
 
+      console.log('=== STARTING SCREEN SHARE ===');
       console.log('Requesting screen sharing access...');
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
@@ -1109,13 +1111,23 @@ export const useVoiceCall = (userId, userName) => {
       const videoTrack = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
       
+      console.log('Stream tracks:', {
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        videoTrack: !!videoTrack,
+        audioTrack: !!audioTrack
+      });
+      
       if (!videoTrack) {
         throw new Error('No video track available');
       }
 
       console.log('Creating screen sharing producers...');
+      console.log('Video track:', videoTrack);
+      console.log('Audio track:', audioTrack);
       
       // Создаем video producer для демонстрации экрана
+      console.log('Creating video producer...');
       const videoProducer = await sendTransportRef.current.produce({
         track: videoTrack,
         encodings: [
@@ -1145,6 +1157,7 @@ export const useVoiceCall = (userId, userName) => {
       // Создаем audio producer для демонстрации экрана, если есть аудио трек
       let audioProducer = null;
       if (audioTrack) {
+        console.log('Creating audio producer...');
         audioProducer = await sendTransportRef.current.produce({
           track: audioTrack,
           encodings: [
@@ -1187,10 +1200,16 @@ export const useVoiceCall = (userId, userName) => {
         });
 
         console.log('Screen sharing audio producer created:', audioProducer.id);
+      } else {
+        console.log('No audio track available for screen sharing');
       }
 
       // Сохраняем producers
       screenProducerRef.current = { video: videoProducer, audio: audioProducer };
+      console.log('Screen sharing producers saved:', { 
+        video: videoProducer.id, 
+        audio: audioProducer ? audioProducer.id : 'none' 
+      });
       setIsScreenSharing(true);
 
       // Обработка событий video producer
@@ -1263,6 +1282,9 @@ export const useVoiceCall = (userId, userName) => {
         }
         audioElementsRef.current.delete(screenShareAudioKey);
       }
+
+      // Логируем состояние audio elements после очистки
+      console.log('Audio elements after screen share cleanup:', Array.from(audioElementsRef.current.keys()));
 
       // Очищаем состояние
       setScreenShareStream(null);

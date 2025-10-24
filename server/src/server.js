@@ -457,11 +457,18 @@ io.on('connection', async (socket) => {
             // Check if this is a screen sharing producer
             if (appData?.mediaType === 'screen') {
                 // Allow both video and audio for screen sharing
+                console.log('=== SCREEN SHARING PRODUCER ===');
                 console.log('Creating screen sharing producer:', { kind, appData });
+                console.log('Track type:', appData?.trackType);
 
                 // For video stream, check if peer is already sharing screen
                 if (kind === 'video' && room.isPeerSharingScreen(socket.id)) {
                     throw new Error('Already sharing screen');
+                }
+                
+                // For audio stream, allow multiple audio tracks for screen sharing
+                if (kind === 'audio') {
+                    console.log('Screen sharing audio producer allowed');
                 }
                 
                 console.log('Creating screen sharing producer:', { kind, appData });
@@ -551,7 +558,8 @@ io.on('connection', async (socket) => {
                 console.log('Screen sharing producer created:', { 
                     id: producer.id, 
                     kind: producer.kind, 
-                    appData: producer.appData 
+                    appData: producer.appData,
+                    trackType: appData?.trackType
                 });
 
                 peer.addProducer(producer);
