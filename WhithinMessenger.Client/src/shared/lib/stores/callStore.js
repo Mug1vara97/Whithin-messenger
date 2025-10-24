@@ -313,16 +313,24 @@ export const useCallStore = create(
             if (isVideoProducer || mediaType === 'screen') {
               const consumer = get().consumers.get(producerId);
               if (consumer) {
-                console.log('🎥 Closing consumer for producer:', producerId);
+                console.log('🎥 Closing consumer for video producer:', producerId, 'kind:', consumer.kind);
                 consumer.close();
                 set((state) => {
                   const newConsumers = new Map(state.consumers);
                   newConsumers.delete(producerId);
                   return { consumers: newConsumers };
                 });
+              } else {
+                console.log('🎥 No consumer found for video producer:', producerId);
               }
             } else {
               console.log('🎥 Preserving consumer for audio producer:', producerId);
+              const consumer = get().consumers.get(producerId);
+              if (consumer) {
+                console.log('🎥 Audio consumer preserved:', producerId, 'kind:', consumer.kind, 'paused:', consumer.paused);
+              } else {
+                console.log('🎥 No audio consumer found for producer:', producerId);
+              }
             }
             
             if (producerSocketId) {
@@ -1574,6 +1582,14 @@ export const useCallStore = create(
           } else {
             console.log('🎥 Local stream: null');
           }
+
+          // Проверяем состояние consumers
+          const finalState = get();
+          console.log('🎥 Consumers after video stop:', Array.from(finalState.consumers.keys()));
+          console.log('🎥 Consumers count:', finalState.consumers.size);
+          finalState.consumers.forEach((consumer, id) => {
+            console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused);
+          });
 
           console.log('🎥🎥🎥 STOP VIDEO END 🎥🎥🎥');
           console.log('Video stopped successfully');
