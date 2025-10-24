@@ -1093,6 +1093,62 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Добавляем обработку остановки вебкамеры
+    socket.on('stopVideo', async ({ producerId }) => {
+        try {
+            console.log('🎥 Stop video request:', { producerId });
+            
+            const peer = peers.get(socket.id);
+            if (!peer) {
+                console.error('Peer not found for socket:', socket.id);
+                return;
+            }
+
+            const room = rooms.get(socket.data?.roomId);
+            if (!room) {
+                console.error('Room not found for peer:', socket.id);
+                return;
+            }
+
+            // Находим и закрываем producer вебкамеры
+            const producer = peer.getProducer(producerId);
+            if (producer && producer.appData?.mediaType === 'camera') {
+                console.log('🎥 Found camera producer:', producerId);
+                // Логируем сокеты в комнате
+                const socketsInRoom = Array.from(io.sockets.adapter.rooms.get(room.id) || []);
+                console.log('🎥 Sockets in room', room.id, socketsInRoom);
+                // Сначала уведомляем всех участников
+                const eventData = {
+                    producerId,
+                    producerSocketId: socket.id,
+                    mediaType: 'camera'
+                };
+                console.log('🎥 Sending producerClosed event with data:', eventData);
+                io.to(room.id).emit('producerClosed', eventData);
+                
+                // Удаляем producer из комнаты (это также очистит связанные consumers)
+                room.removeProducer(producerId);
+                
+                // Удаляем producer из пира
+                peer.removeProducer(producerId);
+                
+                // Закрываем producer
+                if (!producer.closed) {
+                    producer.close();
+                }
+
+                console.log('🎥 Video stopped successfully:', { 
+                    peerId: socket.id, 
+                    producerId 
+                });
+            } else {
+                console.error('🎥 Camera producer not found:', producerId);
+            }
+        } catch (error) {
+            console.error('Error stopping screen sharing:', error);
+        }
+    });
+
     socket.on('restartIce', async ({ transportId }, callback) => {
         try {
             if (!socket.data?.roomId) {

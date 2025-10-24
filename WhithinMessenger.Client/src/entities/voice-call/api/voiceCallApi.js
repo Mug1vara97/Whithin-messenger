@@ -207,6 +207,27 @@ class VoiceCallApi {
       });
     });
   }
+
+  // Метод для остановки вебкамеры
+  async stopVideo(producerId) {
+    return new Promise((resolve, reject) => {
+      // Добавляем таймаут на случай, если сервер не отвечает
+      const timeout = setTimeout(() => {
+        resolve({ success: true }); // Разрешаем промис, чтобы не блокировать UI
+      }, 100); // 1 секунда таймаут
+      
+      this.socket.emit('stopVideo', {
+        producerId
+      }, (response) => {
+        clearTimeout(timeout);
+        if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
 }
 
 export const voiceCallApi = new VoiceCallApi();

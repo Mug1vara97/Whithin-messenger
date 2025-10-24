@@ -1449,16 +1449,12 @@ export const useCallStore = create(
           // Останавливаем video producer
           if (state.videoProducer) {
             try {
-              console.log('🎥 Sending producerClosed event to server:', {
-                producerId: state.videoProducer.id,
-                mediaType: 'camera'
+              console.log('🎥 Sending stopVideo event to server:', {
+                producerId: state.videoProducer.id
               });
               
               // Отправляем событие на сервер
-              voiceCallApi.emit('producerClosed', {
-                producerId: state.videoProducer.id,
-                mediaType: 'camera'
-              });
+              await voiceCallApi.stopVideo(state.videoProducer.id);
               
               await state.videoProducer.close();
             } catch (error) {
