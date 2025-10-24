@@ -515,7 +515,7 @@ export const useCallStore = create(
           const isScreenShare = producerData.appData?.mediaType === 'screen';
           console.log('callStore handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind, 'userId=', userId, 'currentUserId=', state.currentUserId, 'producerUserId=', producerData.appData?.userId);
           
-          // Для демонстрации экрана не создаем AudioContext, но сохраняем информацию
+          // Для демонстрации экрана обрабатываем video и audio отдельно
           if (isScreenShare) {
             // Проверяем, что это не наша собственная демонстрация экрана
             const producerUserId = producerData.appData?.userId;
@@ -524,22 +524,49 @@ export const useCallStore = create(
               return;
             }
             
-            console.log('Screen share producer detected in callStore, storing remote screen share info');
+            console.log('Screen share producer detected in callStore:', { kind: producerData.kind, userId });
             
-            // Создаем MediaStream из consumer track для отображения
-            const screenStream = new MediaStream([consumer.track]);
-            
-            const currentState = get();
-            const newRemoteScreenShares = new Map(currentState.remoteScreenShares);
-            newRemoteScreenShares.set(producerData.producerId, {
-              stream: screenStream,
-              producerId: producerData.producerId,
-              userId: userId,
-              userName: producerData.appData?.userName || 'Unknown',
-              socketId: socketId
-            });
-            
-            set({ remoteScreenShares: newRemoteScreenShares });
+            if (producerData.kind === 'video') {
+              // Создаем MediaStream из consumer track для отображения
+              const screenStream = new MediaStream([consumer.track]);
+              
+              const currentState = get();
+              const newRemoteScreenShares = new Map(currentState.remoteScreenShares);
+              newRemoteScreenShares.set(producerData.producerId, {
+                stream: screenStream,
+                producerId: producerData.producerId,
+                userId: userId,
+                userName: producerData.appData?.userName || 'Unknown',
+                socketId: socketId
+              });
+              
+              set({ remoteScreenShares: newRemoteScreenShares });
+            } else if (producerData.kind === 'audio') {
+              console.log('Screen share audio producer detected, creating audio element');
+              
+              // Создаем audio element для screen share audio
+              const audioElement = document.createElement('audio');
+              audioElement.srcObject = new MediaStream([consumer.track]);
+              audioElement.autoplay = true;
+              audioElement.volume = 1.0; // Полная громкость для screen share audio
+              audioElement.muted = false;
+              audioElement.playsInline = true;
+              audioElement.controls = false;
+              audioElement.style.display = 'none';
+              
+              // Добавляем в DOM для воспроизведения
+              document.body.appendChild(audioElement);
+              
+              // Сохраняем audio element для screen share audio
+              const screenShareAudioKey = `screen-share-audio-${userId}`;
+              const currentState = get();
+              const newAudioElements = new Map(currentState.audioElements);
+              newAudioElements.set(screenShareAudioKey, audioElement);
+              
+              set({ audioElements: newAudioElements });
+              
+              console.log('Screen share audio element created:', screenShareAudioKey);
+            }
             
             return;
           }
@@ -1195,7 +1222,6 @@ export const useCallStore = create(
           const state = get();
           // Уведомляем сервер об остановке демонстрации экрана
           const videoProducer = state.producers.get('screen-video');
-          const audioProducer = state.producers.get('screen-audio');
           
           if (videoProducer && voiceCallApi.socket) {
             try {
@@ -1216,11 +1242,30 @@ export const useCallStore = create(
           newProducers.delete('screen-video');
           newProducers.delete('screen-audio');
 
+          // Очищаем screen share audio elements
+          const newAudioElements = new Map(state.audioElements);
+          for (const [key, audioElement] of newAudioElements.entries()) {
+            if (key.startsWith('screen-share-audio-')) {
+              try {
+                audioElement.pause();
+                audioElement.srcObject = null;
+                if (audioElement.parentNode) {
+                  audioElement.parentNode.removeChild(audioElement);
+                }
+                newAudioElements.delete(key);
+                console.log('Removed screen share audio element:', key);
+              } catch (e) {
+                console.warn('Error removing screen share audio element:', e);
+              }
+            }
+          }
+
           // Очищаем состояние
           set({
             screenShareStream: null,
             isScreenSharing: false,
-            producers: newProducers
+            producers: newProducers,
+            audioElements: newAudioElements
           });
 
           console.log('Screen sharing stopped successfully');
