@@ -84,6 +84,7 @@ const VideoCallGrid = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [bottomPage, setBottomPage] = useState(0);
   const [visibleBottomUsers] = useState(6);
+  const [lastVideoParticipants, setLastVideoParticipants] = useState(new Set());
 
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
@@ -113,27 +114,46 @@ const VideoCallGrid = ({
     setBottomPage(page);
   };
 
-  // Автоматический фокус на вебкамеру
+  // Автоматический фокус на вебкамеру (только при включении новой)
   useEffect(() => {
     if (!isFocusedMode) {
-      // Сначала ищем удаленного участника с вебкамерой
-      let videoParticipant = extendedParticipants.find(p => 
-        p.isVideoEnabled && p.videoStream && !p.isCurrentUser
+      // Получаем текущих участников с вебкамерой
+      const currentVideoParticipants = new Set(
+        extendedParticipants
+          .filter(p => p.isVideoEnabled && p.videoStream)
+          .map(p => p.id)
       );
       
-      // Если удаленного участника с вебкамерой нет, фокусируемся на текущем пользователе
-      if (!videoParticipant) {
-        videoParticipant = extendedParticipants.find(p => 
-          p.isVideoEnabled && p.videoStream && p.isCurrentUser
+      // Находим новых участников с вебкамерой (которых не было в предыдущем состоянии)
+      const newVideoParticipants = [...currentVideoParticipants].filter(
+        id => !lastVideoParticipants.has(id)
+      );
+      
+      if (newVideoParticipants.length > 0) {
+        console.log('VideoCallGrid: New video participants detected:', newVideoParticipants);
+        
+        // Сначала ищем удаленного участника с вебкамерой
+        let videoParticipant = extendedParticipants.find(p => 
+          p.isVideoEnabled && p.videoStream && !p.isCurrentUser && newVideoParticipants.includes(p.id)
         );
+        
+        // Если удаленного участника с вебкамерой нет, фокусируемся на текущем пользователе
+        if (!videoParticipant) {
+          videoParticipant = extendedParticipants.find(p => 
+            p.isVideoEnabled && p.videoStream && p.isCurrentUser && newVideoParticipants.includes(p.id)
+          );
+        }
+        
+        if (videoParticipant) {
+          console.log('VideoCallGrid: Auto-focusing on new video participant:', videoParticipant.id, 'isCurrentUser:', videoParticipant.isCurrentUser);
+          focusParticipant(videoParticipant.id);
+        }
       }
       
-      if (videoParticipant) {
-        console.log('VideoCallGrid: Auto-focusing on video participant:', videoParticipant.id, 'isCurrentUser:', videoParticipant.isCurrentUser);
-        focusParticipant(videoParticipant.id);
-      }
+      // Обновляем состояние для следующей проверки
+      setLastVideoParticipants(currentVideoParticipants);
     }
-  }, [extendedParticipants, isFocusedMode, focusParticipant]);
+  }, [extendedParticipants, isFocusedMode, focusParticipant, lastVideoParticipants]);
 
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
