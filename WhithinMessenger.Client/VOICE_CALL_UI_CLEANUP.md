@@ -108,3 +108,4 @@ const displayParticipants = [currentUser, ...otherParticipants];
 
 
 
+

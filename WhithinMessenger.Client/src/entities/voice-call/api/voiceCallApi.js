@@ -193,7 +193,7 @@ class VoiceCallApi {
       // Добавляем таймаут на случай, если сервер не отвечает
       const timeout = setTimeout(() => {
         resolve({ success: true }); // Разрешаем промис, чтобы не блокировать UI
-      }, 500); // 1 секунда таймаут
+      }, 100); // 1 секунда таймаут
       
       this.socket.emit('stopScreenSharing', {
         producerId

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { createParticipant } from '../../../../entities/video-call/model/types';
 import MicIcon from '@mui/icons-material/Mic';
@@ -6,6 +6,7 @@ import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
+import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
@@ -25,28 +26,17 @@ const ChatVoiceCall = ({
     isMuted,
     isAudioEnabled,
     participants,
-    audioBlocked,
     error,
-    isNoiseSuppressed,
-    noiseSuppressionMode,
-    userVolumes,
-    userMutedStates,
-    showVolumeSliders,
     isGlobalAudioMuted,
     currentCall,
+    isScreenSharing,
     startCall,
     endCall,
     toggleMute,
-    toggleNoiseSuppression,
-    changeNoiseSuppressionMode,
-    toggleUserMute,
-    changeUserVolume,
-    toggleVolumeSlider,
-    toggleGlobalAudio
+    toggleGlobalAudio,
+    startScreenShare,
+    stopScreenShare
   } = useGlobalCall(userId, userName);
-
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   // Автоматически начинаем звонок при монтировании
   useEffect(() => {
@@ -96,14 +86,18 @@ const ChatVoiceCall = ({
     console.log('Video not supported in voice calls');
   };
 
-  const handleScreenShare = () => {
-    // Пока не реализовано
-    console.log('Screen share not implemented');
+  const handleScreenShare = async () => {
+    try {
+      if (isScreenSharing) {
+        await stopScreenShare();
+      } else {
+        await startScreenShare();
+      }
+    } catch (error) {
+      console.error('Screen share error:', error);
+    }
   };
 
-  const handleToggleNoiseSuppression = () => {
-    toggleNoiseSuppression();
-  };
 
   const handleEndCall = async () => {
     handleDisconnect();
@@ -142,30 +136,41 @@ const ChatVoiceCall = ({
       {/* Основная область участников */}
       <div className={styles.voiceCallWrapper}>
         <div className={styles.participantsContainer}>
-          {displayParticipants.map((participant, index) => (
-            <div key={participant.id} className={styles.participantItem}>
-              <div className={styles.participantAvatarContainer}>
-                <div className={styles.participantAvatar}>
-                  <div className={styles.avatarCircle}>
-                    {(participant.name || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  {/* Индикаторы статуса */}
-                  <div className={styles.statusIndicators}>
-                    {participant.isMuted && (
-                      <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
-                        <MicOffIcon />
-                      </div>
-                    )}
-                    {participant.isGlobalAudioMuted && (
-                      <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
-                        <VolumeOffIcon />
-                      </div>
-                    )}
+          {isScreenSharing ? (
+            /* При демонстрации экрана показываем фокус вместо кружков пользователей */
+            <div className={styles.screenShareFocus}>
+              <div className={styles.focusIndicator}>
+                <ScreenShareIcon className={styles.focusIcon} />
+                <span className={styles.focusText}>Демонстрация экрана</span>
+              </div>
+            </div>
+          ) : (
+            /* Обычное отображение кружков пользователей */
+            displayParticipants.map((participant) => (
+              <div key={participant.id} className={styles.participantItem}>
+                <div className={styles.participantAvatarContainer}>
+                  <div className={styles.participantAvatar}>
+                    <div className={styles.avatarCircle}>
+                      {(participant.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    {/* Индикаторы статуса */}
+                    <div className={styles.statusIndicators}>
+                      {participant.isMuted && (
+                        <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
+                          <MicOffIcon />
+                        </div>
+                      )}
+                      {participant.isGlobalAudioMuted && (
+                        <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
+                          <VolumeOffIcon />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -191,6 +196,15 @@ const ChatVoiceCall = ({
               disabled
             >
               <VideocamOffIcon />
+            </button>
+
+            {/* Демонстрация экрана */}
+            <button 
+              className={`${styles.controlBtn} ${styles.screenShareBtn} ${isScreenSharing ? 'active' : ''}`}
+              onClick={handleScreenShare}
+              title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Начать демонстрацию экрана'}
+            >
+              {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
             </button>
 
             {/* Глобальный звук */}
