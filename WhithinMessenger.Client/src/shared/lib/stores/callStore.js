@@ -54,10 +54,10 @@ export const useCallStore = create(
       screenShareStream: null,
       remoteScreenShares: new Map(),
       
-      // Состояние вебкамеры
-      isVideoEnabled: false,
-      videoStream: null,
-      videoProducer: null, // Демонстрации экрана от других пользователей (producerId -> data)
+  // Состояние вебкамеры
+  isVideoEnabled: false,
+  cameraStream: null, // Отдельный поток для вебкамеры
+  videoProducer: null, // Демонстрации экрана от других пользователей (producerId -> data)
       
       // WebRTC соединения (хранятся глобально)
       device: null,
@@ -1403,7 +1403,7 @@ export const useCallStore = create(
           });
 
           console.log('Camera access granted');
-          set({ videoStream: cameraStream, isVideoEnabled: true });
+          set({ cameraStream: cameraStream, isVideoEnabled: true });
 
           const videoTrack = cameraStream.getVideoTracks()[0];
           if (!videoTrack) {
@@ -1475,9 +1475,9 @@ export const useCallStore = create(
           }
 
           // Останавливаем поток вебкамеры (он содержит только видео треки)
-          if (state.videoStream) {
+          if (state.cameraStream) {
             console.log('🎥 Stopping camera stream tracks');
-            state.videoStream.getTracks().forEach(track => {
+            state.cameraStream.getTracks().forEach(track => {
               console.log('🎥 Stopping camera track:', track.label);
               track.stop();
             });
@@ -1487,7 +1487,7 @@ export const useCallStore = create(
           set({
             isVideoEnabled: false,
             videoProducer: null,
-            videoStream: null
+            cameraStream: null
           });
           
           console.log('🎥 Video stopped, but audio should continue working');
@@ -1496,7 +1496,7 @@ export const useCallStore = create(
           const currentState = get();
           console.log('🎥 Remaining producers after video stop:', Array.from(currentState.producers.keys()));
           console.log('🎥 Audio context state:', currentState.audioContext?.state);
-          console.log('🎥 Camera stream state:', currentState.videoStream ? 'exists' : 'null');
+          console.log('🎥 Camera stream state:', currentState.cameraStream ? 'exists' : 'null');
           console.log('🎥 Is video enabled:', currentState.isVideoEnabled);
           
           // Проверяем, есть ли активные аудио треки в основном потоке

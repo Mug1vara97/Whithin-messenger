@@ -33,7 +33,7 @@ const ChatVoiceCall = ({
     isScreenSharing,
     screenShareStream,
     isVideoEnabled,
-    videoStream,
+    cameraStream,
     userVolumes,
     userMutedStates,
     showVolumeSliders,
@@ -190,7 +190,7 @@ const ChatVoiceCall = ({
   currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
   currentUser.isSpeaking = false;
   currentUser.isVideoEnabled = isVideoEnabled;
-  currentUser.videoStream = videoStream;
+  currentUser.videoStream = cameraStream;
   currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
   
   const displayParticipants = [currentUser];
@@ -258,7 +258,7 @@ const ChatVoiceCall = ({
                   forceGridMode={false}
                   hideBottomUsers={true}
                   isVideoEnabled={isVideoEnabled}
-                  videoStream={videoStream}
+                  videoStream={cameraStream}
                 />
               </div>
             ) : (
