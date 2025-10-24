@@ -14,6 +14,11 @@ export const useCall = () => {
 export const CallProvider = ({ children }) => {
   const callStore = useCallStore();
   const isInitialized = useRef(false);
+  
+  // Получаем реактивные значения из Zustand store
+  const isScreenSharing = useCallStore(state => state.isScreenSharing);
+  const screenShareStream = useCallStore(state => state.screenShareStream);
+  const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {
@@ -83,9 +88,9 @@ export const CallProvider = ({ children }) => {
     error: callStore.error,
     audioBlocked: callStore.audioBlocked,
     connecting: callStore.connecting,
-    isScreenSharing: callStore.isScreenSharing,
-    screenShareStream: callStore.screenShareStream,
-    remoteScreenShares: callStore.remoteScreenShares,
+    isScreenSharing: isScreenSharing,
+    screenShareStream: screenShareStream,
+    remoteScreenShares: remoteScreenShares,
     
     // Методы
     initializeCall: callStore.initializeCall,

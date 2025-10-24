@@ -30,6 +30,7 @@ const ChatVoiceCall = ({
     isGlobalAudioMuted,
     currentCall,
     isScreenSharing,
+    screenShareStream,
     startCall,
     endCall,
     toggleMute,
@@ -58,6 +59,16 @@ const ChatVoiceCall = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, chatName, userId, userName]);
+
+  // Отладочная информация для демонстрации экрана
+  useEffect(() => {
+    console.log('ChatVoiceCall: Screen sharing state changed:', { 
+      isScreenSharing, 
+      hasScreenShareStream: !!screenShareStream,
+      participants: participants.length,
+      isConnected
+    });
+  }, [isScreenSharing, screenShareStream, participants.length, isConnected]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -88,6 +99,7 @@ const ChatVoiceCall = ({
 
   const handleScreenShare = async () => {
     try {
+      console.log('ChatVoiceCall: Screen share button clicked, isScreenSharing:', isScreenSharing);
       if (isScreenSharing) {
         await stopScreenShare();
       } else {
@@ -136,15 +148,17 @@ const ChatVoiceCall = ({
       {/* Основная область участников */}
       <div className={styles.voiceCallWrapper}>
         <div className={styles.participantsContainer}>
-          {isScreenSharing ? (
-            /* При демонстрации экрана показываем фокус вместо кружков пользователей */
-            <div className={styles.screenShareFocus}>
-              <div className={styles.focusIndicator}>
-                <ScreenShareIcon className={styles.focusIcon} />
-                <span className={styles.focusText}>Демонстрация экрана</span>
+          {(() => {
+            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing);
+            return isScreenSharing ? (
+              /* При демонстрации экрана показываем фокус вместо кружков пользователей */
+              <div className={styles.screenShareFocus}>
+                <div className={styles.focusIndicator}>
+                  <ScreenShareIcon className={styles.focusIcon} />
+                  <span className={styles.focusText}>Демонстрация экрана</span>
+                </div>
               </div>
-            </div>
-          ) : (
+            ) : (
             /* Обычное отображение кружков пользователей */
             displayParticipants.map((participant) => (
               <div key={participant.id} className={styles.participantItem}>
@@ -170,7 +184,8 @@ const ChatVoiceCall = ({
                 </div>
               </div>
             ))
-          )}
+            );
+          })()}
         </div>
       </div>
 
@@ -203,6 +218,10 @@ const ChatVoiceCall = ({
               className={`${styles.controlBtn} ${styles.screenShareBtn} ${isScreenSharing ? 'active' : ''}`}
               onClick={handleScreenShare}
               title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Начать демонстрацию экрана'}
+              style={{ 
+                backgroundColor: isScreenSharing ? '#5865f2' : '#40444b',
+                color: isScreenSharing ? '#ffffff' : '#b9bbbe'
+              }}
             >
               {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
             </button>
