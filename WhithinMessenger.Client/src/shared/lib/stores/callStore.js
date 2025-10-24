@@ -1591,6 +1591,13 @@ export const useCallStore = create(
             console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
           });
 
+          // Проверяем состояние producers
+          console.log('🎥 Producers after video stop:', Array.from(finalState.producers.keys()));
+          console.log('🎥 Producers count:', finalState.producers.size);
+          finalState.producers.forEach((producer, id) => {
+            console.log('🎥 Producer:', id, 'kind:', producer.kind, 'paused:', producer.paused, 'closed:', producer.closed);
+          });
+
           // Проверяем audio elements
           console.log('🎥 Audio elements count:', finalState.audioElements.size);
           finalState.audioElements.forEach((audioElement, userId) => {

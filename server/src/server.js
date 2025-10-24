@@ -1126,8 +1126,14 @@ io.on('connection', async (socket) => {
                 console.log('🎥 Sending producerClosed event with data:', eventData);
                 io.to(room.id).emit('producerClosed', eventData);
                 
+                // Проверяем producers в комнате до удаления
+                console.log('🎥 Producers in room before removal:', Array.from(room.producers.keys()));
+                
                 // Удаляем producer из комнаты (это также очистит связанные consumers)
                 room.removeProducer(producerId);
+                
+                // Проверяем producers в комнате после удаления
+                console.log('🎥 Producers in room after removal:', Array.from(room.producers.keys()));
                 
                 // Удаляем producer из пира
                 peer.removeProducer(producerId);
@@ -1136,6 +1142,13 @@ io.on('connection', async (socket) => {
                 if (!producer.closed) {
                     producer.close();
                 }
+
+                // Проверяем состояние audio producer после остановки video
+                const audioProducers = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
+                console.log('🎥 Audio producers after video stop:', audioProducers.length);
+                audioProducers.forEach(ap => {
+                    console.log('🎥 Audio producer:', ap.id, 'paused:', ap.paused, 'closed:', ap.closed);
+                });
 
                 console.log('🎥 Video stopped successfully:', { 
                     peerId: socket.id, 
