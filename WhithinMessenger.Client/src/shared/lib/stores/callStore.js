@@ -1454,13 +1454,23 @@ export const useCallStore = create(
 
       // Выключение вебкамеры
       stopVideo: async () => {
-        console.log('Stopping video...');
+        console.log('🎥🎥🎥 STOP VIDEO START 🎥🎥🎥');
         try {
           const state = get();
+          console.log('🎥 Current state before stop:', {
+            isVideoEnabled: state.isVideoEnabled,
+            hasVideoProducer: !!state.videoProducer,
+            hasCameraStream: !!state.cameraStream,
+            hasAudioStream: !!state.audioStream,
+            hasLocalStream: !!state.localStream,
+            producersCount: state.producers.size,
+            producersKeys: Array.from(state.producers.keys())
+          });
           
           // Останавливаем video producer
           if (state.videoProducer) {
             try {
+              console.log('🎥 Closing video producer:', state.videoProducer.id);
               console.log('🎥 Sending stopVideo event to server:', {
                 producerId: state.videoProducer.id
               });
@@ -1469,31 +1479,51 @@ export const useCallStore = create(
               await voiceCallApi.stopVideo(state.videoProducer.id);
               
               await state.videoProducer.close();
+              console.log('🎥 Video producer closed successfully');
             } catch (error) {
-              console.log('stopVideo: videoProducer.close failed:', error.message);
+              console.log('🎥 stopVideo: videoProducer.close failed:', error.message);
             }
+          } else {
+            console.log('🎥 No video producer to close');
           }
 
           // Останавливаем поток вебкамеры (он содержит только видео треки)
           if (state.cameraStream) {
             console.log('🎥 Stopping camera stream tracks');
-            state.cameraStream.getTracks().forEach(track => {
-              console.log('🎥 Stopping camera track:', track.label);
+            const tracks = state.cameraStream.getTracks();
+            console.log('🎥 Camera stream tracks count:', tracks.length);
+            tracks.forEach(track => {
+              console.log('🎥 Stopping camera track:', track.label, 'kind:', track.kind, 'enabled:', track.enabled);
               track.stop();
             });
+            console.log('🎥 Camera stream tracks stopped');
+          } else {
+            console.log('🎥 No camera stream to stop');
           }
 
           // Очищаем состояние вебкамеры
+          console.log('🎥 Clearing video state...');
           set({
             isVideoEnabled: false,
             videoProducer: null,
             cameraStream: null
           });
+          console.log('🎥 Video state cleared');
           
           console.log('🎥 Video stopped, but audio should continue working');
           
           // Проверяем, что основной аудио producer не затронут
           const currentState = get();
+          console.log('🎥 Final state after stop:', {
+            isVideoEnabled: currentState.isVideoEnabled,
+            hasVideoProducer: !!currentState.videoProducer,
+            hasCameraStream: !!currentState.cameraStream,
+            hasAudioStream: !!currentState.audioStream,
+            hasLocalStream: !!currentState.localStream,
+            producersCount: currentState.producers.size,
+            producersKeys: Array.from(currentState.producers.keys())
+          });
+          
           console.log('🎥 Remaining producers after video stop:', Array.from(currentState.producers.keys()));
           console.log('🎥 Audio context state:', currentState.audioContext?.state);
           console.log('🎥 Camera stream state:', currentState.cameraStream ? 'exists' : 'null');
@@ -1510,6 +1540,18 @@ export const useCallStore = create(
             console.log('🎥 Main audio stream: null');
           }
 
+          // Проверяем localStream
+          if (currentState.localStream) {
+            const localTracks = currentState.localStream.getTracks();
+            console.log('🎥 Local stream tracks:', localTracks.length);
+            localTracks.forEach(track => {
+              console.log('🎥 Local track:', track.label, 'kind:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+            });
+          } else {
+            console.log('🎥 Local stream: null');
+          }
+
+          console.log('🎥🎥🎥 STOP VIDEO END 🎥🎥🎥');
           console.log('Video stopped successfully');
         } catch (error) {
           console.error('Error stopping video:', error);
