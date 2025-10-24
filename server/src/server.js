@@ -1126,14 +1126,9 @@ io.on('connection', async (socket) => {
                 console.log('🎥 Sending producerClosed event with data:', eventData);
                 io.to(room.id).emit('producerClosed', eventData);
                 
-                // Проверяем producers в комнате до удаления
-                console.log('🎥 Producers in room before removal:', Array.from(room.producers.keys()));
-                
-                // Удаляем producer из комнаты (это также очистит связанные consumers)
-                room.removeProducer(producerId);
-                
-                // Проверяем producers в комнате после удаления
-                console.log('🎥 Producers in room after removal:', Array.from(room.producers.keys()));
+                // НЕ удаляем producer из комнаты - это может нарушить связь с audio producers
+                // Вместо этого просто закрываем producer локально
+                console.log('🎥 Closing video producer locally without removing from room');
                 
                 // Удаляем producer из пира
                 peer.removeProducer(producerId);
@@ -1148,6 +1143,12 @@ io.on('connection', async (socket) => {
                 console.log('🎥 Audio producers after video stop:', audioProducers.length);
                 audioProducers.forEach(ap => {
                     console.log('🎥 Audio producer:', ap.id, 'paused:', ap.paused, 'closed:', ap.closed);
+                });
+
+                // Проверяем состояние consumers в комнате
+                console.log('🎥 Consumers in room after video stop:', Array.from(room.consumers.keys()));
+                room.consumers.forEach((consumer, id) => {
+                    console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
                 });
 
                 console.log('🎥 Video stopped successfully:', { 

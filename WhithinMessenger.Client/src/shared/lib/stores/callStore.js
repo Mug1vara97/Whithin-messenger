@@ -1589,6 +1589,7 @@ export const useCallStore = create(
           console.log('🎥 Consumers count:', finalState.consumers.size);
           finalState.consumers.forEach((consumer, id) => {
             console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
+            console.log('🎥 Consumer producer:', consumer.producerId, 'producer closed:', consumer.producer?.closed, 'producer paused:', consumer.producer?.paused);
           });
 
           // Проверяем состояние producers
