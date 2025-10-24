@@ -264,6 +264,10 @@ export const useCallStore = create(
             let isVideoProducer = false;
             if (producerKind === 'video' && mediaType === 'camera') {
               isVideoProducer = true;
+            } else if (mediaType === 'camera') {
+              // Если mediaType === 'camera', то это точно video producer
+              console.log('🎥 Detected video producer by mediaType:', userId);
+              isVideoProducer = true;
             } else if (!producerKind && !mediaType) {
               // Альтернативная проверка: если у участника есть isVideoEnabled, то это может быть video producer
               const participant = state.participants.find(p => p.userId === userId);
