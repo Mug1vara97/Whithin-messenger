@@ -1495,8 +1495,8 @@ export const useCallStore = create(
           }
 
           // Очищаем состояние (но не трогаем основной аудио producer)
+          // НЕ очищаем videoStream полностью, чтобы не повлиять на основной аудио producer
           set({
-            videoStream: null,
             isVideoEnabled: false,
             videoProducer: null
           });
@@ -1507,6 +1507,19 @@ export const useCallStore = create(
           const currentState = get();
           console.log('🎥 Remaining producers after video stop:', Array.from(currentState.producers.keys()));
           console.log('🎥 Audio context state:', currentState.audioContext?.state);
+          console.log('🎥 Video stream state:', currentState.videoStream ? 'exists' : 'null');
+          console.log('🎥 Is video enabled:', currentState.isVideoEnabled);
+          
+          // Проверяем, есть ли активные аудио треки в основном потоке
+          if (currentState.audioStream) {
+            const audioTracks = currentState.audioStream.getAudioTracks();
+            console.log('🎥 Main audio stream tracks:', audioTracks.length);
+            audioTracks.forEach(track => {
+              console.log('🎥 Main audio track:', track.label, 'enabled:', track.enabled, 'readyState:', track.readyState);
+            });
+          } else {
+            console.log('🎥 Main audio stream: null');
+          }
 
           console.log('Video stopped successfully');
         } catch (error) {
