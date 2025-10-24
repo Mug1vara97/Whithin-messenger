@@ -78,21 +78,21 @@ const ChatVoiceCall = ({
     });
   }, [isScreenSharing, screenShareStream, participants.length, isConnected]);
 
-  // Принудительная активация фокуса на демонстрации экрана (отключено для показа сетки)
-  // useEffect(() => {
-  //   if (isScreenSharing && screenShareStream) {
-  //     // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
-  //     const timer = setTimeout(() => {
-  //       const screenShareTile = document.querySelector('.screen-share-content');
-  //       if (screenShareTile) {
-  //         screenShareTile.click();
-  //         console.log('ChatVoiceCall: Auto-focused on screen share');
-  //       }
-  //     }, 100);
+  // Принудительная активация фокуса на демонстрации экрана
+  useEffect(() => {
+    if (isScreenSharing && screenShareStream) {
+      // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
+      const timer = setTimeout(() => {
+        const screenShareTile = document.querySelector('.screen-share-content');
+        if (screenShareTile) {
+          screenShareTile.click();
+          console.log('ChatVoiceCall: Auto-focused on screen share');
+        }
+      }, 100);
       
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [isScreenSharing, screenShareStream]);
+      return () => clearTimeout(timer);
+    }
+  }, [isScreenSharing, screenShareStream]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -197,7 +197,7 @@ const ChatVoiceCall = ({
                   } : null}
                   remoteScreenShares={remoteScreenShares}
                   onStopScreenShare={handleScreenShare}
-                  forceGridMode={true}
+                  forceGridMode={false}
                 />
               </div>
             ) : (
