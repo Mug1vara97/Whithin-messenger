@@ -34,6 +34,7 @@ export const useCallStore = create(
       // Состояние участников
       participants: [],
       peerIdToUserIdMap: new Map(),
+      processedProducers: new Set(),
       
       // Состояние аудио
       isMuted: false,
@@ -242,8 +243,19 @@ export const useCallStore = create(
             
             console.log('🎥 Producer closed parsed:', { producerId, producerSocketId, producerKind, mediaType });
             
-            // Проверяем, является ли это демонстрацией экрана
+            // Защита от дублирования обработки
             const state = get();
+            if (state.processedProducers && state.processedProducers.has(producerId)) {
+              console.log('🎥 Producer already processed, ignoring:', producerId);
+              return;
+            }
+            
+            // Отмечаем producer как обработанный
+            set(state => ({
+              processedProducers: new Set([...(state.processedProducers || []), producerId])
+            }));
+            
+            // Проверяем, является ли это демонстрацией экрана
             const screenShare = state.remoteScreenShares.get(producerId);
             if (screenShare) {
               console.log('Screen share producer closed:', producerId);
@@ -394,7 +406,7 @@ export const useCallStore = create(
             });
           }
           
-          set({ isConnected: true, connecting: false });
+          set({ isConnected: true, connecting: false, processedProducers: new Set() });
           
           // Отправляем начальные состояния на сервер
           if (voiceCallApi.socket) {
