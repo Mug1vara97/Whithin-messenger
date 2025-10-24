@@ -182,31 +182,31 @@ const ChatVoiceCall = ({
                 onStopScreenShare={handleScreenShare}
               />
             ) : (
-            /* Обычное отображение кружков пользователей */
-            displayParticipants.map((participant) => (
-              <div key={participant.id} className={styles.participantItem}>
-                <div className={styles.participantAvatarContainer}>
-                  <div className={styles.participantAvatar}>
-                    <div className={styles.avatarCircle}>
-                      {(participant.name || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    {/* Индикаторы статуса */}
-                    <div className={styles.statusIndicators}>
-                      {participant.isMuted && (
-                        <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
-                          <MicOffIcon />
-                        </div>
-                      )}
-                      {participant.isGlobalAudioMuted && (
-                        <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
-                          <VolumeOffIcon />
-                        </div>
-                      )}
+              /* Обычное отображение кружков пользователей */
+              displayParticipants.map((participant) => (
+                <div key={participant.id} className={styles.participantItem}>
+                  <div className={styles.participantAvatarContainer}>
+                    <div className={styles.participantAvatar}>
+                      <div className={styles.avatarCircle}>
+                        {(participant.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      {/* Индикаторы статуса */}
+                      <div className={styles.statusIndicators}>
+                        {participant.isMuted && (
+                          <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
+                            <MicOffIcon />
+                          </div>
+                        )}
+                        {participant.isGlobalAudioMuted && (
+                          <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
+                            <VolumeOffIcon />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))
             );
           })()}
         </div>
