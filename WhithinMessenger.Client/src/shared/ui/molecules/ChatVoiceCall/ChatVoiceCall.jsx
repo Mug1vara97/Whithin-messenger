@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useCallStore } from '../../../lib/stores/callStore';
+import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
+import { createParticipant } from '../../../../entities/video-call/model/types';
 import { VideoCallGrid } from '../../atoms';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
@@ -14,20 +15,6 @@ import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import styles from './ChatVoiceCall.module.css';
 
-// Локальная функция для создания участника
-const createParticipant = (id, name, avatar, status = 'online', role = 'participant') => ({
-  id,
-  name,
-  avatar,
-  status,
-  role,
-  isMuted: false,
-  isVideoEnabled: false,
-  isSpeaking: false,
-  lastSeen: new Date(),
-  isTyping: false
-});
-
 const ChatVoiceCall = ({
   chatId,
   chatName,
@@ -35,35 +22,33 @@ const ChatVoiceCall = ({
   userName,
   onClose
 }) => {
-  // Прямые вызовы к callStore
-  const callStore = useCallStore();
-  const isConnected = callStore.isConnected;
-  const isMuted = callStore.isMuted;
-  const isAudioEnabled = callStore.isAudioEnabled;
-  const participants = callStore.participants;
-  const error = callStore.error;
-  const isGlobalAudioMuted = callStore.isGlobalAudioMuted;
-  const currentCall = callStore.currentCall;
-  const isScreenSharing = callStore.isScreenSharing;
-  const screenShareStream = callStore.screenShareStream;
-  const isVideoEnabled = callStore.isVideoEnabled;
-  const videoStream = callStore.videoStream;
-  const userVolumes = callStore.userVolumes;
-  const userMutedStates = callStore.userMutedStates;
-  const showVolumeSliders = callStore.showVolumeSliders;
-  const remoteScreenShares = callStore.remoteScreenShares;
-  
-  // Функции
-  const startCall = callStore.startCall;
-  const endCall = callStore.endCall;
-  const toggleMute = callStore.toggleMute;
-  const toggleGlobalAudio = callStore.toggleGlobalAudio;
-  const toggleUserMute = callStore.toggleUserMute;
-  const changeUserVolume = callStore.changeUserVolume;
-  const toggleVolumeSlider = callStore.toggleVolumeSlider;
-  const startScreenShare = callStore.startScreenShare;
-  const stopScreenShare = callStore.stopScreenShare;
-  const toggleVideo = callStore.toggleVideo;
+  const {
+    isConnected,
+    isMuted,
+    isAudioEnabled,
+    participants,
+    error,
+    isGlobalAudioMuted,
+    currentCall,
+    isScreenSharing,
+    screenShareStream,
+    isVideoEnabled,
+    videoStream,
+    userVolumes,
+    userMutedStates,
+    showVolumeSliders,
+    remoteScreenShares,
+    startCall,
+    endCall,
+    toggleMute,
+    toggleGlobalAudio,
+    toggleUserMute,
+    changeUserVolume,
+    toggleVolumeSlider,
+    startScreenShare,
+    stopScreenShare,
+    toggleVideo
+  } = useGlobalCall(userId, userName);
 
   // Автоматически начинаем звонок при монтировании
   useEffect(() => {
