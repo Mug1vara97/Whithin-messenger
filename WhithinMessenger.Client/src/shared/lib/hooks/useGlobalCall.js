@@ -1,5 +1,4 @@
 import { useCall } from '../contexts/CallContext';
-import { useAuth } from './useAuth';
 
 /**
  * Хук для работы с глобальным состоянием звонков
@@ -7,10 +6,9 @@ import { useAuth } from './useAuth';
  */
 export const useGlobalCall = (userId = null, userName = null) => {
   const callContext = useCall();
-  const { user: authUser } = useAuth();
   
-  // Используем переданного пользователя или пользователя из auth
-  const user = userId && userName ? { id: userId, username: userName } : authUser;
+  // Используем переданного пользователя
+  const user = userId && userName ? { id: userId, username: userName } : null;
 
   // Автоматическое подключение к звонку при наличии пользователя
   const startCall = async (roomId, roomName) => {

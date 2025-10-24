@@ -1,7 +1,47 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
-import { NoiseSuppressionManager } from '../utils/noiseSuppression';
+// import { NoiseSuppressionManager } from '../utils/noiseSuppression';
+
+// Временная заглушка для NoiseSuppressionManager
+class NoiseSuppressionManager {
+  constructor() {
+    this.initialized = false;
+  }
+  
+  async initialize(stream, _audioContext) {
+    // eslint-disable-next-line no-unused-vars
+    this.initialized = true;
+    return stream;
+  }
+  
+  isInitialized() {
+    return this.initialized;
+  }
+  
+  async enable(_mode) {
+    // eslint-disable-next-line no-unused-vars
+    // Заглушка - mode не используется
+    return true;
+  }
+  
+  async disable() {
+    return true;
+  }
+  
+  getProcessedStream() {
+    return null;
+  }
+  
+  setProducer(_producer) {
+    // eslint-disable-next-line no-unused-vars
+    // Заглушка - producer не используется
+  }
+  
+  cleanup() {
+    this.initialized = false;
+  }
+}
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
