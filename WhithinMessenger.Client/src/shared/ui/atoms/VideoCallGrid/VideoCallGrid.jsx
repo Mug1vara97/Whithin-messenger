@@ -172,6 +172,23 @@ const VideoCallGrid = ({
                 muted
                 playsInline
               />
+            ) : participant.isVideoEnabled && participant.videoStream ? (
+              <video
+                ref={(video) => {
+                  if (video && participant.videoStream) {
+                    video.srcObject = participant.videoStream;
+                    video.play().catch(error => {
+                      if (error.name !== 'AbortError') {
+                        console.warn('Camera video play error:', error);
+                      }
+                    });
+                  }
+                }}
+                className="tile-video"
+                autoPlay
+                muted
+                playsInline
+              />
             ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (

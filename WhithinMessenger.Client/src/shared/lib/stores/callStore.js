@@ -52,7 +52,12 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       screenShareStream: null,
-      remoteScreenShares: new Map(), // Демонстрации экрана от других пользователей (producerId -> data)
+      remoteScreenShares: new Map(),
+      
+      // Состояние вебкамеры
+      isVideoEnabled: false,
+      videoStream: null,
+      videoProducer: null, // Демонстрации экрана от других пользователей (producerId -> data)
       
       // WebRTC соединения (хранятся глобально)
       device: null,
@@ -567,6 +572,22 @@ export const useCallStore = create(
               
               console.log('Screen share audio element created:', screenShareAudioKey);
             }
+            
+            return;
+          }
+
+          // Обработка video producers (вебкамера)
+          if (producerData.kind === 'video' && producerData.appData?.mediaType === 'camera') {
+            console.log('Camera video producer detected, updating participant video stream');
+            
+            // Обновляем участника с video stream
+            set((state) => ({
+              participants: state.participants.map(p => 
+                p.userId === userId 
+                  ? { ...p, isVideoEnabled: true, videoStream: new MediaStream([consumer.track]) }
+                  : p
+              )
+            }));
             
             return;
           }
@@ -1289,6 +1310,124 @@ export const useCallStore = create(
         } else {
           console.log('Starting screen share...');
           await get().startScreenShare();
+        }
+      },
+
+      // Включение/выключение вебкамеры
+      toggleVideo: async () => {
+        console.log('🎥🎥🎥 toggleVideo called in callStore');
+        const state = get();
+        console.log('🎥 Current state:', { isVideoEnabled: state.isVideoEnabled, sendTransport: !!state.sendTransport });
+        if (state.isVideoEnabled) {
+          console.log('🎥 Stopping video...');
+          await get().stopVideo();
+        } else {
+          console.log('🎥 Starting video...');
+          await get().startVideo();
+        }
+      },
+
+      // Включение вебкамеры
+      startVideo: async () => {
+        console.log('🎥🎥🎥 startVideo called');
+        try {
+          const state = get();
+          console.log('🎥 startVideo state check:', { sendTransport: !!state.sendTransport, currentUserId: state.currentUserId });
+          if (!state.sendTransport) {
+            throw new Error('Send transport not available');
+          }
+
+          console.log('Requesting camera access...');
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 30, max: 60 },
+              facingMode: 'user'
+            }
+          });
+
+          console.log('Camera access granted');
+          set({ videoStream: stream, isVideoEnabled: true });
+
+          const videoTrack = stream.getVideoTracks()[0];
+          if (!videoTrack) {
+            throw new Error('No video track available');
+          }
+
+          console.log('Creating video producer...');
+          const videoProducer = await state.sendTransport.produce({
+            track: videoTrack,
+            encodings: [
+              {
+                scaleResolutionDownBy: 1,
+                maxBitrate: 2500000, // 2.5 Mbps для HD
+                maxFramerate: 30
+              }
+            ],
+            codecOptions: {
+              videoGoogleStartBitrate: 1500,
+              videoGoogleMaxBitrate: 2500
+            },
+            appData: {
+              mediaType: 'camera',
+              trackType: 'video',
+              userId: state.currentUserId,
+              userName: state.currentUserName
+            }
+          });
+
+          console.log('Video producer created:', videoProducer.id);
+          set({ videoProducer });
+
+          // Обработка событий video producer
+          videoProducer.on('transportclose', () => {
+            console.log('Video transport closed');
+            get().stopVideo();
+          });
+
+          videoProducer.on('trackended', () => {
+            console.log('Video track ended');
+            get().stopVideo();
+          });
+
+        } catch (error) {
+          console.error('Error starting video:', error);
+          set({ error: 'Failed to start video: ' + error.message });
+        }
+      },
+
+      // Выключение вебкамеры
+      stopVideo: async () => {
+        console.log('Stopping video...');
+        try {
+          const state = get();
+          
+          // Останавливаем video producer
+          if (state.videoProducer) {
+            try {
+              await state.videoProducer.close();
+            } catch (error) {
+              console.log('stopVideo: videoProducer.close failed:', error.message);
+            }
+          }
+
+          // Останавливаем поток
+          if (state.videoStream) {
+            state.videoStream.getTracks().forEach(track => track.stop());
+          }
+
+          // Очищаем состояние
+          set({
+            videoStream: null,
+            isVideoEnabled: false,
+            videoProducer: null
+          });
+
+          console.log('Video stopped successfully');
+        } catch (error) {
+          console.error('Error stopping video:', error);
+          set({ error: 'Failed to stop video: ' + error.message });
         }
       }
     }),

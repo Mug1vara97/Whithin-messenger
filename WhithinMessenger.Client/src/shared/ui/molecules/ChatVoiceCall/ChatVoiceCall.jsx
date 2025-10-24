@@ -32,6 +32,8 @@ const ChatVoiceCall = ({
     currentCall,
     isScreenSharing,
     screenShareStream,
+    isVideoEnabled,
+    videoStream,
     userVolumes,
     userMutedStates,
     showVolumeSliders,
@@ -44,7 +46,8 @@ const ChatVoiceCall = ({
     changeUserVolume,
     toggleVolumeSlider,
     startScreenShare,
-    stopScreenShare
+    stopScreenShare,
+    toggleVideo
   } = useGlobalCall(userId, userName);
 
   // Автоматически начинаем звонок при монтировании
@@ -117,9 +120,15 @@ const ChatVoiceCall = ({
     toggleMute();
   };
 
-  const handleToggleVideo = () => {
-    // Видео не поддерживается в голосовых звонках
-    console.log('Video not supported in voice calls');
+  const handleToggleVideo = async () => {
+    try {
+      console.log('🎥 Video button clicked, isVideoEnabled:', isVideoEnabled);
+      console.log('🎥 toggleVideo function:', typeof toggleVideo);
+      await toggleVideo();
+      console.log('🎥 Video toggle completed');
+    } catch (error) {
+      console.error('🎥 Video toggle error:', error);
+    }
   };
 
   const handleScreenShare = async () => {
@@ -146,6 +155,8 @@ const ChatVoiceCall = ({
   currentUser.isAudioEnabled = isAudioEnabled;
   currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
   currentUser.isSpeaking = false;
+  currentUser.isVideoEnabled = isVideoEnabled;
+  currentUser.videoStream = videoStream;
   
   const displayParticipants = [currentUser];
   
@@ -250,12 +261,15 @@ const ChatVoiceCall = ({
 
             {/* Камера */}
             <button 
-              className={`${styles.controlBtn} ${styles.cameraBtn} disabled`}
+              className={`${styles.controlBtn} ${styles.cameraBtn} ${isVideoEnabled ? 'active' : ''}`}
               onClick={handleToggleVideo}
-              title="Камера недоступна"
-              disabled
+              title={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
+              style={{ 
+                backgroundColor: isVideoEnabled ? '#5865f2' : '#40444b',
+                color: isVideoEnabled ? '#ffffff' : '#b9bbbe'
+              }}
             >
-              <VideocamOffIcon />
+              {isVideoEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
             </button>
 
             {/* Демонстрация экрана */}

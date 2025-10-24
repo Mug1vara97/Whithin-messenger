@@ -88,6 +88,9 @@ export const useGlobalCall = (userId = null, userName = null) => {
     setAudioBlocked: callContext.setAudioBlocked,
     startScreenShare: callContext.startScreenShare,
     stopScreenShare: callContext.stopScreenShare,
-    toggleScreenShare: callContext.toggleScreenShare
+    toggleScreenShare: callContext.toggleScreenShare,
+    startVideo: callContext.startVideo,
+    stopVideo: callContext.stopVideo,
+    toggleVideo: callContext.toggleVideo
   };
 };

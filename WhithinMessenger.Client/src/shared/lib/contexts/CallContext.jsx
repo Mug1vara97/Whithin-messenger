@@ -91,6 +91,8 @@ export const CallProvider = ({ children }) => {
     isScreenSharing: isScreenSharing,
     screenShareStream: screenShareStream,
     remoteScreenShares: remoteScreenShares,
+    isVideoEnabled: callStore.isVideoEnabled,
+    videoStream: callStore.videoStream,
     
     // Методы
     initializeCall: callStore.initializeCall,
@@ -109,6 +111,9 @@ export const CallProvider = ({ children }) => {
     startScreenShare: callStore.startScreenShare,
     stopScreenShare: callStore.stopScreenShare,
     toggleScreenShare: callStore.toggleScreenShare,
+    startVideo: callStore.startVideo,
+    stopVideo: callStore.stopVideo,
+    toggleVideo: callStore.toggleVideo,
     
     // Прямой доступ к store для расширенного использования
     store: callStore
