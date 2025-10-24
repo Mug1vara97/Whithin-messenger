@@ -1591,6 +1591,18 @@ export const useCallStore = create(
             console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused);
           });
 
+          // Проверяем audio elements
+          console.log('🎥 Audio elements count:', finalState.audioElements.size);
+          finalState.audioElements.forEach((audioElement, userId) => {
+            console.log('🎥 Audio element for user:', userId, 'srcObject:', !!audioElement.srcObject, 'paused:', audioElement.paused, 'muted:', audioElement.muted);
+          });
+
+          // Проверяем gain nodes
+          console.log('🎥 Gain nodes count:', finalState.gainNodes.size);
+          finalState.gainNodes.forEach((gainNode, userId) => {
+            console.log('🎥 Gain node for user:', userId, 'gain:', gainNode.gain.value, 'context:', gainNode.context.state);
+          });
+
           console.log('🎥🎥🎥 STOP VIDEO END 🎥🎥🎥');
           console.log('Video stopped successfully');
         } catch (error) {
