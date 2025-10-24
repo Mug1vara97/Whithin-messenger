@@ -305,6 +305,46 @@
   flex: 1;
   overflow: hidden;
   min-height: 0; /* Позволяет сжиматься */
+  max-height: 100%; /* Ограничиваем высоту контейнером */
+}
+
+/* Принудительная адаптация VideoCallGrid под контейнер */
+.screenShareContainer .video-call-container .video-grid-wrapper {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.screenShareContainer .video-call-container .video-grid {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.screenShareContainer .video-call-container .focused-view {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.screenShareContainer .video-call-container .focused-user-wrapper {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Адаптация тайлов под размер контейнера */
+.screenShareContainer .video-call-container .video-tile {
+  max-height: calc(100vh - 300px) !important; /* Ограничиваем высоту тайлов */
+}
+
+.screenShareContainer .video-call-container .small-tile {
+  max-height: 120px !important; /* Ограничиваем высоту маленьких тайлов */
+}
+
+/* Адаптация фокуса под размер контейнера */
+.screenShareContainer .video-call-container .focused-view {
+  max-height: 100% !important;
+}
+
+.screenShareContainer .video-call-container .bottom-users-container {
+  max-height: 120px !important; /* Ограничиваем высоту нижних пользователей */
 }
 
 /* Screen Share Focus */
