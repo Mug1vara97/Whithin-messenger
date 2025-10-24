@@ -1473,17 +1473,31 @@ export const useCallStore = create(
             }
           }
 
-          // Останавливаем поток
+          // Останавливаем только видео треки
           if (state.videoStream) {
-            state.videoStream.getTracks().forEach(track => track.stop());
+            state.videoStream.getTracks().forEach(track => {
+              if (track.kind === 'video') {
+                console.log('🎥 Stopping video track:', track.label);
+                track.stop();
+              } else {
+                console.log('🎥 Keeping audio track:', track.label);
+              }
+            });
           }
 
-          // Очищаем состояние
+          // Очищаем состояние (но не трогаем основной аудио producer)
           set({
             videoStream: null,
             isVideoEnabled: false,
             videoProducer: null
           });
+          
+          console.log('🎥 Video stopped, but audio should continue working');
+          
+          // Проверяем, что основной аудио producer не затронут
+          const currentState = get();
+          console.log('🎥 Remaining producers after video stop:', Array.from(currentState.producers.keys()));
+          console.log('🎥 Audio context state:', currentState.audioContext?.state);
 
           console.log('Video stopped successfully');
         } catch (error) {
