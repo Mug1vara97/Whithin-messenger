@@ -1,6 +1,93 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { voiceCallApi } from '../api/voiceCallApi';
-import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
+// import { voiceCallApi } from '../api/voiceCallApi';
+// import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
+
+// Временная заглушка для voiceCallApi
+const voiceCallApi = {
+  socket: null,
+  isConnected: false,
+  roomId: null,
+  userId: null,
+  userName: null,
+  
+  async connect(userId, userName) {
+    console.log('useVoiceCall voiceCallApi.connect called with:', { userId, userName });
+    this.userId = userId;
+    this.userName = userName;
+    this.isConnected = true;
+    return true;
+  },
+  
+  async disconnect() {
+    console.log('useVoiceCall voiceCallApi.disconnect called');
+    this.isConnected = false;
+    this.socket = null;
+    return true;
+  },
+  
+  async joinRoom(roomId) {
+    console.log('useVoiceCall voiceCallApi.joinRoom called with:', roomId);
+    this.roomId = roomId;
+    return true;
+  },
+  
+  async leaveRoom() {
+    console.log('useVoiceCall voiceCallApi.leaveRoom called');
+    this.roomId = null;
+    return true;
+  },
+  
+  on(event) {
+    console.log('useVoiceCall voiceCallApi.on called with:', event);
+    // Заглушка - не делаем ничего
+  },
+  
+  off(event) {
+    console.log('useVoiceCall voiceCallApi.off called with:', event);
+    // Заглушка - не делаем ничего
+  },
+  
+  emit(event, data) {
+    console.log('useVoiceCall voiceCallApi.emit called with:', event, data);
+    // Заглушка - не делаем ничего
+  }
+};
+
+// Временная заглушка для NoiseSuppressionManager
+class NoiseSuppressionManager {
+  constructor() {
+    this.initialized = false;
+  }
+  
+  async initialize(stream) {
+    this.initialized = true;
+    return stream;
+  }
+  
+  isInitialized() {
+    return this.initialized;
+  }
+  
+  async enable() {
+    return true;
+  }
+  
+  async disable() {
+    return true;
+  }
+  
+  getProcessedStream() {
+    return null;
+  }
+  
+  setProducer() {
+    // Заглушка
+  }
+  
+  cleanup() {
+    this.initialized = false;
+  }
+}
 
 // 🚨 TEST LOGGING - ДОЛЖНО ПОЯВИТЬСЯ В КОНСОЛИ 🚨
 console.log('🔥🔥🔥 useVoiceCall.js LOADED 🔥🔥🔥');
