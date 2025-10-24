@@ -6,6 +6,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  min-height: 0; /* Позволяет сжиматься */
+  overflow: hidden; /* Предотвращает переполнение */
 }
 
 .video-grid-wrapper {
@@ -16,6 +18,8 @@
   padding: 0;
   position: relative;
   overflow: hidden;
+  min-height: 0; /* Позволяет сжиматься */
+  max-height: 100%; /* Ограничиваем высоту */
 }
 
 /* Сетка видео */
@@ -28,6 +32,9 @@
   align-content: center;
   justify-content: center;
   padding: 0 8px;
+  min-height: 0; /* Позволяет сжиматься */
+  max-height: 100%; /* Ограничиваем высоту */
+  overflow: hidden; /* Предотвращает переполнение */
 }
 
 /* Базовые стили для тайлов - точная копия Discord */
@@ -39,6 +46,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
+  max-height: 100%; /* Ограничиваем высоту */
+  height: auto; /* Автоматическая высота */
 }
 
 .video-tile .tile-border {
@@ -589,6 +598,8 @@
   gap: 16px;
   overflow: hidden;
   max-height: 100%;
+  min-height: 0; /* Позволяет сжиматься */
+  height: 100%; /* Занимает всю доступную высоту */
 }
 
 .focused-user-wrapper {
@@ -599,6 +610,8 @@
   min-height: 0;
   overflow: hidden;
   max-width: 100%;
+  max-height: 100%; /* Ограничиваем высоту */
+  height: 100%; /* Занимает всю доступную высоту */
 }
 
 .focused-tile {
@@ -607,6 +620,7 @@
   max-height: 100%;
   aspect-ratio: 16 / 9;
   cursor: pointer;
+  height: auto; /* Автоматическая высота */
 }
 
 /* Bottom users container in focused mode */
@@ -851,4 +865,130 @@
 
 .close-screen-share-btn:active {
   transform: scale(0.95);
+}
+
+/* ===== АДАПТИВНЫЕ СТИЛИ ===== */
+
+/* Адаптивные размеры для маленьких контейнеров */
+@media (max-height: 400px) {
+  .video-tile {
+    max-height: 80% !important;
+    min-height: 60% !important;
+  }
+  
+  .small-tile {
+    max-height: 40% !important;
+    min-height: 30% !important;
+  }
+  
+  .focused-tile {
+    max-height: 80% !important;
+    min-height: 60% !important;
+  }
+  
+  .video-grid {
+    padding: 0 20px !important;
+  }
+  
+  .focused-view {
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-height: 300px) {
+  .video-tile {
+    max-height: 70% !important;
+    min-height: 50% !important;
+  }
+  
+  .small-tile {
+    max-height: 35% !important;
+    min-height: 25% !important;
+  }
+  
+  .focused-tile {
+    max-height: 70% !important;
+    min-height: 50% !important;
+  }
+  
+  .video-grid {
+    padding: 0 30px !important;
+  }
+  
+  .focused-view {
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+}
+
+@media (max-height: 250px) {
+  .video-tile {
+    max-height: 60% !important;
+    min-height: 40% !important;
+  }
+  
+  .small-tile {
+    max-height: 30% !important;
+    min-height: 20% !important;
+  }
+  
+  .focused-tile {
+    max-height: 60% !important;
+    min-height: 40% !important;
+  }
+  
+  .video-grid {
+    padding: 0 40px !important;
+  }
+  
+  .focused-view {
+    padding: 6px !important;
+    gap: 4px !important;
+  }
+}
+
+/* Адаптивные размеры для маленьких контейнеров по ширине */
+@media (max-width: 400px) {
+  .video-tile {
+    max-width: 200px !important;
+    min-width: 150px !important;
+  }
+  
+  .small-tile {
+    max-width: 120px !important;
+    min-width: 80px !important;
+  }
+  
+  .focused-tile {
+    max-width: 100% !important;
+  }
+  
+  .video-grid {
+    padding: 20px 0 !important;
+  }
+  
+  .focused-view {
+    padding: 10px !important;
+  }
+}
+
+@media (max-width: 300px) {
+  .video-tile {
+    max-width: 150px !important;
+    min-width: 100px !important;
+  }
+  
+  .small-tile {
+    max-width: 80px !important;
+    min-width: 60px !important;
+  }
+  
+  .video-grid {
+    padding: 30px 0 !important;
+  }
+  
+  .focused-view {
+    padding: 8px !important;
+  }
 }
