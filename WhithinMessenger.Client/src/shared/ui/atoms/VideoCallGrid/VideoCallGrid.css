@@ -49,12 +49,6 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
-  max-height: 100%; /* Ограничиваем высоту */
-  height: auto; /* Автоматическая высота */
-  max-width: 100%; /* Ограничиваем ширину */
-  width: auto; /* Автоматическая ширина */
-  flex-shrink: 1; /* Позволяет сжиматься */
-  flex-grow: 0; /* Не растет больше необходимого */
 }
 
 .video-tile .tile-border {
@@ -367,26 +361,22 @@
 
 /* Универсальные стили для всех тайлов - автоматическая адаптация */
 .video-grid .video-tile {
-  max-height: 100% !important; /* Ограничиваем высоту контейнером */
-  max-width: 100% !important; /* Ограничиваем ширину контейнером */
-  flex-shrink: 1 !important; /* Позволяет сжиматься */
-  flex-grow: 0 !important; /* Не растет больше необходимого */
-  height: auto !important; /* Автоматическая высота */
-  width: auto !important; /* Автоматическая ширина */
-  min-width: 0 !important; /* Позволяет сжиматься до минимума */
-  min-height: 0 !important; /* Позволяет сжиматься до минимума */
+  max-height: 100%; /* Ограничиваем высоту контейнером */
+  max-width: 100%; /* Ограничиваем ширину контейнером */
+  flex-shrink: 1; /* Позволяет сжиматься */
+  flex-grow: 0; /* Не растет больше необходимого */
+  min-width: 0; /* Позволяет сжиматься до минимума */
+  min-height: 0; /* Позволяет сжиматься до минимума */
 }
 
 /* Адаптация для маленьких тайлов */
 .video-grid .small-tile {
-  max-height: 100% !important;
-  max-width: 100% !important;
-  flex-shrink: 1 !important;
-  flex-grow: 0 !important;
-  height: auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
+  max-height: 100%;
+  max-width: 100%;
+  flex-shrink: 1;
+  flex-grow: 0;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ===== GRID LAYOUTS ===== */
@@ -402,8 +392,6 @@
   width: 100%;
   max-width: 800px;
   height: auto;
-  max-height: 100%; /* Ограничиваем высоту контейнером */
-  flex-shrink: 1; /* Позволяет сжиматься */
 }
 
 /* 2 users - horizontal on wide screens, vertical on narrow */
@@ -415,8 +403,6 @@
 .video-grid[data-user-count="2"] .video-tile {
   width: 100%;
   max-width: 600px;
-  max-height: 100%; /* Ограничиваем высоту контейнером */
-  flex-shrink: 1; /* Позволяет сжиматься */
 }
 
 @media (min-width: 1600px) {
@@ -657,11 +643,6 @@
   max-height: 100%;
   aspect-ratio: 16 / 9;
   cursor: pointer;
-  height: auto; /* Автоматическая высота */
-  flex-shrink: 1; /* Позволяет сжиматься */
-  flex-grow: 0; /* Не растет больше необходимого */
-  min-width: 0; /* Позволяет сжиматься до минимума */
-  min-height: 0; /* Позволяет сжиматься до минимума */
 }
 
 /* Bottom users container in focused mode */
