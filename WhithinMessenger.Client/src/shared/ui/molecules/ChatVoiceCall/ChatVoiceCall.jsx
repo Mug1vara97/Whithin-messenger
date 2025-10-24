@@ -93,15 +93,26 @@ const ChatVoiceCall = ({
         // Сначала пробуем найти screen share tile
         let targetTile = document.querySelector('.screen-share-content');
         
-        // Если screen share не найден, ищем video tile (вебкамера) удаленного пользователя
+        // Если screen share не найден, ищем video tile (вебкамера)
         if (!targetTile) {
-          // Ищем tile с видео, но не текущего пользователя
+          // Сначала ищем tile с видео удаленного пользователя
           const allVideoTiles = document.querySelectorAll('.video-tile, [data-participant-id]');
           for (const tile of allVideoTiles) {
             const participantId = tile.getAttribute('data-participant-id');
             if (participantId && participantId !== userId) {
               targetTile = tile;
               break;
+            }
+          }
+          
+          // Если удаленного пользователя с видео нет, ищем текущего пользователя
+          if (!targetTile) {
+            for (const tile of allVideoTiles) {
+              const participantId = tile.getAttribute('data-participant-id');
+              if (participantId && participantId === userId) {
+                targetTile = tile;
+                break;
+              }
             }
           }
         }

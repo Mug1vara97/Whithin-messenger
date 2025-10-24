@@ -113,15 +113,23 @@ const VideoCallGrid = ({
     setBottomPage(page);
   };
 
-  // Автоматический фокус на вебкамеру собеседника
+  // Автоматический фокус на вебкамеру
   useEffect(() => {
     if (!isFocusedMode) {
-      // Находим участника с включенной вебкамерой (не текущего пользователя)
-      const videoParticipant = extendedParticipants.find(p => 
+      // Сначала ищем удаленного участника с вебкамерой
+      let videoParticipant = extendedParticipants.find(p => 
         p.isVideoEnabled && p.videoStream && !p.isCurrentUser
       );
+      
+      // Если удаленного участника с вебкамерой нет, фокусируемся на текущем пользователе
+      if (!videoParticipant) {
+        videoParticipant = extendedParticipants.find(p => 
+          p.isVideoEnabled && p.videoStream && p.isCurrentUser
+        );
+      }
+      
       if (videoParticipant) {
-        console.log('VideoCallGrid: Auto-focusing on remote video participant:', videoParticipant.id);
+        console.log('VideoCallGrid: Auto-focusing on video participant:', videoParticipant.id, 'isCurrentUser:', videoParticipant.isCurrentUser);
         focusParticipant(videoParticipant.id);
       }
     }
