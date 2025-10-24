@@ -1306,6 +1306,7 @@ export const useVoiceCall = (userId, userName) => {
   const toggleScreenShare = useCallback(async () => {
     console.log('🎯🎯🎯 TOGGLE SCREEN SHARE CALLED 🎯🎯🎯', { isScreenSharing });
     console.log('🔥🔥🔥 TOGGLE FUNCTION EXECUTING 🔥🔥🔥');
+    console.log('🚀🚀🚀 TOGGLE FUNCTION START 🚀🚀🚀');
     if (isScreenSharing) {
       await stopScreenShare();
     } else {
