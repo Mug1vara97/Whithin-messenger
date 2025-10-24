@@ -251,6 +251,22 @@ export const useCallStore = create(
               set({ remoteScreenShares: newRemoteScreenShares });
             }
             
+            // Проверяем, является ли это вебкамерой
+            const userId = state.peerIdToUserIdMap.get(producerSocketId) || producerSocketId;
+            if (userId && userId !== state.currentUserId) {
+              console.log('🎥 Video producer closed for user:', userId);
+              // Обновляем участника - отключаем вебкамеру
+              set((state) => {
+                const updatedParticipants = state.participants.map(p => 
+                  p.userId === userId 
+                    ? { ...p, isVideoEnabled: false, videoStream: null }
+                    : p
+                );
+                console.log('🎥 Updated participants after video close:', updatedParticipants);
+                return { participants: updatedParticipants };
+              });
+            }
+            
             const consumer = get().consumers.get(producerId);
             if (consumer) {
               consumer.close();
