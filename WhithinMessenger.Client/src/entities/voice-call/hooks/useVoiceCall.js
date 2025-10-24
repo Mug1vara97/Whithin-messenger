@@ -2,6 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
 
+// 🚨 TEST LOGGING - ДОЛЖНО ПОЯВИТЬСЯ В КОНСОЛИ 🚨
+console.log('🔥🔥🔥 useVoiceCall.js LOADED 🔥🔥🔥');
+
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
   { urls: ['stun:185.119.59.23:3478'] },
