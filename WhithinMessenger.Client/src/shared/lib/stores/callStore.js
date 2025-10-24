@@ -763,7 +763,7 @@ export const useCallStore = create(
             }
           });
 
-          set({ localStream: stream });
+          set({ localStream: stream, audioStream: stream });
           
           // Инициализация audio context
           let audioContext = state.audioContext;
