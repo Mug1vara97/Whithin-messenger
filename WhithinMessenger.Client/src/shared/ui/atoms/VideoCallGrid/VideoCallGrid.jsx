@@ -1,5 +1,5 @@
 import React, { useRef, useMemo } from 'react';
-import { useVideoCall } from '../../../../entities/video-call';
+import { useVideoCall } from '../../../../entities/video-call/hooks/useVideoCall';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';

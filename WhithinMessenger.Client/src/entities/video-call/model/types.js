@@ -50,5 +50,9 @@ export const createVideoCall = (id, name, participants = [], mode = VIDEO_CALL_M
   maxParticipants: 50
 });
 
+// Экспортируем функцию для использования в других модулях
+export { createVideoCall as createVideoCallFunction };
+
+
 
 

@@ -84,7 +84,7 @@ const ChatVoiceCall = ({
   // Принудительная активация фокуса на демонстрации экрана или вебкамере
   useEffect(() => {
     const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-    const hasAnyVideo = isVideoEnabled || displayParticipants.some(p => p.isVideoEnabled);
+    const hasAnyVideo = isVideoEnabled || participants.some(p => p.isVideoEnabled);
     const shouldAutoFocus = hasAnyScreenShare || hasAnyVideo;
     
     if (shouldAutoFocus) {
@@ -99,7 +99,7 @@ const ChatVoiceCall = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, displayParticipants]);
+  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, participants]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -192,7 +192,7 @@ const ChatVoiceCall = ({
           {(() => {
             console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size, 'isVideoEnabled:', isVideoEnabled);
             const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-            const hasAnyVideo = isVideoEnabled || displayParticipants.some(p => p.isVideoEnabled);
+            const hasAnyVideo = isVideoEnabled || participants.some(p => p.isVideoEnabled);
             const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo;
             return shouldShowVideoGrid ? (
               /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
