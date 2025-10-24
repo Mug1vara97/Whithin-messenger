@@ -23,7 +23,8 @@ const VideoCallGrid = ({
   isScreenSharing = false,
   screenShareParticipant = null,
   remoteScreenShares = new Map(),
-  forceGridMode = false
+  forceGridMode = false,
+  hideBottomUsers = false
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -299,36 +300,38 @@ const VideoCallGrid = ({
             {focusedParticipant && renderParticipantTile(focusedParticipant, false)}
           </div>
           
-          <div className="bottom-users-container">
-            {totalBottomPages > 1 && bottomPage > 0 && (
-              <button 
-                className="pagination-arrow pagination-arrow-left" 
-                onClick={handlePrevBottomPage}
-                aria-label="Предыдущая страница"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            )}
+          {!hideBottomUsers && (
+            <div className="bottom-users-container">
+              {totalBottomPages > 1 && bottomPage > 0 && (
+                <button 
+                  className="pagination-arrow pagination-arrow-left" 
+                  onClick={handlePrevBottomPage}
+                  aria-label="Предыдущая страница"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
 
-            <div className="bottom-users-grid" ref={bottomGridRef}>
-              {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
-              {extendedParticipants.map((participant) => renderParticipantTile(participant, true))}
+              <div className="bottom-users-grid" ref={bottomGridRef}>
+                {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
+                {extendedParticipants.map((participant) => renderParticipantTile(participant, true))}
+              </div>
+
+              {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
+                <button 
+                  className="pagination-arrow pagination-arrow-right" 
+                  onClick={handleNextBottomPage}
+                  aria-label="Следующая страница"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
             </div>
-
-            {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
-              <button 
-                className="pagination-arrow pagination-arrow-right" 
-                onClick={handleNextBottomPage}
-                aria-label="Следующая страница"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     );

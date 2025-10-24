@@ -347,6 +347,44 @@
   max-height: 120px !important; /* Ограничиваем высоту нижних пользователей */
 }
 
+/* Адаптивные размеры для маленьких контейнеров */
+@media (max-height: 400px) {
+  .screenShareContainer .video-call-container .video-tile {
+    max-height: 200px !important;
+    min-height: 150px !important;
+  }
+  
+  .screenShareContainer .video-call-container .small-tile {
+    max-height: 80px !important;
+    min-height: 60px !important;
+  }
+}
+
+@media (max-height: 300px) {
+  .screenShareContainer .video-call-container .video-tile {
+    max-height: 150px !important;
+    min-height: 100px !important;
+  }
+  
+  .screenShareContainer .video-call-container .small-tile {
+    max-height: 60px !important;
+    min-height: 40px !important;
+  }
+}
+
+/* Адаптивные размеры для маленьких контейнеров по ширине */
+@media (max-width: 400px) {
+  .screenShareContainer .video-call-container .video-tile {
+    max-width: 200px !important;
+    min-width: 150px !important;
+  }
+  
+  .screenShareContainer .video-call-container .small-tile {
+    max-width: 120px !important;
+    min-width: 80px !important;
+  }
+}
+
 /* Screen Share Focus */
 .screenShareFocus {
   display: flex;

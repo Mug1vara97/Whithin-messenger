@@ -200,6 +200,7 @@ const ChatVoiceCall = ({
                   remoteScreenShares={remoteScreenShares}
                   onStopScreenShare={handleScreenShare}
                   forceGridMode={false}
+                  hideBottomUsers={true}
                 />
               </div>
             ) : (
