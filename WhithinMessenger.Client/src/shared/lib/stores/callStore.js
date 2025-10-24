@@ -260,6 +260,12 @@ export const useCallStore = create(
             // Проверяем, является ли это вебкамерой (video producer с mediaType camera)
             const userId = state.peerIdToUserIdMap.get(producerSocketId) || producerSocketId;
             
+            // Если это аудио producer, не обрабатываем его здесь
+            if (producerKind === 'audio' && mediaType !== 'screen') {
+              console.log('🎥 Audio producer closed, ignoring to preserve audio stream');
+              return;
+            }
+            
             // Если параметры kind и mediaType не приходят, проверяем по участникам
             let isVideoProducer = false;
             if (producerKind === 'video' && mediaType === 'camera') {
@@ -291,14 +297,20 @@ export const useCallStore = create(
               });
             }
             
-            const consumer = get().consumers.get(producerId);
-            if (consumer) {
-              consumer.close();
-              set((state) => {
-                const newConsumers = new Map(state.consumers);
-                newConsumers.delete(producerId);
-                return { consumers: newConsumers };
-              });
+            // Удаляем consumer только для video producer, не для audio
+            if (isVideoProducer || mediaType === 'screen') {
+              const consumer = get().consumers.get(producerId);
+              if (consumer) {
+                console.log('🎥 Closing consumer for producer:', producerId);
+                consumer.close();
+                set((state) => {
+                  const newConsumers = new Map(state.consumers);
+                  newConsumers.delete(producerId);
+                  return { consumers: newConsumers };
+                });
+              }
+            } else {
+              console.log('🎥 Preserving consumer for audio producer:', producerId);
             }
             
             if (producerSocketId) {
