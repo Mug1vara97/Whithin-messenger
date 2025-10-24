@@ -80,7 +80,8 @@ const ChatVoiceCall = ({
 
   // Принудительная активация фокуса на демонстрации экрана
   useEffect(() => {
-    if (isScreenSharing && screenShareStream) {
+    const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
+    if (hasAnyScreenShare) {
       // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
       const timer = setTimeout(() => {
         const screenShareTile = document.querySelector('.screen-share-content');
@@ -92,7 +93,7 @@ const ChatVoiceCall = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isScreenSharing, screenShareStream]);
+  }, [isScreenSharing, screenShareStream, remoteScreenShares.size]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -173,8 +174,9 @@ const ChatVoiceCall = ({
       <div className={styles.voiceCallWrapper}>
         <div className={styles.participantsContainer}>
           {(() => {
-            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing);
-            return isScreenSharing ? (
+            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size);
+            const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
+            return hasAnyScreenShare ? (
               /* При демонстрации экрана используем VideoCallGrid для фокуса */
               <div className={styles.screenShareContainer}>
                 <VideoCallGrid 
