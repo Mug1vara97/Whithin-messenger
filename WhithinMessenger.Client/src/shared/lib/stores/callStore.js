@@ -1078,7 +1078,14 @@ export const useCallStore = create(
               displaySurface: 'monitor',
               resizeMode: 'crop-and-scale'
             },
-            audio: false
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 2,
+              sampleSize: 16
+            }
           });
 
           console.log('Screen sharing access granted');

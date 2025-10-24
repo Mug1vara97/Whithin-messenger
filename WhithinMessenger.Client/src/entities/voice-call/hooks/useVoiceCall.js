@@ -1307,6 +1307,7 @@ export const useVoiceCall = (userId, userName) => {
     console.log('🎯🎯🎯 TOGGLE SCREEN SHARE CALLED 🎯🎯🎯', { isScreenSharing });
     console.log('🔥🔥🔥 TOGGLE FUNCTION EXECUTING 🔥🔥🔥');
     console.log('🚀🚀🚀 TOGGLE FUNCTION START 🚀🚀🚀');
+    console.log('💥💥💥 TOGGLE FUNCTION MIDDLE 💥💥💥');
     if (isScreenSharing) {
       await stopScreenShare();
     } else {
