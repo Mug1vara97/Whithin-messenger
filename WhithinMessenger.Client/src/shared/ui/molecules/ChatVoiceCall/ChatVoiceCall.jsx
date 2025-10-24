@@ -81,22 +81,25 @@ const ChatVoiceCall = ({
     });
   }, [isScreenSharing, screenShareStream, participants.length, isConnected]);
 
-  // Принудительная активация фокуса на демонстрации экрана
+  // Принудительная активация фокуса на демонстрации экрана или вебкамере
   useEffect(() => {
     const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-    if (hasAnyScreenShare) {
+    const hasAnyVideo = isVideoEnabled || displayParticipants.some(p => p.isVideoEnabled);
+    const shouldAutoFocus = hasAnyScreenShare || hasAnyVideo;
+    
+    if (shouldAutoFocus) {
       // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
       const timer = setTimeout(() => {
         const screenShareTile = document.querySelector('.screen-share-content');
         if (screenShareTile) {
           screenShareTile.click();
-          console.log('ChatVoiceCall: Auto-focused on screen share');
+          console.log('ChatVoiceCall: Auto-focused on screen share or video');
         }
       }, 100);
       
       return () => clearTimeout(timer);
     }
-  }, [isScreenSharing, screenShareStream, remoteScreenShares.size]);
+  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, displayParticipants]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -172,6 +175,8 @@ const ChatVoiceCall = ({
     videoParticipant.isMuted = participant.isMuted || false;
     videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
     videoParticipant.isSpeaking = participant.isSpeaking || false;
+    videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
+    videoParticipant.videoStream = participant.videoStream || null;
     displayParticipants.push(videoParticipant);
   });
 
@@ -185,10 +190,12 @@ const ChatVoiceCall = ({
       <div className={styles.voiceCallWrapper}>
         <div className={styles.participantsContainer}>
           {(() => {
-            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size);
+            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size, 'isVideoEnabled:', isVideoEnabled);
             const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-            return hasAnyScreenShare ? (
-              /* При демонстрации экрана используем VideoCallGrid для фокуса */
+            const hasAnyVideo = isVideoEnabled || displayParticipants.some(p => p.isVideoEnabled);
+            const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo;
+            return shouldShowVideoGrid ? (
+              /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
               <div className={styles.screenShareContainer}>
                 <VideoCallGrid 
                   participants={displayParticipants}

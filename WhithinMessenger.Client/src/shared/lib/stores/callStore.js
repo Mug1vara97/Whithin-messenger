@@ -578,16 +578,23 @@ export const useCallStore = create(
 
           // Обработка video producers (вебкамера)
           if (producerData.kind === 'video' && producerData.appData?.mediaType === 'camera') {
-            console.log('Camera video producer detected, updating participant video stream');
+            console.log('🎥 Camera video producer detected, updating participant video stream');
+            console.log('🎥 Producer data:', { userId, producerUserId: producerData.appData?.userId, currentUserId: state.currentUserId });
+            
+            // Создаем MediaStream из consumer track
+            const videoStream = new MediaStream([consumer.track]);
+            console.log('🎥 Created video stream:', videoStream);
             
             // Обновляем участника с video stream
-            set((state) => ({
-              participants: state.participants.map(p => 
+            set((state) => {
+              const updatedParticipants = state.participants.map(p => 
                 p.userId === userId 
-                  ? { ...p, isVideoEnabled: true, videoStream: new MediaStream([consumer.track]) }
+                  ? { ...p, isVideoEnabled: true, videoStream: videoStream }
                   : p
-              )
-            }));
+              );
+              console.log('🎥 Updated participants:', updatedParticipants);
+              return { participants: updatedParticipants };
+            });
             
             return;
           }
