@@ -358,6 +358,11 @@
     max-height: 80px !important;
     min-height: 60px !important;
   }
+  
+  /* Добавляем отступы по бокам при маленькой высоте */
+  .screenShareContainer .video-call-container .video-grid {
+    padding: 0 20px !important;
+  }
 }
 
 @media (max-height: 300px) {
@@ -369,6 +374,11 @@
   .screenShareContainer .video-call-container .small-tile {
     max-height: 60px !important;
     min-height: 40px !important;
+  }
+  
+  /* Увеличиваем отступы при очень маленькой высоте */
+  .screenShareContainer .video-call-container .video-grid {
+    padding: 0 30px !important;
   }
 }
 
@@ -382,6 +392,78 @@
   .screenShareContainer .video-call-container .small-tile {
     max-width: 120px !important;
     min-width: 80px !important;
+  }
+  
+  /* Добавляем отступы сверху и снизу при маленькой ширине */
+  .screenShareContainer .video-call-container .video-grid {
+    padding: 20px 0 !important;
+  }
+}
+
+/* Адаптивные размеры для очень маленьких контейнеров */
+@media (max-height: 250px) {
+  .screenShareContainer .video-call-container .video-tile {
+    max-height: 120px !important;
+    min-height: 80px !important;
+  }
+  
+  .screenShareContainer .video-call-container .small-tile {
+    max-height: 50px !important;
+    min-height: 30px !important;
+  }
+  
+  /* Максимальные отступы при очень маленькой высоте */
+  .screenShareContainer .video-call-container .video-grid {
+    padding: 0 40px !important;
+  }
+}
+
+/* Адаптивные размеры для очень маленьких контейнеров по ширине */
+@media (max-width: 300px) {
+  .screenShareContainer .video-call-container .video-tile {
+    max-width: 150px !important;
+    min-width: 100px !important;
+  }
+  
+  .screenShareContainer .video-call-container .small-tile {
+    max-width: 80px !important;
+    min-width: 60px !important;
+  }
+  
+  /* Максимальные отступы при очень маленькой ширине */
+  .screenShareContainer .video-call-container .video-grid {
+    padding: 30px 0 !important;
+  }
+}
+
+/* Адаптивные стили для фокуса при маленьких размерах */
+@media (max-height: 400px) {
+  .screenShareContainer .video-call-container .focused-user-wrapper {
+    padding: 0 20px !important;
+  }
+}
+
+@media (max-height: 300px) {
+  .screenShareContainer .video-call-container .focused-user-wrapper {
+    padding: 0 30px !important;
+  }
+}
+
+@media (max-height: 250px) {
+  .screenShareContainer .video-call-container .focused-user-wrapper {
+    padding: 0 40px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .screenShareContainer .video-call-container .focused-user-wrapper {
+    padding: 20px 0 !important;
+  }
+}
+
+@media (max-width: 300px) {
+  .screenShareContainer .video-call-container .focused-user-wrapper {
+    padding: 30px 0 !important;
   }
 }
 
