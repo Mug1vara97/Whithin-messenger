@@ -43,6 +43,9 @@
   padding: 20px 20px 100px 20px; /* Добавляем отступ снизу для кнопок */
   position: relative;
   min-height: 0; /* Позволяет flex-элементам сжиматься */
+  height: 100%; /* Занимает всю доступную высоту */
+  max-height: 100%; /* Ограничиваем высоту */
+  overflow: hidden; /* Предотвращаем переполнение */
 }
 
 .participantsContainer {
@@ -52,6 +55,8 @@
   justify-content: center;
   flex: 1;
   width: 100%;
+  height: 100%; /* Занимает всю доступную высоту */
+  max-height: 100%; /* Ограничиваем высоту */
   overflow: hidden; /* Предотвращаем переполнение */
   min-height: 0; /* Позволяет сжиматься */
 }
