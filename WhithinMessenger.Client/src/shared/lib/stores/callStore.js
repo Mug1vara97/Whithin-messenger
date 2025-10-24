@@ -1392,7 +1392,7 @@ export const useCallStore = create(
           }
 
           console.log('Requesting camera access...');
-          const stream = await navigator.mediaDevices.getUserMedia({
+          const cameraStream = await navigator.mediaDevices.getUserMedia({
             video: {
               width: { ideal: 1280, max: 1920 },
               height: { ideal: 720, max: 1080 },
@@ -1403,9 +1403,9 @@ export const useCallStore = create(
           });
 
           console.log('Camera access granted');
-          set({ videoStream: stream, isVideoEnabled: true });
+          set({ videoStream: cameraStream, isVideoEnabled: true });
 
-          const videoTrack = stream.getVideoTracks()[0];
+          const videoTrack = cameraStream.getVideoTracks()[0];
           if (!videoTrack) {
             throw new Error('No video track available');
           }
@@ -1474,31 +1474,20 @@ export const useCallStore = create(
             }
           }
 
-          // Останавливаем только видео треки, НЕ трогаем аудио треки
+          // Останавливаем поток вебкамеры (он содержит только видео треки)
           if (state.videoStream) {
-            const videoTracks = state.videoStream.getVideoTracks();
-            const audioTracks = state.videoStream.getAudioTracks();
-            
-            console.log('🎥 Video tracks to stop:', videoTracks.length);
-            console.log('🎥 Audio tracks to keep:', audioTracks.length);
-            
-            // Останавливаем только видео треки
-            videoTracks.forEach(track => {
-              console.log('🎥 Stopping video track:', track.label);
+            console.log('🎥 Stopping camera stream tracks');
+            state.videoStream.getTracks().forEach(track => {
+              console.log('🎥 Stopping camera track:', track.label);
               track.stop();
-            });
-            
-            // НЕ останавливаем аудио треки - они могут использоваться для голоса
-            audioTracks.forEach(track => {
-              console.log('🎥 Keeping audio track for voice:', track.label);
             });
           }
 
-          // Очищаем состояние (но не трогаем основной аудио producer)
-          // НЕ очищаем videoStream полностью, чтобы не повлиять на основной аудио producer
+          // Очищаем состояние вебкамеры
           set({
             isVideoEnabled: false,
-            videoProducer: null
+            videoProducer: null,
+            videoStream: null
           });
           
           console.log('🎥 Video stopped, but audio should continue working');
@@ -1507,7 +1496,7 @@ export const useCallStore = create(
           const currentState = get();
           console.log('🎥 Remaining producers after video stop:', Array.from(currentState.producers.keys()));
           console.log('🎥 Audio context state:', currentState.audioContext?.state);
-          console.log('🎥 Video stream state:', currentState.videoStream ? 'exists' : 'null');
+          console.log('🎥 Camera stream state:', currentState.videoStream ? 'exists' : 'null');
           console.log('🎥 Is video enabled:', currentState.isVideoEnabled);
           
           // Проверяем, есть ли активные аудио треки в основном потоке
