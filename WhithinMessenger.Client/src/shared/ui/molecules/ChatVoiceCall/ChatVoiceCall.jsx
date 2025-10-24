@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { createParticipant } from '../../../../entities/video-call/model/types';
+import { VideoCallGrid } from '../../atoms';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
@@ -31,10 +32,17 @@ const ChatVoiceCall = ({
     currentCall,
     isScreenSharing,
     screenShareStream,
+    userVolumes,
+    userMutedStates,
+    showVolumeSliders,
+    remoteScreenShares,
     startCall,
     endCall,
     toggleMute,
     toggleGlobalAudio,
+    toggleUserMute,
+    changeUserVolume,
+    toggleVolumeSlider,
     startScreenShare,
     stopScreenShare
   } = useGlobalCall(userId, userName);
@@ -151,59 +159,28 @@ const ChatVoiceCall = ({
           {(() => {
             console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing);
             return isScreenSharing ? (
-              /* При демонстрации экрана показываем фокус с видео экрана */
-              <div className={styles.screenShareFocus}>
-                {screenShareStream ? (
-                  <div className={styles.screenShareVideoContainer}>
-                    <video
-                      ref={(video) => {
-                        if (video && screenShareStream) {
-                          video.srcObject = screenShareStream;
-                          video.play().catch(error => {
-                            if (error.name !== 'AbortError') {
-                              console.warn('Screen share video play error:', error);
-                            }
-                          });
-                        }
-                      }}
-                      className={styles.screenShareVideo}
-                      autoPlay
-                      muted
-                      playsInline
-                    />
-                    {/* Маленькие блоки пользователей внизу */}
-                    <div className={styles.screenShareParticipants}>
-                      {displayParticipants.map((participant) => (
-                        <div key={participant.id} className={styles.screenShareParticipant}>
-                          <div className={styles.screenShareParticipantAvatar}>
-                            <div className={styles.screenShareAvatarCircle}>
-                              {(participant.name || 'U').charAt(0).toUpperCase()}
-                            </div>
-                            {/* Индикаторы статуса */}
-                            <div className={styles.screenShareStatusIndicators}>
-                              {participant.isMuted && (
-                                <div className={`${styles.screenShareStatusIndicator} ${styles.screenShareMuteIndicator}`}>
-                                  <MicOffIcon />
-                                </div>
-                              )}
-                              {participant.isGlobalAudioMuted && (
-                                <div className={`${styles.screenShareStatusIndicator} ${styles.screenShareAudioMutedIndicator}`}>
-                                  <VolumeOffIcon />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.focusIndicator}>
-                    <ScreenShareIcon className={styles.focusIcon} />
-                    <span className={styles.focusText}>Демонстрация экрана</span>
-                  </div>
-                )}
-              </div>
+              /* При демонстрации экрана используем VideoCallGrid для фокуса */
+              <VideoCallGrid 
+                participants={displayParticipants}
+                onParticipantClick={(participant) => {
+                  console.log('Clicked participant:', participant);
+                }}
+                userVolumes={userVolumes}
+                userMutedStates={userMutedStates}
+                showVolumeSliders={showVolumeSliders}
+                onToggleUserMute={toggleUserMute}
+                onChangeUserVolume={changeUserVolume}
+                onToggleVolumeSlider={toggleVolumeSlider}
+                screenShareStream={screenShareStream}
+                isScreenSharing={isScreenSharing}
+                screenShareParticipant={isScreenSharing ? {
+                  id: userId,
+                  name: userName,
+                  isScreenSharing: true
+                } : null}
+                remoteScreenShares={remoteScreenShares}
+                onStopScreenShare={handleScreenShare}
+              />
             ) : (
             /* Обычное отображение кружков пользователей */
             displayParticipants.map((participant) => (
