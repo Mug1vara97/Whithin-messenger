@@ -1,5 +1,4 @@
-import React, { useRef, useMemo } from 'react';
-import { useVideoCall } from '../../../../entities/video-call';
+import React, { useRef, useMemo, useState } from 'react';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -80,18 +79,39 @@ const VideoCallGrid = ({
     return extended;
   }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
 
-  const {
-    focusedParticipantId,
-    currentPage,
-    bottomPage,
-    totalPages,
-    totalBottomPages,
-    focusParticipant,
-    goToPage,
-    goToBottomPage,
-    isFocusedMode,
-    focusedParticipant
-  } = useVideoCall(extendedParticipants);
+  // Локальная логика вместо useVideoCall
+  const [focusedParticipantId, setFocusedParticipantId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [bottomPage, setBottomPage] = useState(0);
+  const [visibleBottomUsers] = useState(6);
+
+  const isFocusedMode = focusedParticipantId !== null;
+  const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
+
+  // Вычисляемые значения
+  const totalPages = Math.ceil(extendedParticipants.length / 6);
+  const totalBottomPages = Math.ceil(extendedParticipants.length / visibleBottomUsers);
+  
+  const currentParticipants = extendedParticipants.slice(currentPage * 6, (currentPage + 1) * 6);
+
+  // Действия
+  const focusParticipant = (participantId) => {
+    if (focusedParticipantId === participantId) {
+      setFocusedParticipantId(null);
+      setBottomPage(0);
+    } else {
+      setFocusedParticipantId(participantId);
+      setBottomPage(0);
+    }
+  };
+
+  const goToPage = (page) => {
+    setCurrentPage(page);
+  };
+
+  const goToBottomPage = (page) => {
+    setBottomPage(page);
+  };
 
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
@@ -337,7 +357,7 @@ const VideoCallGrid = ({
 
               <div className="bottom-users-grid" ref={bottomGridRef}>
                 {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
-                {extendedParticipants.map((participant) => renderParticipantTile(participant, true))}
+                {currentParticipants.map((participant) => renderParticipantTile(participant, true))}
               </div>
 
               {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
@@ -377,7 +397,7 @@ const VideoCallGrid = ({
         <div className="video-grid" data-user-count={extendedParticipants.length}>
           {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
 
-          {extendedParticipants.map((participant) => renderParticipantTile(participant, false))}
+          {currentParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
 
         {totalPages > 1 && currentPage < totalPages - 1 && (
