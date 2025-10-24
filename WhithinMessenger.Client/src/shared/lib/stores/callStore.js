@@ -235,6 +235,10 @@ export const useCallStore = create(
           voiceCallApi.on('producerClosed', (data) => {
             const producerId = data.producerId || data;
             const producerSocketId = data.producerSocketId;
+            const producerKind = data.kind; // video или audio
+            const mediaType = data.mediaType; // screen или camera
+            
+            console.log('🎥 Producer closed:', { producerId, producerSocketId, producerKind, mediaType });
             
             // Проверяем, является ли это демонстрацией экрана
             const state = get();
@@ -251,10 +255,10 @@ export const useCallStore = create(
               set({ remoteScreenShares: newRemoteScreenShares });
             }
             
-            // Проверяем, является ли это вебкамерой
+            // Проверяем, является ли это вебкамерой (video producer с mediaType camera)
             const userId = state.peerIdToUserIdMap.get(producerSocketId) || producerSocketId;
-            if (userId && userId !== state.currentUserId) {
-              console.log('🎥 Video producer closed for user:', userId);
+            if (userId && userId !== state.currentUserId && producerKind === 'video' && mediaType === 'camera') {
+              console.log('🎥 Camera video producer closed for user:', userId);
               // Обновляем участника - отключаем вебкамеру
               set((state) => {
                 const updatedParticipants = state.participants.map(p => 
