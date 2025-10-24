@@ -35,9 +35,6 @@
   min-height: 0; /* Позволяет сжиматься */
   max-height: 100%; /* Ограничиваем высоту */
   overflow: hidden; /* Предотвращает переполнение */
-  /* Динамическая адаптация */
-  align-items: center; /* Центрируем по вертикали */
-  align-content: flex-start; /* Начинаем с верха при переносе */
 }
 
 /* Базовые стили для тайлов - точная копия Discord */
@@ -49,6 +46,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
+  max-height: 100%; /* Ограничиваем высоту */
+  height: auto; /* Автоматическая высота */
 }
 
 .video-tile .tile-border {
@@ -357,28 +356,6 @@
   text-align: center;
 }
 
-/* ===== ДИНАМИЧЕСКАЯ АДАПТАЦИЯ ===== */
-
-/* Универсальные стили для всех тайлов - автоматическая адаптация */
-.video-grid .video-tile {
-  max-height: 100%; /* Ограничиваем высоту контейнером */
-  max-width: 100%; /* Ограничиваем ширину контейнером */
-  flex-shrink: 1; /* Позволяет сжиматься */
-  flex-grow: 0; /* Не растет больше необходимого */
-  min-width: 0; /* Позволяет сжиматься до минимума */
-  min-height: 0; /* Позволяет сжиматься до минимума */
-}
-
-/* Адаптация для маленьких тайлов */
-.video-grid .small-tile {
-  max-height: 100%;
-  max-width: 100%;
-  flex-shrink: 1;
-  flex-grow: 0;
-  min-width: 0;
-  min-height: 0;
-}
-
 /* ===== GRID LAYOUTS ===== */
 
 /* 1 user - centered large */
@@ -643,6 +620,7 @@
   max-height: 100%;
   aspect-ratio: 16 / 9;
   cursor: pointer;
+  height: auto; /* Автоматическая высота */
 }
 
 /* Bottom users container in focused mode */
