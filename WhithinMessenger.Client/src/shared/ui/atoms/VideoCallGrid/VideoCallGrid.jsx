@@ -35,6 +35,33 @@ const VideoElement = React.memo(({ stream, participantId }) => {
   );
 });
 
+// Мемоизированный компонент для демонстрации экрана
+const ScreenShareElement = React.memo(({ stream, participantId }) => {
+  const videoRef = useRef(null);
+  
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      console.log('🖥️ ScreenShareElement: Setting stream for participant:', participantId);
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(error => {
+        if (error.name !== 'AbortError') {
+          console.warn('Screen share video play error:', error);
+        }
+      });
+    }
+  }, [stream, participantId]);
+  
+  return (
+    <video
+      ref={videoRef}
+      className="tile-video"
+      autoPlay
+      muted
+      playsInline
+    />
+  );
+});
+
 const VideoCallGrid = ({ 
   participants = [], 
   onParticipantClick,
@@ -105,7 +132,13 @@ const VideoCallGrid = ({
     
     const extended = [...participants, ...screenShareParticipants];
     return extended;
-  }, [participants, isScreenSharing, screenShareStream, screenShareParticipant, remoteScreenShares]);
+  }, [
+    participants, 
+    isScreenSharing, 
+    screenShareStream, 
+    screenShareParticipant, 
+    remoteScreenShares
+  ]);
 
   // Локальная логика вместо useVideoCall
   const [focusedParticipantId, setFocusedParticipantId] = useState(null);
@@ -251,22 +284,9 @@ const VideoCallGrid = ({
           {/* Background with avatar, video, or screen share */}
           <div className="tile-background">
             {isScreenShare ? (
-              <video
-                ref={(video) => {
-                  if (video && participant.stream) {
-                    video.srcObject = participant.stream;
-                    video.play().catch(error => {
-                      // Игнорируем ошибки воспроизведения (AbortError)
-                      if (error.name !== 'AbortError') {
-                        console.warn('Video play error:', error);
-                      }
-                    });
-                  }
-                }}
-                className="tile-video"
-                autoPlay
-                muted
-                playsInline
+              <ScreenShareElement 
+                stream={participant.stream} 
+                participantId={participant.id}
               />
             ) : participant.isVideoEnabled && participant.videoStream ? (
               <VideoElement 
@@ -516,6 +536,18 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
         }
       } else if (prop === 'remoteScreenShares') {
         if (prevProps.remoteScreenShares.size !== nextProps.remoteScreenShares.size) {
+          return false;
+        }
+      } else if (prop === 'screenShareStream') {
+        // Сравниваем только наличие потока, не сам объект
+        const prevHasStream = !!prevProps.screenShareStream;
+        const nextHasStream = !!nextProps.screenShareStream;
+        if (prevHasStream !== nextHasStream) {
+          return false;
+        }
+      } else if (prop === 'isScreenSharing') {
+        // Сравниваем только булево значение
+        if (prevProps.isScreenSharing !== nextProps.isScreenSharing) {
           return false;
         }
       } else {
