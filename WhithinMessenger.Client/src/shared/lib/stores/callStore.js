@@ -94,6 +94,9 @@ export const useCallStore = create(
         set({ connecting: true, currentUserId: userId, currentUserName: userName });
         
         try {
+          // Инициализируем звуковой менеджер
+          await audioNotificationManager.initialize();
+          
           // Очищаем старые обработчики
           voiceCallApi.off('peerJoined');
           voiceCallApi.off('peerLeft');
@@ -506,6 +509,11 @@ export const useCallStore = create(
           await state.createAudioStream();
           
           set({ currentRoomId: roomId, isInCall: true, currentCall: { channelId: roomId, channelName: roomId } });
+          
+          // Воспроизводим звук подключения для самого пользователя
+          audioNotificationManager.playUserJoinedSound().catch(error => {
+            console.warn('Failed to play user joined sound for self:', error);
+          });
         } catch (error) {
           console.error('Failed to join room:', error);
           set({ error: error.message });
@@ -1178,6 +1186,11 @@ export const useCallStore = create(
             } catch (e) {
               console.warn('Error removing audio element:', e);
             }
+          });
+          
+          // Воспроизводим звук отключения для самого пользователя
+          audioNotificationManager.playUserLeftSound().catch(error => {
+            console.warn('Failed to play user left sound for self:', error);
           });
           
           await voiceCallApi.disconnect();
