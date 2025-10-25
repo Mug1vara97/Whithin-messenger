@@ -37,6 +37,12 @@ export const useCallStore = create(
       peerIdToUserIdMap: new Map(),
       processedProducers: new Set(),
       
+      // Отдельные состояния для оптимизации (избегаем перерендера демонстрации экрана)
+      participantMuteStates: new Map(), // userId -> isMuted
+      participantAudioStates: new Map(), // userId -> isAudioEnabled
+      participantGlobalAudioStates: new Map(), // userId -> isGlobalAudioMuted
+      participantVideoStates: new Map(), // userId -> isVideoEnabled
+      
       // Состояние аудио
       isMuted: false,
       isAudioEnabled: true, // Добавляем isAudioEnabled
@@ -206,9 +212,19 @@ export const useCallStore = create(
 
           voiceCallApi.on('peerMuteStateChanged', ({ peerId, isMuted }) => {
             const userId = get().peerIdToUserIdMap.get(peerId) || peerId;
+            const mutedState = Boolean(isMuted);
+            
+            // Обновляем только отдельное состояние мьюта, не весь массив участников
+            set((state) => {
+              const newMuteStates = new Map(state.participantMuteStates);
+              newMuteStates.set(userId, mutedState);
+              return { participantMuteStates: newMuteStates };
+            });
+            
+            // Обновляем участников только если нужно (для совместимости)
             set((state) => ({
               participants: state.participants.map(p => 
-                p.userId === userId ? { ...p, isMuted: Boolean(isMuted), isSpeaking: isMuted ? false : p.isSpeaking } : p
+                p.userId === userId ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking } : p
               )
             }));
           });
@@ -221,6 +237,23 @@ export const useCallStore = create(
             console.log('peerAudioStateChanged received:', { peerId, userId, isAudioEnabled: audioEnabled, isGlobalAudioMuted });
             console.log('Full data received:', data);
             
+            // Обновляем отдельные состояния для оптимизации
+            set((state) => {
+              const newAudioStates = new Map(state.participantAudioStates);
+              newAudioStates.set(userId, Boolean(audioEnabled));
+              
+              const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+              if (isGlobalAudioMuted !== undefined) {
+                newGlobalAudioStates.set(userId, isGlobalAudioMuted);
+              }
+              
+              return {
+                participantAudioStates: newAudioStates,
+                participantGlobalAudioStates: newGlobalAudioStates
+              };
+            });
+            
+            // Обновляем участников только если нужно (для совместимости)
             set((state) => ({
               participants: state.participants.map(p => {
                 if (p.userId === userId) {
@@ -319,7 +352,15 @@ export const useCallStore = create(
             
             if (userId && userId !== state.currentUserId && isVideoProducer) {
               console.log('🎥 Camera video producer closed for user:', userId);
-              // Обновляем участника - отключаем вебкамеру
+              
+              // Обновляем отдельное состояние веб-камеры
+              set((state) => {
+                const newVideoStates = new Map(state.participantVideoStates);
+                newVideoStates.set(userId, false);
+                return { participantVideoStates: newVideoStates };
+              });
+              
+              // Обновляем участника - отключаем вебкамеру (для совместимости)
               set((state) => {
                 const updatedParticipants = state.participants.map(p => 
                   p.userId === userId 
@@ -415,8 +456,15 @@ export const useCallStore = create(
           voiceCallApi.on('globalAudioStateChanged', (data) => {
             const { userId, isGlobalAudioMuted } = data;
             console.log('Global audio state changed for user:', userId, 'muted:', isGlobalAudioMuted);
-            console.log('Current participants before update:', get().participants);
             
+            // Обновляем только отдельное состояние глобального звука
+            set((state) => {
+              const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+              newGlobalAudioStates.set(userId, isGlobalAudioMuted);
+              return { participantGlobalAudioStates: newGlobalAudioStates };
+            });
+            
+            // Обновляем участников только если нужно (для совместимости)
             set((state) => {
               const updatedParticipants = state.participants.map(p => 
                 p.userId === userId ? { ...p, isGlobalAudioMuted } : p
@@ -432,6 +480,14 @@ export const useCallStore = create(
               console.log('Received globalAudioState from server:', data);
               const { userId, isGlobalAudioMuted } = data;
               
+              // Обновляем только отдельное состояние глобального звука
+              set((state) => {
+                const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+                newGlobalAudioStates.set(userId, isGlobalAudioMuted);
+                return { participantGlobalAudioStates: newGlobalAudioStates };
+              });
+              
+              // Обновляем участников только если нужно (для совместимости)
               set((state) => {
                 const updatedParticipants = state.participants.map(p => 
                   p.userId === userId ? { ...p, isGlobalAudioMuted } : p
@@ -1014,7 +1070,14 @@ export const useCallStore = create(
         // Обновляем isAudioEnabled в соответствии с глобальным звуком
         set({ isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState });
         
-        // Также обновляем локального пользователя в списке участников
+        // Обновляем отдельное состояние глобального звука для текущего пользователя
+        set((state) => {
+          const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+          newGlobalAudioStates.set(state.currentUserId, newMutedState);
+          return { participantGlobalAudioStates: newGlobalAudioStates };
+        });
+        
+        // Также обновляем локального пользователя в списке участников (для совместимости)
         set((state) => ({
           participants: state.participants.map(p => {
             if (p.userId === state.currentUserId) {
@@ -1223,6 +1286,10 @@ export const useCallStore = create(
             currentRoomId: null,
             currentCall: null,
             participants: [],
+            participantMuteStates: new Map(),
+            participantAudioStates: new Map(),
+            participantGlobalAudioStates: new Map(),
+            participantVideoStates: new Map(),
             userVolumes: new Map(),
             userMutedStates: new Map(),
             showVolumeSliders: new Map(),
@@ -1496,6 +1563,13 @@ export const useCallStore = create(
 
           console.log('Camera access granted');
           set({ cameraStream: cameraStream, isVideoEnabled: true });
+          
+          // Обновляем отдельное состояние веб-камеры для текущего пользователя
+          set((state) => {
+            const newVideoStates = new Map(state.participantVideoStates);
+            newVideoStates.set(state.currentUserId, true);
+            return { participantVideoStates: newVideoStates };
+          });
 
           const videoTrack = cameraStream.getVideoTracks()[0];
           if (!videoTrack) {
@@ -1634,6 +1708,14 @@ export const useCallStore = create(
             cameraStream: null,
             cameraAudioProducer: null
           });
+          
+          // Обновляем отдельное состояние веб-камеры для текущего пользователя
+          set((state) => {
+            const newVideoStates = new Map(state.participantVideoStates);
+            newVideoStates.set(state.currentUserId, false);
+            return { participantVideoStates: newVideoStates };
+          });
+          
           console.log('🎥 Video state cleared');
           
           console.log('🎥 Video stopped, but audio should continue working');
