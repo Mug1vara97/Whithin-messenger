@@ -911,6 +911,17 @@ export const useCallStore = create(
         }
         
         set({ isMuted: newMutedState });
+        
+        // Воспроизводим звук мьюта/размьюта (только локально)
+        if (newMutedState) {
+          audioNotificationManager.playMicMutedSound().catch(error => {
+            console.warn('Failed to play mic muted sound:', error);
+          });
+        } else {
+          audioNotificationManager.playMicUnmutedSound().catch(error => {
+            console.warn('Failed to play mic unmuted sound:', error);
+          });
+        }
       },
       
       // Переключение мута для отдельного пользователя
@@ -1038,6 +1049,17 @@ export const useCallStore = create(
             }
           }
         });
+        
+        // Воспроизводим звук глобального мьюта/размьюта (только локально)
+        if (newMutedState) {
+          audioNotificationManager.playGlobalMutedSound().catch(error => {
+            console.warn('Failed to play global muted sound:', error);
+          });
+        } else {
+          audioNotificationManager.playGlobalUnmutedSound().catch(error => {
+            console.warn('Failed to play global unmuted sound:', error);
+          });
+        }
       },
       
       // Переключение шумоподавления

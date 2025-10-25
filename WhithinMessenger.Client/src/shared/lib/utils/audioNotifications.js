@@ -7,7 +7,11 @@ class AudioNotificationManager {
     this.audioContext = null;
     this.sounds = {
       userJoined: null,
-      userLeft: null
+      userLeft: null,
+      micMuted: null,
+      micUnmuted: null,
+      globalMuted: null,
+      globalUnmuted: null
     };
     this.isInitialized = false;
   }
@@ -54,6 +58,34 @@ class AudioNotificationManager {
         this.sounds.userLeft = await this.audioContext.decodeAudioData(userLeftArrayBuffer);
       }
 
+      // Загружаем звук мьюта микрофона
+      const micMutedResponse = await fetch('/mic-muted.mp3');
+      if (micMutedResponse.ok) {
+        const micMutedArrayBuffer = await micMutedResponse.arrayBuffer();
+        this.sounds.micMuted = await this.audioContext.decodeAudioData(micMutedArrayBuffer);
+      }
+
+      // Загружаем звук размьюта микрофона
+      const micUnmutedResponse = await fetch('/mic-unmuted.mp3');
+      if (micUnmutedResponse.ok) {
+        const micUnmutedArrayBuffer = await micUnmutedResponse.arrayBuffer();
+        this.sounds.micUnmuted = await this.audioContext.decodeAudioData(micUnmutedArrayBuffer);
+      }
+
+      // Загружаем звук глобального мьюта
+      const globalMutedResponse = await fetch('/global-muted.mp3');
+      if (globalMutedResponse.ok) {
+        const globalMutedArrayBuffer = await globalMutedResponse.arrayBuffer();
+        this.sounds.globalMuted = await this.audioContext.decodeAudioData(globalMutedArrayBuffer);
+      }
+
+      // Загружаем звук глобального размьюта
+      const globalUnmutedResponse = await fetch('/global-unmuted.mp3');
+      if (globalUnmutedResponse.ok) {
+        const globalUnmutedArrayBuffer = await globalUnmutedResponse.arrayBuffer();
+        this.sounds.globalUnmuted = await this.audioContext.decodeAudioData(globalUnmutedArrayBuffer);
+      }
+
       console.log('AudioNotificationManager: Sounds loaded successfully');
     } catch (error) {
       console.warn('AudioNotificationManager: Failed to load some sounds:', error);
@@ -72,6 +104,34 @@ class AudioNotificationManager {
    */
   async playUserLeftSound() {
     await this.playSound('userLeft', 0.7); // Громкость 30%
+  }
+
+  /**
+   * Воспроизведение звука мьюта микрофона (только локально)
+   */
+  async playMicMutedSound() {
+    await this.playSound('micMuted', 0.5); // Громкость 50%
+  }
+
+  /**
+   * Воспроизведение звука размьюта микрофона (только локально)
+   */
+  async playMicUnmutedSound() {
+    await this.playSound('micUnmuted', 0.5); // Громкость 50%
+  }
+
+  /**
+   * Воспроизведение звука глобального мьюта (только локально)
+   */
+  async playGlobalMutedSound() {
+    await this.playSound('globalMuted', 0.6); // Громкость 60%
+  }
+
+  /**
+   * Воспроизведение звука глобального размьюта (только локально)
+   */
+  async playGlobalUnmutedSound() {
+    await this.playSound('globalUnmuted', 0.6); // Громкость 60%
   }
 
   /**
@@ -131,7 +191,11 @@ class AudioNotificationManager {
     this.audioContext = null;
     this.sounds = {
       userJoined: null,
-      userLeft: null
+      userLeft: null,
+      micMuted: null,
+      micUnmuted: null,
+      globalMuted: null,
+      globalUnmuted: null
     };
     this.isInitialized = false;
   }
