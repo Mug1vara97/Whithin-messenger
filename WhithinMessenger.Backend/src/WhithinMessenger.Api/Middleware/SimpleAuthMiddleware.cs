@@ -47,46 +47,75 @@ public class SimpleAuthMiddleware
             return;
         }
 
-        var userIdString = context.Session.GetString("UserId");
-        _logger.LogInformation($"SimpleAuthMiddleware: Session UserId: {userIdString}");
-        
-        if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
+        // Сначала проверяем JWT токен
+        var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
         {
-            _logger.LogInformation($"SimpleAuthMiddleware: Parsed UserId: {userId}");
-            
-            var claims = new List<Claim>
-            {
-                new Claim("UserId", userId.ToString()),
-                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
-            };
-            
-            var identity = new ClaimsIdentity(claims, "SimpleAuth");
-            context.User = new ClaimsPrincipal(identity);
+            var token = authHeader.Substring("Bearer ".Length).Trim();
+            _logger.LogInformation($"SimpleAuthMiddleware: Found JWT token");
             
             try
             {
-                var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-                var user = await userManager.FindByIdAsync(userId.ToString());
-                if (user != null)
+                // Декодируем JWT токен для получения UserId
+                var parts = token.Split('.');
+                if (parts.Length == 3)
                 {
-                    context.Items["User"] = user;
-                    context.Items["UserId"] = user.Id;
-                    _logger.LogInformation($"SimpleAuthMiddleware: User found and set in context: {user.UserName}");
-                }
-                else
-                {
-                    _logger.LogWarning($"SimpleAuthMiddleware: User not found in database for UserId: {userId}");
+                    var payload = parts[1];
+                    // Добавляем padding если нужно
+                    var padding = (4 - payload.Length % 4) % 4;
+                    var paddedPayload = payload + new string('=', padding);
+                    var decodedPayload = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(paddedPayload));
+                    var payloadObj = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(decodedPayload);
+                    
+                    if (payloadObj.TryGetValue("UserId", out var userIdObj) && userIdObj != null)
+                    {
+                        var userIdString = userIdObj.ToString();
+                        if (Guid.TryParse(userIdString, out var userId))
+                        {
+                            _logger.LogInformation($"SimpleAuthMiddleware: Found UserId from JWT: {userId}");
+                            
+                            var claims = new List<Claim>
+                            {
+                                new Claim("UserId", userId.ToString()),
+                                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+                            };
+                            
+                            var identity = new ClaimsIdentity(claims, "JWT");
+                            context.User = new ClaimsPrincipal(identity);
+                            
+                            try
+                            {
+                                var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+                                var user = await userManager.FindByIdAsync(userId.ToString());
+                                if (user != null)
+                                {
+                                    context.Items["User"] = user;
+                                    context.Items["UserId"] = user.Id;
+                                    _logger.LogInformation($"SimpleAuthMiddleware: User found and set in context from JWT: {user.UserName}");
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"SimpleAuthMiddleware: User not found in database for JWT UserId: {userId}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"SimpleAuthMiddleware: Error finding user for JWT UserId: {userId}");
+                            }
+                            
+                            await _next(context);
+                            return;
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"SimpleAuthMiddleware: Error finding user for UserId: {userId}");
+                _logger.LogError(ex, $"SimpleAuthMiddleware: Error decoding JWT token");
             }
         }
-        else
-        {
-            _logger.LogInformation($"SimpleAuthMiddleware: No valid UserId in session for {context.Request.Path}");
-        }
+        
+        _logger.LogInformation($"SimpleAuthMiddleware: No valid JWT token found for {context.Request.Path}");
 
         await _next(context);
     }

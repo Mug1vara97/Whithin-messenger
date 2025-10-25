@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button, FormField } from '../../atoms';
+import GhostBackground from '../../atoms/GhostBackground';
 import { validateLogin } from '../../../lib/validation';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import './AuthForms.css';
@@ -41,11 +42,10 @@ const LoginForm = () => {
 
   return (
     <div className="auth-container">
+      <GhostBackground />
       <div className="auth-box">
         <div className="auth-header">
-          <h2>Welcome back!</h2>
-          <p>We're so excited to see you again!</p>
-          <p style={{color: 'red', fontSize: '20px', fontWeight: 'bold'}}>ПРИВЕТ!</p>
+          <h2>Whithin</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">

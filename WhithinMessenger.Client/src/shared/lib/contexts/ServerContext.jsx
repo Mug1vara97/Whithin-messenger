@@ -152,7 +152,7 @@ export const ServerProvider = ({ children }) => {
     };
 
     connectToServerList();
-  }, [fetchServers]);
+  }, [fetchServers]); // Возвращаем fetchServers, но мемоизируем его
 
   useEffect(() => {
     console.log('ServerContext: Servers state updated:', servers);

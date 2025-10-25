@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { authApi } from '../api/authApi';
 import { useUser } from './useUser';
+import tokenManager from '../services/tokenManager';
 
 export const useAuth = () => {
   const { user, updateUser, clearUser, isLoading: userLoading, setIsLoading } = useUser();
@@ -10,15 +11,41 @@ export const useAuth = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const user = await authApi.getCurrentUser();
-        if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
-          updateUser(user);
+        console.log('useAuth: Initializing authentication...');
+        const token = tokenManager.getToken();
+        const isValid = tokenManager.isTokenValid();
+        console.log('useAuth: Token exists:', !!token);
+        console.log('useAuth: Token valid:', isValid);
+        
+        // Проверяем, есть ли валидный токен
+        if (isValid) {
+          console.log('useAuth: Token is valid, getting user info...');
+          // Если токен валиден, получаем информацию о пользователе
+          const userFromToken = tokenManager.getUserFromToken();
+          if (userFromToken) {
+            console.log('useAuth: User from token:', userFromToken);
+            updateUser(userFromToken);
+          } else {
+            console.log('useAuth: Cannot get user from token, making API request...');
+            // Если не можем получить пользователя из токена, делаем запрос к серверу
+            const user = await authApi.getCurrentUser();
+            if (user) {
+              localStorage.setItem('user', JSON.stringify(user));
+              updateUser(user);
+            } else {
+              tokenManager.clearTokens();
+              localStorage.removeItem('user');
+            }
+          }
         } else {
+          console.log('useAuth: Token is invalid or expired, clearing...');
+          // Токен невалиден или истек
+          tokenManager.clearTokens();
           localStorage.removeItem('user');
         }
       } catch (error) {
         console.log('User not authenticated, continuing...');
+        tokenManager.clearTokens();
         localStorage.removeItem('user');
       } finally {
         setIsAuthLoading(false);
@@ -26,7 +53,7 @@ export const useAuth = () => {
     };
 
     initializeAuth();
-  }, [updateUser]);
+  }, []); // Убираем updateUser из зависимостей
 
   const login = useCallback(async (credentials) => {
     try {
@@ -99,6 +126,8 @@ export const useAuth = () => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Очищаем токены и пользователя
+      tokenManager.clearTokens();
       clearUser();
     }
   }, [clearUser]);

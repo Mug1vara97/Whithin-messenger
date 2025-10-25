@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import tokenManager from '../services/tokenManager';
 
 export const authApi = {
   async login(credentials) {
@@ -6,6 +7,15 @@ export const authApi = {
       console.log('Sending login request:', credentials);
       const response = await apiClient.post('/auth/login', credentials);
       console.log('Login response:', response);
+      
+      // Сохраняем JWT токен
+      if (response.data.token) {
+        console.log('Saving JWT token:', response.data.token);
+        tokenManager.setToken(response.data.token);
+      } else {
+        console.warn('No token in response:', response.data);
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Login error details:', error);
@@ -28,6 +38,8 @@ export const authApi = {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Очищаем токены и пользователя
+      tokenManager.clearTokens();
       localStorage.removeItem('user');
     }
   },
@@ -40,6 +52,7 @@ export const authApi = {
       }
       return null;
     } catch (error) {
+      console.error('Error getting current user:', error);
       throw new Error('Failed to get user data');
     }
   }

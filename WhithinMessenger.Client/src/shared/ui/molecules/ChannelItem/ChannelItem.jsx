@@ -1,7 +1,7 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
-import { VolumeOff } from '@mui/icons-material';
+import { VolumeUp } from '@mui/icons-material';
 import './ChannelItem.css';
 
 const ChannelItem = ({ 
@@ -42,7 +42,7 @@ const ChannelItem = ({
 
   const getChannelIcon = () => {
     if (isVoiceChannel) {
-      return <VolumeOff sx={{ fontSize: 16, width: 16, height: 16 }} />;
+      return <VolumeUp sx={{ fontSize: 16, width: 16, height: 16 }} />;
     }
     return '#';
   };

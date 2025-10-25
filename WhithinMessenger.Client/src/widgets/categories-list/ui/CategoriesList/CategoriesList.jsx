@@ -16,7 +16,10 @@ const CategoriesList = ({
   connection,
   serverId,
   userId,
-  userName
+  userName,
+  onCategoriesReordered,
+  onChatsReordered,
+  onServerDataUpdated
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
 
@@ -47,7 +50,9 @@ const CategoriesList = ({
     };
 
     const handleChatCreated = (newChat, categoryId) => {
-      setLocalCategories(prev => prev.map(cat => {
+      console.log('CategoriesList: ChatCreated event received:', { newChat, categoryId });
+      
+      const updatedCategories = localCategories.map(cat => {
         if ((cat.categoryId || cat.CategoryId) === categoryId) {
           return {
             ...cat,
@@ -55,7 +60,15 @@ const CategoriesList = ({
           };
         }
         return cat;
-      }));
+      });
+      
+      setLocalCategories(updatedCategories);
+      
+      // Вызываем onServerDataUpdated для передачи данных в HomePage
+      if (onServerDataUpdated) {
+        console.log('CategoriesList: Calling onServerDataUpdated with updated categories');
+        onServerDataUpdated({ categories: updatedCategories });
+      }
     };
 
     const handleChatDeleted = (chatId) => {
@@ -92,7 +105,7 @@ const CategoriesList = ({
       connection.off("CategoryCreated", handleCategoryCreated);
       connection.off("CategoryDeleted", handleCategoryDeleted);
     };
-  }, [connection?.state]);
+  }, [connection?.state, onCategoriesReordered, onChatsReordered]);
 
   const handleChatClick = (channel) => {
     if (onChatClick) {

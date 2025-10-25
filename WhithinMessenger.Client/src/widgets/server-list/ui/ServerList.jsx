@@ -7,9 +7,9 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import compassIcon from '../../../assets/magnifying-glass.png';
 import { Settings } from '@mui/icons-material';
-import './ServerList.css';
+import styles from './ServerList.module.css';
 
-const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, onSettingsClick, onNotificationsClick, userId }) => {
+const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, onSettingsClick, onNotificationsClick }) => {
   const { logout } = useAuthContext();
   const [isDragging, setIsDragging] = useState(false);
   
@@ -70,33 +70,34 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
 
   if (isLoading) {
     return (
-      <div className="server-list">
-        <div className="server-list-loading">Загрузка серверов...</div>
+      <div className={styles['server-list']}>
+        <div className={styles['server-list-loading']}>Загрузка серверов...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="server-list">
-        <div className="server-list-error">Ошибка: {error}</div>
+      <div className={styles['server-list']}>
+        <div className={styles['server-list-error']}>Ошибка: {error}</div>
       </div>
     );
   }
 
   return (
-    <div className="server-list">
+    <div className={styles['server-list']}>
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <Droppable droppableId="servers" direction="vertical">
           {(provided) => (
             <ul
               {...provided.droppableProps}
               ref={provided.innerRef}
+              className={styles['server-list-ul']}
             >
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <Link 
                   to="/channels/@me" 
-                  className="server-button"
+                  className={styles['server-button']}
                   onClick={() => {
                     onDiscoverClick && onDiscoverClick(false);
                     onServerSelected && onServerSelected(null);
@@ -117,7 +118,7 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
-                      className={`server-item ${snapshot.isDragging ? 'dragging' : ''}`}
+                      className={`${styles['server-item']} ${snapshot.isDragging ? styles.dragging : ''}`}
                       style={{
                         ...provided.draggableProps.style,
                         cursor: isDragging ? 'grabbing' : 'grab'
@@ -125,7 +126,7 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                     >
                       <Link
                         to={`/channels/${server.serverId}`}
-                        className="server-button"
+                        className={styles['server-button']}
                         onClick={(e) => {
                           e.preventDefault();
                           if (!snapshot.isDragging) {
@@ -152,9 +153,9 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                 </Draggable>
               ))}
               {provided.placeholder}
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <div 
-                  className="server-button"
+                  className={styles['server-button']}
                   onClick={handleDiscoverClick}
                 >
                   <img 
@@ -169,17 +170,17 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                   />
                 </div>
               </li>
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <button
-                  className="server-button create-button"
+                  className={`${styles['server-button']} ${styles['create-button']}`}
                   onClick={onCreateServerClick}
                 >
                   +
                 </button>
               </li>
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <button
-                  className="server-button notification-button"
+                  className={`${styles['server-button']} ${styles['notification-button']}`}
                   onClick={onNotificationsClick}
                   title="Уведомления"
                 >
@@ -193,18 +194,18 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                   </svg>
                 </button>
               </li>
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <button
-                  className="server-button settings-button"
+                  className={`${styles['server-button']} ${styles['settings-button']}`}
                   onClick={onSettingsClick}
                   title="Настройки"
                 >
                   <Settings />
                 </button>
               </li>
-              <li className="server-item">
+              <li className={styles['server-item']}>
                 <button
-                  className="server-button logout-button"
+                  className={`${styles['server-button']} ${styles['logout-button']}`}
                   onClick={handleLogout}
                   title="Выйти из аккаунта"
                 >
@@ -264,33 +265,33 @@ const CreateServerForm = ({ onClose, onCreate }) => {
         value={serverName}
         onChange={(e) => setServerName(e.target.value)}
         placeholder="Название сервера"
-        className="modal-input"
+        className={styles['modal-input']}
       />
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Описание сервера"
-        className="modal-input"
+        className={styles['modal-input']}
         rows={3}
       />
-      <div className="server-type-toggle">
-        <label className="toggle-label">
+      <div className={styles['server-type-toggle']}>
+        <label className={styles['toggle-label']}>
           <input
             type="checkbox"
             checked={isPublic}
             onChange={(e) => setIsPublic(e.target.checked)}
           />
-          <span className="toggle-text">
+          <span className={styles['toggle-text']}>
             {isPublic ? 'Публичный сервер' : 'Приватный сервер'}
           </span>
         </label>
-        <p className="toggle-description">
+        <p className={styles['toggle-description']}>
           {isPublic 
             ? 'Сервер будет виден в поиске и доступен всем' 
             : 'Сервер будет доступен только по приглашению'}
         </p>
       </div>
-      <div className="modal-actions">
+      <div className={styles['modal-actions']}>
         <button
           onClick={handleSubmit}
           disabled={!serverName.trim()}

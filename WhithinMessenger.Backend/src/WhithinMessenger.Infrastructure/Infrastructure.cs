@@ -5,8 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Application.Interfaces;
+using WhithinMessenger.Application.Services;
+using WhithinMessenger.Application.Options;
 using WhithinMessenger.Infrastructure.Database;
 using WhithinMessenger.Infrastructure.Repositories;
+using WhithinMessenger.Infrastructure.Services;
 
 namespace WhithinMessenger.Infrastructure;
 
@@ -35,6 +38,10 @@ public static class Infrastructure
         services.AddScoped<IServerMemberRepository, ServerMemberRepository>();
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
+        
+        // JWT Services
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.AddScoped<ITokenGenerator, TokenGenerator>();
         
         return services;
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
@@ -24,33 +24,6 @@ const ServerPanel = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const createCategory = useCallback(async (categoryData) => {
-    if (!selectedServer?.serverId) return;
-    
-    try {
-      const response = await fetch(`${BASE_URL}/api/server/${selectedServer.serverId}/categories`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(categoryData)
-      });
-      
-      if (response.ok) {
-        const newCategory = await response.json();
-        console.log('Category created:', newCategory);
-        fetchServerData();
-        return newCategory;
-      } else {
-        throw new Error('Failed to create category');
-      }
-    } catch (error) {
-      console.error('Error creating category:', error);
-      throw error;
-    }
-  }, [selectedServer?.serverId]);
-  
   
   const [server, setServer] = useState(null);
   const [serverBanner, setServerBanner] = useState(null);
@@ -87,12 +60,39 @@ const ServerPanel = ({
     }
   }, [selectedServer?.serverId]);
 
+  const createCategory = useCallback(async (categoryData) => {
+    if (!selectedServer?.serverId) return;
+    
+    try {
+      const response = await fetch(`${BASE_URL}/api/server/${selectedServer.serverId}/categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(categoryData)
+      });
+      
+      if (response.ok) {
+        const newCategory = await response.json();
+        console.log('Category created:', newCategory);
+        fetchServerData();
+        return newCategory;
+      } else {
+        throw new Error('Failed to create category');
+      }
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }, [selectedServer?.serverId, fetchServerData]);
 
   useEffect(() => {
     if (!serverConnection) return;
 
     const handleChatCreated = (newChat, categoryId) => {
-      console.log('ServerPanel: ChatCreated event received:', { newChat, categoryId });
+      console.log('ServerPanel: ChatCreated event received in useEffect:', { newChat, categoryId });
+      console.log('ServerPanel: onServerDataUpdated available:', !!onServerDataUpdated);
       setServer(prev => {
         if (!prev) return prev;
         
@@ -275,6 +275,7 @@ const ServerPanel = ({
     };
 
     console.log('ServerPanel: Registering SignalR handlers, serverConnection:', serverConnection);
+    console.log('ServerPanel: Registering ChatCreated handler:', handleChatCreated);
     serverConnection.on("ChatCreated", handleChatCreated);
     serverConnection.on("ChatDeleted", handleChatDeleted);
     serverConnection.on("ChatUpdated", handleChatUpdated);
@@ -288,7 +289,7 @@ const ServerPanel = ({
       serverConnection.off("CategoryCreated", handleCategoryCreated);
       serverConnection.off("CategoryDeleted", handleCategoryDeleted);
     };
-  }, [serverConnection, onServerDataUpdated]);
+  }, [serverConnection, onServerDataUpdated]); // Возвращаем onServerDataUpdated
 
 
   const fetchServerBanner = useCallback(async () => {
@@ -315,7 +316,7 @@ const ServerPanel = ({
       fetchServerData();
       fetchServerBanner();
     }
-  }, [selectedServer]);
+  }, [selectedServer, fetchServerData, fetchServerBanner]); // Возвращаем функции
 
 
   useEffect(() => {
@@ -408,170 +409,7 @@ const ServerPanel = ({
           return;
         }
         
-        newConnection.off("ChatCreated");
-        newConnection.off("ChatDeleted");
-        newConnection.off("ChatUpdated");
-        newConnection.off("CategoryCreated");
-        newConnection.off("CategoryDeleted");
-        
-        newConnection.on("ChatCreated", (newChat, categoryId) => {
-          if (!isMounted) return;
-          console.log('ChatCreated event received:', newChat, categoryId);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const updatedCategories = [...(prev.categories || prev.Categories || [])];
-            
-            if (categoryId === null) {
-              const existingNullCategory = updatedCategories.find(cat => (cat.categoryId || cat.CategoryId) === null);
-              if (existingNullCategory) {
-                existingNullCategory.chats = [...(existingNullCategory.chats || existingNullCategory.Chats || []), newChat];
-              } else {
-                updatedCategories.push({
-                  categoryId: null,
-                  categoryName: null,
-                  chats: [newChat],
-                  categoryOrder: -1
-                });
-              }
-            } else {
-              const categoryIndex = updatedCategories.findIndex(cat => (cat.categoryId || cat.CategoryId) === categoryId);
-              if (categoryIndex !== -1) {
-                updatedCategories[categoryIndex] = {
-                  ...updatedCategories[categoryIndex],
-                  chats: [...(updatedCategories[categoryIndex].chats || updatedCategories[categoryIndex].Chats || []), newChat]
-                };
-              }
-            }
-            
-            return { ...prev, categories: updatedCategories };
-          });
-        });
-        
-        newConnection.on("ChatDeleted", (chatId) => {
-          if (!isMounted) return;
-          console.log('ChatDeleted event received:', chatId);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const updatedCategories = (prev.categories || prev.Categories || []).map(cat => ({
-              ...cat,
-              chats: (cat.chats || cat.Chats || []).filter(chat => (chat.chatId || chat.ChatId) !== chatId)
-            }));
-            
-            return { ...prev, categories: updatedCategories };
-          });
-        });
-        
-        newConnection.on("ChatUpdated", (updatedChat) => {
-          if (!isMounted) return;
-          console.log('ChatUpdated event received:', updatedChat);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const updatedCategories = (prev.categories || prev.Categories || []).map(cat => ({
-              ...cat,
-              chats: (cat.chats || cat.Chats || []).map(chat => 
-                (chat.chatId || chat.ChatId) === (updatedChat.chatId || updatedChat.ChatId) ? updatedChat : chat
-              )
-            }));
-            
-            return { ...prev, categories: updatedCategories };
-          });
-        });
-        
-        newConnection.on("CategoryCreated", (newCategory) => {
-          if (!isMounted) return;
-          console.log('CategoryCreated event received:', newCategory);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const updatedCategories = [...(prev.categories || prev.Categories || []), newCategory]
-              .sort((a, b) => (a.categoryOrder || a.CategoryOrder) - (b.categoryOrder || b.CategoryOrder));
-            
-            return { ...prev, categories: updatedCategories };
-          });
-        });
-        
-        newConnection.on("CategoryDeleted", (deletedCategoryId) => {
-          if (!isMounted) return;
-          console.log('CategoryDeleted event received:', deletedCategoryId);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const updatedCategories = (prev.categories || prev.Categories || []).filter(cat => (cat.categoryId || cat.CategoryId) !== deletedCategoryId);
-            
-            return { ...prev, categories: updatedCategories };
-          });
-        });
-        
-        newConnection.on("CategoriesReordered", (updatedCategories) => {
-          if (!isMounted) return;
-          console.log('CategoriesReordered event received:', updatedCategories);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const processedCategories = updatedCategories.map(cat => ({
-              ...cat,
-              chats: (cat.chats || cat.Chats || []).map(chat => ({
-                ...chat,
-                chatId: chat.chatId || chat.ChatId,
-                categoryId: cat.categoryId || cat.CategoryId
-              }))
-            }));
-            
-            const updatedServer = { ...prev, categories: processedCategories };
-            
-            if (onServerDataUpdated) {
-              onServerDataUpdated(updatedServer);
-            }
-            
-            return updatedServer;
-          });
-        });
-        
-        newConnection.on("ChatsReordered", (updatedCategories) => {
-          if (!isMounted) return;
-          console.log('ChatsReordered event received:', updatedCategories);
-          setServer(prev => {
-            if (!prev) return prev;
-            
-            const processedCategories = updatedCategories.map(cat => ({
-              ...cat,
-              chats: (cat.chats || cat.Chats || []).map(chat => ({
-                ...chat,
-                chatId: chat.chatId || chat.ChatId,
-                categoryId: cat.categoryId || cat.CategoryId
-              }))
-            }));
-            
-            const updatedServer = { ...prev, categories: processedCategories };
-            
-            if (onServerDataUpdated) {
-              onServerDataUpdated(updatedServer);
-            }
-            
-            return updatedServer;
-          });
-        });
-
-        newConnection.on("ServerBannerUpdated", (serverId, bannerUrl) => {
-          if (!isMounted) return;
-          console.log('ServerBannerUpdated event received:', serverId, bannerUrl);
-          setServerBanner(prev => {
-            if (!prev || prev.serverId !== serverId) return prev;
-            return { ...prev, banner: bannerUrl };
-          });
-        });
-
-        newConnection.on("ServerBannerColorUpdated", (serverId, bannerColor) => {
-          if (!isMounted) return;
-          console.log('ServerBannerColorUpdated event received:', serverId, bannerColor);
-          setServerBanner(prev => {
-            if (!prev || prev.serverId !== serverId) return prev;
-            return { ...prev, bannerColor: bannerColor };
-          });
-        });
+        // SignalR event handlers are registered in useEffect above
 
         newConnection.on("MemberAdded", (data) => {
           if (!isMounted) return;
@@ -624,8 +462,12 @@ const ServerPanel = ({
         setServerConnection(null);
       }
     };
-  }, [selectedServer?.serverId]);
+  }, [selectedServer?.serverId, user?.id, onServerDataUpdated, user?.userId]); // Возвращаем все зависимости
 
+
+  const memoizedCategories = useMemo(() => {
+    return server?.categories || currentServer?.categories || [];
+  }, [server?.categories, currentServer?.categories]);
 
   const handleChatClick = useCallback((chatId, groupName, chatType) => {
     if (onChatSelected) {
@@ -659,11 +501,27 @@ const ServerPanel = ({
         throw new Error(`SignalR connection not available. State: ${serverConnection?.state || 'null'}`);
       }
       
+      const serverId = selectedServer?.serverId || currentServer?.serverId;
+      const categoryId = selectedCategoryForChannel?.categoryId || selectedCategoryForChannel?.CategoryId || null;
+      const chatName = channelData.name;
+      const chatType = parseInt(channelData.type);
+      
+      console.log('CreateChat parameters:', {
+        serverId: serverId,
+        serverIdType: typeof serverId,
+        categoryId: categoryId,
+        categoryIdType: typeof categoryId,
+        chatName: chatName,
+        chatNameType: typeof chatName,
+        chatType: chatType,
+        chatTypeType: typeof chatType
+      });
+      
       await serverConnection.invoke("CreateChat", 
-        server?.serverId,
-        selectedCategoryForChannel?.categoryId || selectedCategoryForChannel?.CategoryId || null,
-        channelData.name,
-        channelData.type
+        serverId,
+        categoryId,
+        chatName,
+        chatType
       );
 
       console.log('Канал создан успешно');
@@ -698,8 +556,10 @@ const ServerPanel = ({
     }
 
     try {
+      const serverId = selectedServer?.serverId || currentServer?.serverId;
+      
       await serverConnection.invoke("UpdateChatName", 
-        server?.serverId,
+        serverId,
         channelId,
         newName
       );
@@ -716,8 +576,17 @@ const ServerPanel = ({
     }
 
     try {
+      const serverId = selectedServer?.serverId || currentServer?.serverId;
+      
+      console.log('DeleteChat parameters:', {
+        serverId: serverId,
+        serverIdType: typeof serverId,
+        channelId: channelId,
+        channelIdType: typeof channelId
+      });
+      
       await serverConnection.invoke("DeleteChat", 
-        server?.serverId,
+        serverId,
         channelId
       );
       console.log('Канал удален успешно');
@@ -784,8 +653,10 @@ const ServerPanel = ({
           if (!categoryId) {
             throw new Error('ID категории не найден');
           }
+          const serverId = selectedServer?.serverId || currentServer?.serverId;
+          
           await serverConnection.invoke("DeleteCategory", 
-            server?.serverId,
+            serverId,
             categoryId
           );
           console.log('Категория удалена успешно через SignalR');
@@ -819,8 +690,10 @@ const ServerPanel = ({
   const handleCreateCategorySubmit = useCallback(async (categoryData) => {
     try {
       if (serverConnection && serverConnection.state === 'Connected') {
+        const serverId = selectedServer?.serverId || currentServer?.serverId;
+        
         await serverConnection.invoke("CreateCategory", 
-          server?.serverId,
+          serverId,
           categoryData.categoryName
         );
         console.log('Категория создана успешно через SignalR');
@@ -863,7 +736,7 @@ const ServerPanel = ({
         throw new Error('Нет подключения к серверу');
       }
 
-      await serverConnection.invoke('LeaveServer', serverId);
+      await serverConnection.invoke('LeaveServer', selectedServer?.serverId || currentServer?.serverId);
       
       console.log('LeaveServer completed, navigation will be handled by useServers');
       
@@ -887,7 +760,7 @@ const ServerPanel = ({
         throw new Error('Нет подключения к серверу');
       }
 
-      await serverConnection.invoke('DeleteServer', serverId);
+      await serverConnection.invoke('DeleteServer', selectedServer?.serverId || currentServer?.serverId);
       
       console.log('DeleteServer completed, navigation will be handled by useServers');
       
@@ -1025,7 +898,7 @@ const ServerPanel = ({
         }}
       >
         <CategoriesList
-          categories={server?.categories || currentServer?.categories}
+          categories={memoizedCategories}
           selectedChat={selectedChat}
           onChatClick={handleChatClick}
           onAddChannel={handleAddChannel}
@@ -1035,6 +908,7 @@ const ServerPanel = ({
           onChannelSettings={handleChannelSettings}
           connection={connectionRef.current}
           serverId={currentServer?.serverId}
+          onServerDataUpdated={onServerDataUpdated}
           onCategoriesReordered={handleCategoriesReordered}
           onChatsReordered={handleChatsReordered}
           userId={user?.id}

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
+using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs;
 
@@ -16,14 +17,21 @@ public class ServerListHub : Hub
 
     private Guid? GetCurrentUserId()
     {
+        // Сначала пробуем получить из JWT claims
+        var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
+        if (Guid.TryParse(userIdClaim, out var userId))
+        {
+            return userId;
+        }
+
+        // Fallback на query parameter (для совместимости)
         var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
         if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
         {
             return userIdFromQueryParsed;
         }
 
-        var userIdClaim = Context.User?.FindFirst("userId")?.Value;
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+        return null;
     }
 
     public async Task JoinServerListGroup()

@@ -32,7 +32,7 @@ const HomePage = () => {
   const showFriends = location.pathname === '/channels/@me/friends';
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
-  const [createdServerData, setCreatedServerData] = useState(null);
+  // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
   const { chats, createPrivateChat } = useChatList(user?.id || null, (chatId) => {
     navigate(`/channels/@me/${chatId}`);
   });
@@ -67,7 +67,7 @@ const HomePage = () => {
       console.log('HomePage: Creating server connection for user:', user.id);
       createConnection(user.id);
     }
-  }, [user?.id, createConnection]);
+  }, [user?.id, createConnection]); // Возвращаем createConnection
 
   React.useEffect(() => {
     const handleServerCreated = (event) => {
@@ -115,7 +115,7 @@ const HomePage = () => {
       console.log('HomePage: Setting selectedServer to:', serverData);
       setSelectedServer(serverData);
     }
-  }, [serverId, serverData]);
+  }, [serverId, serverData, selectedChat]);
 
   useEffect(() => {
     if (selectedServer && servers && serverId) {
@@ -151,32 +151,47 @@ const HomePage = () => {
 
   useEffect(() => {
     if (serverId && channelId) {
-      const currentServerData = serverDataFromPanel || serverData;
-      
-      if (currentServerData) {
-        const foundChannel = currentServerData.categories
-          ?.flatMap(category => category.chats || category.Chats || [])
-          .find(chat => (chat.chatId || chat.ChatId || chat.chat_id) === channelId);
+      // Добавляем небольшую задержку, чтобы дать время обновиться данным сервера
+      const timeoutId = setTimeout(() => {
+        const currentServerData = serverDataFromPanel || serverData;
+        console.log('HomePage: Using serverDataFromPanel:', !!serverDataFromPanel);
+        console.log('HomePage: Using serverData:', !!serverData);
+        console.log('HomePage: Current server data source:', serverDataFromPanel ? 'serverDataFromPanel' : 'serverData');
         
-        console.log('All channels in server:', currentServerData.categories?.flatMap(category => category.chats || category.Chats || []));
-        console.log('HomePage: Looking for channelId:', channelId);
-        console.log('HomePage: Found channel:', foundChannel);
-        
-        if (foundChannel) {
-          const channelData = {
-            ...foundChannel,
-            chatId: foundChannel.chatId || foundChannel.ChatId || foundChannel.chat_id,
-            groupName: foundChannel.name || foundChannel.Name || foundChannel.groupName,
-            username: foundChannel.name || foundChannel.Name || foundChannel.username
-          };
-          console.log('HomePage: Setting selectedChat to:', channelData);
-          setSelectedChat(channelData);
-        } else {
-          console.log('HomePage: Channel not found, setting selectedChat to null');
-          setSelectedChat(null);
-          navigate(`/server/${serverId}`, { replace: true });
+        if (currentServerData) {
+          const foundChannel = currentServerData.categories
+            ?.flatMap(category => category.chats || category.Chats || [])
+            .find(chat => (chat.chatId || chat.ChatId || chat.chat_id) === channelId);
+          
+          const allChannels = currentServerData.categories?.flatMap(category => category.chats || category.Chats || []);
+          console.log('All channels in server:', allChannels);
+          console.log('All channels details:', allChannels?.map(ch => ({ 
+            chatId: ch.chatId, 
+            ChatId: ch.ChatId, 
+            chat_id: ch.chat_id, 
+            name: ch.name || ch.Name 
+          })));
+          console.log('HomePage: Looking for channelId:', channelId);
+          console.log('HomePage: Found channel:', foundChannel);
+          
+          if (foundChannel) {
+            const channelData = {
+              ...foundChannel,
+              chatId: foundChannel.chatId || foundChannel.ChatId || foundChannel.chat_id,
+              groupName: foundChannel.name || foundChannel.Name || foundChannel.groupName,
+              username: foundChannel.name || foundChannel.Name || foundChannel.username
+            };
+            console.log('HomePage: Setting selectedChat to:', channelData);
+            setSelectedChat(channelData);
+          } else {
+            console.log('HomePage: Channel not found, setting selectedChat to null');
+            setSelectedChat(null);
+            navigate(`/server/${serverId}`, { replace: true });
+          }
         }
-      }
+      }, 200); // Задержка 200мс для обновления данных
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [serverId, channelId, serverData, serverDataFromPanel, navigate]);
 
@@ -213,10 +228,12 @@ const HomePage = () => {
     }
   };
 
-  const handleServerDataUpdated = (updatedServerData) => {
+  const handleServerDataUpdated = useCallback((updatedServerData) => {
     console.log('HomePage: Server data updated from ServerPanel:', updatedServerData);
+    console.log('HomePage: Updated categories:', updatedServerData.categories);
+    console.log('HomePage: All channels in updated data:', updatedServerData.categories?.flatMap(category => category.chats || category.Chats || []));
     setServerDataFromPanel(updatedServerData);
-  };
+  }, []);
 
   const handleServerSelected = useCallback((server) => {
     setSelectedServer(server);

@@ -9,8 +9,8 @@ import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import HeadsetIcon from '@mui/icons-material/Headset';
+import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import styles from './ChatVoiceCall.module.css';
@@ -290,7 +290,7 @@ const ChatVoiceCall = ({
               onClick={toggleGlobalAudio}
               title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
             >
-              {isGlobalAudioMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+              {isGlobalAudioMuted ? <HeadsetOffIcon /> : <HeadsetIcon />}
             </button>
 
             {/* Завершить звонок */}

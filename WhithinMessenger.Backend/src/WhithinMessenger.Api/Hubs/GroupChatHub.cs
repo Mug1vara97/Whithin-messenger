@@ -14,6 +14,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatInfo;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.DeletePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
 using WhithinMessenger.Api.Hubs;
+using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs
 {
@@ -628,40 +629,30 @@ public class GroupChatHub : Hub
         {
             try
             {
-                // Сначала пытаемся получить из HttpContext.Items (для HTTP запросов)
-                var httpContext = _httpContextAccessor?.HttpContext;
-                _logger.LogInformation($"GetCurrentUserId: httpContext is null: {httpContext == null}");
-                
-                if (httpContext?.Items.ContainsKey("UserId") == true)
+                // Сначала пробуем получить из JWT claims
+                if (Context.User?.Identity?.IsAuthenticated == true)
                 {
-                    var userId = httpContext.Items["UserId"] as Guid?;
-                    _logger.LogInformation($"GetCurrentUserId: found userId in HttpContext: {userId}");
-                    return userId;
-                }
-                
-                // Для SignalR соединений получаем userId из query parameters
-                var context = Context;
-                _logger.LogInformation($"GetCurrentUserId: Context is null: {context == null}");
-                
-                if (context != null)
-                {
-                    var httpContextFromSignalR = context.GetHttpContext();
-                    _logger.LogInformation($"GetCurrentUserId: httpContextFromSignalR is null: {httpContextFromSignalR == null}");
-                    
-                    if (httpContextFromSignalR != null)
+                    var userIdClaim = Context.User.FindFirst("UserId")?.Value;
+                    if (Guid.TryParse(userIdClaim, out var userId))
                     {
-                        var userIdString = httpContextFromSignalR.Request.Query["userId"].ToString();
-                        _logger.LogInformation($"GetCurrentUserId: userIdString from query: '{userIdString}'");
-                        
-                        if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out Guid userId))
-                        {
-                            _logger.LogInformation($"GetCurrentUserId: parsed userId: {userId}");
-                            return userId;
-                        }
+                        _logger.LogInformation($"GetCurrentUserId: Found UserId from JWT: {userId}");
+                        return userId;
                     }
                 }
                 
-                _logger.LogWarning($"GetCurrentUserId: failed to get userId");
+                // Fallback на query parameter (для совместимости)
+                var httpContextFromSignalR = Context.GetHttpContext();
+                if (httpContextFromSignalR != null)
+                {
+                    var userIdString = httpContextFromSignalR.Request.Query["userId"].ToString();
+                    if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out Guid userId))
+                    {
+                        _logger.LogInformation($"GetCurrentUserId: Found userId from query: {userId}");
+                        return userId;
+                    }
+                }
+                
+                _logger.LogWarning($"GetCurrentUserId: No UserId found in JWT claims or query");
                 return null;
             }
             catch (Exception ex)

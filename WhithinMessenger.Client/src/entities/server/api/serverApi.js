@@ -1,13 +1,40 @@
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import tokenManager from '../../../shared/lib/services/tokenManager';
+
+// Вспомогательная функция для создания заголовков с JWT токеном
+const createHeaders = () => {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  const token = tokenManager.getToken();
+  if (token && tokenManager.isTokenValid()) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 export const serverApi = {
   getServerById: async (serverId) => {
-    const response = await fetch(`${BASE_URL}/api/server/${serverId}`, {
+    const url = `${BASE_URL}/api/server/${serverId}`;
+    const headers = createHeaders();
+    
+    console.log('serverApi.getServerById: Making request to:', url);
+    console.log('serverApi.getServerById: Headers:', headers);
+    
+    const response = await fetch(url, {
+      headers,
       credentials: 'include'
     });
     
+    console.log('serverApi.getServerById: Response status:', response.status);
+    console.log('serverApi.getServerById: Response ok:', response.ok);
+    
     if (!response.ok) {
-      throw new Error('Failed to fetch server');
+      const errorText = await response.text();
+      console.error('serverApi.getServerById: Error response:', errorText);
+      throw new Error(`Failed to fetch server: ${response.status} ${response.statusText}`);
     }
     
     return response.json();
@@ -15,6 +42,7 @@ export const serverApi = {
 
   getUserServers: async (userId) => {
     const response = await fetch(`${BASE_URL}/api/server/servers`, {
+      headers: createHeaders(),
       credentials: 'include'
     });
     
@@ -29,9 +57,7 @@ export const serverApi = {
   createServer: async (serverData, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: createHeaders(),
       body: JSON.stringify({
         serverName: serverData.serverName,
         ownerId: userId,
@@ -51,10 +77,7 @@ export const serverApi = {
   updateServer: async (serverId, serverData) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      headers: createHeaders(),
       body: JSON.stringify(serverData),
     });
 
@@ -69,9 +92,7 @@ export const serverApi = {
   deleteServer: async (serverId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      headers: createHeaders(),
     });
 
     if (!response.ok) {
@@ -85,9 +106,7 @@ export const serverApi = {
   joinServer: async (serverId, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}/add-member`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: createHeaders(),
       body: JSON.stringify({
         userIdToAdd: parseInt(userId),
         requestingUserId: parseInt(userId)
@@ -105,10 +124,7 @@ export const serverApi = {
   leaveServer: async (serverId, userId) => {
     const response = await fetch(`${BASE_URL}/api/messages/servers/${serverId}/remove-member`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      headers: createHeaders(),
       body: JSON.stringify({
         userIdToRemove: parseInt(userId)
       })

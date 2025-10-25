@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Register;
 using WhithinMessenger.Domain.Models;
+using WhithinMessenger.Application.Services;
+using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -11,10 +13,12 @@ namespace WhithinMessenger.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ITokenGenerator _tokenGenerator;
 
-    public AuthController(IMediator mediator)
+    public AuthController(IMediator mediator, ITokenGenerator tokenGenerator)
     {
         _mediator = mediator;
+        _tokenGenerator = tokenGenerator;
     }
 
     [HttpPost("login")]
@@ -25,11 +29,16 @@ public class AuthController : ControllerBase
 
         if (result.IsSuccess && result.User != null)
         {
-            HttpContext.Session.SetString("UserId", result.User.Id.ToString());
-            HttpContext.Session.SetString("Username", result.User.UserName ?? "");
+            // Генерируем JWT токен
+            var token = _tokenGenerator.GenerateAccessToken(
+                result.User.Id.ToString(), 
+                result.User.UserName ?? "", 
+                result.User.Email ?? ""
+            );
             
             return Ok(new { 
                 Message = "Успешный вход",
+                Token = token,
                 User = new {
                     Id = result.User.Id,
                     Username = result.User.UserName,
@@ -58,16 +67,18 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        HttpContext.Session.Clear();
+        // JWT токены не требуют очистки на сервере
         return Ok(new { Message = "Успешный выход" });
     }
 
     [HttpGet("status")]
     public IActionResult GetAuthStatus()
     {
-        var user = HttpContext.Items["User"] as ApplicationUser;
+        var userId = User.FindFirst("UserId")?.Value;
+        var username = User.FindFirst("Username")?.Value;
+        var email = User.FindFirst(ClaimTypes.Email)?.Value;
         
-        if (user == null)
+        if (string.IsNullOrEmpty(userId))
         {
             return Ok(new { 
                 IsAuthenticated = false,
@@ -80,10 +91,9 @@ public class AuthController : ControllerBase
             IsAuthenticated = true,
             User = new
             {
-                Id = user.Id,
-                Username = user.UserName,
-                Email = user.Email,
-                CreatedAt = user.CreatedAt
+                Id = userId,
+                Username = username,
+                Email = email
             }
         });
     }

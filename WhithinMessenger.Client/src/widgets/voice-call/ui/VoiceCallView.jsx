@@ -9,8 +9,8 @@ import VideocamIcon from '@mui/icons-material/Videocam';
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import HeadsetIcon from '@mui/icons-material/Headset';
+import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
@@ -345,9 +345,9 @@ const VoiceCallView = ({
                           title={isGlobalAudioMuted ? 'Звук всех участников выключен' : 'Звук всех участников включен'}
                         >
                           {isGlobalAudioMuted ? (
-                            <VolumeOffIcon sx={{ fontSize: 24 }} />
+                            <HeadsetOffIcon sx={{ fontSize: 24 }} />
                           ) : (
-                            <VolumeUpIcon sx={{ fontSize: 24 }} />
+                            <HeadsetIcon sx={{ fontSize: 24 }} />
                           )}
                         </button>
                       </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button, FormField } from '../../atoms';
+import GhostBackground from '../../atoms/GhostBackground';
 import { validateRegister } from '../../../lib/validation';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import './AuthForms.css';
@@ -43,6 +44,7 @@ const RegisterForm = () => {
 
   return (
     <div className="auth-container">
+      <GhostBackground />
       <div className="auth-box">
         <div className="auth-header">
           <h2>Create an account</h2>

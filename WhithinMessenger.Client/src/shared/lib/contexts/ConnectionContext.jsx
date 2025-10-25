@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
+import tokenManager from '../services/tokenManager';
 
 const ConnectionContext = createContext();
 
@@ -57,8 +58,20 @@ export const ConnectionProvider = ({ children }) => {
     pendingConnections.current.add(connectionKey);
 
     try {
+      // Получаем JWT токен для аутентификации
+      const token = tokenManager.getToken();
+      const isValid = tokenManager.isTokenValid();
+      console.log(`ConnectionContext: Token for ${hubName}:`, token ? 'Token exists' : 'No token');
+      console.log(`ConnectionContext: Token valid:`, isValid);
+      
+      const url = token && isValid 
+        ? `${BASE_URL}/${hubName}?userId=${userId}&access_token=${token}`
+        : `${BASE_URL}/${hubName}?userId=${userId}`;
+      
+      console.log(`ConnectionContext: SignalR URL:`, url);
+
       const connection = new HubConnectionBuilder()
-        .withUrl(`${BASE_URL}/${hubName}?userId=${userId}`)
+        .withUrl(url)
         .withAutomaticReconnect()
         .build();
 

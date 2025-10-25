@@ -73,6 +73,14 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 _ => Guid.Parse("33333333-3333-3333-3333-333333333333")  // По умолчанию TextChannel
             };
 
+            // Получаем максимальный ChatOrder для данной категории
+            var existingChats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
+            var maxOrder = existingChats
+                .Where(c => c.CategoryId == request.CategoryId)
+                .Select(c => c.ChatOrder)
+                .DefaultIfEmpty(0)
+                .Max();
+
             var chat = new Chat
             {
                 Id = Guid.NewGuid(),
@@ -81,7 +89,8 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 CategoryId = request.CategoryId,
                 TypeId = typeId,
                 CreatedAt = DateTime.UtcNow,
-                IsPrivate = false
+                IsPrivate = false,
+                ChatOrder = maxOrder + 1
             };
 
             await _chatRepository.CreateAsync(chat, cancellationToken);
@@ -95,7 +104,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 typeId = chat.TypeId,
                 createdAt = chat.CreatedAt,
                 isPrivate = chat.IsPrivate,
-                chatOrder = 0,
+                chatOrder = chat.ChatOrder,
                 members = new List<object>()
             };
 

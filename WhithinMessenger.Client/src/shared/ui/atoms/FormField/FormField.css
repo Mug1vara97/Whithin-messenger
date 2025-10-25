@@ -21,7 +21,7 @@
 .form-field__input {
   width: 100%;
   padding: 12px;
-  background: var(--background, #2f3136);
+  background: #2f313600;
   border: 1px solid var(--border, #4f545c);
   border-radius: 4px;
   color: var(--text, #ffffff);

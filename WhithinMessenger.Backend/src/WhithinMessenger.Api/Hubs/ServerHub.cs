@@ -7,6 +7,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Servers.LeaveServer;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.DeleteServer;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Domain.Models;
+using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs;
 
@@ -21,19 +22,42 @@ public class ServerHub : Hub
 
     private Guid? GetCurrentUserId()
     {
+        Console.WriteLine($"ServerHub: GetCurrentUserId called");
+        Console.WriteLine($"ServerHub: Context.User is null: {Context.User == null}");
+        Console.WriteLine($"ServerHub: Context.User.Identity.IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}");
+        
+        // Сначала пробуем получить из JWT claims
+        var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
+        Console.WriteLine($"ServerHub: JWT UserId claim: {userIdClaim}");
+        
+        if (Guid.TryParse(userIdClaim, out var userId))
+        {
+            Console.WriteLine($"ServerHub: Found UserId from JWT: {userId}");
+            return userId;
+        }
+
+        // Fallback на query parameter (для совместимости)
         var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
+        Console.WriteLine($"ServerHub: Query UserId: {userIdFromQuery}");
+        
         if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
         {
+            Console.WriteLine($"ServerHub: Found UserId from query: {userIdFromQueryParsed}");
             return userIdFromQueryParsed;
         }
 
-        var userIdClaim = Context.User?.FindFirst("userId")?.Value;
-        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+        Console.WriteLine($"ServerHub: No UserId found");
+        return null;
     }
 
     public async Task JoinServerGroup(string serverId)
     {
+        Console.WriteLine($"ServerHub: JoinServerGroup called with serverId: {serverId}");
+        var userId = GetCurrentUserId();
+        Console.WriteLine($"ServerHub: JoinServerGroup - userId: {userId}");
+        
         await Groups.AddToGroupAsync(Context.ConnectionId, serverId);
+        Console.WriteLine($"ServerHub: Successfully joined group {serverId}");
     }
 
     public async Task LeaveServerGroup(string serverId)

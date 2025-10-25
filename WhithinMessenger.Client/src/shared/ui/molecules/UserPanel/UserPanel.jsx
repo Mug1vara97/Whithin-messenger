@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Headset, HeadsetOff } from '@mui/icons-material';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
-import './UserPanel.css';
+import styles from './UserPanel.module.css';
 
 const UserPanel = ({ 
     userId, 
@@ -142,11 +142,11 @@ const UserPanel = ({
 
     return (
         <>
-            <div className="user-panel">
-                <div className="user-panel-content">
-                    <div className="user-avatar-container">
+            <div className={styles['user-panel']}>
+                <div className={styles['user-panel-content']}>
+                    <div className={styles['user-avatar-container']}>
                         <div 
-                            className="user-avatar" 
+                            className={styles['user-avatar']} 
                             style={{ 
                                 backgroundColor: userProfile?.avatarColor || '#5865F2', 
                                 cursor: 'pointer',
@@ -179,13 +179,13 @@ const UserPanel = ({
                         </div>
                     </div>
                     
-                    <div className="user-info">
-                        <span className="username">{username}</span>
+                    <div className={styles['user-info']}>
+                        <span className={styles.username}>{username}</span>
                     </div>
                     
-                    <div className="voice-controls">
+                    <div className={styles['voice-controls']}>
                         <button
-                            className="voice-control-button"
+                            className={styles['voice-control-button']}
                             onClick={onToggleMute}
                             title={isMuted ? "Включить микрофон" : "Выключить микрофон"}
                         >
@@ -193,7 +193,7 @@ const UserPanel = ({
                         </button>
                         
                         <button
-                            className="voice-control-button"
+                            className={styles['voice-control-button']}
                             onClick={onToggleAudio}
                             title={isAudioEnabled ? "Выключить звук" : "Включить звук"}
                         >
@@ -204,9 +204,9 @@ const UserPanel = ({
             </div>
 
             {showProfile && (
-                <div className="profile-modal">
-                    <div className="profile-modal-content">
-                        <div className="profile-banner" style={{ 
+                <div className={styles['profile-modal']}>
+                    <div className={styles['profile-modal-content']}>
+                        <div className={styles['profile-banner']} style={{ 
                             backgroundImage: userProfile?.banner?.startsWith('/uploads/') 
                                 ? `url(${BASE_URL}${userProfile.banner})` 
                                 : (userProfile?.banner?.startsWith('http') ? `url(${userProfile.banner})` : 'none'),
@@ -216,11 +216,11 @@ const UserPanel = ({
                             backgroundSize: 'cover',
                             backgroundPosition: 'center'
                         }}>
-                            <button className="close-button-profile" onClick={toggleProfile}>×</button>
+                            <button className={styles['close-button-profile']} onClick={toggleProfile}>×</button>
                             
-                            <div className="profile-avatar-large-container">
+                            <div className={styles['profile-avatar-large-container']}>
                                 <div 
-                                    className="profile-avatar-large" 
+                                    className={styles['profile-avatar-large']} 
                                     style={{ 
                                         backgroundColor: userProfile?.avatarColor || '#5865F2',
                                         position: 'relative'
@@ -231,19 +231,19 @@ const UserPanel = ({
                                         <img 
                                             src={userProfile.avatar.startsWith('http') ? userProfile.avatar : `${BASE_URL}${userProfile.avatar}`} 
                                             alt="User avatar" 
-                                            className="avatar-image-large" 
+                                            className={styles['avatar-image-large']} 
                                         />
                                     ) : (
                                         username.charAt(0).toUpperCase()
                                     )}
-                                    <div className="avatar-edit-overlay">
+                                    <div className={styles['avatar-edit-overlay']}>
                                         <span>Изменить</span>
                                     </div>
                                 </div>
                             </div>
 
                             <button 
-                                className="edit-banner-button"
+                                className={styles['edit-banner-button']}
                                 onClick={() => setShowBannerEditor(true)}
                             >
                                 Изменить баннер
@@ -251,10 +251,10 @@ const UserPanel = ({
                         </div>
 
                         {showAvatarEditor && (
-                            <div className="avatar-editor">
+                            <div className={styles['avatar-editor']}>
                                 <h3>Редактирование аватарки</h3>
-                                <div className="avatar-options">
-                                    <div className="image-option">
+                                <div className={styles['avatar-options']}>
+                                    <div className={styles['image-option']}>
                                         <input
                                             type="file"
                                             ref={avatarFileInputRef}
@@ -264,12 +264,12 @@ const UserPanel = ({
                                         />
                                         <button 
                                             onClick={() => avatarFileInputRef.current.click()}
-                                            className="upload-button"
+                                            className={styles['upload-button']}
                                         >
                                             Загрузить фото
                                         </button>
                                         {avatarInput && (
-                                            <div className="avatar-preview">
+                                            <div className={styles['avatar-preview']}>
                                                 <img 
                                                     src={avatarInput} 
                                                     alt="Preview" 
@@ -284,7 +284,7 @@ const UserPanel = ({
                                         )}
                                     </div>
                                 </div>
-                                <div className="avatar-editor-actions">
+                                <div className={styles['avatar-editor-actions']}>
                                     <button onClick={updateAvatar}>Сохранить</button>
                                     <button onClick={() => {
                                         setShowAvatarEditor(false);
@@ -295,10 +295,10 @@ const UserPanel = ({
                         )}
 
                         {showBannerEditor && (
-                            <div className="banner-editor">
+                            <div className={styles['banner-editor']}>
                                 <h3>Редактирование баннера</h3>
-                                <div className="banner-options">
-                                    <div className="color-option">
+                                <div className={styles['banner-options']}>
+                                    <div className={styles['color-option']}>
                                         <p>Использовать цвет:</p>
                                         <input 
                                             type="color" 
@@ -309,7 +309,7 @@ const UserPanel = ({
                                             Использовать цвет аватарки
                                         </button>
                                     </div>
-                                    <div className="image-option">
+                                    <div className={styles['image-option']}>
                                         <p>Или загрузить изображение:</p>
                                         <input
                                             type="file"
@@ -322,13 +322,13 @@ const UserPanel = ({
                                             Выбрать файл
                                         </button>
                                         {(bannerInput.startsWith('http') || bannerInput.startsWith('/')) && (
-                                            <div className="image-preview">
+                                            <div className={styles['image-preview']}>
                                                 <img src={bannerInput} alt="Preview" style={{ maxWidth: '100%', maxHeight: '100px' }} />
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div className="banner-editor-actions">
+                                <div className={styles['banner-editor-actions']}>
                                     <button onClick={updateBanner}>Сохранить</button>
                                     <button onClick={() => {
                                         setShowBannerEditor(false);
@@ -338,23 +338,23 @@ const UserPanel = ({
                             </div>
                         )}
 
-                        <div className="profile-header">
+                        <div className={styles['profile-header']}>
                             <h2>{username}</h2>
                         </div>
-                        <div className="profile-body">
+                        <div className={styles['profile-body']}>
                             {userProfile?.description && (
-                                <div className="profile-section">
+                                <div className={styles['profile-section']}>
                                     <h3>Обо мне</h3>
                                     <p>{userProfile.description}</p>
                                 </div>
                             )}
-                            <div className="profile-section">
+                            <div className={styles['profile-section']}>
                                 <h3>Информация</h3>
                                 <p>В числе участников с {new Date(userProfile?.createdAt).toLocaleDateString()}</p>
                             </div>
                         </div>
                     </div>
-                    <div className="profile-modal-overlay" onClick={toggleProfile}></div>
+                    <div className={styles['profile-modal-overlay']} onClick={toggleProfile}></div>
                 </div>
             )}
         </>

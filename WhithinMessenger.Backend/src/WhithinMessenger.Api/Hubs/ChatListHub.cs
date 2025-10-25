@@ -8,6 +8,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Chats.CreatePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.CreateGroupChat;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs
 {
@@ -178,17 +179,31 @@ namespace WhithinMessenger.Api.Hubs
 
         private Guid? GetCurrentUserId()
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            _logger.LogInformation($"ChatListHub: GetCurrentUserId - HttpContext is null: {httpContext == null}");
+            _logger.LogInformation($"ChatListHub: GetCurrentUserId called");
+            _logger.LogInformation($"ChatListHub: Context.User is null: {Context.User == null}");
+            _logger.LogInformation($"ChatListHub: Context.User.Identity.IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}");
             
-            if (httpContext?.Items.ContainsKey("UserId") == true)
+            // Сначала пробуем получить из JWT claims
+            var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
+            _logger.LogInformation($"ChatListHub: JWT UserId claim: {userIdClaim}");
+            
+            if (Guid.TryParse(userIdClaim, out var userId))
             {
-                var userId = httpContext.Items["UserId"] as Guid?;
-                _logger.LogInformation($"ChatListHub: Found UserId in context: {userId}");
+                _logger.LogInformation($"ChatListHub: Found UserId from JWT: {userId}");
                 return userId;
             }
+
+            // Fallback на query parameter (для совместимости)
+            var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
+            _logger.LogInformation($"ChatListHub: Query UserId: {userIdFromQuery}");
             
-            _logger.LogWarning("ChatListHub: No UserId found in HttpContext.Items");
+            if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
+            {
+                _logger.LogInformation($"ChatListHub: Found UserId from query: {userIdFromQueryParsed}");
+                return userIdFromQueryParsed;
+            }
+
+            _logger.LogWarning("ChatListHub: No UserId found");
             return null;
         }
 
