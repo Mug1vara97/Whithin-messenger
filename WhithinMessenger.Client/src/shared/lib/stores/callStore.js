@@ -398,11 +398,11 @@ export const useCallStore = create(
             
             // ВАЖНО: НЕ очищаем audio elements и gain nodes для video producer!
             // Audio elements должны оставаться активными для аудио потока
-            // Очищаем их только если это действительно audio producer или screen share
-            if (producerSocketId && (producerKind === 'audio' || mediaType === 'screen')) {
+            // Очищаем их только если это действительно audio producer (НЕ screen share!)
+            if (producerSocketId && producerKind === 'audio' && mediaType !== 'screen') {
               const userId = get().peerIdToUserIdMap.get(producerSocketId);
               if (userId) {
-                console.log('🎥 Cleaning up audio elements for audio/screen producer:', producerId);
+                console.log('🎥 Cleaning up audio elements for audio producer:', producerId);
                 // Очищаем audio element и gain node только для audio producer
                 const audioElement = get().audioElements.get(userId);
                 if (audioElement) {
@@ -447,8 +447,8 @@ export const useCallStore = create(
                   };
                 });
               }
-            } else if (producerSocketId && isVideoProducer) {
-              console.log('🎥 Video producer closed - preserving audio elements for user:', get().peerIdToUserIdMap.get(producerSocketId));
+            } else if (producerSocketId && (isVideoProducer || mediaType === 'screen')) {
+              console.log('🎥 Video/Screen producer closed - preserving audio elements for user:', get().peerIdToUserIdMap.get(producerSocketId));
             }
           });
 
