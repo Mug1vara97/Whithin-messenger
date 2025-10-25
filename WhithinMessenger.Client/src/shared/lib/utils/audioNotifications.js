@@ -96,14 +96,14 @@ class AudioNotificationManager {
    * Воспроизведение звука подключения пользователя
    */
   async playUserJoinedSound() {
-    await this.playSound('userJoined', 0.7); // Громкость 30%
+    await this.playSound('userJoined', 0.5); // Громкость 50%
   }
 
   /**
    * Воспроизведение звука отключения пользователя
    */
   async playUserLeftSound() {
-    await this.playSound('userLeft', 0.7); // Громкость 30%
+    await this.playSound('userLeft', 0.5); // Громкость 50%
   }
 
   /**

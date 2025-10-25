@@ -9,7 +9,7 @@ import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
 // Компонент для управления video элементом
-const VideoElement = ({ stream, participantId }) => {
+const VideoElement = React.memo(({ stream, participantId }) => {
   const videoRef = useRef(null);
   
   useEffect(() => {
@@ -33,7 +33,7 @@ const VideoElement = ({ stream, participantId }) => {
       playsInline
     />
   );
-};
+});
 
 const VideoCallGrid = ({ 
   participants = [], 
@@ -486,4 +486,45 @@ const VideoCallGrid = ({
   );
 };
 
-export default VideoCallGrid;
+// Мемоизированный компонент с кастомной функцией сравнения
+const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) => {
+  // Сравниваем только критически важные пропсы
+  const criticalProps = [
+    'participants',
+    'screenShareStream', 
+    'isScreenSharing',
+    'remoteScreenShares',
+    'enableAutoFocus'
+  ];
+  
+  for (const prop of criticalProps) {
+    if (prevProps[prop] !== nextProps[prop]) {
+      // Для объектов и массивов делаем глубокое сравнение
+      if (prop === 'participants') {
+        if (prevProps.participants.length !== nextProps.participants.length) {
+          return false;
+        }
+        // Сравниваем только ключевые свойства участников
+        for (let i = 0; i < prevProps.participants.length; i++) {
+          const prev = prevProps.participants[i];
+          const next = nextProps.participants[i];
+          if (prev.userId !== next.userId || 
+              prev.isVideoEnabled !== next.isVideoEnabled ||
+              prev.isScreenSharing !== next.isScreenSharing) {
+            return false;
+          }
+        }
+      } else if (prop === 'remoteScreenShares') {
+        if (prevProps.remoteScreenShares.size !== nextProps.remoteScreenShares.size) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+  }
+  
+  return true; // Пропсы не изменились, не перерендериваем
+});
+
+export default MemoizedVideoCallGrid;

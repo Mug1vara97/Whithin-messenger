@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { createParticipant } from '../../../entities/video-call/model/types';
@@ -57,7 +57,6 @@ const VoiceCallView = ({
   } = useGlobalCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
-  const [videoParticipants, setVideoParticipants] = useState([]);
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
 
   // Логирование состояния демонстрации экрана
@@ -96,8 +95,8 @@ const VoiceCallView = ({
     };
   }, []);
 
-  // Преобразуем участников голосового звонка в формат для видеосетки
-  useEffect(() => {
+  // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
+  const videoParticipants = useMemo(() => {
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
@@ -129,7 +128,7 @@ const VoiceCallView = ({
     });
     
     console.log('Video participants updated:', videoParticipantsList);
-    setVideoParticipants(videoParticipantsList);
+    return videoParticipantsList;
   }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream]);
 
 
