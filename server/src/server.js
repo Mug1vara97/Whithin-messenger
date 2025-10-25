@@ -1065,7 +1065,8 @@ io.on('connection', async (socket) => {
                 const eventData = {
                     producerId,
                     producerSocketId: socket.id,
-                    mediaType: 'screen'
+                    mediaType: 'screen',
+                    kind: 'video' // Screen share is also video type
                 };
                 console.log('Sending producerClosed event with data:', eventData);
                 io.to(room.id).emit('producerClosed', eventData);
@@ -1110,6 +1111,22 @@ io.on('connection', async (socket) => {
                 return;
             }
 
+            // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО НА СЕРВЕРЕ ДО ОСТАНОВКИ ВЕБКАМЕРЫ
+            console.log('🔍🔍🔍 СЕРВЕР: АУДИО ДИАГНОСТИКА ДО ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
+            
+            // Проверяем состояние audio producers ДО остановки
+            const audioProducersBefore = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
+            console.log('🔍 СЕРВЕР: Audio producers ДО остановки вебкамеры:', audioProducersBefore.length);
+            audioProducersBefore.forEach(ap => {
+                console.log('🔍 СЕРВЕР: Audio producer ДО:', {
+                    id: ap.id,
+                    kind: ap.kind,
+                    paused: ap.paused,
+                    closed: ap.closed,
+                    appData: ap.appData
+                });
+            });
+            
             // Находим и закрываем producer вебкамеры
             const producer = peer.getProducer(producerId);
             if (producer && producer.appData?.mediaType === 'camera') {
@@ -1121,7 +1138,8 @@ io.on('connection', async (socket) => {
                 const eventData = {
                     producerId,
                     producerSocketId: socket.id,
-                    mediaType: 'camera'
+                    mediaType: 'camera',
+                    kind: 'video' // Добавляем kind для правильной обработки на клиенте
                 };
                 console.log('🎥 Sending producerClosed event with data:', eventData);
                 io.to(room.id).emit('producerClosed', eventData);
@@ -1138,11 +1156,20 @@ io.on('connection', async (socket) => {
                     producer.close();
                 }
 
+                // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО НА СЕРВЕРЕ ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ
+                console.log('🔍🔍🔍 СЕРВЕР: АУДИО ДИАГНОСТИКА ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
+                
                 // Проверяем состояние audio producers после остановки video
                 const audioProducers = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
-                console.log('🎥 Audio producers after video stop:', audioProducers.length);
+                console.log('🔍 СЕРВЕР: Audio producers после остановки вебкамеры:', audioProducers.length);
                 audioProducers.forEach(ap => {
-                    console.log('🎥 Audio producer:', ap.id, 'paused:', ap.paused, 'closed:', ap.closed);
+                    console.log('🔍 СЕРВЕР: Audio producer:', {
+                        id: ap.id,
+                        kind: ap.kind,
+                        paused: ap.paused,
+                        closed: ap.closed,
+                        appData: ap.appData
+                    });
                 });
 
                 // Проверяем состояние consumers в комнате

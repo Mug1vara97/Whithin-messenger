@@ -243,6 +243,14 @@ export const useCallStore = create(
             
             console.log('🎥 Producer closed parsed:', { producerId, producerSocketId, producerKind, mediaType });
             
+            // Дополнительная диагностика для понимания типа producer
+            console.log('🎥 Producer type analysis:', {
+              isVideoProducer: producerKind === 'video' && mediaType === 'camera',
+              isAudioProducer: producerKind === 'audio',
+              isScreenShare: mediaType === 'screen',
+              shouldCleanAudio: producerKind === 'audio' || mediaType === 'screen'
+            });
+            
             // Защита от дублирования обработки
             const state = get();
             if (state.processedProducers && state.processedProducers.has(producerId)) {
@@ -333,10 +341,14 @@ export const useCallStore = create(
               }
             }
             
-            if (producerSocketId) {
+            // ВАЖНО: НЕ очищаем audio elements и gain nodes для video producer!
+            // Audio elements должны оставаться активными для аудио потока
+            // Очищаем их только если это действительно audio producer или screen share
+            if (producerSocketId && (producerKind === 'audio' || mediaType === 'screen')) {
               const userId = get().peerIdToUserIdMap.get(producerSocketId);
               if (userId) {
-                // Очищаем audio element и gain node
+                console.log('🎥 Cleaning up audio elements for audio/screen producer:', producerId);
+                // Очищаем audio element и gain node только для audio producer
                 const audioElement = get().audioElements.get(userId);
                 if (audioElement) {
                   audioElement.pause();
@@ -380,6 +392,8 @@ export const useCallStore = create(
                   };
                 });
               }
+            } else if (producerSocketId && isVideoProducer) {
+              console.log('🎥 Video producer closed - preserving audio elements for user:', get().peerIdToUserIdMap.get(producerSocketId));
             }
           });
 
@@ -1489,15 +1503,47 @@ export const useCallStore = create(
         console.log('🎥🎥🎥 STOP VIDEO START 🎥🎥🎥');
         try {
           const state = get();
-          console.log('🎥 Current state before stop:', {
-            isVideoEnabled: state.isVideoEnabled,
-            hasVideoProducer: !!state.videoProducer,
-            hasCameraStream: !!state.cameraStream,
-            hasAudioStream: !!state.audioStream,
-            hasLocalStream: !!state.localStream,
-            producersCount: state.producers.size,
-            producersKeys: Array.from(state.producers.keys())
+        console.log('🎥 Current state before stop:', {
+          isVideoEnabled: state.isVideoEnabled,
+          hasVideoProducer: !!state.videoProducer,
+          hasCameraStream: !!state.cameraStream,
+          hasAudioStream: !!state.audioStream,
+          hasLocalStream: !!state.localStream,
+          producersCount: state.producers.size,
+          producersKeys: Array.from(state.producers.keys())
+        });
+        
+        // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО ДО ОСТАНОВКИ ВЕБКАМЕРЫ
+        console.log('🔍🔍🔍 АУДИО ДИАГНОСТИКА ДО ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
+        
+        // Проверяем audio producers ДО остановки
+        const audioProducersBefore = Array.from(state.producers.values()).filter(p => p.kind === 'audio');
+        console.log('🔍 Audio producers ДО остановки вебкамеры:', audioProducersBefore.length);
+        audioProducersBefore.forEach(producer => {
+          console.log('🔍 Audio producer ДО:', {
+            id: producer.id,
+            kind: producer.kind,
+            closed: producer.closed,
+            paused: producer.paused,
+            appData: producer.appData
           });
+        });
+        
+        // Проверяем audio consumers ДО остановки
+        const audioConsumersBefore = Array.from(state.consumers.values()).filter(c => c.kind === 'audio');
+        console.log('🔍 Audio consumers ДО остановки вебкамеры:', audioConsumersBefore.length);
+        audioConsumersBefore.forEach(consumer => {
+          console.log('🔍 Audio consumer ДО:', {
+            id: consumer.id,
+            kind: consumer.kind,
+            closed: consumer.closed,
+            paused: consumer.paused,
+            producerPaused: consumer.producerPaused,
+            producerId: consumer.producer ? consumer.producer.id : 'NO_PRODUCER',
+            producerClosed: consumer.producer ? consumer.producer.closed : 'NO_PRODUCER',
+            producerPausedState: consumer.producer ? consumer.producer.paused : 'NO_PRODUCER'
+          });
+        });
           
           // Останавливаем video producer
           if (state.videoProducer) {
@@ -1546,8 +1592,49 @@ export const useCallStore = create(
           
           console.log('🎥 Video stopped, but audio should continue working');
           
-          // Проверяем, что основной аудио producer не затронут
+          // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ
+          console.log('🔍🔍🔍 АУДИО ДИАГНОСТИКА ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
+          
           const currentState = get();
+          console.log('🔍 Состояние после остановки вебкамеры:', {
+            hasAudioStream: !!currentState.audioStream,
+            hasLocalStream: !!currentState.localStream,
+            audioStreamTracks: currentState.audioStream ? currentState.audioStream.getTracks().length : 0,
+            localStreamTracks: currentState.localStream ? currentState.localStream.getTracks().length : 0,
+            producersCount: currentState.producers.size,
+            consumersCount: currentState.consumers.size
+          });
+          
+          // Проверяем audio producers
+          const audioProducers = Array.from(currentState.producers.values()).filter(p => p.kind === 'audio');
+          console.log('🔍 Audio producers после остановки вебкамеры:', audioProducers.length);
+          audioProducers.forEach(producer => {
+            console.log('🔍 Audio producer:', {
+              id: producer.id,
+              kind: producer.kind,
+              closed: producer.closed,
+              paused: producer.paused,
+              appData: producer.appData
+            });
+          });
+          
+          // Проверяем audio consumers
+          const audioConsumers = Array.from(currentState.consumers.values()).filter(c => c.kind === 'audio');
+          console.log('🔍 Audio consumers после остановки вебкамеры:', audioConsumers.length);
+          audioConsumers.forEach(consumer => {
+            console.log('🔍 Audio consumer:', {
+              id: consumer.id,
+              kind: consumer.kind,
+              closed: consumer.closed,
+              paused: consumer.paused,
+              producerPaused: consumer.producerPaused,
+              producerId: consumer.producer ? consumer.producer.id : 'NO_PRODUCER',
+              producerClosed: consumer.producer ? consumer.producer.closed : 'NO_PRODUCER',
+              producerPausedState: consumer.producer ? consumer.producer.paused : 'NO_PRODUCER'
+            });
+          });
+          
+          // Проверяем, что основной аудио producer не затронут
           console.log('🎥 Final state after stop:', {
             isVideoEnabled: currentState.isVideoEnabled,
             hasVideoProducer: !!currentState.videoProducer,
