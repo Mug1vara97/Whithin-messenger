@@ -81,56 +81,7 @@ const ChatVoiceCall = ({
     });
   }, [isScreenSharing, screenShareStream, participants.length, isConnected]);
 
-  // Принудительная активация фокуса на демонстрации экрана или вебкамере
-  useEffect(() => {
-    const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-    const hasAnyVideo = isVideoEnabled || participants.some(p => p.isVideoEnabled);
-    const shouldAutoFocus = hasAnyScreenShare || hasAnyVideo;
-    
-    if (shouldAutoFocus) {
-      // Небольшая задержка для того, чтобы VideoCallGrid успел отрендериться
-      const timer = setTimeout(() => {
-        // Сначала пробуем найти screen share tile
-        let targetTile = document.querySelector('.screen-share-content');
-        
-        // Если screen share не найден, ищем video tile (вебкамера)
-        if (!targetTile) {
-          // Сначала ищем tile с видео удаленного пользователя
-          const allVideoTiles = document.querySelectorAll('.video-tile, [data-participant-id]');
-          for (const tile of allVideoTiles) {
-            const participantId = tile.getAttribute('data-participant-id');
-            if (participantId && participantId !== userId) {
-              targetTile = tile;
-              break;
-            }
-          }
-          
-          // Если удаленного пользователя с видео нет, ищем текущего пользователя
-          if (!targetTile) {
-            for (const tile of allVideoTiles) {
-              const participantId = tile.getAttribute('data-participant-id');
-              if (participantId && participantId === userId) {
-                targetTile = tile;
-                break;
-              }
-            }
-          }
-        }
-        
-        // Если все еще не найден, ищем любой tile с видео
-        if (!targetTile) {
-          targetTile = document.querySelector('[data-participant-id]');
-        }
-        
-        if (targetTile) {
-          targetTile.click();
-          console.log('ChatVoiceCall: Auto-focused on screen share or video');
-        }
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isScreenSharing, screenShareStream, remoteScreenShares.size, isVideoEnabled, participants, userId]);
+  // Автофокус отключен - используем enableAutoFocus={false} в VideoCallGrid
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -259,6 +210,7 @@ const ChatVoiceCall = ({
                   hideBottomUsers={true}
                   isVideoEnabled={isVideoEnabled}
                   videoStream={cameraStream}
+                  enableAutoFocus={false}
                 />
               </div>
             ) : (
