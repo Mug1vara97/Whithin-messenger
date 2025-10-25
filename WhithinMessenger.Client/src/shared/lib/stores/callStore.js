@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
+import { audioNotificationManager } from '../utils/audioNotifications';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -130,6 +131,11 @@ export const useCallStore = create(
                 isSpeaking: false
               }]
             }));
+
+            // Воспроизводим звук подключения пользователя
+            audioNotificationManager.playUserJoinedSound().catch(error => {
+              console.warn('Failed to play user joined sound:', error);
+            });
           });
 
           voiceCallApi.on('peerLeft', (peerData) => {
@@ -188,6 +194,11 @@ export const useCallStore = create(
                 };
               });
             }
+
+            // Воспроизводим звук отключения пользователя
+            audioNotificationManager.playUserLeftSound().catch(error => {
+              console.warn('Failed to play user left sound:', error);
+            });
           });
 
           voiceCallApi.on('peerMuteStateChanged', ({ peerId, isMuted }) => {
