@@ -41,6 +41,8 @@ const VoiceCallView = ({
     isScreenSharing,
     screenShareStream,
     remoteScreenShares,
+    isVideoEnabled,
+    cameraStream,
     startCall,
     endCall,
     toggleMute,
@@ -50,7 +52,8 @@ const VoiceCallView = ({
     changeUserVolume,
     toggleVolumeSlider,
     toggleGlobalAudio,
-    toggleScreenShare
+    toggleScreenShare,
+    toggleVideo
   } = useGlobalCall(userId, userName);
 
   const [showChatPanel, setShowChatPanel] = useState(false);
@@ -101,6 +104,9 @@ const VoiceCallView = ({
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
     currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
+    currentUser.videoStream = cameraStream; // Добавляем видео поток
+    currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
     
     const videoParticipantsList = [currentUser];
     
@@ -117,12 +123,14 @@ const VoiceCallView = ({
       videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
       videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
       videoParticipant.isSpeaking = participant.isSpeaking || false;
+      videoParticipant.isVideoEnabled = participant.isVideoEnabled || false; // Добавляем состояние веб-камеры
+      videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
       videoParticipantsList.push(videoParticipant);
     });
     
     console.log('Video participants updated:', videoParticipantsList);
     setVideoParticipants(videoParticipantsList);
-  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted]);
+  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream]);
 
 
   const handleClose = () => {
@@ -231,6 +239,7 @@ const VoiceCallView = ({
                       } : null}
                       remoteScreenShares={remoteScreenShares}
                       onStopScreenShare={toggleScreenShare}
+                      enableAutoFocus={false} // Отключаем автофокус для серверных звонков
                     />
                   </div>
                 )}
@@ -298,9 +307,10 @@ const VoiceCallView = ({
                       {/* Camera with dropdown */}
                       <div className="attached-caret-button-container">
                         <button 
-                          className="center-button attached-button"
+                          className={`center-button attached-button ${isVideoEnabled ? 'active' : ''}`}
                           type="button" 
-                          aria-label="Включить камеру"
+                          aria-label={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
+                          onClick={toggleVideo}
                         >
                           <VideocamIcon sx={{ fontSize: 24 }} />
                         </button>
