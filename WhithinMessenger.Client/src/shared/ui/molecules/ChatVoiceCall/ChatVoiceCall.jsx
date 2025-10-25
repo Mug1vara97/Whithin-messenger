@@ -259,6 +259,7 @@ const ChatVoiceCall = ({
                   hideBottomUsers={true}
                   isVideoEnabled={isVideoEnabled}
                   videoStream={cameraStream}
+                  enableAutoFocus={false} // Отключаем автофокус для серверных звонков
                 />
               </div>
             ) : (

@@ -50,7 +50,8 @@ const VideoCallGrid = ({
   screenShareParticipant = null,
   remoteScreenShares = new Map(),
   forceGridMode = false,
-  hideBottomUsers = false
+  hideBottomUsers = false,
+  enableAutoFocus = true // Новый пропс для управления автофокусом
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -143,6 +144,12 @@ const VideoCallGrid = ({
 
   // Автоматический фокус на вебкамеру (только при включении новой)
   useEffect(() => {
+    // Проверяем, включен ли автофокус
+    if (!enableAutoFocus) {
+      console.log('VideoCallGrid: Auto-focus disabled');
+      return;
+    }
+    
     if (!isFocusedMode) {
       // Получаем текущих участников с вебкамерой
       const currentVideoParticipants = new Set(
@@ -180,7 +187,7 @@ const VideoCallGrid = ({
       // Обновляем состояние для следующей проверки
       setLastVideoParticipants(currentVideoParticipants);
     }
-  }, [extendedParticipants, isFocusedMode, focusParticipant, lastVideoParticipants]);
+  }, [extendedParticipants, isFocusedMode, focusParticipant, lastVideoParticipants, enableAutoFocus]);
 
   const handleParticipantClick = (participant) => {
     focusParticipant(participant.id);
