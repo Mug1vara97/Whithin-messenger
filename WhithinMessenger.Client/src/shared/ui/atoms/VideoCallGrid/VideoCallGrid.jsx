@@ -514,7 +514,10 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
     'screenShareStream', 
     'isScreenSharing',
     'remoteScreenShares',
-    'enableAutoFocus'
+    'enableAutoFocus',
+    'userVolumes',
+    'userMutedStates',
+    'showVolumeSliders'
   ];
   
   for (const prop of criticalProps) {
@@ -537,8 +540,14 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
             return false;
           }
         }
-      } else if (prop === 'remoteScreenShares') {
-        if (prevProps.remoteScreenShares.size !== nextProps.remoteScreenShares.size) {
+      } else if (prop === 'remoteScreenShares' || prop === 'userVolumes' || prop === 'userMutedStates' || prop === 'showVolumeSliders') {
+        // Для всех Map проверяем размер - если изменился, нужен перерендер
+        if (prevProps[prop]?.size !== nextProps[prop]?.size) {
+          return false;
+        }
+        // Если размер одинаковый, но это разные объекты Map, тоже перерендериваем
+        // (т.к. содержимое могло измениться)
+        if (prevProps[prop] !== nextProps[prop]) {
           return false;
         }
       } else if (prop === 'screenShareStream') {
