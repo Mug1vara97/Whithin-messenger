@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -117,41 +117,32 @@ const VideoCallGrid = ({
   };
 
   // Создаем расширенный список участников, включая демонстрации экрана
-  const extendedParticipants = useMemo(() => {
-    const screenShareParticipants = [];
-    
-    // Локальная демонстрация экрана
-    if (isScreenSharing && screenShareStream && screenShareParticipant) {
-      screenShareParticipants.push({
-        id: `screen-share-local-${screenShareParticipant.id}`,
-        name: screenShareParticipant.name,
-        isScreenShare: true,
-        isLocal: true,
-        stream: screenShareStream
-      });
-    }
-    
-    // Удаленные демонстрации экрана
-    Array.from(remoteScreenShares.values()).forEach((screenShare) => {
-      screenShareParticipants.push({
-        id: `screen-share-remote-${screenShare.producerId}`,
-        name: screenShare.userName,
-        isScreenShare: true,
-        isLocal: false,
-        stream: screenShare.stream,
-        producerId: screenShare.producerId
-      });
+  const screenShareParticipants = [];
+  
+  // Локальная демонстрация экрана
+  if (isScreenSharing && screenShareStream && screenShareParticipant) {
+    screenShareParticipants.push({
+      id: `screen-share-local-${screenShareParticipant.id}`,
+      name: screenShareParticipant.name,
+      isScreenShare: true,
+      isLocal: true,
+      stream: screenShareStream
     });
-    
-    const extended = [...participants, ...screenShareParticipants];
-    return extended;
-  }, [
-    participants, 
-    isScreenSharing, 
-    screenShareStream, 
-    screenShareParticipant, 
-    remoteScreenShares
-  ]);
+  }
+  
+  // Удаленные демонстрации экрана
+  Array.from(remoteScreenShares.values()).forEach((screenShare) => {
+    screenShareParticipants.push({
+      id: `screen-share-remote-${screenShare.producerId}`,
+      name: screenShare.userName,
+      isScreenShare: true,
+      isLocal: false,
+      stream: screenShare.stream,
+      producerId: screenShare.producerId
+    });
+  });
+  
+  const extendedParticipants = [...participants, ...screenShareParticipants];
 
   // Локальная логика вместо useVideoCall
   const [focusedParticipantId, setFocusedParticipantId] = useState(null);
