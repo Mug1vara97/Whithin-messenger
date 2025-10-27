@@ -95,6 +95,7 @@
 .media-image-container {
   position: relative;
   max-width: 100%;
+  min-height: 200px;
 }
 
 .media-image {
@@ -103,12 +104,83 @@
   max-height: 300px;
   object-fit: contain;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.3s ease;
   display: block;
+}
+
+.media-image.media-loading {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
 }
 
 .media-image:hover {
   transform: scale(1.02);
+}
+
+/* Skeleton loader */
+.media-skeleton {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  height: 200px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.media-skeleton-video {
+  height: 225px;
+}
+
+.skeleton-shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+.skeleton-icon {
+  font-size: 48px;
+  opacity: 0.3;
+  z-index: 1;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.media-video.media-loading {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
 }
 
 

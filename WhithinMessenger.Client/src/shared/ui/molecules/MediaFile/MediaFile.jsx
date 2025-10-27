@@ -4,50 +4,40 @@ import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import './MediaFile.css';
 
-const MediaFile = ({ mediaFile, onDelete, canDelete = false }) => {
-  const [isLoading, setIsLoading] = useState(false);
+const MediaFile = ({ mediaFile }) => {
   const [error, setError] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
-
-
-  const handleDelete = async () => {
-    if (!canDelete || !onDelete) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      await onDelete(mediaFile.id);
-    } catch (err) {
-      setError('Ошибка при удалении файла');
-      console.error('Error deleting media file:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDownload = () => {
-    const downloadUrl = `${BASE_URL}/${mediaFile.filePath}`;
-    window.open(downloadUrl, '_blank');
-  };
+  const [imageLoading, setImageLoading] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(true);
 
   const renderMediaContent = () => {
     if (mediaFile.contentType.startsWith('image/')) {
       const imageUrl = `${BASE_URL}/${mediaFile.filePath}`;
-      const thumbnailUrl = mediaFile.thumbnailPath ? `${BASE_URL}/${mediaFile.thumbnailPath}` : null;
       
       
       return (
         <div className="media-image-container">
+          {imageLoading && (
+            <div className="media-skeleton">
+              <div className="skeleton-shimmer"></div>
+              <div className="skeleton-icon">🖼️</div>
+            </div>
+          )}
           <img
             src={imageUrl}
             alt={mediaFile.originalFileName}
-            className="media-image"
-            onClick={() => setShowPreview(true)}
+            className={`media-image ${imageLoading ? 'media-loading' : ''}`}
+            onClick={() => !imageLoading && setShowPreview(true)}
+            onLoad={() => {
+              console.log('✅ MediaFile - изображение загружено:', imageUrl);
+              setImageLoading(false);
+            }}
             onError={(e) => {
               console.error('❌ MediaFile - ошибка загрузки изображения:', imageUrl, e);
+              setImageLoading(false);
               setError('Ошибка загрузки изображения');
             }}
+            loading="lazy"
           />
         </div>
       );
@@ -56,11 +46,26 @@ const MediaFile = ({ mediaFile, onDelete, canDelete = false }) => {
     if (mediaFile.contentType.startsWith('video/')) {
       return (
         <div className="media-video-container">
+          {videoLoading && (
+            <div className="media-skeleton media-skeleton-video">
+              <div className="skeleton-shimmer"></div>
+              <div className="skeleton-icon">🎥</div>
+            </div>
+          )}
           <video
             src={`${BASE_URL}/${mediaFile.filePath}`}
             controls
-            className="media-video"
+            className={`media-video ${videoLoading ? 'media-loading' : ''}`}
             preload="metadata"
+            onLoadedData={() => {
+              console.log('✅ MediaFile - видео загружено');
+              setVideoLoading(false);
+            }}
+            onError={(e) => {
+              console.error('❌ MediaFile - ошибка загрузки видео:', e);
+              setVideoLoading(false);
+              setError('Ошибка загрузки видео');
+            }}
           >
             Ваш браузер не поддерживает видео.
           </video>
@@ -92,13 +97,6 @@ const MediaFile = ({ mediaFile, onDelete, canDelete = false }) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const getFileIcon = () => {
-    if (mediaFile.contentType.startsWith('image/')) return '🖼️';
-    if (mediaFile.contentType.startsWith('video/')) return '🎥';
-    if (mediaFile.contentType.startsWith('audio/')) return '🎵';
-    return '📄';
   };
 
   return (

@@ -5,7 +5,8 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioChunks, setAudioChunks] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -22,6 +23,14 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     if (!file || !connection) return;
 
     try {
+      // Устанавливаем состояние загрузки
+      setUploadingFile({
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
+      setUploadProgress(0);
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('chatId', chatId);
@@ -29,23 +38,81 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       formData.append('userId', userId);
       formData.append('username', username);
 
-      const response = await fetch(`${BASE_URL}/api/media/upload`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
+      /**
+       * Используем XMLHttpRequest вместо Fetch API
+       * 
+       * Почему XMLHttpRequest, а не Fetch?
+       * - Fetch API НЕ поддерживает отслеживание прогресса ОТПРАВКИ (upload progress)
+       * - xhr.upload.onprogress - единственный нативный способ отслеживать загрузку файлов
+       * - Fetch может отслеживать только прогресс СКАЧИВАНИЯ ответа через ReadableStream
+       * - Для upload progress XMLHttpRequest - это правильный и единственный выбор
+       * 
+       * Альтернативы: библиотеки типа axios, которые внутри тоже используют XMLHttpRequest
+       */
+      const xhr = new XMLHttpRequest();
+
+      // Promise для обработки результата
+      const uploadPromise = new Promise((resolve, reject) => {
+        // Отслеживаем прогресс отправки файла
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percentComplete);
+          }
+        });
+
+        // Обработка успешного ответа
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch {
+              reject(new Error('Invalid JSON response'));
+            }
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              reject(new Error(errorData.error || `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+
+        // Обработка сетевых ошибок
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'));
+        });
+
+        // Обработка отмены
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload aborted'));
+        });
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        
-        return true;
-      } else {
-        const errorData = await response.json();
-        console.error('Upload failed:', errorData);
-        alert(`Ошибка загрузки файла: ${errorData.error || 'Неизвестная ошибка'}`);
-      }
+      // Отправляем запрос
+      xhr.open('POST', `${BASE_URL}/api/media/upload`);
+      xhr.withCredentials = true;
+      xhr.send(formData);
+
+      // Ждем результата
+      await uploadPromise;
+      
+      console.log('✅ Файл успешно загружен');
+      
+      // Небольшая задержка для плавности UI
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Сбрасываем состояние загрузки
+      setUploadingFile(null);
+      setUploadProgress(0);
+      
+      return true;
     } catch (error) {
-      console.error('Error sending media:', error);
+      console.error('❌ Ошибка загрузки файла:', error);
+      setUploadingFile(null);
+      setUploadProgress(0);
       alert(`Ошибка загрузки файла: ${error.message}`);
     }
     return false;
@@ -71,14 +138,11 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
         await handleSendMedia(audioFile);
         
-        setAudioChunks([]);
-        
         stream.getTracks().forEach(track => track.stop());
       };
 
       recorder.start();
       setMediaRecorder(recorder);
-      setAudioChunks(chunks);
       setIsRecording(true);
       setRecordingTime(0);
     } catch (error) {
@@ -112,7 +176,6 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const cancelRecording = useCallback(() => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
-      setAudioChunks([]);
       setIsRecording(false);
       setRecordingTime(0);
     }
@@ -125,6 +188,8 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     handleSendMedia,
     handleAudioRecording,
     formatRecordingTime,
-    cancelRecording
+    cancelRecording,
+    uploadingFile,
+    uploadProgress
   };
 };

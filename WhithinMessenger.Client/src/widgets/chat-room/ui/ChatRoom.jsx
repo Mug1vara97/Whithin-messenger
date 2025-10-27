@@ -65,7 +65,9 @@ const ChatRoom = ({
     handleSendMedia,
     handleAudioRecording,
     formatRecordingTime,
-    cancelRecording
+    cancelRecording,
+    uploadingFile,
+    uploadProgress
   } = useMediaHandlers(connection, chatId, userId, username);
 
   const {
@@ -344,7 +346,7 @@ const ChatRoom = ({
     handleContextMenu(e, messageId, isOwnMessage, canDelete, 'message');
   };
 
-  const handleStartCall = (e) => {
+  const handleStartCall = () => {
     console.log('handleStartCall: clicked', { isPrivateChat, isGroupChat, isCallActiveInThisChat, otherUserInCall });
     
     if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat) {
@@ -407,23 +409,30 @@ const ChatRoom = ({
 
   useEffect(() => {
     const handleGlobalPaste = async (e) => {
+      // Проверяем, что это не модальное окно
       const activeElement = document.activeElement;
-      const isInChatContainer = activeElement?.closest('.group-chat-container') || 
-                               activeElement === inputRef.current;
-      
       const isInModal = activeElement?.closest('.modal') || 
-                       activeElement?.closest('[role="dialog"]');
+                       activeElement?.closest('[role="dialog"]') ||
+                       activeElement?.closest('.image-preview-overlay');
       
-      if (!isInChatContainer || isInModal) return;
+      if (isInModal) return;
       
+      // Проверяем, что это не другое поле ввода (например, поиск)
+      if (activeElement?.tagName === 'INPUT' && activeElement !== inputRef.current) return;
+      if (activeElement?.tagName === 'TEXTAREA' && activeElement !== inputRef.current) return;
+      
+      // Обрабатываем файлы
       if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
         const file = e.clipboardData.files[0];
         if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
           e.preventDefault();
+          console.log('Вставка файла из буфера обмена:', file.name, file.type);
           await handleSendMedia(file);
           return;
         }
       }
+      
+      // Обрабатываем текст только если не в поле ввода
       if (e.clipboardData && e.clipboardData.getData('text')) {
         const text = e.clipboardData.getData('text');
         if (text && activeElement !== inputRef.current) {
@@ -775,6 +784,40 @@ const ChatRoom = ({
               <Call style={{ fontSize: '16px' }} />
               Звонить без уведомления
             </button>
+          </div>
+        )}
+        
+        {/* Индикатор загрузки файла */}
+        {uploadingFile && (
+          <div className="message my-message uploading-message">
+            <UserAvatar 
+              username={username}
+              avatarUrl={null}
+              avatarColor="#5865F2"
+            />
+            <div className="message-content">
+              <strong className="message-username">{username}</strong>
+              <div className="uploading-file-container">
+                <div className="uploading-file-info">
+                  <div className="uploading-file-icon">
+                    {uploadingFile.type.startsWith('image/') ? '🖼️' : 
+                     uploadingFile.type.startsWith('video/') ? '🎥' : '📄'}
+                  </div>
+                  <div className="uploading-file-details">
+                    <div className="uploading-file-name">{uploadingFile.name}</div>
+                    <div className="uploading-file-progress">
+                      Загрузка... {uploadProgress}%
+                    </div>
+                  </div>
+                </div>
+                <div className="upload-progress-bar">
+                  <div 
+                    className="upload-progress-fill" 
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
