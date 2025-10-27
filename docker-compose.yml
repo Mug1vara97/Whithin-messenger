@@ -24,7 +24,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./WhithinMessenger.Backend/src/WhithinMessenger.Api/wwwroot/uploads:/app/wwwroot/uploads
       - uploads_data:/app/wwwroot/uploads
       - ./ssl:/app/ssl
     environment:
@@ -98,7 +97,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/whithin-messenger/data/uploads
+      device: /home/whithin-messenger/data/wwwroot/uploads
 
 networks:
   app-network:

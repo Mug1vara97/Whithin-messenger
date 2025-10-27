@@ -68,7 +68,7 @@ jobs:
           # Создаем директории для данных
           echo "Creating data directories..."
           mkdir -p /home/whithin-messenger/data/postgres
-          mkdir -p /home/whithin-messenger/data/uploads
+          mkdir -p /home/whithin-messenger/data/wwwroot/uploads
           chmod -R 755 /home/whithin-messenger/data
           
           # Устанавливаем права
