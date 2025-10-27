@@ -409,9 +409,16 @@ const ChatRoom = ({
 
   useEffect(() => {
     const handleGlobalPaste = async (e) => {
+      console.log('🔍 Paste event triggered', {
+        target: e.target,
+        files: e.clipboardData?.files?.length,
+        hasText: !!e.clipboardData?.getData('text')
+      });
+
       // Проверяем, что мы в контексте чата
       const chatContainer = document.querySelector('.group-chat-container');
       if (!chatContainer || !chatContainer.contains(e.target)) {
+        console.log('❌ Paste outside chat container');
         return; // Вставка происходит вне чата
       }
 
@@ -422,24 +429,44 @@ const ChatRoom = ({
                        activeElement?.closest('[role="dialog"]') ||
                        activeElement?.closest('.image-preview-overlay');
       
-      if (isInModal) return;
+      if (isInModal) {
+        console.log('❌ Paste in modal');
+        return;
+      }
       
       // Проверяем, что это не другое поле ввода (например, поиск или редактирование)
       const isInOtherInput = activeElement?.tagName === 'INPUT' && activeElement !== inputRef.current;
       const isInOtherTextarea = activeElement?.tagName === 'TEXTAREA' && activeElement !== inputRef.current;
       
-      if (isInOtherInput || isInOtherTextarea) return;
+      if (isInOtherInput || isInOtherTextarea) {
+        console.log('❌ Paste in other input');
+        return;
+      }
+      
+      // Проверяем наличие файлов ПЕРВЫМ делом
+      console.log('📎 Checking for files:', e.clipboardData?.files);
       
       // Обрабатываем файлы (изображения и видео)
-      if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
         const file = e.clipboardData.files[0];
+        console.log('📎 File found:', {
+          name: file.name,
+          type: file.type,
+          size: file.size
+        });
+        
         if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
           e.preventDefault();
           e.stopPropagation();
-          console.log('📋 Вставка файла из буфера обмена:', file.name, file.type);
+          console.log('✅ Sending file:', file.name, file.type);
           await handleSendMedia(file);
+          console.log('✅ File sent successfully');
           return;
+        } else {
+          console.log('❌ File type not supported:', file.type);
         }
+      } else {
+        console.log('❌ No files in clipboard');
       }
       
       // Обрабатываем текст только если не в поле ввода сообщения
@@ -447,6 +474,7 @@ const ChatRoom = ({
         if (e.clipboardData && e.clipboardData.getData('text')) {
           const text = e.clipboardData.getData('text');
           if (text) {
+            console.log('📝 Pasting text:', text.substring(0, 50));
             e.preventDefault();
             setNewMessage((prev) => prev + text);
             inputRef.current?.focus();
@@ -504,7 +532,7 @@ const ChatRoom = ({
       window.removeEventListener('paste', handleGlobalPaste);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [newMessage]);
+  }, [newMessage, handleSendMedia, handleSendMessage, setNewMessage]);
 
 
   const ForwardModal = () => {
