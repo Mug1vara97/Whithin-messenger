@@ -15,10 +15,31 @@ export const CallProvider = ({ children }) => {
   const callStore = useCallStore();
   const isInitialized = useRef(false);
   
-  // Получаем реактивные значения из Zustand store
+  // Получаем реактивные значения из Zustand store через селекторы
+  // Это критично для правильной подписки на изменения!
+  const isConnected = useCallStore(state => state.isConnected);
+  const isInCall = useCallStore(state => state.isInCall);
+  const currentRoomId = useCallStore(state => state.currentRoomId);
+  const currentUserId = useCallStore(state => state.currentUserId);
+  const currentUserName = useCallStore(state => state.currentUserName);
+  const currentCall = useCallStore(state => state.currentCall);
+  const participants = useCallStore(state => state.participants);
+  const isMuted = useCallStore(state => state.isMuted);
+  const isGlobalAudioMuted = useCallStore(state => state.isGlobalAudioMuted);
+  const isAudioEnabled = useCallStore(state => state.isAudioEnabled);
+  const isNoiseSuppressed = useCallStore(state => state.isNoiseSuppressed);
+  const noiseSuppressionMode = useCallStore(state => state.noiseSuppressionMode);
+  const userVolumes = useCallStore(state => state.userVolumes);
+  const userMutedStates = useCallStore(state => state.userMutedStates);
+  const showVolumeSliders = useCallStore(state => state.showVolumeSliders);
+  const error = useCallStore(state => state.error);
+  const audioBlocked = useCallStore(state => state.audioBlocked);
+  const connecting = useCallStore(state => state.connecting);
   const isScreenSharing = useCallStore(state => state.isScreenSharing);
   const screenShareStream = useCallStore(state => state.screenShareStream);
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
+  const isVideoEnabled = useCallStore(state => state.isVideoEnabled);
+  const cameraStream = useCallStore(state => state.cameraStream);
   
   // Получаем отдельные состояния участников через селекторы для реактивности
   const participantMuteStates = useCallStore(state => state.participantMuteStates);
@@ -76,36 +97,36 @@ export const CallProvider = ({ children }) => {
   }, []);
 
   const contextValue = {
-    // Состояние
-    isConnected: callStore.isConnected,
-    isInCall: callStore.isInCall,
-    currentRoomId: callStore.currentRoomId,
-    currentUserId: callStore.currentUserId,
-    currentUserName: callStore.currentUserName,
-    currentCall: callStore.currentCall,
-    participants: callStore.participants,
-    isMuted: callStore.isMuted,
-    isGlobalAudioMuted: callStore.isGlobalAudioMuted,
-    isAudioEnabled: callStore.isAudioEnabled,
-    isNoiseSuppressed: callStore.isNoiseSuppressed,
-    noiseSuppressionMode: callStore.noiseSuppressionMode,
-    userVolumes: callStore.userVolumes,
-    userMutedStates: callStore.userMutedStates,
-    showVolumeSliders: callStore.showVolumeSliders,
-    error: callStore.error,
-    audioBlocked: callStore.audioBlocked,
-    connecting: callStore.connecting,
-    isScreenSharing: isScreenSharing,
-    screenShareStream: screenShareStream,
-    remoteScreenShares: remoteScreenShares,
-    isVideoEnabled: callStore.isVideoEnabled,
-    cameraStream: callStore.cameraStream,
+    // Состояние (используем реактивные переменные из селекторов)
+    isConnected,
+    isInCall,
+    currentRoomId,
+    currentUserId,
+    currentUserName,
+    currentCall,
+    participants,
+    isMuted,
+    isGlobalAudioMuted,
+    isAudioEnabled,
+    isNoiseSuppressed,
+    noiseSuppressionMode,
+    userVolumes,
+    userMutedStates,
+    showVolumeSliders,
+    error,
+    audioBlocked,
+    connecting,
+    isScreenSharing,
+    screenShareStream,
+    remoteScreenShares,
+    isVideoEnabled,
+    cameraStream,
     
     // Отдельные состояния участников для оптимизации рендеринга
-    participantMuteStates: participantMuteStates,
-    participantAudioStates: participantAudioStates,
-    participantGlobalAudioStates: participantGlobalAudioStates,
-    participantVideoStates: participantVideoStates,
+    participantMuteStates,
+    participantAudioStates,
+    participantGlobalAudioStates,
+    participantVideoStates,
     
     // Методы
     initializeCall: callStore.initializeCall,
