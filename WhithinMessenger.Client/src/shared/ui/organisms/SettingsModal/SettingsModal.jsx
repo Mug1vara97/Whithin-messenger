@@ -11,6 +11,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [hotkeys, setHotkeys] = useState(() => hotkeyStorage.getHotkeys());
   const [editingHotkey, setEditingHotkey] = useState(null);
   const [tempKey, setTempKey] = useState('');
+  const [microphoneGain, setMicrophoneGain] = useState(() => {
+    const saved = localStorage.getItem('microphoneGain');
+    return saved ? parseFloat(saved) : 2.0;
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -31,6 +35,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
       detail: { enabled: noiseSuppression }
     }));
   }, [noiseSuppression]);
+
+  useEffect(() => {
+    localStorage.setItem('microphoneGain', microphoneGain.toString());
+    
+    window.dispatchEvent(new CustomEvent('microphoneGainChanged', {
+      detail: { gain: microphoneGain }
+    }));
+  }, [microphoneGain]);
 
   const handleNoiseSuppressionToggle = () => {
     setNoiseSuppression(!noiseSuppression);
@@ -136,6 +148,27 @@ const SettingsModal = ({ isOpen, onClose }) => {
               </label>
               <p className="setting-description">
                 Автоматически удаляет фоновый шум из вашего микрофона
+              </p>
+            </div>
+
+            <div className="setting-item">
+              <label className="setting-label">
+                <span className="setting-text">🎤 Усиление микрофона</span>
+              </label>
+              <div className="volume-control">
+                <input
+                  type="range"
+                  min="0.5"
+                  max="5.0"
+                  step="0.1"
+                  value={microphoneGain}
+                  onChange={(e) => setMicrophoneGain(parseFloat(e.target.value))}
+                  className="volume-slider"
+                />
+                <span className="volume-value">{Math.round(microphoneGain * 100)}%</span>
+              </div>
+              <p className="setting-description">
+                Текущее: {Math.round(microphoneGain * 100)}% | По умолчанию: 200% | Если микрофон тихий, увеличьте до 300-500%
               </p>
             </div>
           </div>

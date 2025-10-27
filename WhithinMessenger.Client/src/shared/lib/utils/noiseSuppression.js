@@ -94,20 +94,20 @@ export class NoiseSuppressionManager {
 
       this.rnnWorkletNode = new RnnoiseWorkletNode(this.audioContext, {
         wasmBinary: this.wasmBinaries.rnnoise,
-        maxChannels: 1, // Изменено на 1 канал для совместимости с getUserMedia
+        maxChannels: 1,
         vadOffset: 0.25,
-        gainOffset: -25,
+        gainOffset: 10,  // Изменено с -25 на +10 (усиление вместо подавления)
         enableVAD: true
       });
 
       this.speexWorkletNode = new SpeexWorkletNode(this.audioContext, {
         wasmBinary: this.wasmBinaries.speex,
-        maxChannels: 1, // Изменено на 1 канал для совместимости с getUserMedia
+        maxChannels: 1,
         denoise: true,
         aggressiveness: 15,
         vadOffset: 1.5,
         enableVAD: true,
-        gainOffset: -15
+        gainOffset: 5  // Изменено с -15 на +5 (усиление вместо подавления)
       });
 
       this.noiseGateNode = new NoiseGateWorkletNode(this.audioContext, {
@@ -118,12 +118,20 @@ export class NoiseSuppressionManager {
       });
 
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 1.0;
+      this.gainNode.gain.value = 2.0;  // Увеличено с 1.0 до 2.0 (200% усиление)
 
-      // Подключаем source -> gain -> destination (без обработки по умолчанию)
-      this.sourceNode.connect(this.gainNode);
+      // Создаем High-Pass фильтр для удаления низких частот (звуки клавиатуры, дыхание)
+      this.highPassFilter = this.audioContext.createBiquadFilter();
+      this.highPassFilter.type = 'highpass';
+      this.highPassFilter.frequency.value = 80;  // Срез на 80 Гц - убирает звуки клавиатуры (100-500 Гц), сохраняет речь (80-8000 Гц)
+      this.highPassFilter.Q.value = 0.7071;  // Butterworth фильтр (плоская АЧХ)
+      console.log('NoiseSuppressionManager: High-pass filter created at 80 Hz');
+
+      // Подключаем source -> highpass -> gain -> destination (без обработки по умолчанию)
+      this.sourceNode.connect(this.highPassFilter);
+      this.highPassFilter.connect(this.gainNode);
       this.gainNode.connect(this.destinationNode);
-      console.log('NoiseSuppressionManager: Audio nodes connected (passthrough mode)');
+      console.log('NoiseSuppressionManager: Audio nodes connected: source -> highpass -> gain -> destination');
 
       this._isInitialized = true;
       console.log('NoiseSuppressionManager: Initialization completed successfully');
@@ -162,6 +170,15 @@ export class NoiseSuppressionManager {
       }
       
       try {
+        if (this.highPassFilter) {
+          this.highPassFilter.disconnect();
+          console.log('NoiseSuppressionManager: High-pass filter disconnected');
+        }
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting high-pass filter:', e);
+      }
+      
+      try {
         this.gainNode.disconnect();
         console.log('NoiseSuppressionManager: Gain node disconnected');
       } catch (e) {
@@ -183,22 +200,25 @@ export class NoiseSuppressionManager {
           console.log('NoiseSuppressionManager: Selected Noise Gate worklet');
           break;
         case 'combined':
-          this.sourceNode.connect(this.noiseGateNode);
+          // Цепочка: source -> highpass -> gain -> noisegate -> rnnoise -> destination
+          this.sourceNode.connect(this.highPassFilter);
+          this.highPassFilter.connect(this.gainNode);
+          this.gainNode.connect(this.noiseGateNode);
           this.noiseGateNode.connect(this.rnnWorkletNode);
-          this.rnnWorkletNode.connect(this.gainNode);
-          this.gainNode.connect(this.destinationNode);
+          this.rnnWorkletNode.connect(this.destinationNode);
           this.currentMode = mode;
-          console.log('NoiseSuppressionManager: Enabled in combined mode');
+          console.log('NoiseSuppressionManager: Enabled in combined mode with high-pass');
           return true;
         default:
           throw new Error('Invalid noise suppression mode');
       }
 
-      // Подключаем новую цепочку: source -> gain -> processing -> destination
-      this.sourceNode.connect(this.gainNode);
+      // Подключаем с high-pass фильтром: source -> highpass -> gain -> processing -> destination
+      this.sourceNode.connect(this.highPassFilter);
+      this.highPassFilter.connect(this.gainNode);
       this.gainNode.connect(processingNode);
       processingNode.connect(this.destinationNode);
-      console.log(`NoiseSuppressionManager: Audio chain connected: source -> gain -> ${mode} -> destination`);
+      console.log(`NoiseSuppressionManager: Audio chain connected: source -> highpass -> gain -> ${mode} -> destination`);
 
       this.currentMode = mode;
 
@@ -222,6 +242,149 @@ export class NoiseSuppressionManager {
       return true;
     } catch (error) {
       console.error('NoiseSuppressionManager: Error enabling noise suppression:', error);
+      return false;
+    }
+  }
+
+  // Метод для изменения усиления микрофона (1.0 = 100%, 2.0 = 200%, и т.д.)
+  setMicrophoneGain(gainValue) {
+    try {
+      if (!this._isInitialized || !this.gainNode) {
+        console.warn('NoiseSuppressionManager: Not initialized or no gain node');
+        return false;
+      }
+
+      // Ограничиваем значение от 0.1 до 5.0 (от 10% до 500%)
+      const clampedGain = Math.max(0.1, Math.min(5.0, gainValue));
+      this.gainNode.gain.value = clampedGain;
+      console.log(`NoiseSuppressionManager: Microphone gain set to ${clampedGain} (${Math.round(clampedGain * 100)}%)`);
+      return true;
+    } catch (error) {
+      console.error('NoiseSuppressionManager: Error setting microphone gain:', error);
+      return false;
+    }
+  }
+
+  // Получить текущее усиление
+  getMicrophoneGain() {
+    if (!this._isInitialized || !this.gainNode) {
+      return 1.0;
+    }
+    return this.gainNode.gain.value;
+  }
+
+  // Метод для настройки частоты среза High-Pass фильтра
+  setHighPassFrequency(frequency) {
+    try {
+      if (!this._isInitialized || !this.highPassFilter) {
+        console.warn('NoiseSuppressionManager: Not initialized or no high-pass filter');
+        return false;
+      }
+
+      // Ограничиваем значение от 20 Гц до 500 Гц
+      // 20-50 Гц - убирает только очень низкие частоты (гул, вибрации)
+      // 80-100 Гц - убирает звуки клавиатуры, дыхание (рекомендуется)
+      // 150-300 Гц - агрессивная фильтрация (может повлиять на голос)
+      const clampedFreq = Math.max(20, Math.min(500, frequency));
+      this.highPassFilter.frequency.value = clampedFreq;
+      console.log(`NoiseSuppressionManager: High-pass filter frequency set to ${clampedFreq} Hz`);
+      return true;
+    } catch (error) {
+      console.error('NoiseSuppressionManager: Error setting high-pass frequency:', error);
+      return false;
+    }
+  }
+
+  // Получить текущую частоту среза
+  getHighPassFrequency() {
+    if (!this._isInitialized || !this.highPassFilter) {
+      return 80;
+    }
+    return this.highPassFilter.frequency.value;
+  }
+
+  // Включить/выключить High-Pass фильтр
+  setHighPassEnabled(enabled) {
+    try {
+      if (!this._isInitialized) {
+        console.warn('NoiseSuppressionManager: Not initialized');
+        return false;
+      }
+
+      // Отключаем все соединения
+      this.sourceNode.disconnect();
+      
+      if (enabled && this.highPassFilter) {
+        // Включен: source -> highpass -> gain -> [processing] -> destination
+        this.sourceNode.connect(this.highPassFilter);
+        
+        // Если есть активная обработка, подключаем через неё
+        if (this.currentMode && this.currentMode !== 'passthrough') {
+          let processingNode;
+          switch (this.currentMode) {
+            case 'rnnoise':
+              processingNode = this.rnnWorkletNode;
+              break;
+            case 'speex':
+              processingNode = this.speexWorkletNode;
+              break;
+            case 'noisegate':
+              processingNode = this.noiseGateNode;
+              break;
+          }
+          
+          if (processingNode) {
+            this.highPassFilter.disconnect();
+            this.gainNode.disconnect();
+            
+            this.highPassFilter.connect(this.gainNode);
+            this.gainNode.connect(processingNode);
+            processingNode.connect(this.destinationNode);
+          } else {
+            this.highPassFilter.connect(this.gainNode);
+            this.gainNode.connect(this.destinationNode);
+          }
+        } else {
+          // Нет активной обработки, прямое соединение
+          this.highPassFilter.connect(this.gainNode);
+          this.gainNode.connect(this.destinationNode);
+        }
+        console.log('NoiseSuppressionManager: High-pass filter enabled');
+      } else {
+        // Выключен: source -> gain -> [processing] -> destination
+        if (this.currentMode && this.currentMode !== 'passthrough') {
+          let processingNode;
+          switch (this.currentMode) {
+            case 'rnnoise':
+              processingNode = this.rnnWorkletNode;
+              break;
+            case 'speex':
+              processingNode = this.speexWorkletNode;
+              break;
+            case 'noisegate':
+              processingNode = this.noiseGateNode;
+              break;
+          }
+          
+          if (processingNode) {
+            this.gainNode.disconnect();
+            this.sourceNode.connect(this.gainNode);
+            this.gainNode.connect(processingNode);
+            processingNode.connect(this.destinationNode);
+          } else {
+            this.sourceNode.connect(this.gainNode);
+            this.gainNode.connect(this.destinationNode);
+          }
+        } else {
+          this.sourceNode.connect(this.gainNode);
+          this.gainNode.connect(this.destinationNode);
+        }
+        console.log('NoiseSuppressionManager: High-pass filter disabled');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('NoiseSuppressionManager: Error toggling high-pass filter:', error);
       return false;
     }
   }
@@ -290,9 +453,10 @@ export class NoiseSuppressionManager {
       }
 
       // Подключаем прямую цепочку без обработки: source -> gain -> destination
-      this.sourceNode.connect(this.gainNode);
+      this.sourceNode.connect(this.highPassFilter);
+      this.highPassFilter.connect(this.gainNode);
       this.gainNode.connect(this.destinationNode);
-      console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode)');
+      console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode with high-pass)');
 
       this.currentMode = null;
 
@@ -340,6 +504,13 @@ export class NoiseSuppressionManager {
         console.log('Source node disconnected');
       } catch (e) {
         console.warn('Error disconnecting source node:', e);
+      }
+      
+      try {
+        this.highPassFilter?.disconnect();
+        console.log('High-pass filter disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting high-pass filter:', e);
       }
       
       try {
