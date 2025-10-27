@@ -82,7 +82,7 @@ const VideoCallGrid = ({
 }) => {
   const bottomGridRef = useRef(null);
   
-  // Логируем входящие props
+  // Логируем входящие props (только Map объекты, без функций)
   useEffect(() => {
     console.log('📥 VideoCallGrid received props:', {
       participantsCount: participants.length,
@@ -91,12 +91,9 @@ const VideoCallGrid = ({
       showVolumeSlidersSize: showVolumeSliders?.size,
       userVolumesEntries: Array.from(userVolumes?.entries() || []),
       userMutedStatesEntries: Array.from(userMutedStates?.entries() || []),
-      showVolumeSlidersEntries: Array.from(showVolumeSliders?.entries() || []),
-      onToggleUserMuteExists: !!onToggleUserMute,
-      onChangeUserVolumeExists: !!onChangeUserVolume,
-      onToggleVolumeSliderExists: !!onToggleVolumeSlider
+      showVolumeSlidersEntries: Array.from(showVolumeSliders?.entries() || [])
     });
-  }, [participants, userVolumes, userMutedStates, showVolumeSliders, onToggleUserMute, onChangeUserVolume, onToggleVolumeSlider]);
+  }, [participants.length, userVolumes, userMutedStates, showVolumeSliders]);
 
   const getInitials = (name) => {
     if (!name) return '?';
