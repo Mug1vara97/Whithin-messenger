@@ -19,6 +19,11 @@ export const CallProvider = ({ children }) => {
   const isScreenSharing = useCallStore(state => state.isScreenSharing);
   const screenShareStream = useCallStore(state => state.screenShareStream);
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
+  
+  // Подписываемся на изменения userVolumes, userMutedStates, showVolumeSliders
+  const userVolumes = useCallStore(state => state.userVolumes);
+  const userMutedStates = useCallStore(state => state.userMutedStates);
+  const showVolumeSliders = useCallStore(state => state.showVolumeSliders);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {
@@ -82,9 +87,9 @@ export const CallProvider = ({ children }) => {
     isGlobalAudioMuted: callStore.isGlobalAudioMuted,
     isNoiseSuppressed: callStore.isNoiseSuppressed,
     noiseSuppressionMode: callStore.noiseSuppressionMode,
-    userVolumes: callStore.userVolumes,
-    userMutedStates: callStore.userMutedStates,
-    showVolumeSliders: callStore.showVolumeSliders,
+    userVolumes: userVolumes,  // Используем реактивные значения из хука
+    userMutedStates: userMutedStates,  // Используем реактивные значения из хука
+    showVolumeSliders: showVolumeSliders,  // Используем реактивные значения из хука
     error: callStore.error,
     audioBlocked: callStore.audioBlocked,
     connecting: callStore.connecting,
