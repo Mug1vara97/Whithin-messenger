@@ -20,6 +20,12 @@ COPY public ./public
 COPY index.html ./
 COPY vite.config.js ./
 
+# Set production environment variables for build
+ENV VITE_API_URL=https://whithin.ru
+ENV VITE_API_BASE_URL=https://whithin.ru
+ENV VITE_VOICE_SERVER_URL=https://whithin.ru
+ENV NODE_ENV=production
+
 # Build the app
 RUN npm run build && \
     npm cache clean --force && \

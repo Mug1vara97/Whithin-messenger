@@ -46,6 +46,10 @@ export const HUB_ENDPOINTS = {
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.MODE === 'production' ? '' : 'http://localhost:5109');
 
+// Unified URL for media files (images, videos, audio)
+export const MEDIA_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.MODE === 'production' ? 'https://whithin.ru' : 'http://localhost:5109');
+
 // Voice server endpoints
 export const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 
   (import.meta.env.MODE === 'production' ? 'https://whithin.ru' : 'https://whithin.ru');
