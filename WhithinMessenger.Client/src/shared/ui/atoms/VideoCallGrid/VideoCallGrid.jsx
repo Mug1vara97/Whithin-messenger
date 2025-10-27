@@ -256,7 +256,7 @@ const VideoCallGrid = ({
     goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
   };
 
-  const renderParticipantTile = (participant, isSmall = false) => {
+  const renderParticipantTile = useCallback((participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
@@ -265,16 +265,16 @@ const VideoCallGrid = ({
     const showSlider = showVolumeSliders?.get(participant.id) || false;
     const isScreenShare = participant.isScreenShare || false;
     
-    console.log(`🎨 Rendering tile for ${participant.name}:`, {
-      id: participant.id,
-      isMuted,
-      isAudioMuted,
-      volume,
-      showSlider,
-      userMutedStatesSize: userMutedStates?.size,
-      userVolumesSize: userVolumes?.size,
-      showVolumeSlidersSize: showVolumeSliders?.size
-    });
+    // Детальное логирование для отладки
+    if (showVolumeSliders?.size > 0) {
+      console.log(`🎨 Rendering tile for ${participant.name}:`, {
+        participantId: participant.id,
+        showSlider,
+        showVolumeSlidersMapKeys: Array.from(showVolumeSliders.keys()),
+        hasKeyInMap: showVolumeSliders.has(participant.id),
+        rawMapValue: showVolumeSliders.get(participant.id)
+      });
+    }
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
@@ -434,7 +434,7 @@ const VideoCallGrid = ({
         <div className="tile-border"></div>
       </div>
     );
-  };
+  }, [focusedParticipantId, userMutedStates, userVolumes, showVolumeSliders, onToggleUserMute, onToggleVolumeSlider, onChangeUserVolume]);
 
   // Режим фокусировки (но не принудительная сетка)
   if (isFocusedMode && !forceGridMode) {

@@ -225,6 +225,7 @@ const VoiceCallView = ({
                 {(participants.length > 0 || isConnected) && (
                   <div className="video-call-grid-container">
                     <VideoCallGrid 
+                      key={`grid-${userVolumes?.size}-${userMutedStates?.size}-${showVolumeSliders?.size}`}
                       participants={videoParticipants}
                       onParticipantClick={(participant) => {
                         console.log('Clicked participant:', participant);

@@ -199,6 +199,7 @@ const ActiveCallBar = () => {
           {videoParticipants.length > 0 && (
             <div className="participants-grid">
               <VideoCallGrid 
+                key={`grid-${userVolumes?.size}-${userMutedStates?.size}-${showVolumeSliders?.size}`}
                 participants={videoParticipants}
                 onParticipantClick={(participant) => {
                   console.log('Clicked participant:', participant);
