@@ -423,7 +423,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine($ChatRepository - Error checking user participation: {ex.Message}");
+                Console.WriteLine($"ChatRepository - Error checking user participation: {ex.Message}");
                 return false;
             }
         }
