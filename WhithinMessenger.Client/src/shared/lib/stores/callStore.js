@@ -1029,17 +1029,12 @@ export const useCallStore = create(
       
       // Переключение мута для отдельного пользователя
       toggleUserMute: (peerId) => {
-        console.log('🔘 toggleUserMute called for:', peerId);
         const state = get();
         const audioElement = state.audioElements.get(peerId);
-        if (!audioElement) {
-          console.warn('⚠️ toggleUserMute: No audio element for peer:', peerId);
-          return;
-        }
+        if (!audioElement) return;
 
         const isCurrentlyMuted = state.userMutedStates.get(peerId) || false;
         const newIsMuted = !isCurrentlyMuted;
-        console.log('🔘 toggleUserMute: Changing from', isCurrentlyMuted, 'to', newIsMuted);
 
         if (newIsMuted) {
           const currentVolume = state.userVolumes.get(peerId) || 100;
@@ -1064,17 +1059,12 @@ export const useCallStore = create(
       
       // Изменение громкости отдельного пользователя
       changeUserVolume: (peerId, newVolume) => {
-        console.log('🎚️ changeUserVolume called for:', peerId, 'volume:', newVolume);
         const state = get();
         const audioElement = state.audioElements.get(peerId);
-        if (!audioElement) {
-          console.warn('⚠️ changeUserVolume: No audio element for peer:', peerId);
-          return;
-        }
+        if (!audioElement) return;
 
         const audioVolume = state.isGlobalAudioMuted ? 0 : (newVolume / 100.0);
         audioElement.volume = audioVolume;
-        console.log('🎚️ changeUserVolume: Set audio volume to', audioVolume);
 
         set((state) => {
           const newUserVolumes = new Map(state.userVolumes);
@@ -1100,13 +1090,10 @@ export const useCallStore = create(
       
       // Переключение отображения слайдера громкости
       toggleVolumeSlider: (peerId) => {
-        console.log('🎛️ toggleVolumeSlider called for:', peerId);
         set((state) => {
           const newShowVolumeSliders = new Map(state.showVolumeSliders);
           const currentState = newShowVolumeSliders.get(peerId) || false;
           newShowVolumeSliders.set(peerId, !currentState);
-          console.log('🎛️ toggleVolumeSlider: Changing from', currentState, 'to', !currentState);
-          console.log('🎛️ toggleVolumeSlider: New Map size:', newShowVolumeSliders.size);
           return { showVolumeSliders: newShowVolumeSliders };
         });
       },

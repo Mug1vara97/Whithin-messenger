@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -81,19 +81,6 @@ const VideoCallGrid = ({
   enableAutoFocus = true // Новый пропс для управления автофокусом
 }) => {
   const bottomGridRef = useRef(null);
-  
-  // Логируем входящие props (только Map объекты, без функций)
-  useEffect(() => {
-    console.log('📥 VideoCallGrid received props:', {
-      participantsCount: participants.length,
-      userVolumesSize: userVolumes?.size,
-      userMutedStatesSize: userMutedStates?.size,
-      showVolumeSlidersSize: showVolumeSliders?.size,
-      userVolumesEntries: Array.from(userVolumes?.entries() || []),
-      userMutedStatesEntries: Array.from(userMutedStates?.entries() || []),
-      showVolumeSlidersEntries: Array.from(showVolumeSliders?.entries() || [])
-    });
-  }, [participants.length, userVolumes, userMutedStates, showVolumeSliders]);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -117,32 +104,41 @@ const VideoCallGrid = ({
   };
 
   // Создаем расширенный список участников, включая демонстрации экрана
-  const screenShareParticipants = [];
-  
-  // Локальная демонстрация экрана
-  if (isScreenSharing && screenShareStream && screenShareParticipant) {
-    screenShareParticipants.push({
-      id: `screen-share-local-${screenShareParticipant.id}`,
-      name: screenShareParticipant.name,
-      isScreenShare: true,
-      isLocal: true,
-      stream: screenShareStream
+  const extendedParticipants = useMemo(() => {
+    const screenShareParticipants = [];
+    
+    // Локальная демонстрация экрана
+    if (isScreenSharing && screenShareStream && screenShareParticipant) {
+      screenShareParticipants.push({
+        id: `screen-share-local-${screenShareParticipant.id}`,
+        name: screenShareParticipant.name,
+        isScreenShare: true,
+        isLocal: true,
+        stream: screenShareStream
+      });
+    }
+    
+    // Удаленные демонстрации экрана
+    Array.from(remoteScreenShares.values()).forEach((screenShare) => {
+      screenShareParticipants.push({
+        id: `screen-share-remote-${screenShare.producerId}`,
+        name: screenShare.userName,
+        isScreenShare: true,
+        isLocal: false,
+        stream: screenShare.stream,
+        producerId: screenShare.producerId
+      });
     });
-  }
-  
-  // Удаленные демонстрации экрана
-  Array.from(remoteScreenShares.values()).forEach((screenShare) => {
-    screenShareParticipants.push({
-      id: `screen-share-remote-${screenShare.producerId}`,
-      name: screenShare.userName,
-      isScreenShare: true,
-      isLocal: false,
-      stream: screenShare.stream,
-      producerId: screenShare.producerId
-    });
-  });
-  
-  const extendedParticipants = [...participants, ...screenShareParticipants];
+    
+    const extended = [...participants, ...screenShareParticipants];
+    return extended;
+  }, [
+    participants, 
+    isScreenSharing, 
+    screenShareStream, 
+    screenShareParticipant, 
+    remoteScreenShares
+  ]);
 
   // Локальная логика вместо useVideoCall
   const [focusedParticipantId, setFocusedParticipantId] = useState(null);
@@ -251,25 +247,13 @@ const VideoCallGrid = ({
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
-    const isAudioMuted = userMutedStates?.get(participant.id) || false;
-    const volume = userVolumes?.get(participant.id) || 100;
-    const showSlider = showVolumeSliders?.get(participant.id) || false;
+    const isAudioMuted = userMutedStates.get(participant.id) || false;
+    const volume = userVolumes.get(participant.id) || 100;
+    const showSlider = showVolumeSliders.get(participant.id) || false;
     const isScreenShare = participant.isScreenShare || false;
-    
-    // Детальное логирование для отладки
-    if (showVolumeSliders?.size > 0) {
-      console.log(`🎨 Rendering tile for ${participant.name}:`, {
-        participantId: participant.id,
-        showSlider,
-        showVolumeSlidersMapKeys: Array.from(showVolumeSliders.keys()),
-        hasKeyInMap: showVolumeSliders.has(participant.id),
-        rawMapValue: showVolumeSliders.get(participant.id)
-      });
-    }
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
-      console.log('🖱️ Volume button clicked for:', participant.id);
       if (onToggleUserMute) {
         onToggleUserMute(participant.id);
       }
@@ -278,7 +262,6 @@ const VideoCallGrid = ({
     const handleVolumeRightClick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('🖱️ Volume button right-clicked for:', participant.id);
       if (onToggleVolumeSlider) {
         onToggleVolumeSlider(participant.id);
       }

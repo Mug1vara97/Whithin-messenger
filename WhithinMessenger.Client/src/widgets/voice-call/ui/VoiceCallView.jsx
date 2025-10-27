@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { createParticipant } from '../../../entities/video-call/model/types';
@@ -96,38 +96,40 @@ const VoiceCallView = ({
   }, []);
 
   // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
-  // Текущий пользователь (хост)
-  const currentUser = createParticipant(userId, userName, null, 'online', 'host');
-  currentUser.isMuted = isMuted;
-  currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
-  currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
-  currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
-  currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
-  currentUser.videoStream = cameraStream; // Добавляем видео поток
-  currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
-  
-  const videoParticipantsList = [currentUser];
-  
-  // Добавляем всех остальных участников
-  participants.forEach(participant => {
-    const videoParticipant = createParticipant(
-      participant.userId || participant.id || participant.name, 
-      participant.name, 
-      participant.avatar || null, 
-      'online', 
-      'participant'
-    );
-    videoParticipant.isMuted = participant.isMuted || false;
-    videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
-    videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
-    videoParticipant.isSpeaking = participant.isSpeaking || false;
-    videoParticipant.isVideoEnabled = participant.isVideoEnabled || false; // Добавляем состояние веб-камеры
-    videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
-    videoParticipantsList.push(videoParticipant);
-  });
-  
-  console.log('Video participants updated:', videoParticipantsList);
-  const videoParticipants = videoParticipantsList;
+  const videoParticipants = useMemo(() => {
+    // Текущий пользователь (хост)
+    const currentUser = createParticipant(userId, userName, null, 'online', 'host');
+    currentUser.isMuted = isMuted;
+    currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
+    currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
+    currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
+    currentUser.videoStream = cameraStream; // Добавляем видео поток
+    currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
+    
+    const videoParticipantsList = [currentUser];
+    
+    // Добавляем всех остальных участников
+    participants.forEach(participant => {
+      const videoParticipant = createParticipant(
+        participant.userId || participant.id || participant.name, 
+        participant.name, 
+        participant.avatar || null, 
+        'online', 
+        'participant'
+      );
+      videoParticipant.isMuted = participant.isMuted || false;
+      videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
+      videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
+      videoParticipant.isSpeaking = participant.isSpeaking || false;
+      videoParticipant.isVideoEnabled = participant.isVideoEnabled || false; // Добавляем состояние веб-камеры
+      videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
+      videoParticipantsList.push(videoParticipant);
+    });
+    
+    console.log('Video participants updated:', videoParticipantsList);
+    return videoParticipantsList;
+  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream]);
 
 
   const handleClose = () => {

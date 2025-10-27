@@ -93,3 +93,4 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   return { isElectron };
 };
 
+
