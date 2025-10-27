@@ -127,11 +127,22 @@ export class NoiseSuppressionManager {
       this.highPassFilter.Q.value = 0.7071;  // Butterworth фильтр (плоская АЧХ)
       console.log('NoiseSuppressionManager: High-pass filter created at 80 Hz');
 
-      // Подключаем source -> highpass -> gain -> destination (без обработки по умолчанию)
+      // Создаем компрессор для предотвращения клиппинга (искажения при громких звуках)
+      this.compressor = this.audioContext.createDynamicsCompressor();
+      // Настройка компрессора:
+      this.compressor.threshold.value = -24;    // Начинать сжатие при -24 dB
+      this.compressor.knee.value = 30;          // Плавное сжатие (soft knee)
+      this.compressor.ratio.value = 12;         // Коэффициент сжатия 12:1 (почти лимитер)
+      this.compressor.attack.value = 0.003;     // Быстрая атака (3 мс)
+      this.compressor.release.value = 0.25;     // Быстрое восстановление (250 мс)
+      console.log('NoiseSuppressionManager: Compressor created (threshold: -24dB, ratio: 12:1)');
+
+      // Подключаем source -> highpass -> gain -> compressor -> destination
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
-      this.gainNode.connect(this.destinationNode);
-      console.log('NoiseSuppressionManager: Audio nodes connected: source -> highpass -> gain -> destination');
+      this.gainNode.connect(this.compressor);
+      this.compressor.connect(this.destinationNode);
+      console.log('NoiseSuppressionManager: Audio nodes connected: source -> highpass -> gain -> compressor -> destination');
 
       this._isInitialized = true;
       console.log('NoiseSuppressionManager: Initialization completed successfully');
@@ -184,6 +195,15 @@ export class NoiseSuppressionManager {
       } catch (e) {
         console.warn('NoiseSuppressionManager: Error disconnecting gain node:', e);
       }
+      
+      try {
+        if (this.compressor) {
+          this.compressor.disconnect();
+          console.log('NoiseSuppressionManager: Compressor disconnected');
+        }
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting compressor:', e);
+      }
 
       let processingNode;
       switch (mode) {
@@ -200,25 +220,27 @@ export class NoiseSuppressionManager {
           console.log('NoiseSuppressionManager: Selected Noise Gate worklet');
           break;
         case 'combined':
-          // Цепочка: source -> highpass -> gain -> noisegate -> rnnoise -> destination
+          // Цепочка: source -> highpass -> gain -> noisegate -> rnnoise -> compressor -> destination
           this.sourceNode.connect(this.highPassFilter);
           this.highPassFilter.connect(this.gainNode);
           this.gainNode.connect(this.noiseGateNode);
           this.noiseGateNode.connect(this.rnnWorkletNode);
-          this.rnnWorkletNode.connect(this.destinationNode);
+          this.rnnWorkletNode.connect(this.compressor);
+          this.compressor.connect(this.destinationNode);
           this.currentMode = mode;
-          console.log('NoiseSuppressionManager: Enabled in combined mode with high-pass');
+          console.log('NoiseSuppressionManager: Enabled in combined mode with high-pass and compressor');
           return true;
         default:
           throw new Error('Invalid noise suppression mode');
       }
 
-      // Подключаем с high-pass фильтром: source -> highpass -> gain -> processing -> destination
+      // Подключаем цепочку: source -> highpass -> gain -> processing -> compressor -> destination
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
       this.gainNode.connect(processingNode);
-      processingNode.connect(this.destinationNode);
-      console.log(`NoiseSuppressionManager: Audio chain connected: source -> highpass -> gain -> ${mode} -> destination`);
+      processingNode.connect(this.compressor);
+      this.compressor.connect(this.destinationNode);
+      console.log(`NoiseSuppressionManager: Audio chain connected: source -> highpass -> gain -> ${mode} -> compressor -> destination`);
 
       this.currentMode = mode;
 
@@ -451,12 +473,22 @@ export class NoiseSuppressionManager {
       } catch (e) {
         console.warn('NoiseSuppressionManager: Error disconnecting gain node:', e);
       }
+      
+      try {
+        if (this.compressor) {
+          this.compressor.disconnect();
+          console.log('NoiseSuppressionManager: Compressor disconnected');
+        }
+      } catch (e) {
+        console.warn('NoiseSuppressionManager: Error disconnecting compressor:', e);
+      }
 
-      // Подключаем прямую цепочку без обработки: source -> gain -> destination
+      // Подключаем цепочку без обработки: source -> highpass -> gain -> compressor -> destination
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
-      this.gainNode.connect(this.destinationNode);
-      console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode with high-pass)');
+      this.gainNode.connect(this.compressor);
+      this.compressor.connect(this.destinationNode);
+      console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode with high-pass and compressor)');
 
       this.currentMode = null;
 
@@ -518,6 +550,13 @@ export class NoiseSuppressionManager {
         console.log('Gain node disconnected');
       } catch (e) {
         console.warn('Error disconnecting gain node:', e);
+      }
+      
+      try {
+        this.compressor?.disconnect();
+        console.log('Compressor disconnected');
+      } catch (e) {
+        console.warn('Error disconnecting compressor:', e);
       }
       
       try {
