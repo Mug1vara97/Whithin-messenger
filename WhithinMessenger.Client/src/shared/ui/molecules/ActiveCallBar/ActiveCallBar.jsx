@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../atoms/VideoCallGrid';
 import { createParticipant } from '../../../../entities/video-call/model/types';
@@ -49,19 +49,21 @@ const ActiveCallBar = () => {
   }
 
   // Преобразуем участников голосового звонка в формат для видеосетки
-  const videoParticipants = participants.map(participant => {
-    const videoParticipant = createParticipant(
-      participant.userId || participant.id || participant.name, 
-      participant.name, 
-      participant.avatar || null, 
-      'online', 
-      'participant'
-    );
-    videoParticipant.isMuted = participant.isMuted || false;
-    videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
-    videoParticipant.isSpeaking = participant.isSpeaking || false;
-    return videoParticipant;
-  });
+  const videoParticipants = useMemo(() => {
+    return participants.map(participant => {
+      const videoParticipant = createParticipant(
+        participant.userId || participant.id || participant.name, 
+        participant.name, 
+        participant.avatar || null, 
+        'online', 
+        'participant'
+      );
+      videoParticipant.isMuted = participant.isMuted || false;
+      videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
+      videoParticipant.isSpeaking = participant.isSpeaking || false;
+      return videoParticipant;
+    });
+  }, [participants, userVolumes, userMutedStates, showVolumeSliders]);
 
   const enableAudioPlayback = async () => {
     const audioElements = document.querySelectorAll('audio');

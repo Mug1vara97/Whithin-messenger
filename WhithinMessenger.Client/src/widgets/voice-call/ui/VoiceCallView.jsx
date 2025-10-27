@@ -129,7 +129,7 @@ const VoiceCallView = ({
     
     console.log('Video participants updated:', videoParticipantsList);
     return videoParticipantsList;
-  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream]);
+  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream, userVolumes, userMutedStates, showVolumeSliders]);
 
 
   const handleClose = () => {
