@@ -28,6 +28,9 @@ const ActiveCallBar = () => {
     showVolumeSliders,
     error,
     audioBlocked,
+    participantMuteStates,
+    participantAudioStates,
+    participantGlobalAudioStates,
     toggleMute,
     toggleGlobalAudio,
     toggleNoiseSuppression,
@@ -49,17 +52,24 @@ const ActiveCallBar = () => {
   }
 
   // Преобразуем участников голосового звонка в формат для видеосетки
+  // Используем отдельные Maps для реактивности в реальном времени
   const videoParticipants = participants.map(participant => {
+    const participantUserId = participant.userId || participant.id || participant.name;
+    
     const videoParticipant = createParticipant(
-      participant.userId || participant.id || participant.name, 
+      participantUserId, 
       participant.name, 
       participant.avatar || null, 
       'online', 
       'participant'
     );
-    videoParticipant.isMuted = participant.isMuted || false;
-    videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
+    
+    // Читаем состояния из отдельных Maps для реактивности в реальном времени
+    videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+    videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
+    videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
     videoParticipant.isSpeaking = participant.isSpeaking || false;
+    
     return videoParticipant;
   });
 

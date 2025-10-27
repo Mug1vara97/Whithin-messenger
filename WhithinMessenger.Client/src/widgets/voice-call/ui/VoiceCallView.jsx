@@ -43,6 +43,10 @@ const VoiceCallView = ({
     remoteScreenShares,
     isVideoEnabled,
     cameraStream,
+    participantMuteStates,
+    participantAudioStates,
+    participantGlobalAudioStates,
+    participantVideoStates,
     startCall,
     endCall,
     toggleMute,
@@ -110,26 +114,44 @@ const VoiceCallView = ({
     const videoParticipantsList = [currentUser];
     
     // Добавляем всех остальных участников
+    // Используем отдельные Maps для реактивности в реальном времени
     participants.forEach(participant => {
+      const participantUserId = participant.userId || participant.id || participant.name;
+      
       const videoParticipant = createParticipant(
-        participant.userId || participant.id || participant.name, 
+        participantUserId, 
         participant.name, 
         participant.avatar || null, 
         'online', 
         'participant'
       );
-      videoParticipant.isMuted = participant.isMuted || false;
-      videoParticipant.isAudioEnabled = participant.isAudioEnabled !== undefined ? participant.isAudioEnabled : true;
-      videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false; // Добавляем статус глобального звука
+      
+      // Читаем состояния из отдельных Maps для реактивности в реальном времени
+      videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+      videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
+      videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
       videoParticipant.isSpeaking = participant.isSpeaking || false;
-      videoParticipant.isVideoEnabled = participant.isVideoEnabled || false; // Добавляем состояние веб-камеры
+      videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
       videoParticipantsList.push(videoParticipant);
     });
     
     console.log('Video participants updated:', videoParticipantsList);
     return videoParticipantsList;
-  }, [participants, userId, userName, isMuted, isAudioEnabled, isGlobalAudioMuted, isVideoEnabled, cameraStream]);
+  }, [
+    participants, 
+    userId, 
+    userName, 
+    isMuted, 
+    isAudioEnabled, 
+    isGlobalAudioMuted, 
+    isVideoEnabled, 
+    cameraStream,
+    participantMuteStates,
+    participantAudioStates,
+    participantGlobalAudioStates,
+    participantVideoStates
+  ]);
 
 
   const handleClose = () => {

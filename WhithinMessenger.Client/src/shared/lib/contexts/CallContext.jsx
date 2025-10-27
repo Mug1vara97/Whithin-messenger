@@ -19,6 +19,12 @@ export const CallProvider = ({ children }) => {
   const isScreenSharing = useCallStore(state => state.isScreenSharing);
   const screenShareStream = useCallStore(state => state.screenShareStream);
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
+  
+  // Получаем отдельные состояния участников через селекторы для реактивности
+  const participantMuteStates = useCallStore(state => state.participantMuteStates);
+  const participantAudioStates = useCallStore(state => state.participantAudioStates);
+  const participantGlobalAudioStates = useCallStore(state => state.participantGlobalAudioStates);
+  const participantVideoStates = useCallStore(state => state.participantVideoStates);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {
@@ -80,6 +86,7 @@ export const CallProvider = ({ children }) => {
     participants: callStore.participants,
     isMuted: callStore.isMuted,
     isGlobalAudioMuted: callStore.isGlobalAudioMuted,
+    isAudioEnabled: callStore.isAudioEnabled,
     isNoiseSuppressed: callStore.isNoiseSuppressed,
     noiseSuppressionMode: callStore.noiseSuppressionMode,
     userVolumes: callStore.userVolumes,
@@ -93,6 +100,12 @@ export const CallProvider = ({ children }) => {
     remoteScreenShares: remoteScreenShares,
     isVideoEnabled: callStore.isVideoEnabled,
     cameraStream: callStore.cameraStream,
+    
+    // Отдельные состояния участников для оптимизации рендеринга
+    participantMuteStates: participantMuteStates,
+    participantAudioStates: participantAudioStates,
+    participantGlobalAudioStates: participantGlobalAudioStates,
+    participantVideoStates: participantVideoStates,
     
     // Методы
     initializeCall: callStore.initializeCall,
