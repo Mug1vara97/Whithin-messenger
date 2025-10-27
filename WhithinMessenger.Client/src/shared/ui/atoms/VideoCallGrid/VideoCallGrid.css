@@ -42,7 +42,7 @@
   position: relative;
   background: #1e1f22;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* Изменено с hidden на visible для слайдера громкости */
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;

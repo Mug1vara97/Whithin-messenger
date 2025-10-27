@@ -256,7 +256,7 @@ const VideoCallGrid = ({
     goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
   };
 
-  const renderParticipantTile = useCallback((participant, isSmall = false) => {
+  const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
@@ -434,7 +434,7 @@ const VideoCallGrid = ({
         <div className="tile-border"></div>
       </div>
     );
-  }, [focusedParticipantId, userMutedStates, userVolumes, showVolumeSliders, onToggleUserMute, onToggleVolumeSlider, onChangeUserVolume]);
+  };
 
   // Режим фокусировки (но не принудительная сетка)
   if (isFocusedMode && !forceGridMode) {
