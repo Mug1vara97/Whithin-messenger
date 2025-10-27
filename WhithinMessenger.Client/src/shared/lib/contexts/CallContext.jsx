@@ -96,7 +96,7 @@ export const CallProvider = ({ children }) => {
     };
   }, []);
 
-  const contextValue = {
+  const contextValue = React.useMemo(() => ({
     // Состояние (используем реактивные переменные из селекторов)
     isConnected,
     isInCall,
@@ -151,7 +151,36 @@ export const CallProvider = ({ children }) => {
     
     // Прямой доступ к store для расширенного использования
     store: callStore
-  };
+  }), [
+    isConnected,
+    isInCall,
+    currentRoomId,
+    currentUserId,
+    currentUserName,
+    currentCall,
+    participants,
+    isMuted,
+    isGlobalAudioMuted,
+    isAudioEnabled,
+    isNoiseSuppressed,
+    noiseSuppressionMode,
+    userVolumes,
+    userMutedStates,
+    showVolumeSliders,
+    error,
+    audioBlocked,
+    connecting,
+    isScreenSharing,
+    screenShareStream,
+    remoteScreenShares,
+    isVideoEnabled,
+    cameraStream,
+    participantMuteStates,
+    participantAudioStates,
+    participantGlobalAudioStates,
+    participantVideoStates,
+    callStore
+  ]);
 
   return (
     <CallContext.Provider value={contextValue}>

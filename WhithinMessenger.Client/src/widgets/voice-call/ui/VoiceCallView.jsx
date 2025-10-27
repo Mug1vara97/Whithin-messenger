@@ -101,6 +101,17 @@ const VoiceCallView = ({
 
   // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
   const videoParticipants = useMemo(() => {
+    console.log('🔄 useMemo triggered with:', {
+      isMuted,
+      isAudioEnabled,
+      isGlobalAudioMuted,
+      isVideoEnabled,
+      participantMuteStatesSize: participantMuteStates?.size,
+      participantAudioStatesSize: participantAudioStates?.size,
+      participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
+      participantVideoStatesSize: participantVideoStates?.size
+    });
+    
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
@@ -110,6 +121,12 @@ const VoiceCallView = ({
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
+    
+    console.log('🧑 Current user state:', {
+      isMuted: currentUser.isMuted,
+      isAudioEnabled: currentUser.isAudioEnabled,
+      isGlobalAudioMuted: currentUser.isGlobalAudioMuted
+    });
     
     const videoParticipantsList = [currentUser];
     
