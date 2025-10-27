@@ -20,6 +20,13 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
+{
+    var logger = provider.GetRequiredService<ILogger<WhithinMessenger.Application.Services.FileService>>();
+    var env = provider.GetRequiredService<IWebHostEnvironment>();
+    return new WhithinMessenger.Application.Services.FileService(logger, env.WebRootPath);
+});
+
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = true;

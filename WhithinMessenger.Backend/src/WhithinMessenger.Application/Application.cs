@@ -13,11 +13,7 @@ public static class Application
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddMediatR(x => x.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         
-        services.AddScoped<IFileService>(provider => 
-        {
-            var logger = provider.GetRequiredService<ILogger<FileService>>();
-            return new FileService(logger, "wwwroot");
-        });
+        // FileService регистрируется в Program.cs с использованием IWebHostEnvironment
         
         return services;
     } 

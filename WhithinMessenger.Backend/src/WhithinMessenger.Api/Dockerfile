@@ -21,6 +21,19 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./WhithinMessenger.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:CopyRefAssembliesToPublishDirectory=true
 
 FROM base AS final
+USER root
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+# Создаем структуру папок для uploads
+RUN mkdir -p /app/wwwroot/uploads/images && \
+    mkdir -p /app/wwwroot/uploads/videos && \
+    mkdir -p /app/wwwroot/uploads/audio && \
+    mkdir -p /app/wwwroot/uploads/files && \
+    mkdir -p /app/wwwroot/uploads/avatars && \
+    mkdir -p /app/wwwroot/uploads/banners && \
+    mkdir -p /app/wwwroot/uploads/chat-avatars && \
+    chown -R $APP_UID:$APP_UID /app/wwwroot
+
+USER $APP_UID
 ENTRYPOINT ["dotnet", "WhithinMessenger.Api.dll"]
