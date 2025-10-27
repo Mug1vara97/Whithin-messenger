@@ -197,7 +197,7 @@ const ActiveCallBar = () => {
           {videoParticipants.length > 0 && (
             <div className="participants-grid">
               <VideoCallGrid 
-                key={`grid-${userVolumes?.size}-${userMutedStates?.size}-${showVolumeSliders?.size}`}
+                key={`grid-${Array.from(userVolumes?.entries() || []).map(([k,v]) => `${k}:${v}`).join(',')}-${Array.from(userMutedStates?.entries() || []).map(([k,v]) => `${k}:${v}`).join(',')}-${Array.from(showVolumeSliders?.entries() || []).map(([k,v]) => `${k}:${v}`).join(',')}`}
                 participants={videoParticipants}
                 onParticipantClick={(participant) => {
                   console.log('Clicked participant:', participant);
