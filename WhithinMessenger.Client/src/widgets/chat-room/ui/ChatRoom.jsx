@@ -409,36 +409,48 @@ const ChatRoom = ({
 
   useEffect(() => {
     const handleGlobalPaste = async (e) => {
-      // Проверяем, что это не модальное окно
+      // Проверяем, что мы в контексте чата
+      const chatContainer = document.querySelector('.group-chat-container');
+      if (!chatContainer || !chatContainer.contains(e.target)) {
+        return; // Вставка происходит вне чата
+      }
+
       const activeElement = document.activeElement;
+      
+      // Проверяем, что это не модальное окно или превью изображения
       const isInModal = activeElement?.closest('.modal') || 
                        activeElement?.closest('[role="dialog"]') ||
                        activeElement?.closest('.image-preview-overlay');
       
       if (isInModal) return;
       
-      // Проверяем, что это не другое поле ввода (например, поиск)
-      if (activeElement?.tagName === 'INPUT' && activeElement !== inputRef.current) return;
-      if (activeElement?.tagName === 'TEXTAREA' && activeElement !== inputRef.current) return;
+      // Проверяем, что это не другое поле ввода (например, поиск или редактирование)
+      const isInOtherInput = activeElement?.tagName === 'INPUT' && activeElement !== inputRef.current;
+      const isInOtherTextarea = activeElement?.tagName === 'TEXTAREA' && activeElement !== inputRef.current;
       
-      // Обрабатываем файлы
+      if (isInOtherInput || isInOtherTextarea) return;
+      
+      // Обрабатываем файлы (изображения и видео)
       if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
         const file = e.clipboardData.files[0];
         if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
           e.preventDefault();
-          console.log('Вставка файла из буфера обмена:', file.name, file.type);
+          e.stopPropagation();
+          console.log('📋 Вставка файла из буфера обмена:', file.name, file.type);
           await handleSendMedia(file);
           return;
         }
       }
       
-      // Обрабатываем текст только если не в поле ввода
-      if (e.clipboardData && e.clipboardData.getData('text')) {
-        const text = e.clipboardData.getData('text');
-        if (text && activeElement !== inputRef.current) {
-          e.preventDefault();
-          setNewMessage((prev) => prev + text);
-          inputRef.current?.focus();
+      // Обрабатываем текст только если не в поле ввода сообщения
+      if (activeElement !== inputRef.current) {
+        if (e.clipboardData && e.clipboardData.getData('text')) {
+          const text = e.clipboardData.getData('text');
+          if (text) {
+            e.preventDefault();
+            setNewMessage((prev) => prev + text);
+            inputRef.current?.focus();
+          }
         }
       }
     };
@@ -889,15 +901,6 @@ const ChatRoom = ({
                     : "Введите сообщение..."
               }
               className="message-input no-focus-outline"
-              onPaste={async (e) => {
-                if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
-                  const file = e.clipboardData.files[0];
-                  if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
-                    e.preventDefault();
-                    await handleSendMedia(file);
-                  }
-                }
-              }}
               autoComplete="off"
               spellCheck={true}
             />
