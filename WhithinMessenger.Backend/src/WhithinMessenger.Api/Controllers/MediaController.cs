@@ -93,7 +93,7 @@ public class MediaController : ControllerBase
 
                     await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent", 
                         new { 
-                            messageId = result.MediaFileId,
+                            messageId = result.MessageId,  // Используем MessageId для корректного удаления
                             content = caption ?? string.Empty, 
                             username = username ?? "Unknown",
                             chatId = chatId,
@@ -112,6 +112,7 @@ public class MediaController : ControllerBase
                 return Ok(new
                 {
                     success = true,
+                    messageId = result.MessageId,
                     mediaFileId = result.MediaFileId,
                     filePath = result.FilePath,
                     thumbnailPath = result.ThumbnailPath

@@ -43,10 +43,37 @@ export const useCallStore = create(
       participantGlobalAudioStates: new Map(), // userId -> isGlobalAudioMuted
       participantVideoStates: new Map(), // userId -> isVideoEnabled
       
-      // Состояние аудио
-      isMuted: false,
-      isAudioEnabled: true, // Добавляем isAudioEnabled
-      isGlobalAudioMuted: false,
+      // Состояние аудио (загружаем из localStorage)
+      isMuted: (() => {
+        try {
+          const saved = localStorage.getItem('micMuted');
+          const value = saved ? JSON.parse(saved) : false;
+          console.log('🎤 Loaded mic state from localStorage:', value);
+          return value;
+        } catch {
+          return false;
+        }
+      })(),
+      isAudioEnabled: (() => {
+        try {
+          const saved = localStorage.getItem('audioMuted');
+          const value = saved ? !JSON.parse(saved) : true; // инверсия: audioMuted=true значит isAudioEnabled=false
+          console.log('🔊 Loaded audio state from localStorage:', value);
+          return value;
+        } catch {
+          return true;
+        }
+      })(),
+      isGlobalAudioMuted: (() => {
+        try {
+          const saved = localStorage.getItem('audioMuted');
+          const value = saved ? JSON.parse(saved) : false;
+          console.log('🎧 Loaded global audio muted state from localStorage:', value);
+          return value;
+        } catch {
+          return false;
+        }
+      })(),
       isNoiseSuppressed: false,
       noiseSuppressionMode: 'rnnoise',
       userVolumes: new Map(),
@@ -564,6 +591,22 @@ export const useCallStore = create(
           // Создаем аудио поток
           await state.createAudioStream();
           
+          // Отправляем начальное состояние микрофона и наушников на сервер
+          const currentState = get();
+          if (voiceCallApi.socket) {
+            // Отправляем состояние микрофона
+            voiceCallApi.socket.emit('muteState', { isMuted: currentState.isMuted });
+            console.log('📤 Initial mic state sent to server:', currentState.isMuted);
+            
+            // Отправляем состояние наушников
+            voiceCallApi.socket.emit('audioState', { 
+              isEnabled: !currentState.isGlobalAudioMuted,
+              isGlobalAudioMuted: currentState.isGlobalAudioMuted,
+              userId: currentState.currentUserId
+            });
+            console.log('📤 Initial audio state sent to server:', !currentState.isGlobalAudioMuted);
+          }
+          
           set({ currentRoomId: roomId, isInCall: true, currentCall: { channelId: roomId, channelName: roomId } });
           
           // Воспроизводим звук подключения для самого пользователя
@@ -948,6 +991,10 @@ export const useCallStore = create(
         const state = get();
         const newMutedState = !state.isMuted;
         
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('micMuted', JSON.stringify(newMutedState));
+        console.log('💾 Mic state saved to localStorage:', newMutedState);
+        
         if (state.noiseSuppressionManager) {
           const processedStream = state.noiseSuppressionManager.getProcessedStream();
           const audioTrack = processedStream?.getAudioTracks()[0];
@@ -1055,6 +1102,10 @@ export const useCallStore = create(
       toggleGlobalAudio: () => {
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
+        
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('audioMuted', JSON.stringify(newMutedState));
+        console.log('💾 Audio (headphones) state saved to localStorage:', newMutedState);
         
         // Отправляем состояние наушников на сервер (как в старом клиенте)
         if (voiceCallApi.socket) {
@@ -1436,16 +1487,38 @@ export const useCallStore = create(
 
         } catch (error) {
           console.error('Error starting screen share:', error);
+          
+          // Проверяем, является ли это отменой пользователем
+          const isCancelled = error.message && (
+            error.message.includes('отменена') || 
+            error.message.includes('cancelled') ||
+            error.message.includes('canceled') ||
+            error.message.includes('Permission denied') ||
+            error.name === 'NotAllowedError' ||
+            error.name === 'AbortError'
+          );
+          
           // Очищаем при ошибке
           const currentState = get();
           if (currentState.screenShareStream) {
             currentState.screenShareStream.getTracks().forEach(track => track.stop());
           }
-          set({ 
-            screenShareStream: null,
-            isScreenSharing: false,
-            error: 'Failed to start screen sharing: ' + error.message 
-          });
+          
+          // Показываем ошибку только если это не отмена пользователем
+          if (isCancelled) {
+            console.log('Screen sharing cancelled by user');
+            set({ 
+              screenShareStream: null,
+              isScreenSharing: false
+              // НЕ устанавливаем error при отмене
+            });
+          } else {
+            set({ 
+              screenShareStream: null,
+              isScreenSharing: false,
+              error: 'Failed to start screen sharing: ' + error.message 
+            });
+          }
         }
       },
 

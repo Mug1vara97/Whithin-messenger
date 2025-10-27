@@ -14,6 +14,7 @@ public record UploadMediaCommand(
 public record UploadMediaResult
 {
     public bool Success { get; init; }
+    public Guid? MessageId { get; init; }
     public Guid? MediaFileId { get; init; }
     public string? FilePath { get; init; }
     public string? ThumbnailPath { get; init; }

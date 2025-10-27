@@ -13,7 +13,6 @@ const ChatList = ({ onChatSelected, onFriendsSelected }) => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [showModal, setShowModal] = useState(false);
   
-  
   const {
     chats,
     searchResults,
@@ -209,10 +208,6 @@ const ChatList = ({ onChatSelected, onFriendsSelected }) => {
           userId={user?.id}
           username={user?.username || user?.userName}
           isOpen={true}
-          isMuted={false}
-          isAudioEnabled={true}
-          onToggleMute={() => {}}
-          onToggleAudio={() => {}}
         />
       </div>
     </div>

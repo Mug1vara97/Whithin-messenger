@@ -93,7 +93,8 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
             return new UploadMediaResult
             {
                 Success = true,
-                MediaFileId = savedMediaFile.Id,
+                MessageId = savedMessage.Id,  // ID сообщения для удаления/редактирования
+                MediaFileId = savedMediaFile.Id,  // ID медиафайла
                 FilePath = savedMediaFile.FilePath,
                 ThumbnailPath = savedMediaFile.ThumbnailPath
             };

@@ -957,10 +957,6 @@ const ServerPanel = ({
         userId={user?.id}
         username={user?.username || user?.userName}
         isOpen={true}
-        isMuted={false}
-        isAudioEnabled={true}
-        onToggleMute={() => {}}
-        onToggleAudio={() => {}}
       />
     </div>
   );

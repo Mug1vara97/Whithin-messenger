@@ -1243,6 +1243,17 @@ export const useVoiceCall = (userId, userName) => {
 
     } catch (error) {
       console.error('Error starting screen share:', error);
+      
+      // Проверяем, является ли это отменой пользователем
+      const isCancelled = error.message && (
+        error.message.includes('отменена') || 
+        error.message.includes('cancelled') ||
+        error.message.includes('canceled') ||
+        error.message.includes('Permission denied') ||
+        error.name === 'NotAllowedError' ||
+        error.name === 'AbortError'
+      );
+      
       // Очищаем при ошибке
       if (screenShareStream) {
         screenShareStream.getTracks().forEach(track => track.stop());
@@ -1250,7 +1261,13 @@ export const useVoiceCall = (userId, userName) => {
       setScreenShareStream(null);
       screenProducerRef.current = null;
       setIsScreenSharing(false);
-      setError('Failed to start screen sharing: ' + error.message);
+      
+      // Показываем ошибку только если это не отмена пользователем
+      if (!isCancelled) {
+        setError('Failed to start screen sharing: ' + error.message);
+      } else {
+        console.log('Screen sharing cancelled by user');
+      }
     }
   }, [userId, userName, isScreenSharing, screenShareStream, stopScreenShare]);
 

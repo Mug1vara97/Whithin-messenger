@@ -1,17 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Headset, HeadsetOff } from '@mui/icons-material';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import styles from './UserPanel.module.css';
 
 const UserPanel = ({ 
     userId, 
     username, 
-    isOpen, 
-    isMuted, 
-    isAudioEnabled, 
-    onToggleMute, 
-    onToggleAudio 
+    isOpen
 }) => {
+    // Подключаемся к глобальному состоянию звонка напрямую в компоненте
+    const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio } = useGlobalCall();
+    
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
     const [showBannerEditor, setShowBannerEditor] = useState(false);
@@ -186,7 +186,7 @@ const UserPanel = ({
                     <div className={styles['voice-controls']}>
                         <button
                             className={styles['voice-control-button']}
-                            onClick={onToggleMute}
+                            onClick={toggleMute}
                             title={isMuted ? "Включить микрофон" : "Выключить микрофон"}
                         >
                             {isMuted ? <MicOff fontSize="small" /> : <Mic fontSize="small" />}
@@ -194,10 +194,10 @@ const UserPanel = ({
                         
                         <button
                             className={styles['voice-control-button']}
-                            onClick={onToggleAudio}
-                            title={isAudioEnabled ? "Выключить звук" : "Включить звук"}
+                            onClick={toggleGlobalAudio}
+                            title={!isGlobalAudioMuted ? "Выключить звук" : "Включить звук"}
                         >
-                            {isAudioEnabled ? <Headset fontSize="small" /> : <HeadsetOff fontSize="small" />}
+                            {!isGlobalAudioMuted ? <Headset fontSize="small" /> : <HeadsetOff fontSize="small" />}
                         </button>
                     </div>
                 </div>
