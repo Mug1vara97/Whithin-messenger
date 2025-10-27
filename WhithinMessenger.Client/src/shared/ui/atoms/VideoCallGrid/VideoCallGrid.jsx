@@ -81,6 +81,22 @@ const VideoCallGrid = ({
   enableAutoFocus = true // Новый пропс для управления автофокусом
 }) => {
   const bottomGridRef = useRef(null);
+  
+  // Логируем входящие props
+  useEffect(() => {
+    console.log('📥 VideoCallGrid received props:', {
+      participantsCount: participants.length,
+      userVolumesSize: userVolumes?.size,
+      userMutedStatesSize: userMutedStates?.size,
+      showVolumeSlidersSize: showVolumeSliders?.size,
+      userVolumesEntries: Array.from(userVolumes?.entries() || []),
+      userMutedStatesEntries: Array.from(userMutedStates?.entries() || []),
+      showVolumeSlidersEntries: Array.from(showVolumeSliders?.entries() || []),
+      onToggleUserMuteExists: !!onToggleUserMute,
+      onChangeUserVolumeExists: !!onChangeUserVolume,
+      onToggleVolumeSliderExists: !!onToggleVolumeSlider
+    });
+  }, [participants, userVolumes, userMutedStates, showVolumeSliders, onToggleUserMute, onChangeUserVolume, onToggleVolumeSlider]);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -247,13 +263,25 @@ const VideoCallGrid = ({
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
-    const isAudioMuted = userMutedStates.get(participant.id) || false;
-    const volume = userVolumes.get(participant.id) || 100;
-    const showSlider = showVolumeSliders.get(participant.id) || false;
+    const isAudioMuted = userMutedStates?.get(participant.id) || false;
+    const volume = userVolumes?.get(participant.id) || 100;
+    const showSlider = showVolumeSliders?.get(participant.id) || false;
     const isScreenShare = participant.isScreenShare || false;
+    
+    console.log(`🎨 Rendering tile for ${participant.name}:`, {
+      id: participant.id,
+      isMuted,
+      isAudioMuted,
+      volume,
+      showSlider,
+      userMutedStatesSize: userMutedStates?.size,
+      userVolumesSize: userVolumes?.size,
+      showVolumeSlidersSize: showVolumeSliders?.size
+    });
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
+      console.log('🖱️ Volume button clicked for:', participant.id);
       if (onToggleUserMute) {
         onToggleUserMute(participant.id);
       }
@@ -262,6 +290,7 @@ const VideoCallGrid = ({
     const handleVolumeRightClick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      console.log('🖱️ Volume button right-clicked for:', participant.id);
       if (onToggleVolumeSlider) {
         onToggleVolumeSlider(participant.id);
       }

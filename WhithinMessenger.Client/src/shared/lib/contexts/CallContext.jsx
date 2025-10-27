@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useCallStore } from '../stores/callStore';
+import { shallow } from 'zustand/shallow';
 
 const CallContext = createContext();
 
@@ -21,9 +22,37 @@ export const CallProvider = ({ children }) => {
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
   
   // Подписываемся на изменения userVolumes, userMutedStates, showVolumeSliders
-  const userVolumes = useCallStore(state => state.userVolumes);
-  const userMutedStates = useCallStore(state => state.userMutedStates);
-  const showVolumeSliders = useCallStore(state => state.showVolumeSliders);
+  // Используем shallow для правильного сравнения Map объектов
+  const { userVolumes, userMutedStates, showVolumeSliders } = useCallStore(
+    state => ({
+      userVolumes: state.userVolumes,
+      userMutedStates: state.userMutedStates,
+      showVolumeSliders: state.showVolumeSliders
+    }),
+    shallow
+  );
+  
+  // Логируем изменения для отладки
+  useEffect(() => {
+    console.log('🔄 CallContext: userVolumes updated', {
+      size: userVolumes?.size,
+      entries: Array.from(userVolumes?.entries() || [])
+    });
+  }, [userVolumes]);
+  
+  useEffect(() => {
+    console.log('🔄 CallContext: userMutedStates updated', {
+      size: userMutedStates?.size,
+      entries: Array.from(userMutedStates?.entries() || [])
+    });
+  }, [userMutedStates]);
+  
+  useEffect(() => {
+    console.log('🔄 CallContext: showVolumeSliders updated', {
+      size: showVolumeSliders?.size,
+      entries: Array.from(showVolumeSliders?.entries() || [])
+    });
+  }, [showVolumeSliders]);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {

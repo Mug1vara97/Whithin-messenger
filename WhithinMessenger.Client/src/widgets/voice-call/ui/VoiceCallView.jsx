@@ -97,6 +97,12 @@ const VoiceCallView = ({
 
   // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
   const videoParticipants = useMemo(() => {
+    console.log('🔄 VoiceCallView: Recalculating videoParticipants', {
+      userVolumesSize: userVolumes?.size,
+      userMutedStatesSize: userMutedStates?.size,
+      showVolumeSlidersSize: showVolumeSliders?.size
+    });
+    
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
