@@ -105,55 +105,177 @@
 
 .setting-select {
   margin-left: auto;
-  padding: 8px 12px;
   background-color: var(--background, #2f3136);
-  border: 1px solid var(--border, #4f545c);
-  border-radius: 4px;
   color: var(--text, #dcddde);
+  border: 1px solid var(--border, #4f545c);
+  padding: 8px 12px;
+  border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
 }
 
-.setting-select:focus {
+/* Стили для горячих клавиш */
+.setting-item-info {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.hotkey-display-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hotkey-display {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffffff;
+  min-width: 80px;
+  text-align: center;
+}
+
+.hotkey-edit-btn,
+.hotkey-reset-btn {
+  background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hotkey-edit-btn:hover,
+.hotkey-reset-btn:hover {
+  background: linear-gradient(135deg, #6875F5 0%, #5865F2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(88, 101, 242, 0.3);
+}
+
+.hotkey-edit-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hotkey-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid #5865F2;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffffff;
+  min-width: 150px;
+  text-align: center;
   outline: none;
-  border-color: var(--primary, #5865f2);
+  cursor: pointer;
+}
+
+.hotkey-input:focus {
+  border-color: #6875F5;
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.3);
+}
+
+.hotkey-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: inherit;
+}
+
+.hotkey-save-btn {
+  background: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotkey-save-btn:hover {
+  background: #27ae60;
+}
+
+.hotkey-cancel-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotkey-cancel-btn:hover {
+  background: #c0392b;
 }
 
 .modal-actions {
+  padding: 20px;
+  border-top: 1px solid var(--border, #4f545c);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 20px;
-  border-top: 1px solid var(--border, #4f545c);
 }
 
 .save-button,
 .cancel-button {
   padding: 10px 20px;
   border-radius: 4px;
-  border: none;
-  cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
 }
 
 .save-button {
-  background-color: var(--primary, #5865f2);
+  background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
   color: white;
 }
 
 .save-button:hover {
-  background-color: var(--primary-hover, #4752c4);
+  background: linear-gradient(135deg, #6875F5 0%, #5865F2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(88, 101, 242, 0.3);
 }
 
 .cancel-button {
-  background-color: var(--text-muted, #4f545c);
-  color: var(--text, #dcddde);
+  background: transparent;
+  color: var(--text-secondary, #8e9297);
+  border: 1px solid var(--border, #4f545c);
 }
 
 .cancel-button:hover {
-  background-color: var(--text-secondary, #8e9297);
+  background: var(--hover, #40444b);
+  color: var(--text, #dcddde);
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: var(--primary, #5865f2);
 }
 
 @media (max-width: 768px) {

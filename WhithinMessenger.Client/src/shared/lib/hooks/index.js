@@ -7,3 +7,4 @@ export * from './useMediaHandlers';
 export * from './useContextMenu';
 export * from './useMessageForward';
 export * from './useGlobalCall';
+export * from './useGlobalHotkeys';

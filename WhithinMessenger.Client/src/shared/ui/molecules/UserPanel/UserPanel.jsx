@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Mic, MicOff, Headset, HeadsetOff } from '@mui/icons-material';
+import { Mic, MicOff, Headset, HeadsetOff, Settings as SettingsIcon } from '@mui/icons-material';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
+import { useGlobalHotkeys } from '../../../lib/hooks/useGlobalHotkeys';
+import { SettingsModal } from '../../organisms';
 import styles from './UserPanel.module.css';
 
 const UserPanel = ({ 
@@ -12,6 +14,9 @@ const UserPanel = ({
     // Подключаемся к глобальному состоянию звонка напрямую в компоненте
     const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio } = useGlobalCall();
     
+    // Подключаем глобальные горячие клавиши
+    useGlobalHotkeys(toggleMute, toggleGlobalAudio);
+    
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
     const [showBannerEditor, setShowBannerEditor] = useState(false);
@@ -20,6 +25,7 @@ const UserPanel = ({
     const [showAvatarEditor, setShowAvatarEditor] = useState(false);
     const [avatarInput, setAvatarInput] = useState('');
     const avatarFileInputRef = useRef(null);
+    const [showSettings, setShowSettings] = useState(false);
 
     const fetchUserProfile = async () => {
         try {
@@ -199,6 +205,14 @@ const UserPanel = ({
                         >
                             {!isGlobalAudioMuted ? <Headset fontSize="small" /> : <HeadsetOff fontSize="small" />}
                         </button>
+
+                        <button
+                            className={styles['voice-control-button']}
+                            onClick={() => setShowSettings(true)}
+                            title="Настройки"
+                        >
+                            <SettingsIcon fontSize="small" />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -357,6 +371,12 @@ const UserPanel = ({
                     <div className={styles['profile-modal-overlay']} onClick={toggleProfile}></div>
                 </div>
             )}
+
+            {/* Модальное окно настроек */}
+            <SettingsModal 
+                isOpen={showSettings} 
+                onClose={() => setShowSettings(false)} 
+            />
         </>
     );
 };
