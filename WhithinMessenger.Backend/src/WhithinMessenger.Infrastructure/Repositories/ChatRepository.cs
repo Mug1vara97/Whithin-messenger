@@ -204,8 +204,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 ChatRepository - Getting participants for chatId: {chatId}");
-                
                 var participants = await _context.Members
                     .Where(m => m.ChatId == chatId)
                     .Select(m => new ChatParticipantInfo
@@ -219,7 +217,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     })
                     .ToListAsync(cancellationToken);
                 
-                Console.WriteLine($"ChatRepository - Found {participants.Count} participants");
                 return participants;
             }
             catch (Exception ex)
@@ -335,9 +332,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                Console.WriteLine($"ChatRepository - Getting available users for group {groupChatId} by user {currentUserId}");
-                
-                Console.WriteLine($"ChatRepository - Querying users with private chats...");
                 var usersWithPrivateChats = await _context.Members
                     .Where(m => m.UserId == currentUserId)
                     .Include(m => m.Chat)
@@ -349,19 +343,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Distinct()
                     .ToListAsync(cancellationToken);
 
-                Console.WriteLine($"ChatRepository - Found {usersWithPrivateChats.Count} users with private chats");
-
-                Console.WriteLine($"ChatRepository - Querying group members...");
                 var groupMembers = await _context.Members
                     .Where(m => m.ChatId == groupChatId)
                     .Select(m => m.UserId)
                     .ToListAsync(cancellationToken);
-
-                Console.WriteLine($"ChatRepository - Found {groupMembers.Count} group members");
-                Console.WriteLine($"ChatRepository - Group members: {string.Join(", ", groupMembers)}");
-
-                Console.WriteLine($"ChatRepository - Filtering available users...");
-                Console.WriteLine($"ChatRepository - Users with private chats: {string.Join(", ", usersWithPrivateChats.Select(u => $"{u.UserName}({u.Id})"))}");
                 
                 var availableUsers = usersWithPrivateChats
                     .Where(u => u != null && !groupMembers.Contains(u.Id))
@@ -377,7 +362,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     })
                     .ToList();
 
-                Console.WriteLine($"ChatRepository - Found {availableUsers.Count} available users");
                 return availableUsers;
             }
             catch (Exception ex)
@@ -391,21 +375,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                Console.WriteLine($"ChatRepository - Adding user {userId} to group {groupChatId}");
-                
                 var chat = await _context.Chats
                     .Include(c => c.Type)
                     .FirstOrDefaultAsync(c => c.Id == groupChatId, cancellationToken);
 
-                if (chat == null)
+                if (chat == null || chat.Type.TypeName != "Group")
                 {
-                    Console.WriteLine($"ChatRepository - Group chat {groupChatId} not found");
-                    return false;
-                }
-
-                if (chat.Type.TypeName != "Group")
-                {
-                    Console.WriteLine($"ChatRepository - Chat {groupChatId} is not a group chat");
                     return false;
                 }
 
@@ -414,8 +389,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
                 if (existingMember != null)
                 {
-                    Console.WriteLine($"ChatRepository - User {userId} is already in group {groupChatId}");
-                    return false;
+                    return false; // User already in group
                 }
 
                 var member = new Member
@@ -431,7 +405,6 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 _context.Members.Add(member);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                Console.WriteLine($"ChatRepository - User {userId} added to group {groupChatId}");
                 return true;
             }
             catch (Exception ex)
@@ -445,15 +418,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                var isParticipant = await _context.Members
+                return await _context.Members
                     .AnyAsync(m => m.ChatId == chatId && m.UserId == userId, cancellationToken);
-                
-                Console.WriteLine($"ChatRepository - User {userId} is participant of chat {chatId}: {isParticipant}");
-                return isParticipant;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ChatRepository - Error checking user participation: {ex.Message}");
+                Console.WriteLine($ChatRepository - Error checking user participation: {ex.Message}");
                 return false;
             }
         }

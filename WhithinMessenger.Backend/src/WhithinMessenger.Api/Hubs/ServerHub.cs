@@ -22,42 +22,36 @@ public class ServerHub : Hub
 
     private Guid? GetCurrentUserId()
     {
-        Console.WriteLine($"ServerHub: GetCurrentUserId called");
-        Console.WriteLine($"ServerHub: Context.User is null: {Context.User == null}");
-        Console.WriteLine($"ServerHub: Context.User.Identity.IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}");
+        // Удалено избыточное логирование для производительности
+        // Этот метод вызывается при каждом SignalR вызове
         
         // Сначала пробуем получить из JWT claims
         var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
-        Console.WriteLine($"ServerHub: JWT UserId claim: {userIdClaim}");
         
         if (Guid.TryParse(userIdClaim, out var userId))
         {
-            Console.WriteLine($"ServerHub: Found UserId from JWT: {userId}");
             return userId;
         }
 
         // Fallback на query parameter (для совместимости)
         var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
-        Console.WriteLine($"ServerHub: Query UserId: {userIdFromQuery}");
         
         if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
         {
-            Console.WriteLine($"ServerHub: Found UserId from query: {userIdFromQueryParsed}");
             return userIdFromQueryParsed;
         }
 
-        Console.WriteLine($"ServerHub: No UserId found");
+        // Логируем только если не нашли userId (это ошибка)
+        Console.WriteLine($"ServerHub: No UserId found in request");
         return null;
     }
 
     public async Task JoinServerGroup(string serverId)
     {
-        Console.WriteLine($"ServerHub: JoinServerGroup called with serverId: {serverId}");
         var userId = GetCurrentUserId();
-        Console.WriteLine($"ServerHub: JoinServerGroup - userId: {userId}");
-        
         await Groups.AddToGroupAsync(Context.ConnectionId, serverId);
-        Console.WriteLine($"ServerHub: Successfully joined group {serverId}");
+        // Логируем только успешные подключения (не каждый раз)
+        // Console.WriteLine($"erverHub: User {userId} joined group {serverId}");
     }
 
     public async Task LeaveServerGroup(string serverId)
@@ -557,7 +551,7 @@ public class ServerHub : Hub
                     addedBy = currentUserId.Value
                 });
 
-                Console.WriteLine($"ServerHub: Sending YouWereAddedToServer to user {userId} via ServerListHub");
+                // Уведомляем пользователя через ServerListHub
                 var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
                 if (serverListHubContext != null)
                 {
@@ -566,7 +560,7 @@ public class ServerHub : Hub
                         serverId,
                         addedBy = currentUserId.Value
                     });
-                    Console.WriteLine($"ServerHub: YouWereAddedToServer sent successfully to user {userId} via ServerListHub");
+                    // Notification sent successfully
                 }
                 else
                 {
@@ -813,55 +807,30 @@ public class ServerHub : Hub
             }
 
             var serverMembers = await GetServerMembersList(serverId);
-            Console.WriteLine($"ServerHub: Found {serverMembers?.Count ?? 0} server members to notify before deletion");
-            if (serverMembers != null && serverMembers.Any())
-            {
-                foreach (var member in serverMembers)
-                {
-                    Console.WriteLine($"ServerHub: Member to notify: {member.UserId}");
-                }
-            }
-
+            
             var command = new DeleteServerCommand(serverId, userId.Value);
             var result = await _mediator.Send(command);
 
             if (result.Success)
             {
-                Console.WriteLine($"ServerHub: Server {serverId} deleted successfully, sending notifications");
-                
                 await Clients.Group(serverId.ToString()).SendAsync("ServerDeleted", serverId);
-                Console.WriteLine($"ServerHub: Sent ServerDeleted to group {serverId}");
-
                 await Clients.Caller.SendAsync("ServerDeleted", serverId);
-                Console.WriteLine($"ServerHub: Sent ServerDeleted to caller");
                 
                 var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
                 if (serverListHubContext != null)
                 {
                     await serverListHubContext.Clients.User(userId.Value.ToString()).SendAsync("ServerDeleted", serverId);
-                    Console.WriteLine($"ServerHub: Sent ServerDeleted to ServerListHub for user {userId}");
                     
                     if (serverMembers != null && serverMembers.Any())
                     {
-                        Console.WriteLine($"ServerHub: Notifying {serverMembers.Count} members via ServerListHub");
                         foreach (var member in serverMembers)
                         {
                             if (member.UserId != userId.Value)
                             {
-                                Console.WriteLine($"ServerHub: Sending ServerDeleted to ServerListHub for member {member.UserId}");
                                 await serverListHubContext.Clients.User(member.UserId.ToString()).SendAsync("ServerDeleted", serverId);
-                                Console.WriteLine($"ServerHub: Sent ServerDeleted to ServerListHub for member {member.UserId}");
                             }
                         }
                     }
-                    else
-                    {
-                        Console.WriteLine($"ServerHub: No server members found to notify via ServerListHub");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"ServerHub: ServerListHub context is null");
                 }
             }
             else
@@ -882,16 +851,14 @@ public class ServerHub : Hub
             var userId = GetCurrentUserId();
             if (userId == null)
             {
-                Console.WriteLine($"ServerHub: Cannot get current user ID for server members query");
                 return null;
             }
 
             var query = new GetServerMembersQuery(serverId, userId.Value);
             var result = await _mediator.Send(query);
-            
+
             if (result.Success)
             {
-                Console.WriteLine($"ServerHub: Successfully retrieved {result.Members?.Count ?? 0} server members");
                 return result.Members;
             }
             else
@@ -907,3 +874,4 @@ public class ServerHub : Hub
         }
     }
 }
+
