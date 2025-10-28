@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
+import { chatMediaAudioManager } from '../../../lib/utils/chatMediaAudio';
 import './MediaFile.css';
 
 const MediaFile = ({ mediaFile }) => {
@@ -9,6 +10,23 @@ const MediaFile = ({ mediaFile }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
+  const videoRef = useRef(null);
+
+  // Подключаем видео к Web Audio API для обхода suppressLocalAudioPlayback
+  useEffect(() => {
+    if (videoRef.current && mediaFile.contentType.startsWith('video/')) {
+      const videoElement = videoRef.current;
+      // Подключаем видео элемент к Web Audio API
+      chatMediaAudioManager.connectMediaElement(videoElement);
+      console.log('🎥 MediaFile: Video element connected to Web Audio API');
+
+      return () => {
+        // Отключаем при размонтировании
+        chatMediaAudioManager.disconnectMediaElement(videoElement);
+        console.log('🎥 MediaFile: Video element disconnected from Web Audio API');
+      };
+    }
+  }, [mediaFile.contentType]);
 
   const renderMediaContent = () => {
     if (mediaFile.contentType.startsWith('image/')) {
@@ -53,6 +71,7 @@ const MediaFile = ({ mediaFile }) => {
             </div>
           )}
           <video
+            ref={videoRef}
             src={`${BASE_URL}/${mediaFile.filePath}`}
             controls
             className={`media-video ${videoLoading ? 'media-loading' : ''}`}

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AddUserModal from '../AddUserModal/AddUserModal';
 import ChatAvatarUpload from '../ChatAvatarUpload/ChatAvatarUpload';
+import { chatMediaAudioManager } from '../../../lib/utils/chatMediaAudio';
 import { 
   GroupAdd, 
   Image, 
@@ -24,6 +25,29 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [chatAvatar, setChatAvatar] = useState(chatInfo?.chatAvatar);
   const [chatAvatarColor, setChatAvatarColor] = useState(chatInfo?.chatAvatarColor);
+  const modalVideoRef = useRef(null);
+  const modalAudioRef = useRef(null);
+
+  // Подключаем медиа элементы к Web Audio API
+  useEffect(() => {
+    if (modalVideoRef.current) {
+      chatMediaAudioManager.connectMediaElement(modalVideoRef.current);
+      console.log('🎥 ChatInfoModal: Video element connected to Web Audio API');
+    }
+    if (modalAudioRef.current) {
+      chatMediaAudioManager.connectMediaElement(modalAudioRef.current);
+      console.log('🎵 ChatInfoModal: Audio element connected to Web Audio API');
+    }
+
+    return () => {
+      if (modalVideoRef.current) {
+        chatMediaAudioManager.disconnectMediaElement(modalVideoRef.current);
+      }
+      if (modalAudioRef.current) {
+        chatMediaAudioManager.disconnectMediaElement(modalAudioRef.current);
+      }
+    };
+  }, [selectedMedia]);
 
   // Обновляем локальное состояние при изменении chatInfo
   React.useEffect(() => {
@@ -460,12 +484,14 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
             <div className="chat-info-media-modal-content">
               {selectedMedia.contentType.startsWith('video/') ? (
                 <video 
+                  ref={modalVideoRef}
                   src={`${BASE_URL}/${selectedMedia.filePath}`} 
                   controls 
                   className="chat-info-media-preview-video"
                 />
               ) : selectedMedia.contentType.startsWith('audio/') ? (
                 <audio 
+                  ref={modalAudioRef}
                   src={`${BASE_URL}/${selectedMedia.filePath}`} 
                   controls 
                   className="chat-info-media-preview-audio"

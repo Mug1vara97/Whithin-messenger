@@ -1098,8 +1098,14 @@ export const useVoiceCall = (userId, userName) => {
           autoGainControl: true,
           sampleRate: 48000,
           channelCount: 2,
-          sampleSize: 16
-        }
+          sampleSize: 16,
+          // Подавляем звук из самого браузера (включая звонки)
+          // Это позволит захватить звук системы, но не звук из звонка
+          suppressLocalAudioPlayback: true
+        },
+        // Предпочитаем захват всего экрана для лучшей совместимости со звуком
+        preferCurrentTab: false,
+        systemAudio: 'include'
       });
 
       console.log('Screen sharing access granted');

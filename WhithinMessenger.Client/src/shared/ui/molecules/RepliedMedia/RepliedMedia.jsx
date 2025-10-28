@@ -1,9 +1,24 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import AudioMessage from '../AudioMessage/AudioMessage';
+import { chatMediaAudioManager } from '../../../lib/utils/chatMediaAudio';
 import './RepliedMedia.css';
 
 const RepliedMedia = ({ content, mediaFiles }) => {
+  const videoRef = useRef(null);
+
+  // Подключаем видео к Web Audio API
+  useEffect(() => {
+    if (videoRef.current) {
+      const videoElement = videoRef.current;
+      chatMediaAudioManager.connectMediaElement(videoElement);
+      console.log('🎥 RepliedMedia: Video element connected to Web Audio API');
+
+      return () => {
+        chatMediaAudioManager.disconnectMediaElement(videoElement);
+      };
+    }
+  }, []);
   // Если есть медиафайлы, используем их
   if (mediaFiles && mediaFiles.length > 0) {
     const mediaFile = mediaFiles[0]; // Берем первый медиафайл
@@ -25,6 +40,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     if (mediaFile.contentType.startsWith('video/')) {
       return (
         <video 
+          ref={videoRef}
           src={`${BASE_URL}/${mediaFile.filePath}`} 
           controls 
           className="replied-video"
@@ -47,12 +63,12 @@ const RepliedMedia = ({ content, mediaFiles }) => {
       switch (extension) {
         case 'mp4':
         case 'mov':
-          return <video src={src} controls className="replied-video" />;
+          return <video ref={videoRef} src={src} controls className="replied-video" />;
         case 'webm':
           // WebM может быть как видео, так и аудио - определяем по MIME типу или другим признакам
           // Для простоты считаем webm видео, если нужна поддержка аудио webm, 
           // можно добавить дополнительную проверку
-          return <video src={src} controls className="replied-video" />;
+          return <video ref={videoRef} src={src} controls className="replied-video" />;
         case 'jpg':
         case 'jpeg':
         case 'png':
@@ -62,7 +78,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
         case 'wav':
         case 'mp3':
         case 'ogg':
-        case 'm4a':
+        case 'm4a': {
           // Создаем объект mediaFile для AudioMessage
           const audioMediaFile = {
             id: 'replied-audio',
@@ -71,6 +87,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
             fileName: content.split('/').pop()
           };
           return <AudioMessage mediaFile={audioMediaFile} />;
+        }
         default:
           return <a href={src} target="_blank" rel="noopener noreferrer">Download file</a>;
       }
