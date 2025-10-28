@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
+import { isolatedCallAudioManager } from '../../../shared/lib/utils/isolatedCallAudio';
 
 // 🚨 TEST LOGGING - ДОЛЖНО ПОЯВИТЬСЯ В КОНСОЛИ 🚨
 console.log('🔥🔥🔥 useVoiceCall.js LOADED 🔥🔥🔥');
@@ -131,29 +132,9 @@ export const useVoiceCall = (userId, userName) => {
           return;
         }
         
-        // Очищаем audio element
-        const audioElement = audioElementsRef.current.get(userId);
-        if (audioElement) {
-          console.log('Removing audio element for user:', userId);
-          audioElement.pause();
-          audioElement.srcObject = null;
-          if (audioElement.parentNode) {
-            audioElement.parentNode.removeChild(audioElement);
-          }
-          audioElementsRef.current.delete(userId);
-        }
-        
-        // Очищаем gain node
-        const gainNode = gainNodesRef.current.get(userId);
-        if (gainNode) {
-          console.log('Disconnecting gain node for user:', userId);
-          try {
-            gainNode.disconnect();
-          } catch (e) {
-            console.warn('Error disconnecting gain node:', e);
-          }
-          gainNodesRef.current.delete(userId);
-        }
+        // Удаляем участника из изолированной аудио-системы
+        isolatedCallAudioManager.removeParticipant(userId);
+        console.log('Removed participant from isolated audio system:', userId);
         
         // Очищаем состояния громкости и мута
         setUserVolumes(prev => {
@@ -364,27 +345,12 @@ export const useVoiceCall = (userId, userName) => {
       producersRef.current.forEach(producer => producer.close());
       producersRef.current.clear();
       
-      // Очистка GainNodes и audio elements
-      gainNodesRef.current.forEach(gainNode => {
-        try {
-          gainNode.disconnect();
-        } catch (e) {
-          console.warn('Error disconnecting gain node:', e);
-        }
-      });
-      gainNodesRef.current.clear();
+      // Очистка изолированной аудио-системы
+      isolatedCallAudioManager.cleanup();
+      console.log('✅ Isolated audio system cleaned up');
       
-      audioElementsRef.current.forEach(audioElement => {
-        try {
-          audioElement.pause();
-          audioElement.srcObject = null;
-          if (audioElement.parentNode) {
-            audioElement.parentNode.removeChild(audioElement);
-          }
-        } catch (e) {
-          console.warn('Error removing audio element:', e);
-        }
-      });
+      // Очищаем все ref-ы
+      gainNodesRef.current.clear();
       audioElementsRef.current.clear();
       previousVolumesRef.current.clear();
       peerIdToUserIdMapRef.current.clear();
@@ -554,36 +520,22 @@ export const useVoiceCall = (userId, userName) => {
         await audioContextRef.current.resume();
       }
       
-      // Создаем audio element
-      const audioElement = document.createElement('audio');
-      audioElement.srcObject = new MediaStream([consumer.track]);
-      audioElement.autoplay = true;
-      audioElement.playsInline = true;
-      audioElement.controls = false;
-      audioElement.style.display = 'none';
-      document.body.appendChild(audioElement);
+      // НОВАЯ СИСТЕМА: Используем изолированный AudioContext для участников
+      // Это предотвращает захват их голосов при демонстрации экрана
+      const audioStream = new MediaStream([consumer.track]);
       
-      // Создаем Web Audio API chain: source -> gain
-      // НЕ подключаем к destination, чтобы избежать двойного воспроизведения!
-      // Воспроизведение идет только через HTML Audio элемент
-      const source = audioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
-      const gainNode = audioContextRef.current.createGain();
-      
-      // GainNode больше не используется для воспроизведения, только для отслеживания состояния
-      // Устанавливаем начальную громкость HTML Audio элемента
+      // Получаем параметры громкости
       const initialVolume = userVolumes.get(userId) || 100;
       const isMuted = userMutedStates.get(userId) || false;
-      // Если глобально выключен звук, устанавливаем 0, иначе используем индивидуальную громкость
       const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-      audioElement.volume = audioVolume;
       
-      // Подключаем source -> gain, но НЕ к destination (только для анализа)
-      source.connect(gainNode);
-      // gainNode.connect(audioContextRef.current.destination); // ОТКЛЮЧЕНО - используем только HTML Audio
+      // Добавляем участника в изолированную систему
+      await isolatedCallAudioManager.addParticipant(userId, audioStream, {
+        volume: audioVolume,
+        muted: isMuted || isGlobalAudioMuted
+      });
       
-      // Сохраняем ссылки
-      gainNodesRef.current.set(userId, gainNode);
-      audioElementsRef.current.set(userId, audioElement);
+      console.log(`✅ Added participant ${userId} to isolated audio system`);
       
       // Инициализируем громкость в состоянии если еще не установлена
       if (!userVolumes.has(userId)) {
@@ -594,22 +546,7 @@ export const useVoiceCall = (userId, userName) => {
         });
       }
 
-      try {
-        await audioElement.play();
-        console.log('Audio playback started for peer:', userId);
-        setAudioBlocked(false);
-      } catch (error) {
-        console.log('Auto-play blocked, user interaction required:', error);
-        setAudioBlocked(true);
-        setTimeout(async () => {
-          try {
-            await audioElement.play();
-            setAudioBlocked(false);
-          } catch {
-            console.log('Audio playback still blocked');
-          }
-        }, 1000);
-      }
+      setAudioBlocked(false);
 
       await voiceCallApi.resumeConsumer(consumerData.id);
       console.log('New consumer created:', consumerData.id);
@@ -832,29 +769,12 @@ export const useVoiceCall = (userId, userName) => {
   // Переключение мута для отдельного пользователя
   const toggleUserMute = useCallback((peerId) => {
     console.log('toggleUserMute called for:', peerId);
-    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
-    const audioElement = audioElementsRef.current.get(peerId);
-    if (!audioElement) {
-      console.error('Audio element not found for peer:', peerId);
-      return;
-    }
-
+    
     const isCurrentlyMuted = userMutedStates.get(peerId) || false;
     const newIsMuted = !isCurrentlyMuted;
 
-    if (newIsMuted) {
-      // Мутим - устанавливаем 0, НЕ меняя ползунок (сохраняем текущее значение)
-      const currentVolume = userVolumes.get(peerId) || 100;
-      previousVolumesRef.current.set(peerId, currentVolume);
-      audioElement.volume = 0;
-      // НЕ меняем userVolumes, чтобы ползунок остался на месте
-    } else {
-      // Размутиваем - восстанавливаем звук на текущую позицию ползунка
-      const currentVolume = userVolumes.get(peerId) || 100;
-      const audioVolume = isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
-      audioElement.volume = audioVolume;
-      // НЕ меняем userVolumes, ползунок уже на нужном месте
-    }
+    // Используем изолированную систему
+    isolatedCallAudioManager.setParticipantMuted(peerId, newIsMuted);
 
     setUserMutedStates(prev => {
       const newMap = new Map(prev);
@@ -863,21 +783,15 @@ export const useVoiceCall = (userId, userName) => {
     });
 
     console.log(`User ${peerId} ${newIsMuted ? 'muted' : 'unmuted'}`);
-  }, [userVolumes, userMutedStates, isGlobalAudioMuted]);
+  }, [userMutedStates]);
 
   // Изменение громкости отдельного пользователя
   const changeUserVolume = useCallback((peerId, newVolume) => {
     console.log('changeUserVolume called for:', peerId, 'newVolume:', newVolume);
-    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
-    const audioElement = audioElementsRef.current.get(peerId);
-    if (!audioElement) {
-      console.error('Audio element not found for peer:', peerId);
-      return;
-    }
-
-    // Если глобально замучено, применяем только состояние, но не звук
-    const audioVolume = isGlobalAudioMuted ? 0 : (newVolume / 100.0);
-    audioElement.volume = audioVolume;
+    
+    // Используем изолированную систему
+    const audioVolume = newVolume / 100.0;
+    isolatedCallAudioManager.setParticipantVolume(peerId, audioVolume);
 
     setUserVolumes(prev => {
       const newMap = new Map(prev);
@@ -887,12 +801,14 @@ export const useVoiceCall = (userId, userName) => {
 
     // Если размутиваем через слайдер, обновляем состояние мута
     if (newVolume > 0 && userMutedStates.get(peerId)) {
+      isolatedCallAudioManager.setParticipantMuted(peerId, false);
       setUserMutedStates(prev => {
         const newMap = new Map(prev);
         newMap.set(peerId, false);
         return newMap;
       });
     } else if (newVolume === 0 && !userMutedStates.get(peerId)) {
+      isolatedCallAudioManager.setParticipantMuted(peerId, true);
       setUserMutedStates(prev => {
         const newMap = new Map(prev);
         newMap.set(peerId, true);
@@ -901,7 +817,7 @@ export const useVoiceCall = (userId, userName) => {
     }
 
     console.log(`User ${peerId} volume set to ${newVolume}%`);
-  }, [userMutedStates, isGlobalAudioMuted]);
+  }, [userMutedStates]);
 
   // Переключение отображения слайдера громкости
   const toggleVolumeSlider = useCallback((peerId) => {
@@ -918,7 +834,6 @@ export const useVoiceCall = (userId, userName) => {
     const newMutedState = !isGlobalAudioMuted;
     
     console.log(`toggleGlobalAudio called, new state: ${newMutedState}`);
-    console.log(`Audio elements count: ${audioElementsRef.current.size}`);
     
     // Отправляем состояние наушников на сервер
     // isGlobalAudioMuted=true означает isAudioEnabled=false
@@ -927,27 +842,12 @@ export const useVoiceCall = (userId, userName) => {
       console.log('Audio state (headphones) sent to server, isEnabled:', !newMutedState);
     }
     
-    // Управляем только HTML Audio элементами (GainNode больше не используется для воспроизведения)
-    audioElementsRef.current.forEach((audioElement, peerId) => {
-      if (audioElement) {
-        if (newMutedState) {
-          // Мутим HTML Audio элемент
-          audioElement.volume = 0;
-          console.log(`HTML Audio muted for peer: ${peerId}`);
-        } else {
-          // Размутиваем с индивидуальной громкостью
-          const volume = userVolumes.get(peerId) || 100;
-          const isIndividuallyMuted = userMutedStates.get(peerId) || false;
-          const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
-          audioElement.volume = audioVolume;
-          console.log(`HTML Audio unmuted for peer: ${peerId}, volume: ${audioVolume}`);
-        }
-      }
-    });
+    // Используем мастер-громкость изолированной системы
+    isolatedCallAudioManager.setMasterVolume(newMutedState ? 0 : 1.0);
     
     setIsGlobalAudioMuted(newMutedState);
     console.log(`Global audio ${newMutedState ? 'muted' : 'unmuted'}`);
-  }, [isGlobalAudioMuted, userVolumes, userMutedStates]);
+  }, [isGlobalAudioMuted]);
 
   // Переключение шумоподавления
   const toggleNoiseSuppression = useCallback(async () => {
