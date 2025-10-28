@@ -67,18 +67,7 @@ const GhostBackground = () => {
     const preloader = new PreloaderManager();
     preloader.updateProgress(1);
 
-    // Load Three.js and other dependencies
-    // Load script function (kept for potential future use)
-    // const loadScript = (src) => {
-    //   return new Promise((resolve, reject) => {
-    //     const script = document.createElement('script');
-    //     script.src = src;
-    //     script.onload = resolve;
-    //     script.onerror = reject;
-    //     document.head.appendChild(script);
-    //   });
-    // };
-
+    // Load dependencies (just fonts, three.js is now bundled)
     const loadStylesheet = (href) => {
       return new Promise((resolve, reject) => {
         const link = document.createElement('link');
@@ -90,93 +79,37 @@ const GhostBackground = () => {
       });
     };
 
-    // Load dependencies with multiple CDN fallbacks
-    const loadThreeJS = () => {
-      return new Promise((resolve, reject) => {
-        // Check if Three.js is already loaded
-        if (typeof window.THREE !== 'undefined') {
-          console.log('Three.js already loaded');
-          resolve();
-          return;
-        }
+    // Load fonts and initialize animation
+    loadStylesheet('https://fonts.googleapis.com/css2?family=Boldonse&display=swap')
+      .then(() => {
+        console.log('Fonts loaded successfully');
+        preloader.updateProgress(2);
         
-        // Try multiple CDNs
-        const cdnUrls = [
-          'https://unpkg.com/three@0.158.0/build/three.min.js',
-          'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js'
-        ];
+        console.log('Initializing ghost animation...');
+        console.log('window.ghostAnimationInitialized before call:', window.ghostAnimationInitialized);
         
-        let currentIndex = 0;
+        // Initialize the ghost animation
+        initializeGhostAnimation(preloader);
+        console.log('window.ghostAnimationInitialized after call:', window.ghostAnimationInitialized);
         
-        const tryLoad = () => {
-          if (currentIndex >= cdnUrls.length) {
-            reject(new Error('All CDNs failed'));
-            return;
-          }
-          
-          const script = document.createElement('script');
-          script.src = cdnUrls[currentIndex];
-          script.onload = () => {
-            console.log(`Three.js loaded from: ${cdnUrls[currentIndex]}`);
-            resolve();
-          };
-          script.onerror = () => {
-            console.log(`Failed to load from: ${cdnUrls[currentIndex]}`);
-            currentIndex++;
-            tryLoad();
-          };
-          document.head.appendChild(script);
-        };
-        
-        tryLoad();
-      });
-    };
-
-    Promise.all([
-      loadThreeJS(),
-      loadStylesheet('https://fonts.googleapis.com/css2?family=Boldonse&display=swap')
-    ]).then(() => {
-      console.log('Dependencies loaded successfully');
-      preloader.updateProgress(2);
-      
-      // Check if Three.js is available
-      if (typeof window.THREE === 'undefined') {
-        console.error('Three.js failed to load');
-        // Show fallback animation
-        showFallbackAnimation();
+        // Check if canvas was created after a short delay
         setTimeout(() => {
-          preloader.complete();
-        }, 2000);
-        return;
-      }
-      
-      console.log('Three.js loaded, initializing animation...');
-      console.log('window.ghostAnimationInitialized before call:', window.ghostAnimationInitialized);
-      // Animation is already initialized in the module, just complete preloader
-      initializeGhostAnimation(preloader);
-      console.log('window.ghostAnimationInitialized after call:', window.ghostAnimationInitialized);
-      
-      // Check if canvas was created after a short delay
-      setTimeout(() => {
-        const canvas = document.querySelector('.ghost-background canvas');
-        if (canvas) {
-          console.log('Canvas found in DOM:', canvas);
-          console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
-          console.log('Canvas parent:', canvas.parentElement);
-        } else {
-          console.log('Canvas not found in DOM');
-        }
-      }, 1000);
-    }).catch(error => {
-      console.error('Error loading dependencies:', error);
-      // Show fallback animation
-      showFallbackAnimation();
-      // Fallback: complete preloader anyway
-      setTimeout(() => {
-        preloader.complete();
-      }, 2000);
-    });
+          const canvas = document.querySelector('.ghost-background canvas');
+          if (canvas) {
+            console.log('Canvas found in DOM:', canvas);
+            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+            console.log('Canvas parent:', canvas.parentElement);
+          } else {
+            console.log('Canvas not found in DOM');
+          }
+        }, 1000);
+      })
+      .catch(error => {
+        console.error('Error loading fonts:', error);
+        // Even if fonts fail, initialize animation
+        preloader.updateProgress(2);
+        initializeGhostAnimation(preloader);
+      });
 
     // Cleanup function
     return () => {
@@ -190,39 +123,6 @@ const GhostBackground = () => {
       window.ghostAnimationInitialized = false;
     };
   }, []);
-
-  // Fallback animation function
-  const showFallbackAnimation = () => {
-    console.log('Showing fallback animation');
-    const container = document.querySelector('.ghost-background');
-    if (container) {
-      // Create a simple CSS animation fallback
-      const fallbackDiv = document.createElement('div');
-      fallbackDiv.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 100px;
-        height: 100px;
-        background: radial-gradient(circle, rgba(255, 69, 0, 0.3) 0%, transparent 70%);
-        border-radius: 50%;
-        animation: fallbackPulse 2s ease-in-out infinite;
-        z-index: 1;
-      `;
-      
-      // Add CSS animation
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes fallbackPulse {
-          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
-          50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
-        }
-      `;
-      document.head.appendChild(style);
-      container.appendChild(fallbackDiv);
-    }
-  };
 
   return (
     <div className="ghost-background">

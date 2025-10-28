@@ -36,6 +36,7 @@
     "styled-components": "^6.1.19",
     "three": "^0.180.0",
     "tone": "^15.1.22",
+    "tweakpane": "^4.0.5",
     "wavesurfer.js": "^7.10.1",
     "zustand": "^5.0.8"
   },

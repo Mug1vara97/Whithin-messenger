@@ -1,10 +1,10 @@
-import * as THREE from "https://esm.sh/three";
-import { Pane } from "https://cdn.skypack.dev/tweakpane@4.0.4";
-import { EffectComposer } from "https://esm.sh/three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "https://esm.sh/three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "https://esm.sh/three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "https://esm.sh/three/examples/jsm/postprocessing/OutputPass.js";
-import { ShaderPass } from "https://esm.sh/three/examples/jsm/postprocessing/ShaderPass.js";
+import * as THREE from 'three';
+import { Pane } from 'tweakpane';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 // Preloader management
 class PreloaderManager {
@@ -58,7 +58,7 @@ class PreloaderManager {
 }
 
 // Global variables for animation
-let scene, camera, renderer, composer, ghostGroup, eyes, fireflies, particles, preloader;
+let scene, camera, renderer, preloader;
 
        // Initialize animation function
        function initializeAnimation() {
@@ -72,14 +72,6 @@ let scene, camera, renderer, composer, ghostGroup, eyes, fireflies, particles, p
 
          console.log('Initializing ghost animation...');
          window.ghostAnimationInitialized = true;
-
-         // Check if Three.js is available
-         if (typeof window.THREE === 'undefined') {
-           console.error('Three.js is not available in initializeAnimation');
-           return;
-         }
-
-         console.log('Three.js is available, proceeding with animation setup...');
 
   // Initialize preloader
   preloader = new PreloaderManager();
