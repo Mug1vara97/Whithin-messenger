@@ -1395,8 +1395,14 @@ export const useCallStore = create(
               autoGainControl: true,
               sampleRate: 48000,
               channelCount: 2,
-              sampleSize: 16
-            }
+              sampleSize: 16,
+              // ВАЖНО: Подавляем захват звука из браузера (включая наш звонок)
+              // Системный звук (музыка, видео) всё равно захватится
+              suppressLocalAudioPlayback: true
+            },
+            // Предпочитаем захват всего экрана для захвата системного звука
+            preferCurrentTab: false,
+            systemAudio: 'include'
           });
 
           console.log('Screen sharing access granted');
