@@ -42,6 +42,7 @@ export const useCallStore = create(
       participantAudioStates: new Map(), // userId -> isAudioEnabled
       participantGlobalAudioStates: new Map(), // userId -> isGlobalAudioMuted
       participantVideoStates: new Map(), // userId -> isVideoEnabled
+      speakingUsers: new Set(), // Пользователи, которые сейчас говорят (userId -> boolean)
       
       // Состояние аудио (загружаем из localStorage)
       isMuted: (() => {
@@ -98,6 +99,8 @@ export const useCallStore = create(
       device: null,
       sendTransport: null,
       recvTransport: null,
+      analyserNodes: new Map(), // AnalyserNode для анализа громкости каждого участника (userId -> AnalyserNode)
+      voiceDetectionIntervals: new Map(), // Интервалы для проверки активности голоса (userId -> intervalId)
       producers: new Map(),
       consumers: new Map(),
       localStream: null,
@@ -833,10 +836,16 @@ export const useCallStore = create(
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
           
-          // Создаем Web Audio API chain
+          // Создаем Web Audio API chain с AnalyserNode для определения активности голоса
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
           const gainNode = audioContext.createGain();
+          const analyserNode = audioContext.createAnalyser();
+          analyserNode.fftSize = 256;  // Размер FFT (меньше = быстрее, но менее точно)
+          analyserNode.smoothingTimeConstant = 0.8;  // Сглаживание
+          
+          // Подключаем цепочку: source -> gain -> analyser
           source.connect(gainNode);
+          gainNode.connect(analyserNode);
           
           // Устанавливаем начальную громкость
           const initialVolume = state.userVolumes.get(userId) || 100;
@@ -848,8 +857,10 @@ export const useCallStore = create(
           set((state) => {
             const newGainNodes = new Map(state.gainNodes);
             const newAudioElements = new Map(state.audioElements);
+            const newAnalyserNodes = new Map(state.analyserNodes);
             newGainNodes.set(userId, gainNode);
             newAudioElements.set(userId, audioElement);
+            newAnalyserNodes.set(userId, analyserNode);
             
             const newUserVolumes = new Map(state.userVolumes);
             if (!newUserVolumes.has(userId)) {
@@ -859,9 +870,53 @@ export const useCallStore = create(
             return {
               gainNodes: newGainNodes,
               audioElements: newAudioElements,
+              analyserNodes: newAnalyserNodes,
               userVolumes: newUserVolumes
             };
           });
+          
+          // 🎙️ Запускаем определение активности голоса
+          const VOICE_THRESHOLD = 30; // Громкость от 0 до 255
+          const CHECK_INTERVAL = 100; // Проверяем каждые 100ms
+          
+          const bufferLength = analyserNode.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+          
+          // Очищаем предыдущий интервал, если есть
+          const existingInterval = state.voiceDetectionIntervals.get(userId);
+          if (existingInterval) {
+            clearInterval(existingInterval);
+          }
+          
+          const interval = setInterval(() => {
+            analyserNode.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+            const isSpeakingNow = average > VOICE_THRESHOLD;
+            
+            const currentState = get();
+            const wasSpeaking = currentState.speakingUsers.has(userId);
+            
+            if (isSpeakingNow !== wasSpeaking) {
+              set((state) => {
+                const newSpeakingUsers = new Set(state.speakingUsers);
+                if (isSpeakingNow) {
+                  newSpeakingUsers.add(userId);
+                } else {
+                  newSpeakingUsers.delete(userId);
+                }
+                return { speakingUsers: newSpeakingUsers };
+              });
+            }
+          }, CHECK_INTERVAL);
+          
+          // Сохраняем интервал
+          set((state) => {
+            const newIntervals = new Map(state.voiceDetectionIntervals);
+            newIntervals.set(userId, interval);
+            return { voiceDetectionIntervals: newIntervals };
+          });
+          
+          console.log(`🎙️ Voice detection started for user: ${userId}`);
 
           try {
             await audioElement.play();
@@ -922,7 +977,8 @@ export const useCallStore = create(
               autoGainControl: true,
               sampleRate: 48000,
               channelCount: 1,
-              latency: 0
+              latency: 0,
+              suppressLocalAudioPlayback: true
             }
           });
 
@@ -1302,6 +1358,9 @@ export const useCallStore = create(
           state.consumers.forEach(consumer => consumer.close());
           state.producers.forEach(producer => producer.close());
           
+          // Останавливаем все интервалы анализа голоса
+          state.voiceDetectionIntervals.forEach(interval => clearInterval(interval));
+          
           // Очистка GainNodes и audio elements
           state.gainNodes.forEach(gainNode => {
             try {
@@ -1347,6 +1406,9 @@ export const useCallStore = create(
             audioElements: new Map(),
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
+            analyserNodes: new Map(),
+            voiceDetectionIntervals: new Map(),
+            speakingUsers: new Set(),
             device: null,
             sendTransport: null,
             recvTransport: null,
@@ -1379,20 +1441,24 @@ export const useCallStore = create(
           }
 
           console.log('Requesting screen sharing access...');
-          // ВАЖНО: НЕ указываем preferCurrentTab и systemAudio
-          // Пользователь сам выберет окно/вкладку/экран
-          // При выборе ОКНА - захватится звук только этого окна (не голоса участников!)
-          // При выборе ВКЛАДКИ - захватится звук только этой вкладки
-          // При выборе ЭКРАНА - можно выбрать "Системный звук" (захватит всё)
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               cursor: 'always',
               frameRate: { ideal: 60, max: 60 },
               width: { ideal: 1920, max: 1920 },
               height: { ideal: 1080, max: 1080 },
-              aspectRatio: 16/9
+              aspectRatio: 16/9,
+              displaySurface: 'monitor',
+              resizeMode: 'crop-and-scale'
             },
-            audio: true // Захватываем звук выбранного источника
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 2,
+              sampleSize: 16
+            }
           });
 
           console.log('Screen sharing access granted');

@@ -47,6 +47,7 @@ const VoiceCallView = ({
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
+    speakingUsers,
     startCall,
     endCall,
     toggleMute,
@@ -117,7 +118,7 @@ const VoiceCallView = ({
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
-    currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    currentUser.isSpeaking = false; // Текущий пользователь не может видеть себя говорящим
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
@@ -147,7 +148,7 @@ const VoiceCallView = ({
       videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
       videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
       videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
-      videoParticipant.isSpeaking = participant.isSpeaking || false;
+      videoParticipant.isSpeaking = speakingUsers?.has(participantUserId) ?? false; // 🎙️ Используем реальные данные анализа голоса
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
       videoParticipantsList.push(videoParticipant);
@@ -167,7 +168,8 @@ const VoiceCallView = ({
     participantMuteStates,
     participantAudioStates,
     participantGlobalAudioStates,
-    participantVideoStates
+    participantVideoStates,
+    speakingUsers // 🎙️ Реагируем на изменения активности голоса
   ]);
 
 

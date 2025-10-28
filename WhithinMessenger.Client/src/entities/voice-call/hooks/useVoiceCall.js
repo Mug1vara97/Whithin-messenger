@@ -30,6 +30,7 @@ export const useVoiceCall = (userId, userName) => {
   const [volume, setVolume] = useState(1.0);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [error, setError] = useState(null);
+  const [speakingUsers, setSpeakingUsers] = useState(new Set()); // Пользователи, которые сейчас говорят
   const [isNoiseSuppressed, setIsNoiseSuppressed] = useState(() => {
     const saved = localStorage.getItem('noiseSuppression');
     return saved ? JSON.parse(saved) : false;
@@ -59,11 +60,71 @@ export const useVoiceCall = (userId, userName) => {
   const audioElementsRef = useRef(new Map()); // Audio elements для каждого пользователя
   const previousVolumesRef = useRef(new Map()); // Предыдущая громкость перед мутом
   const peerIdToUserIdMapRef = useRef(new Map()); // Маппинг producerSocketId -> userId
-  
-  // ИЗОЛИРОВАННЫЙ AudioContext для участников звонка (НЕ захватывается screen sharing!)
-  const participantsAudioContextRef = useRef(null);
-  const participantsDestinationRef = useRef(null);
-  const participantsAudioElementRef = useRef(null);
+  const analyserNodesRef = useRef(new Map()); // AnalyserNode для анализа громкости каждого участника
+  const voiceDetectionIntervalsRef = useRef(new Map()); // Интервалы для проверки активности голоса
+
+  // 🎙️ Функция для определения активности голоса
+  const startVoiceDetection = useCallback((userId, analyserNode) => {
+    // Очищаем предыдущий интервал, если есть
+    const existingInterval = voiceDetectionIntervalsRef.current.get(userId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
+
+    const bufferLength = analyserNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    // Порог активности голоса (можно настроить)
+    const VOICE_THRESHOLD = 30; // Громкость от 0 до 255
+    const CHECK_INTERVAL = 100; // Проверяем каждые 100ms
+    
+    const interval = setInterval(() => {
+      analyserNode.getByteFrequencyData(dataArray);
+      
+      // Вычисляем среднюю громкость
+      const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+      
+      const isSpeakingNow = average > VOICE_THRESHOLD;
+      
+      // Обновляем состояние только если оно изменилось
+      setSpeakingUsers(prev => {
+        const wasSpeaking = prev.has(userId);
+        if (isSpeakingNow && !wasSpeaking) {
+          const newSet = new Set(prev);
+          newSet.add(userId);
+          return newSet;
+        } else if (!isSpeakingNow && wasSpeaking) {
+          const newSet = new Set(prev);
+          newSet.delete(userId);
+          return newSet;
+        }
+        return prev;
+      });
+    }, CHECK_INTERVAL);
+    
+    voiceDetectionIntervalsRef.current.set(userId, interval);
+    console.log(`🎙️ Voice detection started for user: ${userId}`);
+  }, []);
+
+  // Остановка определения голоса
+  const stopVoiceDetection = useCallback((userId) => {
+    const interval = voiceDetectionIntervalsRef.current.get(userId);
+    if (interval) {
+      clearInterval(interval);
+      voiceDetectionIntervalsRef.current.delete(userId);
+      console.log(`🛑 Voice detection stopped for user: ${userId}`);
+    }
+    
+    // Удаляем из говорящих
+    setSpeakingUsers(prev => {
+      if (prev.has(userId)) {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      }
+      return prev;
+    });
+  }, []);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
@@ -136,7 +197,25 @@ export const useVoiceCall = (userId, userName) => {
           return;
         }
         
-        // Очищаем gain node (audio элементов больше нет)
+        // Останавливаем анализ голоса
+        stopVoiceDetection(userId);
+        
+        // Очищаем audio element
+        const audioElement = audioElementsRef.current.get(userId);
+        if (audioElement) {
+          console.log('Removing audio element for user:', userId);
+          audioElement.pause();
+          audioElement.srcObject = null;
+          if (audioElement.parentNode) {
+            audioElement.parentNode.removeChild(audioElement);
+          }
+          audioElementsRef.current.delete(userId);
+        }
+        
+        // Очищаем analyser node
+        analyserNodesRef.current.delete(userId);
+        
+        // Очищаем gain node
         const gainNode = gainNodesRef.current.get(userId);
         if (gainNode) {
           console.log('Disconnecting gain node for user:', userId);
@@ -245,6 +324,24 @@ export const useVoiceCall = (userId, userName) => {
           console.log('Producer closed for socketId:', producerSocketId, 'userId:', userId);
           
           if (userId) {
+            // Останавливаем анализ голоса
+            stopVoiceDetection(userId);
+            
+            // Очищаем audio element
+            const audioElement = audioElementsRef.current.get(userId);
+            if (audioElement) {
+              console.log('Removing audio element for user:', userId);
+              audioElement.pause();
+              audioElement.srcObject = null;
+              if (audioElement.parentNode) {
+                audioElement.parentNode.removeChild(audioElement);
+              }
+              audioElementsRef.current.delete(userId);
+            }
+            
+            // Очищаем analyser node
+            analyserNodesRef.current.delete(userId);
+            
             // Очищаем gain node
             const gainNode = gainNodesRef.current.get(userId);
             if (gainNode) {
@@ -296,7 +393,7 @@ export const useVoiceCall = (userId, userName) => {
       setError(error.message);
       connectingRef.current = false;
     }
-  }, [userId, userName, isMuted, isGlobalAudioMuted]);
+  }, [userId, userName, isMuted, isGlobalAudioMuted, stopVoiceDetection]);
 
   // Отключение от сервера
   const disconnect = useCallback(async () => {
@@ -329,20 +426,6 @@ export const useVoiceCall = (userId, userName) => {
         audioContextRef.current = null;
       }
       
-      // Закрытие ИЗОЛИРОВАННОГО audio context для участников
-      if (participantsAudioElementRef.current) {
-        participantsAudioElementRef.current.pause();
-        participantsAudioElementRef.current.srcObject = null;
-        participantsAudioElementRef.current = null;
-      }
-      
-      if (participantsAudioContextRef.current && participantsAudioContextRef.current.state !== 'closed') {
-        await participantsAudioContextRef.current.close();
-        participantsAudioContextRef.current = null;
-        participantsDestinationRef.current = null;
-        console.log('Isolated participants audio context closed');
-      }
-      
       if (sendTransportRef.current) {
         sendTransportRef.current.close();
         sendTransportRef.current = null;
@@ -359,7 +442,17 @@ export const useVoiceCall = (userId, userName) => {
       producersRef.current.forEach(producer => producer.close());
       producersRef.current.clear();
       
-      // Очистка GainNodes
+      // Останавливаем все интервалы анализа голоса
+      voiceDetectionIntervalsRef.current.forEach(interval => clearInterval(interval));
+      voiceDetectionIntervalsRef.current.clear();
+      
+      // Очищаем analyser nodes
+      analyserNodesRef.current.clear();
+      
+      // Очищаем состояние говорящих пользователей
+      setSpeakingUsers(new Set());
+      
+      // Очистка GainNodes и audio elements
       gainNodesRef.current.forEach(gainNode => {
         try {
           gainNode.disconnect();
@@ -369,7 +462,17 @@ export const useVoiceCall = (userId, userName) => {
       });
       gainNodesRef.current.clear();
       
-      // Очищаем ref-ы
+      audioElementsRef.current.forEach(audioElement => {
+        try {
+          audioElement.pause();
+          audioElement.srcObject = null;
+          if (audioElement.parentNode) {
+            audioElement.parentNode.removeChild(audioElement);
+          }
+        } catch (e) {
+          console.warn('Error removing audio element:', e);
+        }
+      });
       audioElementsRef.current.clear();
       previousVolumesRef.current.clear();
       peerIdToUserIdMapRef.current.clear();
@@ -539,54 +642,47 @@ export const useVoiceCall = (userId, userName) => {
         await audioContextRef.current.resume();
       }
       
-      // СОЗДАЕМ ИЗОЛИРОВАННЫЙ AUDIO CONTEXT ДЛЯ УЧАСТНИКОВ
-      // Это предотвращает захват их голосов при screen sharing!
-      if (!participantsAudioContextRef.current || participantsAudioContextRef.current.state === 'closed') {
-        participantsAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 48000,
-          latencyHint: 'interactive'
-        });
-        
-        // Создаем MediaStreamDestination - это ВЫХОД из Web Audio API
-        participantsDestinationRef.current = participantsAudioContextRef.current.createMediaStreamDestination();
-        
-        // Создаем скрытый audio элемент для воспроизведения
-        if (!participantsAudioElementRef.current) {
-          participantsAudioElementRef.current = new Audio();
-          participantsAudioElementRef.current.autoplay = true;
-          participantsAudioElementRef.current.volume = 1.0;
-        }
-        
-        // Подключаем destination stream к audio элементу
-        // Этот stream НЕ захватывается screen sharing!
-        participantsAudioElementRef.current.srcObject = participantsDestinationRef.current.stream;
-        
-        console.log('✅ Created isolated audio system for participants (not captured by screen sharing)');
-      }
+      // Создаем audio element
+      const audioElement = document.createElement('audio');
+      audioElement.srcObject = new MediaStream([consumer.track]);
+      audioElement.autoplay = true;
+      audioElement.playsInline = true;
+      audioElement.controls = false;
+      audioElement.style.display = 'none';
+      document.body.appendChild(audioElement);
       
-      // Resume audio context if suspended
-      if (participantsAudioContextRef.current.state === 'suspended') {
-        await participantsAudioContextRef.current.resume();
-      }
+      // Создаем Web Audio API chain: source -> gain
+      // НЕ подключаем к destination, чтобы избежать двойного воспроизведения!
+      // Воспроизведение идет только через HTML Audio элемент
+      const source = audioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
+      const gainNode = audioContextRef.current.createGain();
       
-      // Создаем audio source и gain node в ИЗОЛИРОВАННОМ context
-      const source = participantsAudioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
-      const gainNode = participantsAudioContextRef.current.createGain();
-      
-      // Устанавливаем начальную громкость через gain node
+      // GainNode больше не используется для воспроизведения, только для отслеживания состояния
+      // Устанавливаем начальную громкость HTML Audio элемента
       const initialVolume = userVolumes.get(userId) || 100;
       const isMuted = userMutedStates.get(userId) || false;
+      // Если глобально выключен звук, устанавливаем 0, иначе используем индивидуальную громкость
       const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-      gainNode.gain.value = audioVolume;
+      audioElement.volume = audioVolume;
       
-      // КЛЮЧЕВОЙ МОМЕНТ: Подключаем к ИЗОЛИРОВАННОМУ destination, а НЕ к основному!
-      // participantsDestinationRef -> audio element -> динамики
-      // Screen sharing НЕ захватывает этот путь!
+      // Создаем AnalyserNode для определения активности голоса
+      const analyserNode = audioContextRef.current.createAnalyser();
+      analyserNode.fftSize = 256;  // Размер FFT (меньше = быстрее, но менее точно)
+      analyserNode.smoothingTimeConstant = 0.8;  // Сглаживание
+      
+      // Подключаем цепочку: source -> gain -> analyser
+      // Воспроизведение идет через HTML Audio элемент, а analyser только анализирует
       source.connect(gainNode);
-      gainNode.connect(participantsDestinationRef.current);
+      gainNode.connect(analyserNode);
+      // gainNode.connect(audioContextRef.current.destination); // ОТКЛЮЧЕНО - используем только HTML Audio
       
       // Сохраняем ссылки
       gainNodesRef.current.set(userId, gainNode);
+      audioElementsRef.current.set(userId, audioElement);
+      analyserNodesRef.current.set(userId, analyserNode);
+      
+      // 🎙️ Запускаем определение активности голоса
+      startVoiceDetection(userId, analyserNode);
       
       // Инициализируем громкость в состоянии если еще не установлена
       if (!userVolumes.has(userId)) {
@@ -597,15 +693,29 @@ export const useVoiceCall = (userId, userName) => {
         });
       }
 
-      console.log(`✅ Audio connected via Web Audio API for peer: ${userId}`);
-      setAudioBlocked(false);
+      try {
+        await audioElement.play();
+        console.log('Audio playback started for peer:', userId);
+        setAudioBlocked(false);
+      } catch (error) {
+        console.log('Auto-play blocked, user interaction required:', error);
+        setAudioBlocked(true);
+        setTimeout(async () => {
+          try {
+            await audioElement.play();
+            setAudioBlocked(false);
+          } catch {
+            console.log('Audio playback still blocked');
+          }
+        }, 1000);
+      }
 
       await voiceCallApi.resumeConsumer(consumerData.id);
       console.log('New consumer created:', consumerData.id);
     } catch (error) {
       console.error('Failed to handle new producer:', error);
     }
-  }, [userVolumes, userMutedStates, isGlobalAudioMuted]);
+  }, [userVolumes, userMutedStates, isGlobalAudioMuted, startVoiceDetection]);
   
   // Обновляем ref при изменении handleNewProducer
   handleNewProducerRef.current = handleNewProducer;
@@ -649,7 +759,7 @@ export const useVoiceCall = (userId, userName) => {
           sampleRate: 48000,
           channelCount: 1,
           latency: 0,
-          suppressLocalAudioPlayback: false
+          suppressLocalAudioPlayback: true
         }
       });
 
@@ -821,9 +931,10 @@ export const useVoiceCall = (userId, userName) => {
   // Переключение мута для отдельного пользователя
   const toggleUserMute = useCallback((peerId) => {
     console.log('toggleUserMute called for:', peerId);
-    const gainNode = gainNodesRef.current.get(peerId);
-    if (!gainNode) {
-      console.error('Gain node not found for peer:', peerId);
+    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
+    const audioElement = audioElementsRef.current.get(peerId);
+    if (!audioElement) {
+      console.error('Audio element not found for peer:', peerId);
       return;
     }
 
@@ -831,13 +942,17 @@ export const useVoiceCall = (userId, userName) => {
     const newIsMuted = !isCurrentlyMuted;
 
     if (newIsMuted) {
-      // Мутим - устанавливаем gain на 0
-      gainNode.gain.value = 0;
+      // Мутим - устанавливаем 0, НЕ меняя ползунок (сохраняем текущее значение)
+      const currentVolume = userVolumes.get(peerId) || 100;
+      previousVolumesRef.current.set(peerId, currentVolume);
+      audioElement.volume = 0;
+      // НЕ меняем userVolumes, чтобы ползунок остался на месте
     } else {
-      // Размутиваем - восстанавливаем громкость
+      // Размутиваем - восстанавливаем звук на текущую позицию ползунка
       const currentVolume = userVolumes.get(peerId) || 100;
       const audioVolume = isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
-      gainNode.gain.value = audioVolume;
+      audioElement.volume = audioVolume;
+      // НЕ меняем userVolumes, ползунок уже на нужном месте
     }
 
     setUserMutedStates(prev => {
@@ -852,15 +967,16 @@ export const useVoiceCall = (userId, userName) => {
   // Изменение громкости отдельного пользователя
   const changeUserVolume = useCallback((peerId, newVolume) => {
     console.log('changeUserVolume called for:', peerId, 'newVolume:', newVolume);
-    const gainNode = gainNodesRef.current.get(peerId);
-    if (!gainNode) {
-      console.error('Gain node not found for peer:', peerId);
+    console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
+    const audioElement = audioElementsRef.current.get(peerId);
+    if (!audioElement) {
+      console.error('Audio element not found for peer:', peerId);
       return;
     }
 
-    // Устанавливаем громкость через gain node
+    // Если глобально замучено, применяем только состояние, но не звук
     const audioVolume = isGlobalAudioMuted ? 0 : (newVolume / 100.0);
-    gainNode.gain.value = audioVolume;
+    audioElement.volume = audioVolume;
 
     setUserVolumes(prev => {
       const newMap = new Map(prev);
@@ -901,7 +1017,7 @@ export const useVoiceCall = (userId, userName) => {
     const newMutedState = !isGlobalAudioMuted;
     
     console.log(`toggleGlobalAudio called, new state: ${newMutedState}`);
-    console.log(`Gain nodes count: ${gainNodesRef.current.size}`);
+    console.log(`Audio elements count: ${audioElementsRef.current.size}`);
     
     // Отправляем состояние наушников на сервер
     // isGlobalAudioMuted=true означает isAudioEnabled=false
@@ -910,20 +1026,20 @@ export const useVoiceCall = (userId, userName) => {
       console.log('Audio state (headphones) sent to server, isEnabled:', !newMutedState);
     }
     
-    // Управляем громкостью через Gain Nodes
-    gainNodesRef.current.forEach((gainNode, peerId) => {
-      if (gainNode) {
+    // Управляем только HTML Audio элементами (GainNode больше не используется для воспроизведения)
+    audioElementsRef.current.forEach((audioElement, peerId) => {
+      if (audioElement) {
         if (newMutedState) {
-          // Мутим - устанавливаем gain на 0
-          gainNode.gain.value = 0;
-          console.log(`Gain muted for peer: ${peerId}`);
+          // Мутим HTML Audio элемент
+          audioElement.volume = 0;
+          console.log(`HTML Audio muted for peer: ${peerId}`);
         } else {
           // Размутиваем с индивидуальной громкостью
           const volume = userVolumes.get(peerId) || 100;
           const isIndividuallyMuted = userMutedStates.get(peerId) || false;
           const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
-          gainNode.gain.value = audioVolume;
-          console.log(`Gain unmuted for peer: ${peerId}, volume: ${audioVolume}`);
+          audioElement.volume = audioVolume;
+          console.log(`HTML Audio unmuted for peer: ${peerId}, volume: ${audioVolume}`);
         }
       }
     });
@@ -1065,20 +1181,24 @@ export const useVoiceCall = (userId, userName) => {
 
         console.log('=== STARTING SCREEN SHARE ===');
       console.log('Requesting screen sharing access...');
-      // ВАЖНО: НЕ указываем preferCurrentTab и systemAudio
-      // Пользователь сам выберет окно/вкладку/экран
-      // При выборе ОКНА - захватится звук только этого окна (не голоса участников!)
-      // При выборе ВКЛАДКИ - захватится звук только этой вкладки
-      // При выборе ЭКРАНА - можно выбрать "Системный звук" (захватит всё)
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'always',
           frameRate: { ideal: 60, max: 60 },
           width: { ideal: 1920, max: 1920 },
           height: { ideal: 1080, max: 1080 },
-          aspectRatio: 16/9
+          aspectRatio: 16/9,
+          displaySurface: 'monitor',
+          resizeMode: 'crop-and-scale'
         },
-        audio: true // Захватываем звук выбранного источника
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 2,
+          sampleSize: 16
+        }
       });
 
       console.log('Screen sharing access granted');
@@ -1098,8 +1218,8 @@ export const useVoiceCall = (userId, userName) => {
       console.log('Stream tracks:', {
         videoTracks: stream.getVideoTracks().length,
         audioTracks: stream.getAudioTracks().length,
-        hasVideo: !!videoTrack,
-        hasAudio: !!audioTrack
+        videoTrack: !!videoTrack,
+        audioTrack: !!audioTrack
       });
       
       if (!videoTrack) {
@@ -1107,6 +1227,11 @@ export const useVoiceCall = (userId, userName) => {
       }
 
       console.log('Creating screen sharing producers...');
+      console.log('Video track:', videoTrack);
+      console.log('Audio track:', audioTrack);
+      
+      // Создаем video producer для демонстрации экрана
+      console.log('Creating video producer...');
       const videoProducer = await sendTransportRef.current.produce({
         track: videoTrack,
         encodings: [
@@ -1133,16 +1258,17 @@ export const useVoiceCall = (userId, userName) => {
 
       console.log('Screen sharing video producer created:', videoProducer.id);
 
-      // Создаем audio producer для системного звука, если он захвачен
+      // Создаем audio producer для демонстрации экрана, если есть аудио трек
       let audioProducer = null;
       if (audioTrack) {
-        console.log('Creating audio producer for system audio...');
+        console.log('Creating audio producer...');
         audioProducer = await sendTransportRef.current.produce({
           track: audioTrack,
           encodings: [
             {
+              ssrc: Math.floor(Math.random() * 4294967296),
               dtx: true,
-              maxBitrate: 128000,
+              maxBitrate: 128000, // 128 kbps для аудио демонстрации экрана
               scalabilityMode: 'S1T1',
               numberOfChannels: 2
             }
@@ -1151,23 +1277,37 @@ export const useVoiceCall = (userId, userName) => {
             opusStereo: true,
             opusDtx: true,
             opusFec: true,
+            opusNack: true,
             channelsCount: 2,
             sampleRate: 48000,
             opusMaxAverageBitrate: 128000,
-            opusApplication: 'music' // Для системного звука используем 'music'
+            opusMaxPlaybackRate: 48000,
+            opusPtime: 20,
+            opusApplication: 'music', // Для демонстрации экрана используем music вместо voip
+            opusCbr: false,
+            opusUseinbandfec: true
           },
           appData: {
             mediaType: 'screen',
             trackType: 'audio',
             userId: userId,
-            userName: userName
+            userName: userName,
+            audioProcessing: {
+              echoCancellation: false, // Отключаем для демонстрации экрана
+              noiseSuppression: false,
+              autoGainControl: false,
+              highpassFilter: false,
+              typingNoiseDetection: false,
+              monoAudio: false
+            }
           }
         });
+
         console.log('Screen sharing audio producer created:', audioProducer.id);
       } else {
-        console.log('No system audio captured (user may have declined or not available)');
+        console.log('No audio track available for screen sharing');
       }
-      
+
       // Сохраняем producers
       screenProducerRef.current = { video: videoProducer, audio: audioProducer };
       console.log('Screen sharing producers saved:', { 
@@ -1187,7 +1327,7 @@ export const useVoiceCall = (userId, userName) => {
         stopScreenShare();
       });
 
-      // Обработка событий audio producer, если есть
+      // Обработка событий audio producer, если он есть
       if (audioProducer) {
         audioProducer.on('transportclose', () => {
           console.log('Screen sharing audio transport closed');
@@ -1311,6 +1451,7 @@ export const useVoiceCall = (userId, userName) => {
     currentCall,
     isScreenSharing,
     screenShareStream,
+    speakingUsers, // Пользователи, которые сейчас говорят
     
     // Методы
     connect,

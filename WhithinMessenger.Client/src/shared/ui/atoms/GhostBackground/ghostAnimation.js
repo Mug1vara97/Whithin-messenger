@@ -58,7 +58,7 @@ class PreloaderManager {
 }
 
 // Global variables for animation
-let scene, camera, renderer, composer, ghostGroup, eyes, fireflies, particles, preloader;
+let scene, camera, renderer, preloader;
 
        // Initialize animation function
        function initializeAnimation() {
