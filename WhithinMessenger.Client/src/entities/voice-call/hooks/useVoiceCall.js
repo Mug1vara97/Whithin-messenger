@@ -59,6 +59,11 @@ export const useVoiceCall = (userId, userName) => {
   const audioElementsRef = useRef(new Map()); // Audio elements для каждого пользователя
   const previousVolumesRef = useRef(new Map()); // Предыдущая громкость перед мутом
   const peerIdToUserIdMapRef = useRef(new Map()); // Маппинг producerSocketId -> userId
+  
+  // ИЗОЛИРОВАННЫЙ AudioContext для участников звонка (НЕ захватывается screen sharing!)
+  const participantsAudioContextRef = useRef(null);
+  const participantsDestinationRef = useRef(null);
+  const participantsAudioElementRef = useRef(null);
 
   // Подключение к серверу
   const connect = useCallback(async () => {
@@ -324,6 +329,20 @@ export const useVoiceCall = (userId, userName) => {
         audioContextRef.current = null;
       }
       
+      // Закрытие ИЗОЛИРОВАННОГО audio context для участников
+      if (participantsAudioElementRef.current) {
+        participantsAudioElementRef.current.pause();
+        participantsAudioElementRef.current.srcObject = null;
+        participantsAudioElementRef.current = null;
+      }
+      
+      if (participantsAudioContextRef.current && participantsAudioContextRef.current.state !== 'closed') {
+        await participantsAudioContextRef.current.close();
+        participantsAudioContextRef.current = null;
+        participantsDestinationRef.current = null;
+        console.log('Isolated participants audio context closed');
+      }
+      
       if (sendTransportRef.current) {
         sendTransportRef.current.close();
         sendTransportRef.current = null;
@@ -520,10 +539,39 @@ export const useVoiceCall = (userId, userName) => {
         await audioContextRef.current.resume();
       }
       
-      // ИСПОЛЬЗУЕМ ТОЛЬКО WEB AUDIO API - звук НЕ захватывается при демонстрации экрана
-      // Создаем source из MediaStream
-      const source = audioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
-      const gainNode = audioContextRef.current.createGain();
+      // СОЗДАЕМ ИЗОЛИРОВАННЫЙ AUDIO CONTEXT ДЛЯ УЧАСТНИКОВ
+      // Это предотвращает захват их голосов при screen sharing!
+      if (!participantsAudioContextRef.current || participantsAudioContextRef.current.state === 'closed') {
+        participantsAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 48000,
+          latencyHint: 'interactive'
+        });
+        
+        // Создаем MediaStreamDestination - это ВЫХОД из Web Audio API
+        participantsDestinationRef.current = participantsAudioContextRef.current.createMediaStreamDestination();
+        
+        // Создаем скрытый audio элемент для воспроизведения
+        if (!participantsAudioElementRef.current) {
+          participantsAudioElementRef.current = new Audio();
+          participantsAudioElementRef.current.autoplay = true;
+          participantsAudioElementRef.current.volume = 1.0;
+        }
+        
+        // Подключаем destination stream к audio элементу
+        // Этот stream НЕ захватывается screen sharing!
+        participantsAudioElementRef.current.srcObject = participantsDestinationRef.current.stream;
+        
+        console.log('✅ Created isolated audio system for participants (not captured by screen sharing)');
+      }
+      
+      // Resume audio context if suspended
+      if (participantsAudioContextRef.current.state === 'suspended') {
+        await participantsAudioContextRef.current.resume();
+      }
+      
+      // Создаем audio source и gain node в ИЗОЛИРОВАННОМ context
+      const source = participantsAudioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
+      const gainNode = participantsAudioContextRef.current.createGain();
       
       // Устанавливаем начальную громкость через gain node
       const initialVolume = userVolumes.get(userId) || 100;
@@ -531,12 +579,13 @@ export const useVoiceCall = (userId, userName) => {
       const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
       gainNode.gain.value = audioVolume;
       
-      // ВАЖНО: Подключаем напрямую к destination (динамики)
-      // Это НЕ захватывается при screen sharing!
+      // КЛЮЧЕВОЙ МОМЕНТ: Подключаем к ИЗОЛИРОВАННОМУ destination, а НЕ к основному!
+      // participantsDestinationRef -> audio element -> динамики
+      // Screen sharing НЕ захватывает этот путь!
       source.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
+      gainNode.connect(participantsDestinationRef.current);
       
-      // Сохраняем ссылки (audioElement больше не нужен)
+      // Сохраняем ссылки
       gainNodesRef.current.set(userId, gainNode);
       
       // Инициализируем громкость в состоянии если еще не установлена
@@ -600,7 +649,7 @@ export const useVoiceCall = (userId, userName) => {
           sampleRate: 48000,
           channelCount: 1,
           latency: 0,
-          suppressLocalAudioPlayback: true
+          suppressLocalAudioPlayback: false
         }
       });
 
@@ -1026,7 +1075,18 @@ export const useVoiceCall = (userId, userName) => {
           displaySurface: 'monitor',
           resizeMode: 'crop-and-scale'
         },
-        audio: false  // НЕ захватываем звук браузера вообще
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 2
+          // НЕ используем suppressLocalAudioPlayback - он не работает в Electron
+          // Вместо этого используем изолированный AudioContext для участников
+        },
+        // Захват всего экрана для системного звука
+        preferCurrentTab: false,
+        systemAudio: 'include'
       });
 
       console.log('Screen sharing access granted');
@@ -1041,15 +1101,20 @@ export const useVoiceCall = (userId, userName) => {
       setScreenShareStream(stream);
 
       const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      
+      console.log('Stream tracks:', {
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        hasVideo: !!videoTrack,
+        hasAudio: !!audioTrack
+      });
       
       if (!videoTrack) {
         throw new Error('No video track available');
       }
 
-      console.log('Creating screen sharing video producer...');
-      
-      // Создаем video producer для демонстрации экрана
-      console.log('Creating video producer...');
+      console.log('Creating screen sharing producers...');
       const videoProducer = await sendTransportRef.current.produce({
         track: videoTrack,
         encodings: [
@@ -1076,12 +1141,47 @@ export const useVoiceCall = (userId, userName) => {
 
       console.log('Screen sharing video producer created:', videoProducer.id);
 
-      // Звук браузера НЕ захватываем (audio: false)
-      // Системный звук можно захватить через Windows/системные настройки
+      // Создаем audio producer для системного звука, если он захвачен
+      let audioProducer = null;
+      if (audioTrack) {
+        console.log('Creating audio producer for system audio...');
+        audioProducer = await sendTransportRef.current.produce({
+          track: audioTrack,
+          encodings: [
+            {
+              dtx: true,
+              maxBitrate: 128000,
+              scalabilityMode: 'S1T1',
+              numberOfChannels: 2
+            }
+          ],
+          codecOptions: {
+            opusStereo: true,
+            opusDtx: true,
+            opusFec: true,
+            channelsCount: 2,
+            sampleRate: 48000,
+            opusMaxAverageBitrate: 128000,
+            opusApplication: 'music' // Для системного звука используем 'music'
+          },
+          appData: {
+            mediaType: 'screen',
+            trackType: 'audio',
+            userId: userId,
+            userName: userName
+          }
+        });
+        console.log('Screen sharing audio producer created:', audioProducer.id);
+      } else {
+        console.log('No system audio captured (user may have declined or not available)');
+      }
       
-      // Сохраняем producer (только video)
-      screenProducerRef.current = { video: videoProducer, audio: null };
-      console.log('Screen sharing producer saved (video only):', videoProducer.id);
+      // Сохраняем producers
+      screenProducerRef.current = { video: videoProducer, audio: audioProducer };
+      console.log('Screen sharing producers saved:', { 
+        video: videoProducer.id, 
+        audio: audioProducer ? audioProducer.id : 'none' 
+      });
       setIsScreenSharing(true);
 
       // Обработка событий video producer
@@ -1094,6 +1194,19 @@ export const useVoiceCall = (userId, userName) => {
         console.log('Screen sharing video track ended');
         stopScreenShare();
       });
+
+      // Обработка событий audio producer, если есть
+      if (audioProducer) {
+        audioProducer.on('transportclose', () => {
+          console.log('Screen sharing audio transport closed');
+          stopScreenShare();
+        });
+
+        audioProducer.on('trackended', () => {
+          console.log('Screen sharing audio track ended');
+          stopScreenShare();
+        });
+      }
 
     } catch (error) {
       console.error('Error starting screen share:', error);

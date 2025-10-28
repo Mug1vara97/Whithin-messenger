@@ -1389,7 +1389,18 @@ export const useCallStore = create(
               displaySurface: 'monitor',
               resizeMode: 'crop-and-scale'
             },
-            audio: false  // НЕ захватываем звук браузера вообще
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              sampleRate: 48000,
+              channelCount: 2
+              // НЕ используем suppressLocalAudioPlayback - он не работает в Electron
+              // Вместо этого используем изолированный AudioContext для участников
+            },
+            // Захват всего экрана для системного звука
+            preferCurrentTab: false,
+            systemAudio: 'include'
           });
 
           console.log('Screen sharing access granted');
