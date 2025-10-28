@@ -922,8 +922,7 @@ export const useCallStore = create(
               autoGainControl: true,
               sampleRate: 48000,
               channelCount: 1,
-              latency: 0,
-              suppressLocalAudioPlayback: true
+              latency: 0
             }
           });
 
@@ -1396,14 +1395,8 @@ export const useCallStore = create(
               autoGainControl: true,
               sampleRate: 48000,
               channelCount: 2,
-              sampleSize: 16,
-              // Подавляем звук из самого браузера (включая звонки)
-              // Это позволит захватить звук системы, но не звук из звонка
-              suppressLocalAudioPlayback: true
-            },
-            // Предпочитаем захват всего экрана для лучшей совместимости со звуком
-            preferCurrentTab: false,
-            systemAudio: 'include'
+              sampleSize: 16
+            }
           });
 
           console.log('Screen sharing access granted');
