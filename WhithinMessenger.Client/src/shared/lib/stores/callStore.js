@@ -1389,20 +1389,7 @@ export const useCallStore = create(
               displaySurface: 'monitor',
               resizeMode: 'crop-and-scale'
             },
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000,
-              channelCount: 2,
-              sampleSize: 16,
-              // ВАЖНО: Подавляем захват звука из браузера (включая наш звонок)
-              // Системный звук (музыка, видео) всё равно захватится
-              suppressLocalAudioPlayback: true
-            },
-            // Предпочитаем захват всего экрана для захвата системного звука
-            preferCurrentTab: false,
-            systemAudio: 'include'
+            audio: false  // НЕ захватываем звук браузера вообще
           });
 
           console.log('Screen sharing access granted');

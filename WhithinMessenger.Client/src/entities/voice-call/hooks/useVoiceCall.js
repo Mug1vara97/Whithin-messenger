@@ -1026,20 +1026,7 @@ export const useVoiceCall = (userId, userName) => {
           displaySurface: 'monitor',
           resizeMode: 'crop-and-scale'
         },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 2,
-          sampleSize: 16,
-          // ВАЖНО: Подавляем захват звука из браузера (включая наш звонок)
-          // Системный звук (музыка, видео) всё равно захватится
-          suppressLocalAudioPlayback: true
-        },
-        // Предпочитаем захват всего экрана для захвата системного звука
-        preferCurrentTab: false,
-        systemAudio: 'include'
+        audio: false  // НЕ захватываем звук браузера вообще
       });
 
       console.log('Screen sharing access granted');
@@ -1054,22 +1041,12 @@ export const useVoiceCall = (userId, userName) => {
       setScreenShareStream(stream);
 
       const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
-      
-      console.log('Stream tracks:', {
-        videoTracks: stream.getVideoTracks().length,
-        audioTracks: stream.getAudioTracks().length,
-        videoTrack: !!videoTrack,
-        audioTrack: !!audioTrack
-      });
       
       if (!videoTrack) {
         throw new Error('No video track available');
       }
 
-      console.log('Creating screen sharing producers...');
-      console.log('Video track:', videoTrack);
-      console.log('Audio track:', audioTrack);
+      console.log('Creating screen sharing video producer...');
       
       // Создаем video producer для демонстрации экрана
       console.log('Creating video producer...');
@@ -1099,62 +1076,12 @@ export const useVoiceCall = (userId, userName) => {
 
       console.log('Screen sharing video producer created:', videoProducer.id);
 
-      // Создаем audio producer для демонстрации экрана, если есть аудио трек
-      let audioProducer = null;
-      if (audioTrack) {
-        console.log('Creating audio producer...');
-        audioProducer = await sendTransportRef.current.produce({
-          track: audioTrack,
-          encodings: [
-            {
-              ssrc: Math.floor(Math.random() * 4294967296),
-              dtx: true,
-              maxBitrate: 128000, // 128 kbps для аудио демонстрации экрана
-              scalabilityMode: 'S1T1',
-              numberOfChannels: 2
-            }
-          ],
-          codecOptions: {
-            opusStereo: true,
-            opusDtx: true,
-            opusFec: true,
-            opusNack: true,
-            channelsCount: 2,
-            sampleRate: 48000,
-            opusMaxAverageBitrate: 128000,
-            opusMaxPlaybackRate: 48000,
-            opusPtime: 20,
-            opusApplication: 'music', // Для демонстрации экрана используем music вместо voip
-            opusCbr: false,
-            opusUseinbandfec: true
-          },
-          appData: {
-            mediaType: 'screen',
-            trackType: 'audio',
-            userId: userId,
-            userName: userName,
-            audioProcessing: {
-              echoCancellation: false, // Отключаем для демонстрации экрана
-              noiseSuppression: false,
-              autoGainControl: false,
-              highpassFilter: false,
-              typingNoiseDetection: false,
-              monoAudio: false
-            }
-          }
-        });
-
-        console.log('Screen sharing audio producer created:', audioProducer.id);
-      } else {
-        console.log('No audio track available for screen sharing');
-      }
-
-      // Сохраняем producers
-      screenProducerRef.current = { video: videoProducer, audio: audioProducer };
-      console.log('Screen sharing producers saved:', { 
-        video: videoProducer.id, 
-        audio: audioProducer ? audioProducer.id : 'none' 
-      });
+      // Звук браузера НЕ захватываем (audio: false)
+      // Системный звук можно захватить через Windows/системные настройки
+      
+      // Сохраняем producer (только video)
+      screenProducerRef.current = { video: videoProducer, audio: null };
+      console.log('Screen sharing producer saved (video only):', videoProducer.id);
       setIsScreenSharing(true);
 
       // Обработка событий video producer
@@ -1167,19 +1094,6 @@ export const useVoiceCall = (userId, userName) => {
         console.log('Screen sharing video track ended');
         stopScreenShare();
       });
-
-      // Обработка событий audio producer, если он есть
-      if (audioProducer) {
-        audioProducer.on('transportclose', () => {
-          console.log('Screen sharing audio transport closed');
-          stopScreenShare();
-        });
-
-        audioProducer.on('trackended', () => {
-          console.log('Screen sharing audio track ended');
-          stopScreenShare();
-        });
-      }
 
     } catch (error) {
       console.error('Error starting screen share:', error);
