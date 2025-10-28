@@ -75,7 +75,7 @@ export const useVoiceCall = (userId, userName) => {
     const dataArray = new Uint8Array(bufferLength);
     
     // Порог активности голоса (можно настроить)
-    const VOICE_THRESHOLD = 30; // Громкость от 0 до 255
+    const VOICE_THRESHOLD = 20; // Громкость от 0 до 255 (снижен для более чувствительного определения)
     const CHECK_INTERVAL = 100; // Проверяем каждые 100ms
     
     const interval = setInterval(() => {
@@ -86,16 +86,25 @@ export const useVoiceCall = (userId, userName) => {
       
       const isSpeakingNow = average > VOICE_THRESHOLD;
       
+      // Логируем только когда громкость выше порога для отладки
+      if (average > 10) {
+        console.log(`🎙️ [useVoiceCall] User ${userId} - average: ${average.toFixed(2)}, threshold: ${VOICE_THRESHOLD}, speaking: ${isSpeakingNow}`);
+      }
+      
       // Обновляем состояние только если оно изменилось
       setSpeakingUsers(prev => {
         const wasSpeaking = prev.has(userId);
         if (isSpeakingNow && !wasSpeaking) {
+          console.log(`🔄 [useVoiceCall] Speaking state changed for ${userId}: ${wasSpeaking} -> ${isSpeakingNow}`);
           const newSet = new Set(prev);
           newSet.add(userId);
+          console.log(`✅ [useVoiceCall] New speakingUsers Set:`, Array.from(newSet));
           return newSet;
         } else if (!isSpeakingNow && wasSpeaking) {
+          console.log(`🔄 [useVoiceCall] Speaking state changed for ${userId}: ${wasSpeaking} -> ${isSpeakingNow}`);
           const newSet = new Set(prev);
           newSet.delete(userId);
+          console.log(`✅ [useVoiceCall] New speakingUsers Set:`, Array.from(newSet));
           return newSet;
         }
         return prev;

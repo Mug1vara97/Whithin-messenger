@@ -110,7 +110,9 @@ const VoiceCallView = ({
       participantMuteStatesSize: participantMuteStates?.size,
       participantAudioStatesSize: participantAudioStates?.size,
       participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
-      participantVideoStatesSize: participantVideoStates?.size
+      participantVideoStatesSize: participantVideoStates?.size,
+      speakingUsersSize: speakingUsers?.size,
+      speakingUsersArray: speakingUsers ? Array.from(speakingUsers) : []
     });
     
     // Текущий пользователь (хост)
@@ -151,6 +153,9 @@ const VoiceCallView = ({
       videoParticipant.isSpeaking = speakingUsers?.has(participantUserId) ?? false; // 🎙️ Используем реальные данные анализа голоса
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
+      
+      console.log(`🎙️ Participant ${participantUserId}: isSpeaking=${videoParticipant.isSpeaking}, in speakingUsers=${speakingUsers?.has(participantUserId)}`);
+      
       videoParticipantsList.push(videoParticipant);
     });
     

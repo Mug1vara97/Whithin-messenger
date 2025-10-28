@@ -828,6 +828,7 @@ export const useCallStore = create(
           }
           
           // Создаем audio element
+          console.log(`🔊 [callStore] Creating audio element for user: ${userId}`);
           const audioElement = document.createElement('audio');
           audioElement.srcObject = new MediaStream([consumer.track]);
           audioElement.autoplay = true;
@@ -837,11 +838,13 @@ export const useCallStore = create(
           document.body.appendChild(audioElement);
           
           // Создаем Web Audio API chain с AnalyserNode для определения активности голоса
+          console.log(`🎚️ [callStore] Creating Web Audio API chain for user: ${userId}`);
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
           const gainNode = audioContext.createGain();
           const analyserNode = audioContext.createAnalyser();
           analyserNode.fftSize = 256;  // Размер FFT (меньше = быстрее, но менее точно)
           analyserNode.smoothingTimeConstant = 0.8;  // Сглаживание
+          console.log(`✅ [callStore] AnalyserNode created for user: ${userId}, fftSize: ${analyserNode.fftSize}`);
           
           // Подключаем цепочку: source -> gain -> analyser
           source.connect(gainNode);
@@ -876,7 +879,7 @@ export const useCallStore = create(
           });
           
           // 🎙️ Запускаем определение активности голоса
-          const VOICE_THRESHOLD = 30; // Громкость от 0 до 255
+          const VOICE_THRESHOLD = 20; // Громкость от 0 до 255 (снижен для более чувствительного определения)
           const CHECK_INTERVAL = 100; // Проверяем каждые 100ms
           
           const bufferLength = analyserNode.frequencyBinCount;
@@ -893,10 +896,16 @@ export const useCallStore = create(
             const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
             const isSpeakingNow = average > VOICE_THRESHOLD;
             
+            // Логируем только когда громкость выше порога для отладки
+            if (average > 10) {
+              console.log(`🎙️ [callStore] User ${userId} - average: ${average.toFixed(2)}, threshold: ${VOICE_THRESHOLD}, speaking: ${isSpeakingNow}`);
+            }
+            
             const currentState = get();
             const wasSpeaking = currentState.speakingUsers.has(userId);
             
             if (isSpeakingNow !== wasSpeaking) {
+              console.log(`🔄 [callStore] Speaking state changed for ${userId}: ${wasSpeaking} -> ${isSpeakingNow}`);
               set((state) => {
                 const newSpeakingUsers = new Set(state.speakingUsers);
                 if (isSpeakingNow) {
@@ -904,6 +913,7 @@ export const useCallStore = create(
                 } else {
                   newSpeakingUsers.delete(userId);
                 }
+                console.log(`✅ [callStore] New speakingUsers Set:`, Array.from(newSpeakingUsers));
                 return { speakingUsers: newSpeakingUsers };
               });
             }
@@ -916,7 +926,7 @@ export const useCallStore = create(
             return { voiceDetectionIntervals: newIntervals };
           });
           
-          console.log(`🎙️ Voice detection started for user: ${userId}`);
+          console.log(`✅ [callStore] Voice detection STARTED for user: ${userId}, interval ID: ${interval}`);
 
           try {
             await audioElement.play();
