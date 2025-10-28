@@ -1065,28 +1065,20 @@ export const useVoiceCall = (userId, userName) => {
 
         console.log('=== STARTING SCREEN SHARE ===');
       console.log('Requesting screen sharing access...');
+      // ВАЖНО: НЕ указываем preferCurrentTab и systemAudio
+      // Пользователь сам выберет окно/вкладку/экран
+      // При выборе ОКНА - захватится звук только этого окна (не голоса участников!)
+      // При выборе ВКЛАДКИ - захватится звук только этой вкладки
+      // При выборе ЭКРАНА - можно выбрать "Системный звук" (захватит всё)
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'always',
           frameRate: { ideal: 60, max: 60 },
           width: { ideal: 1920, max: 1920 },
           height: { ideal: 1080, max: 1080 },
-          aspectRatio: 16/9,
-          displaySurface: 'monitor',
-          resizeMode: 'crop-and-scale'
+          aspectRatio: 16/9
         },
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 48000,
-          channelCount: 2
-          // НЕ используем suppressLocalAudioPlayback - он не работает в Electron
-          // Вместо этого используем изолированный AudioContext для участников
-        },
-        // Захват всего экрана для системного звука
-        preferCurrentTab: false,
-        systemAudio: 'include'
+        audio: true // Захватываем звук выбранного источника
       });
 
       console.log('Screen sharing access granted');
