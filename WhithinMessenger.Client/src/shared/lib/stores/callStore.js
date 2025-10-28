@@ -99,8 +99,9 @@ export const useCallStore = create(
       device: null,
       sendTransport: null,
       recvTransport: null,
-      analyserNodes: new Map(), // AnalyserNode для анализа громкости каждого участника (userId -> AnalyserNode)
-      voiceDetectionIntervals: new Map(), // Интервалы для проверки активности голоса (userId -> intervalId)
+      voiceDetectorNodes: new Map(), // AudioWorkletNode для определения активности голоса (userId -> WorkletNode)
+      voiceDetectorSources: new Map(), // MediaStreamSource для каждого участника (userId -> SourceNode)
+      voiceWorkletLoaded: false, // Флаг загрузки worklet модуля
       producers: new Map(),
       consumers: new Map(),
       localStream: null,
@@ -828,7 +829,6 @@ export const useCallStore = create(
           }
           
           // Создаем audio element
-          console.log(`🔊 [callStore] Creating audio element for user: ${userId}`);
           const audioElement = document.createElement('audio');
           audioElement.srcObject = new MediaStream([consumer.track]);
           audioElement.autoplay = true;
@@ -837,18 +837,9 @@ export const useCallStore = create(
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
           
-          // Создаем Web Audio API chain с AnalyserNode для определения активности голоса
-          console.log(`🎚️ [callStore] Creating Web Audio API chain for user: ${userId}`);
+          // Создаем Web Audio API chain с GainNode
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
           const gainNode = audioContext.createGain();
-          const analyserNode = audioContext.createAnalyser();
-          analyserNode.fftSize = 256;  // Размер FFT (меньше = быстрее, но менее точно)
-          analyserNode.smoothingTimeConstant = 0.8;  // Сглаживание
-          console.log(`✅ [callStore] AnalyserNode created for user: ${userId}, fftSize: ${analyserNode.fftSize}`);
-          
-          // Подключаем цепочку: source -> gain -> analyser
-          source.connect(gainNode);
-          gainNode.connect(analyserNode);
           
           // Устанавливаем начальную громкость
           const initialVolume = state.userVolumes.get(userId) || 100;
@@ -856,77 +847,98 @@ export const useCallStore = create(
           const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
           audioElement.volume = audioVolume;
           
-          // Сохраняем ссылки
-          set((state) => {
-            const newGainNodes = new Map(state.gainNodes);
-            const newAudioElements = new Map(state.audioElements);
-            const newAnalyserNodes = new Map(state.analyserNodes);
-            newGainNodes.set(userId, gainNode);
-            newAudioElements.set(userId, audioElement);
-            newAnalyserNodes.set(userId, analyserNode);
-            
-            const newUserVolumes = new Map(state.userVolumes);
-            if (!newUserVolumes.has(userId)) {
-              newUserVolumes.set(userId, 100);
+          // 🎙️ Запускаем определение активности голоса через AudioWorklet
+          try {
+            // Загружаем worklet модуль если еще не загружен
+            if (!state.voiceWorkletLoaded) {
+              await audioContext.audioWorklet.addModule('/voice-detector.worklet.js');
+              set({ voiceWorkletLoaded: true });
+              console.log('✅ Voice detector worklet loaded');
             }
             
-            return {
-              gainNodes: newGainNodes,
-              audioElements: newAudioElements,
-              analyserNodes: newAnalyserNodes,
-              userVolumes: newUserVolumes
+            // Создаем VoiceDetectorNode
+            const voiceDetectorNode = new AudioWorkletNode(audioContext, 'voice-detector', {
+              numberOfInputs: 1,
+              numberOfOutputs: 1,
+              channelCount: 1
+            });
+            
+            // Подключаем цепочку: source -> voiceDetector -> gainNode
+            // voiceDetector только анализирует, не изменяет звук
+            source.connect(voiceDetectorNode);
+            voiceDetectorNode.connect(gainNode);
+            
+            // Обработчик сообщений от worklet (работает в отдельном потоке!)
+            voiceDetectorNode.port.onmessage = (event) => {
+              const { speaking } = event.data;
+              
+              // Обновляем состояние только при изменении
+              const currentState = get();
+              const wasSpeaking = currentState.speakingUsers.has(userId);
+              
+              if (speaking !== wasSpeaking) {
+                set((state) => {
+                  const newSpeakingUsers = new Set(state.speakingUsers);
+                  if (speaking) {
+                    newSpeakingUsers.add(userId);
+                  } else {
+                    newSpeakingUsers.delete(userId);
+                  }
+                  return { speakingUsers: newSpeakingUsers };
+                });
+              }
             };
-          });
-          
-          // 🎙️ Запускаем определение активности голоса
-          const VOICE_THRESHOLD = 20; // Громкость от 0 до 255 (снижен для более чувствительного определения)
-          const CHECK_INTERVAL = 100; // Проверяем каждые 100ms
-          
-          const bufferLength = analyserNode.frequencyBinCount;
-          const dataArray = new Uint8Array(bufferLength);
-          
-          // Очищаем предыдущий интервал, если есть
-          const existingInterval = state.voiceDetectionIntervals.get(userId);
-          if (existingInterval) {
-            clearInterval(existingInterval);
+            
+            // Сохраняем ссылки
+            set((state) => {
+              const newGainNodes = new Map(state.gainNodes);
+              const newAudioElements = new Map(state.audioElements);
+              const newVoiceDetectorNodes = new Map(state.voiceDetectorNodes);
+              const newVoiceDetectorSources = new Map(state.voiceDetectorSources);
+              
+              newGainNodes.set(userId, gainNode);
+              newAudioElements.set(userId, audioElement);
+              newVoiceDetectorNodes.set(userId, voiceDetectorNode);
+              newVoiceDetectorSources.set(userId, source);
+              
+              const newUserVolumes = new Map(state.userVolumes);
+              if (!newUserVolumes.has(userId)) {
+                newUserVolumes.set(userId, 100);
+              }
+              
+              return {
+                gainNodes: newGainNodes,
+                audioElements: newAudioElements,
+                voiceDetectorNodes: newVoiceDetectorNodes,
+                voiceDetectorSources: newVoiceDetectorSources,
+                userVolumes: newUserVolumes
+              };
+            });
+            
+            console.log(`✅ [callStore] Voice detection with AudioWorklet STARTED for user: ${userId}`);
+          } catch (error) {
+            console.error(`Failed to setup voice detection for ${userId}:`, error);
+            // Если AudioWorklet не поддерживается, просто подключаем gainNode
+            source.connect(gainNode);
+            
+            set((state) => {
+              const newGainNodes = new Map(state.gainNodes);
+              const newAudioElements = new Map(state.audioElements);
+              newGainNodes.set(userId, gainNode);
+              newAudioElements.set(userId, audioElement);
+              
+              const newUserVolumes = new Map(state.userVolumes);
+              if (!newUserVolumes.has(userId)) {
+                newUserVolumes.set(userId, 100);
+              }
+              
+              return {
+                gainNodes: newGainNodes,
+                audioElements: newAudioElements,
+                userVolumes: newUserVolumes
+              };
+            });
           }
-          
-          const interval = setInterval(() => {
-            analyserNode.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-            const isSpeakingNow = average > VOICE_THRESHOLD;
-            
-            // Логируем только когда громкость выше порога для отладки
-            if (average > 10) {
-              console.log(`🎙️ [callStore] User ${userId} - average: ${average.toFixed(2)}, threshold: ${VOICE_THRESHOLD}, speaking: ${isSpeakingNow}`);
-            }
-            
-            const currentState = get();
-            const wasSpeaking = currentState.speakingUsers.has(userId);
-            
-            if (isSpeakingNow !== wasSpeaking) {
-              console.log(`🔄 [callStore] Speaking state changed for ${userId}: ${wasSpeaking} -> ${isSpeakingNow}`);
-              set((state) => {
-                const newSpeakingUsers = new Set(state.speakingUsers);
-                if (isSpeakingNow) {
-                  newSpeakingUsers.add(userId);
-                } else {
-                  newSpeakingUsers.delete(userId);
-                }
-                console.log(`✅ [callStore] New speakingUsers Set:`, Array.from(newSpeakingUsers));
-                return { speakingUsers: newSpeakingUsers };
-              });
-            }
-          }, CHECK_INTERVAL);
-          
-          // Сохраняем интервал
-          set((state) => {
-            const newIntervals = new Map(state.voiceDetectionIntervals);
-            newIntervals.set(userId, interval);
-            return { voiceDetectionIntervals: newIntervals };
-          });
-          
-          console.log(`✅ [callStore] Voice detection STARTED for user: ${userId}, interval ID: ${interval}`);
 
           try {
             await audioElement.play();
@@ -1368,8 +1380,24 @@ export const useCallStore = create(
           state.consumers.forEach(consumer => consumer.close());
           state.producers.forEach(producer => producer.close());
           
-          // Останавливаем все интервалы анализа голоса
-          state.voiceDetectionIntervals.forEach(interval => clearInterval(interval));
+          // Очищаем VoiceDetector worklet nodes
+          state.voiceDetectorNodes.forEach((node, userId) => {
+            try {
+              node.port.close();
+              node.disconnect();
+            } catch (e) {
+              console.warn(`Error disconnecting voice detector for ${userId}:`, e);
+            }
+          });
+          
+          // Очищаем source nodes
+          state.voiceDetectorSources.forEach((source, userId) => {
+            try {
+              source.disconnect();
+            } catch (e) {
+              console.warn(`Error disconnecting source for ${userId}:`, e);
+            }
+          });
           
           // Очистка GainNodes и audio elements
           state.gainNodes.forEach(gainNode => {
@@ -1416,8 +1444,9 @@ export const useCallStore = create(
             audioElements: new Map(),
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
-            analyserNodes: new Map(),
-            voiceDetectionIntervals: new Map(),
+            voiceDetectorNodes: new Map(),
+            voiceDetectorSources: new Map(),
+            voiceWorkletLoaded: false,
             speakingUsers: new Set(),
             device: null,
             sendTransport: null,

@@ -102,18 +102,18 @@ const VoiceCallView = ({
 
   // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
   const videoParticipants = useMemo(() => {
-    console.log('🔄 useMemo triggered with:', {
-      isMuted,
-      isAudioEnabled,
-      isGlobalAudioMuted,
-      isVideoEnabled,
-      participantMuteStatesSize: participantMuteStates?.size,
-      participantAudioStatesSize: participantAudioStates?.size,
-      participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
-      participantVideoStatesSize: participantVideoStates?.size,
-      speakingUsersSize: speakingUsers?.size,
-      speakingUsersArray: speakingUsers ? Array.from(speakingUsers) : []
-    });
+    // console.log('🔄 useMemo triggered with:', {
+    //   isMuted,
+    //   isAudioEnabled,
+    //   isGlobalAudioMuted,
+    //   isVideoEnabled,
+    //   participantMuteStatesSize: participantMuteStates?.size,
+    //   participantAudioStatesSize: participantAudioStates?.size,
+    //   participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
+    //   participantVideoStatesSize: participantVideoStates?.size,
+    //   speakingUsersSize: speakingUsers?.size,
+    //   speakingUsersArray: speakingUsers ? Array.from(speakingUsers) : []
+    // });
     
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
@@ -153,8 +153,6 @@ const VoiceCallView = ({
       videoParticipant.isSpeaking = speakingUsers?.has(participantUserId) ?? false; // 🎙️ Используем реальные данные анализа голоса
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
-      
-      console.log(`🎙️ Participant ${participantUserId}: isSpeaking=${videoParticipant.isSpeaking}, in speakingUsers=${speakingUsers?.has(participantUserId)}`);
       
       videoParticipantsList.push(videoParticipant);
     });
