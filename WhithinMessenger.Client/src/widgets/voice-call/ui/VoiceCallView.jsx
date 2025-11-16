@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
+import { AudioDeviceSelector } from '../../../shared/ui/molecules/AudioDeviceSelector';
 import { createParticipant } from '../../../entities/video-call/model/types';
 import { Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
@@ -258,6 +259,9 @@ const VoiceCallView = ({
                     </div>
                   </div>
                 )}
+
+                {/* Audio Device Selector */}
+                <AudioDeviceSelector className="audio-device-selector" />
 
                 {/* Video Call Grid */}
                 {(participants.length > 0 || isConnected) && (

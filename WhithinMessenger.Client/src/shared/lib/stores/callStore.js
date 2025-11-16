@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
+import { getAudioDeviceManager } from '../utils/audioDeviceManager';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -843,6 +844,11 @@ export const useCallStore = create(
           audioElement.controls = false;
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
+          
+          // Применяем выбранное аудио устройство (для предотвращения эха при демонстрации окна)
+          const audioDeviceManager = getAudioDeviceManager();
+          await audioDeviceManager.applyAudioOutput(audioElement);
+          console.log('🔊 Applied audio output device to participant:', userId);
           
           // Создаем Web Audio API chain с GainNode
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
@@ -2076,6 +2082,72 @@ export const useCallStore = create(
           console.error('Error stopping video:', error);
           set({ error: 'Failed to stop video: ' + error.message });
         }
+      },
+
+      // ========== Audio Device Management ==========
+      
+      /**
+       * Получить список доступных аудио устройств вывода
+       */
+      getAudioOutputDevices: async () => {
+        const audioDeviceManager = getAudioDeviceManager();
+        return await audioDeviceManager.getAudioOutputDevices();
+      },
+
+      /**
+       * Установить устройство вывода для голосов участников
+       * @param {string} deviceId - ID устройства или 'default'
+       */
+      setParticipantsAudioDevice: async (deviceId) => {
+        const audioDeviceManager = getAudioDeviceManager();
+        audioDeviceManager.setParticipantsOutputDevice(deviceId);
+        
+        // Применяем к существующим audio элементам
+        const state = get();
+        const updatePromises = [];
+        
+        state.audioElements.forEach((audioElement, userId) => {
+          // Применяем только к элементам участников (не к screen share audio)
+          if (!userId.startsWith('screen-share-audio-')) {
+            updatePromises.push(audioDeviceManager.applyAudioOutput(audioElement, deviceId));
+          }
+        });
+        
+        await Promise.all(updatePromises);
+        console.log('✅ Audio output device updated for all participants');
+      },
+
+      /**
+       * Автоматически выбрать наушники (если доступны)
+       */
+      autoSelectHeadphones: async () => {
+        const audioDeviceManager = getAudioDeviceManager();
+        const headphones = await audioDeviceManager.autoSelectHeadphones();
+        
+        if (headphones) {
+          // Применяем к существующим audio элементам
+          await get().setParticipantsAudioDevice(headphones.deviceId);
+          console.log('🎧 Headphones selected:', headphones.label);
+          return headphones;
+        }
+        
+        return null;
+      },
+
+      /**
+       * Получить текущее устройство вывода для участников
+       */
+      getCurrentAudioDevice: async () => {
+        const audioDeviceManager = getAudioDeviceManager();
+        return await audioDeviceManager.getCurrentDeviceInfo();
+      },
+
+      /**
+       * Проверить, поддерживается ли выбор аудио устройства
+       */
+      isAudioDeviceSelectionSupported: () => {
+        const audioDeviceManager = getAudioDeviceManager();
+        return audioDeviceManager.isSinkIdSupported();
       }
     }),
     {
