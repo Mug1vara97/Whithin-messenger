@@ -90,6 +90,7 @@ export const useCallStore = create(
       isScreenSharing: false,
       screenShareStream: null,
       remoteScreenShares: new Map(),
+      screenShareAudioContexts: new Map(), // Отдельные AudioContext'ы для screen share audio (userId -> {context, source, gain})
       
   // Состояние вебкамеры
   isVideoEnabled: false,
@@ -756,30 +757,96 @@ export const useCallStore = create(
               
               set({ remoteScreenShares: newRemoteScreenShares });
             } else if (producerData.kind === 'audio') {
-              console.log('Screen share audio producer detected, creating audio element');
+              console.log('Screen share audio producer detected, creating ISOLATED audio element');
               
-              // Создаем audio element для screen share audio
+              // Создаём ОТДЕЛЬНЫЙ AudioContext для screen share audio
+              // Это изолирует его от основного аудио графа и предотвращает ducking
+              const screenShareAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+                latencyHint: 'playback',  // Оптимизация для воспроизведения
+                sampleRate: 48000
+              });
+              
+              // Создаём MediaStreamSource из consumer track
+              const screenShareSource = screenShareAudioContext.createMediaStreamSource(
+                new MediaStream([consumer.track])
+              );
+              
+              // Создаём GainNode с фиксированной громкостью
+              const screenShareGain = screenShareAudioContext.createGain();
+              screenShareGain.gain.value = 1.0;  // Полная громкость
+              
+              // Подключаем: source -> gain -> destination
+              screenShareSource.connect(screenShareGain);
+              screenShareGain.connect(screenShareAudioContext.destination);
+              
+              // Resume context если приостановлен
+              if (screenShareAudioContext.state === 'suspended') {
+                await screenShareAudioContext.resume();
+              }
+              
+              // Создаем audio element КАК FALLBACK (для мониторинга)
               const audioElement = document.createElement('audio');
               audioElement.srcObject = new MediaStream([consumer.track]);
-              audioElement.autoplay = true;
-              audioElement.volume = 1.0; // Полная громкость для screen share audio
-              audioElement.muted = false;
+              audioElement.autoplay = false;  // НЕ автовоспроизведение (через AudioContext)
+              audioElement.volume = 1.0;
+              audioElement.muted = true;  // Muted потому что звук идёт через AudioContext
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
               
-              // Добавляем в DOM для воспроизведения
+              // Помечаем элемент
+              audioElement.setAttribute('data-screen-share-audio', 'true');
+              audioElement.setAttribute('data-isolated-audio', 'true');
+              
+              // Защита от изменения громкости (на случай если кто-то попытается)
+              Object.defineProperty(audioElement, '_protectedVolume', {
+                value: 1.0,
+                writable: false,
+                configurable: false
+              });
+              
+              const originalVolumeDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume');
+              Object.defineProperty(audioElement, 'volume', {
+                get: function() {
+                  return this._protectedVolume || 1.0;
+                },
+                // eslint-disable-next-line no-unused-vars
+                set: function(value) {
+                  console.log('⚠️ Screen share audio volume is protected and isolated. Changes ignored.');
+                  if (originalVolumeDescriptor && originalVolumeDescriptor.set) {
+                    originalVolumeDescriptor.set.call(this, 1.0);
+                  }
+                },
+                configurable: true
+              });
+              
+              // Добавляем в DOM
               document.body.appendChild(audioElement);
               
-              // Сохраняем audio element для screen share audio
+              // Сохраняем элементы для очистки
               const screenShareAudioKey = `screen-share-audio-${userId}`;
               const currentState = get();
               const newAudioElements = new Map(currentState.audioElements);
               newAudioElements.set(screenShareAudioKey, audioElement);
               
-              set({ audioElements: newAudioElements });
+              // Сохраняем AudioContext и nodes для очистки
+              if (!state.screenShareAudioContexts) {
+                set({ screenShareAudioContexts: new Map() });
+              }
+              const newScreenShareContexts = new Map(get().screenShareAudioContexts || new Map());
+              newScreenShareContexts.set(userId, {
+                context: screenShareAudioContext,
+                source: screenShareSource,
+                gain: screenShareGain
+              });
               
-              console.log('Screen share audio element created:', screenShareAudioKey);
+              set({ 
+                audioElements: newAudioElements,
+                screenShareAudioContexts: newScreenShareContexts
+              });
+              
+              console.log('🔊 Screen share audio created with ISOLATED AudioContext:', screenShareAudioKey);
+              console.log('🔒 Protected from volume changes and browser ducking');
             }
             
             return;
@@ -1434,6 +1501,22 @@ export const useCallStore = create(
             }
           });
           
+          // Очищаем изолированные AudioContext'ы для screen share audio
+          if (state.screenShareAudioContexts) {
+            state.screenShareAudioContexts.forEach((contextData, userId) => {
+              try {
+                contextData.source.disconnect();
+                contextData.gain.disconnect();
+                if (contextData.context.state !== 'closed') {
+                  contextData.context.close();
+                }
+                console.log('✅ Closed isolated screen share AudioContext for:', userId);
+              } catch (e) {
+                console.warn('Error closing screen share AudioContext:', e);
+              }
+            });
+          }
+          
           state.audioElements.forEach(audioElement => {
             try {
               audioElement.pause();
@@ -1482,7 +1565,8 @@ export const useCallStore = create(
             localStream: null,
             noiseSuppressionManager: null,
             audioContext: null,
-            connecting: false
+            connecting: false,
+            screenShareAudioContexts: new Map()
           });
           
           console.log('Call ended successfully');
@@ -1723,18 +1807,40 @@ export const useCallStore = create(
           newProducers.delete('screen-video');
           newProducers.delete('screen-audio');
 
-          // Очищаем screen share audio elements
+          // Очищаем screen share audio elements и AudioContext'ы
           const newAudioElements = new Map(state.audioElements);
+          const newScreenShareContexts = new Map(state.screenShareAudioContexts || new Map());
+          
           for (const [key, audioElement] of newAudioElements.entries()) {
             if (key.startsWith('screen-share-audio-')) {
               try {
+                // Получаем userId из ключа
+                const userId = key.replace('screen-share-audio-', '');
+                
+                // Очищаем изолированный AudioContext если есть
+                const contextData = newScreenShareContexts.get(userId);
+                if (contextData) {
+                  try {
+                    contextData.source.disconnect();
+                    contextData.gain.disconnect();
+                    if (contextData.context.state !== 'closed') {
+                      await contextData.context.close();
+                    }
+                    newScreenShareContexts.delete(userId);
+                    console.log('✅ Closed isolated AudioContext for screen share:', userId);
+                  } catch (e) {
+                    console.warn('Error closing screen share AudioContext:', e);
+                  }
+                }
+                
+                // Очищаем audio element
                 audioElement.pause();
                 audioElement.srcObject = null;
                 if (audioElement.parentNode) {
                   audioElement.parentNode.removeChild(audioElement);
                 }
                 newAudioElements.delete(key);
-                console.log('Removed screen share audio element:', key);
+                console.log('✅ Removed screen share audio element:', key);
               } catch (e) {
                 console.warn('Error removing screen share audio element:', e);
               }
@@ -1753,7 +1859,8 @@ export const useCallStore = create(
             screenShareStream: null,
             isScreenSharing: false,
             producers: newProducers,
-            audioElements: newAudioElements
+            audioElements: newAudioElements,
+            screenShareAudioContexts: newScreenShareContexts
           });
 
           console.log('Screen sharing stopped successfully');
