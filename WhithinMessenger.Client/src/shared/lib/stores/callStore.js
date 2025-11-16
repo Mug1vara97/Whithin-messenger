@@ -188,6 +188,16 @@ export const useCallStore = create(
               // Очищаем audio element
               const audioElement = get().audioElements.get(userId);
               if (audioElement) {
+                // Удаляем из echo canceller (Electron)
+                if (window.electronAPI?.echoCancellation) {
+                  try {
+                    window.electronAPI.echoCancellation.removeParticipantAudio(audioElement);
+                    console.log('[Electron] 🗑️ Removed participant from echo cancellation:', userId);
+                  } catch (error) {
+                    console.warn('[Electron] Failed to remove participant from echo cancellation:', error);
+                  }
+                }
+                
                 audioElement.pause();
                 audioElement.srcObject = null;
                 if (audioElement.parentNode) {
@@ -952,6 +962,20 @@ export const useCallStore = create(
             await audioElement.play();
             console.log('Audio playback started for peer:', userId);
             set({ audioBlocked: false });
+            
+            // === ELECTRON: Добавляем аудио участника в echo canceller ===
+            if (window.electronAPI?.echoCancellation) {
+              try {
+                const added = window.electronAPI.echoCancellation.addParticipantAudio(audioElement);
+                if (added) {
+                  console.log('[Electron] ✅ Added participant audio to echo cancellation:', userId);
+                } else {
+                  console.log('[Electron] ℹ️ Echo cancellation not active yet');
+                }
+              } catch (error) {
+                console.warn('[Electron] Failed to add participant to echo cancellation:', error);
+              }
+            }
           } catch (error) {
             console.log('Auto-play blocked, user interaction required:', error);
             set({ audioBlocked: true });
@@ -959,6 +983,16 @@ export const useCallStore = create(
               try {
                 await audioElement.play();
                 set({ audioBlocked: false });
+                
+                // === ELECTRON: Добавляем после успешного воспроизведения ===
+                if (window.electronAPI?.echoCancellation) {
+                  try {
+                    window.electronAPI.echoCancellation.addParticipantAudio(audioElement);
+                    console.log('[Electron] ✅ Added participant audio to echo cancellation (delayed):', userId);
+                  } catch (err) {
+                    console.warn('[Electron] Failed to add participant:', err);
+                  }
+                }
               } catch {
                 console.log('Audio playback still blocked');
               }
@@ -1547,7 +1581,7 @@ export const useCallStore = create(
           });
 
           // Проверяем аудио трек
-          const audioTrack = stream.getAudioTracks()[0];
+          let audioTrack = stream.getAudioTracks()[0];
           
           if (audioTrack) {
             const audioSettings = audioTrack.getSettings();
@@ -1558,23 +1592,43 @@ export const useCallStore = create(
               channelCount: audioSettings.channelCount
             });
             
-            // ПРАВИЛЬНОЕ ПОНИМАНИЕ:
-            // - Вкладка (browser): suppressLocalAudioPlayback фильтрует голоса
-            // - Окно (window): захватывается звук ТОЛЬКО этого окна
-            // - Монитор (monitor): захватывается звук ВСЕХ окон (может быть эхо)
+            // === ПРОВЕРКА: ELECTRON или БРАУЗЕР ===
+            const isElectron = window.electronAPI && typeof window.electronAPI.isElectron === 'function';
+            const isInElectron = isElectron ? await window.electronAPI.isElectron() : false;
             
-            if (videoSettings.displaySurface === 'browser') {
-              if (audioSettings.suppressLocalAudioPlayback) {
-                console.log('✅ Browser Tab + suppressLocalAudioPlayback - perfect! 🎉');
+            console.log(`🖥️ Running in: ${isInElectron ? 'ELECTRON' : 'BROWSER'}`);
+            
+            if (isInElectron) {
+              // === ELECTRON: Echo cancellation применяется автоматически ===
+              // В Electron echo cancellation применяется НАПРЯМУЮ в preload.js/main.js
+              // при захвате экрана, поэтому здесь ничего делать не нужно
+              console.log('ℹ️ ELECTRON MODE: Echo cancellation applied automatically');
+              console.log('💡 Participant audio will be added to cancellation as they join');
+              
+            } else {
+              // === БРАУЗЕР: Discord-like решение ===
+              if (videoSettings.displaySurface === 'browser') {
+                // Вкладка - suppressLocalAudioPlayback работает
+                if (audioSettings.suppressLocalAudioPlayback) {
+                  console.log('✅ Browser Tab - no echo! 🎉');
+                } else {
+                  console.warn('⚠️ suppressLocalAudioPlayback not active');
+                }
               } else {
-                console.warn('⚠️ suppressLocalAudioPlayback not active for tab');
+                // Окно/Монитор - захватывает системный звук → УДАЛЯЕМ!
+                console.warn('⚠️ Window/Monitor detected - system audio captured!');
+                console.warn('⚠️ Removing audio track to prevent echo');
+                console.log('💡 To share audio with game/app:');
+                console.log('   1. Use Browser Tab (in browser)');
+                console.log('   2. Or use Electron app with echo cancellation');
+                
+                // Останавливаем и удаляем аудио трек
+                audioTrack.stop();
+                stream.removeTrack(audioTrack);
+                audioTrack = null;
+                
+                console.log('🔇 Audio track removed - video only sharing');
               }
-            } else if (videoSettings.displaySurface === 'window') {
-              console.log('✅ Window sharing - captures ONLY window audio (not Chrome) 🎮');
-              console.log('💡 Participants voices are in Chrome → not captured!');
-            } else if (videoSettings.displaySurface === 'monitor') {
-              console.warn('⚠️ Monitor sharing - captures ALL audio (including Chrome)');
-              console.warn('💡 Use HEADPHONES to prevent echo!');
             }
           } else {
             console.log('ℹ️ No audio track - user did not enable audio sharing');
@@ -1714,6 +1768,19 @@ export const useCallStore = create(
           // Останавливаем поток
           if (state.screenShareStream) {
             state.screenShareStream.getTracks().forEach(track => track.stop());
+          }
+
+          // Очищаем echo canceller (Electron)
+          if (window.electronAPI?.echoCancellation) {
+            try {
+              const isActive = window.electronAPI.echoCancellation.isActive();
+              if (isActive) {
+                window.electronAPI.echoCancellation.cleanup();
+                console.log('[Electron] ✅ Echo cancellation cleaned up');
+              }
+            } catch (error) {
+              console.warn('[Electron] Error cleaning up echo cancellation:', error);
+            }
           }
 
           // Удаляем producers
