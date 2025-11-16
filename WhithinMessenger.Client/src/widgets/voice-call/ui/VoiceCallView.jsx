@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { AudioDeviceSelector } from '../../../shared/ui/molecules/AudioDeviceSelector';
-import { ElectronIndicator } from '../../../shared/ui/molecules/ElectronIndicator';
 import { createParticipant } from '../../../entities/video-call/model/types';
 import { Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
@@ -260,11 +259,6 @@ const VoiceCallView = ({
                     </div>
                   </div>
                 )}
-
-                {/* Electron Indicator */}
-                <div className="electron-indicator-wrapper">
-                  <ElectronIndicator />
-                </div>
 
                 {/* Audio Device Selector */}
                 <AudioDeviceSelector className="audio-device-selector" />

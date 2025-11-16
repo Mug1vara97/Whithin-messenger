@@ -148,18 +148,9 @@
     }
   }
 
-  /* Electron Indicator */
-  .electron-indicator-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 16px 32px 8px 32px;
-    animation: slideIn 0.3s ease;
-  }
-
   /* Audio Device Selector */
   .audio-device-selector {
-    margin: 8px 32px 16px 32px;
+    margin: 16px 32px;
     animation: slideIn 0.3s ease;
   }
   
