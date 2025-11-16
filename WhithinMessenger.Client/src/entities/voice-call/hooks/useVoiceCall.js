@@ -1180,11 +1180,9 @@ export const useVoiceCall = (userId, userName) => {
         }
 
         console.log('=== STARTING SCREEN SHARE ===');
-      console.log('Requesting screen sharing access...');
+      console.log('🖥️ Requesting screen sharing access...');
       
-      // Запрашиваем демонстрацию с опцией аудио
-      // suppressLocalAudioPlayback: true должен отфильтровать звуки из звонка
-      // Для YouTube/игр - пользователь включает "Поделиться звуком вкладки" в диалоге
+      // НОВЫЙ ПОДХОД: Используем ТОЛЬКО нативные возможности браузера
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'always',
@@ -1194,37 +1192,50 @@ export const useVoiceCall = (userId, userName) => {
           aspectRatio: 16/9,
           resizeMode: 'crop-and-scale'
         },
-        audio: true, // Разрешаем захват звука - браузер предложит опцию
-        // Примечание: audio будет захвачен только если пользователь 
-        // выберет "Поделиться звуком вкладки" в диалоге Chrome/Edge
+        audio: {
+          // Подавление локального аудио (работает для вкладок)
+          suppressLocalAudioPlayback: true,
+          
+          // Отключаем обработки для максимального качества
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          
+          // Высокое качество
+          sampleRate: 48000,
+          channelCount: 2
+        }
       });
 
-      console.log('Screen sharing access granted');
+      console.log('✅ Screen sharing access granted');
       
       const videoTrack = stream.getVideoTracks()[0];
       if (!videoTrack) {
         throw new Error('No video track available');
       }
 
-      // Проверяем наличие аудио трека
-      const audioTracks = stream.getAudioTracks();
-      if (audioTracks.length > 0) {
-        console.log('✅ User enabled audio sharing - applying echo prevention');
-        
-        // Для вкладок браузера Chrome/Edge автоматически применяет suppressLocalAudioPlayback
-        // Это означает что звук из звонка не должен захватываться
-        const audioTrack = audioTracks[0];
-        const settings = audioTrack.getSettings();
-        console.log('Audio track settings:', {
-          suppressLocalAudioPlayback: settings.suppressLocalAudioPlayback,
-          echoCancellation: settings.echoCancellation,
-          noiseSuppression: settings.noiseSuppression
+      const videoSettings = videoTrack.getSettings();
+      console.log('📹 Video settings:', {
+        displaySurface: videoSettings.displaySurface,
+        width: videoSettings.width,
+        height: videoSettings.height
+      });
+
+      // Проверяем аудио трек
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        const audioSettings = audioTrack.getSettings();
+        console.log('🔊 Audio settings:', {
+          displaySurface: videoSettings.displaySurface,
+          suppressLocalAudioPlayback: audioSettings.suppressLocalAudioPlayback,
+          sampleRate: audioSettings.sampleRate
         });
         
-        // ВАЖНО: Для предотвращения эха, пользователь должен:
-        // 1. Использовать НАУШНИКИ (не динамики)
-        // 2. Выбрать именно ВКЛАДКУ браузера (не окно, не весь экран)
-        // 3. Включить галочку "Поделиться звуком вкладки"
+        if (audioSettings.suppressLocalAudioPlayback) {
+          console.log('✅ suppressLocalAudioPlayback ACTIVE - no echo!');
+        } else {
+          console.warn('⚠️ suppressLocalAudioPlayback INACTIVE - use HEADPHONES!');
+        }
       } else {
         console.log('ℹ️ No audio track - user did not enable audio sharing');
       }
@@ -1237,8 +1248,6 @@ export const useVoiceCall = (userId, userName) => {
 
       // Устанавливаем поток
       setScreenShareStream(stream);
-
-      const audioTrack = stream.getAudioTracks()[0];
       
       console.log('Stream tracks:', {
         videoTracks: stream.getVideoTracks().length,

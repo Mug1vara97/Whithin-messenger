@@ -3,7 +3,6 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
-import { getEchoSuppressor } from '../utils/echoSuppressor';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -90,7 +89,6 @@ export const useCallStore = create(
       isScreenSharing: false,
       screenShareStream: null,
       remoteScreenShares: new Map(),
-      screenShareAudioContexts: new Map(), // Отдельные AudioContext'ы для screen share audio (userId -> {context, source, gain})
       
   // Состояние вебкамеры
   isVideoEnabled: false,
@@ -757,96 +755,37 @@ export const useCallStore = create(
               
               set({ remoteScreenShares: newRemoteScreenShares });
             } else if (producerData.kind === 'audio') {
-              console.log('Screen share audio producer detected, creating ISOLATED audio element');
+              console.log('🔊 Screen share audio producer detected - creating simple audio element');
+              console.log('🔊 User ID:', userId);
+              console.log('🔊 Producer ID:', producerData.producerId);
               
-              // Создаём ОТДЕЛЬНЫЙ AudioContext для screen share audio
-              // Это изолирует его от основного аудио графа и предотвращает ducking
-              const screenShareAudioContext = new (window.AudioContext || window.webkitAudioContext)({
-                latencyHint: 'playback',  // Оптимизация для воспроизведения
-                sampleRate: 48000
-              });
-              
-              // Создаём MediaStreamSource из consumer track
-              const screenShareSource = screenShareAudioContext.createMediaStreamSource(
-                new MediaStream([consumer.track])
-              );
-              
-              // Создаём GainNode с фиксированной громкостью
-              const screenShareGain = screenShareAudioContext.createGain();
-              screenShareGain.gain.value = 1.0;  // Полная громкость
-              
-              // Подключаем: source -> gain -> destination
-              screenShareSource.connect(screenShareGain);
-              screenShareGain.connect(screenShareAudioContext.destination);
-              
-              // Resume context если приостановлен
-              if (screenShareAudioContext.state === 'suspended') {
-                await screenShareAudioContext.resume();
-              }
-              
-              // Создаем audio element КАК FALLBACK (для мониторинга)
+              // ПРОСТОЙ ПОДХОД: создаём обычный audio element
+              // БЕЗ AudioContext, БЕЗ фильтров, БЕЗ обработок
+              // Максимальное качество и надёжность!
               const audioElement = document.createElement('audio');
               audioElement.srcObject = new MediaStream([consumer.track]);
-              audioElement.autoplay = false;  // НЕ автовоспроизведение (через AudioContext)
+              audioElement.autoplay = true;
               audioElement.volume = 1.0;
-              audioElement.muted = true;  // Muted потому что звук идёт через AudioContext
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
               
-              // Помечаем элемент
+              // Помечаем как screen share audio
               audioElement.setAttribute('data-screen-share-audio', 'true');
-              audioElement.setAttribute('data-isolated-audio', 'true');
-              
-              // Защита от изменения громкости (на случай если кто-то попытается)
-              Object.defineProperty(audioElement, '_protectedVolume', {
-                value: 1.0,
-                writable: false,
-                configurable: false
-              });
-              
-              const originalVolumeDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume');
-              Object.defineProperty(audioElement, 'volume', {
-                get: function() {
-                  return this._protectedVolume || 1.0;
-                },
-                // eslint-disable-next-line no-unused-vars
-                set: function(value) {
-                  console.log('⚠️ Screen share audio volume is protected and isolated. Changes ignored.');
-                  if (originalVolumeDescriptor && originalVolumeDescriptor.set) {
-                    originalVolumeDescriptor.set.call(this, 1.0);
-                  }
-                },
-                configurable: true
-              });
               
               // Добавляем в DOM
               document.body.appendChild(audioElement);
               
-              // Сохраняем элементы для очистки
+              // Сохраняем для очистки
               const screenShareAudioKey = `screen-share-audio-${userId}`;
               const currentState = get();
               const newAudioElements = new Map(currentState.audioElements);
               newAudioElements.set(screenShareAudioKey, audioElement);
               
-              // Сохраняем AudioContext и nodes для очистки
-              if (!state.screenShareAudioContexts) {
-                set({ screenShareAudioContexts: new Map() });
-              }
-              const newScreenShareContexts = new Map(get().screenShareAudioContexts || new Map());
-              newScreenShareContexts.set(userId, {
-                context: screenShareAudioContext,
-                source: screenShareSource,
-                gain: screenShareGain
-              });
+              set({ audioElements: newAudioElements });
               
-              set({ 
-                audioElements: newAudioElements,
-                screenShareAudioContexts: newScreenShareContexts
-              });
-              
-              console.log('🔊 Screen share audio created with ISOLATED AudioContext:', screenShareAudioKey);
-              console.log('🔒 Protected from volume changes and browser ducking');
+              console.log('✅ Screen share audio created:', screenShareAudioKey);
+              console.log('✅ Playing with native browser audio - no processing!');
             }
             
             return;
@@ -1450,13 +1389,6 @@ export const useCallStore = create(
             state.noiseSuppressionManager.cleanup();
           }
           
-          // Очистка echo suppressor
-          const echoSuppressor = getEchoSuppressor();
-          if (echoSuppressor) {
-            echoSuppressor.cleanup();
-            console.log('Echo suppressor cleaned up');
-          }
-          
           // Закрытие audio context
           if (state.audioContext && state.audioContext.state !== 'closed') {
             await state.audioContext.close();
@@ -1500,22 +1432,6 @@ export const useCallStore = create(
               console.warn('Error disconnecting gain node:', e);
             }
           });
-          
-          // Очищаем изолированные AudioContext'ы для screen share audio
-          if (state.screenShareAudioContexts) {
-            state.screenShareAudioContexts.forEach((contextData, userId) => {
-              try {
-                contextData.source.disconnect();
-                contextData.gain.disconnect();
-                if (contextData.context.state !== 'closed') {
-                  contextData.context.close();
-                }
-                console.log('✅ Closed isolated screen share AudioContext for:', userId);
-              } catch (e) {
-                console.warn('Error closing screen share AudioContext:', e);
-              }
-            });
-          }
           
           state.audioElements.forEach(audioElement => {
             try {
@@ -1565,8 +1481,7 @@ export const useCallStore = create(
             localStream: null,
             noiseSuppressionManager: null,
             audioContext: null,
-            connecting: false,
-            screenShareAudioContexts: new Map()
+            connecting: false
           });
           
           console.log('Call ended successfully');
@@ -1589,11 +1504,10 @@ export const useCallStore = create(
             await get().stopScreenShare();
           }
 
-          console.log('Requesting screen sharing access...');
+          console.log('🖥️ Requesting screen sharing access...');
           
-          // Запрашиваем демонстрацию с опцией аудио
-          // suppressLocalAudioPlayback: true должен отфильтровать звуки из звонка
-          // Для YouTube/игр - пользователь включает "Поделиться звуком вкладки" в диалоге
+          // НОВЫЙ ПОДХОД: Используем ТОЛЬКО нативные возможности браузера
+          // Никаких кастомных обработок - максимальное качество!
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               cursor: 'always',
@@ -1603,42 +1517,59 @@ export const useCallStore = create(
               aspectRatio: 16/9,
               resizeMode: 'crop-and-scale'
             },
-            audio: true, // Разрешаем захват звука - браузер предложит опцию
-            // Примечание: audio будет захвачен только если пользователь 
-            // выберет "Поделиться звуком вкладки" в диалоге Chrome/Edge
+            audio: {
+              // КРИТИЧНО: suppressLocalAudioPlayback подавляет локальные звуки (голоса из звонка)
+              // Работает ТОЛЬКО для вкладок браузера (displaySurface: 'browser')
+              suppressLocalAudioPlayback: true,
+              
+              // Отключаем обработки для максимального качества
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              
+              // Высокое качество аудио
+              sampleRate: 48000,
+              channelCount: 2
+            }
           });
 
-          console.log('Screen sharing access granted');
+          console.log('✅ Screen sharing access granted');
           
           const videoTrack = stream.getVideoTracks()[0];
           if (!videoTrack) {
             throw new Error('No video track available');
           }
 
-          // Проверяем наличие аудио трека
-          const audioTracks = stream.getAudioTracks();
-          if (audioTracks.length > 0) {
-            console.log('✅ User enabled audio sharing - applying echo prevention');
-            
-            // Для вкладок браузера Chrome/Edge автоматически применяет suppressLocalAudioPlayback
-            // Это означает что звук из звонка не должен захватываться
-            const audioTrack = audioTracks[0];
-            const settings = audioTrack.getSettings();
-            console.log('Audio track settings:', {
-              suppressLocalAudioPlayback: settings.suppressLocalAudioPlayback,
-              echoCancellation: settings.echoCancellation,
-              noiseSuppression: settings.noiseSuppression
+          const videoSettings = videoTrack.getSettings();
+          console.log('📹 Video settings:', {
+            displaySurface: videoSettings.displaySurface,
+            width: videoSettings.width,
+            height: videoSettings.height,
+            frameRate: videoSettings.frameRate
+          });
+
+          // Проверяем аудио трек
+          const audioTrack = stream.getAudioTracks()[0];
+          if (audioTrack) {
+            const audioSettings = audioTrack.getSettings();
+            console.log('🔊 Audio track settings:', {
+              displaySurface: videoSettings.displaySurface,
+              suppressLocalAudioPlayback: audioSettings.suppressLocalAudioPlayback,
+              sampleRate: audioSettings.sampleRate,
+              channelCount: audioSettings.channelCount
             });
             
-            // ВАЖНО: Для предотвращения эха, пользователь должен:
-            // 1. Использовать НАУШНИКИ (не динамики)
-            // 2. Выбрать именно ВКЛАДКУ браузера (не окно, не весь экран)
-            // 3. Включить галочку "Поделиться звуком вкладки"
+            if (audioSettings.suppressLocalAudioPlayback) {
+              console.log('✅ suppressLocalAudioPlayback ACTIVE - no echo expected!');
+            } else {
+              console.warn('⚠️ suppressLocalAudioPlayback INACTIVE - user is sharing window/monitor');
+              console.warn('⚠️ User MUST use HEADPHONES to prevent echo!');
+            }
           } else {
             console.log('ℹ️ No audio track - user did not enable audio sharing');
           }
 
-          // Обработка остановки потока пользователем
+          // Обработка остановки потока
           videoTrack.onended = () => {
             console.log('Screen sharing stopped by user');
             get().stopScreenShare();
@@ -1647,7 +1578,7 @@ export const useCallStore = create(
           // Устанавливаем поток
           set({ screenShareStream: stream });
 
-          console.log('Creating screen sharing producer...');
+          console.log('Creating screen sharing video producer...');
           const videoProducer = await state.sendTransport.produce({
             track: videoTrack,
             encodings: [
@@ -1658,67 +1589,39 @@ export const useCallStore = create(
               }
             ],
             codecOptions: {
-              videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
-              videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
+              videoGoogleStartBitrate: 3000,
+              videoGoogleMaxBitrate: 5000
             },
             appData: {
               mediaType: 'screen',
               trackType: 'video',
               userId: state.currentUserId,
               userName: state.currentUserName,
-              width: videoTrack.getSettings().width,
-              height: videoTrack.getSettings().height,
-              frameRate: videoTrack.getSettings().frameRate
+              width: videoSettings.width,
+              height: videoSettings.height,
+              frameRate: videoSettings.frameRate
             }
           });
 
-          console.log('Screen sharing video producer created:', videoProducer.id);
+          console.log('✅ Screen sharing video producer created:', videoProducer.id);
 
-          // Создаем отдельный audio producer для демонстрации экрана
-          const audioTrack = stream.getAudioTracks()[0];
+          // Создаем audio producer (если есть)
           let audioProducer = null;
-          
           if (audioTrack) {
             console.log('Creating screen sharing audio producer...');
             
-            let finalAudioTrack = audioTrack;
-            const audioSettings = audioTrack.getSettings();
-            
-            // Если suppressLocalAudioPlayback НЕ активен (окно/монитор, а не вкладка)
-            // применяем наше подавление эха
-            if (!audioSettings.suppressLocalAudioPlayback) {
-              console.log('⚠️ suppressLocalAudioPlayback is disabled - applying custom echo suppression');
-              
-              try {
-                const echoSuppressor = getEchoSuppressor();
-                await echoSuppressor.initialize();
-                
-                // Применяем продвинутое подавление эха
-                const processedStream = await echoSuppressor.suppressEchoAdvanced(audioTrack);
-                finalAudioTrack = processedStream.getAudioTracks()[0];
-                
-                console.log('✅ Echo suppression applied to screen share audio');
-              } catch (error) {
-                console.error('❌ Failed to apply echo suppression:', error);
-                // Если не удалось применить подавление, используем оригинальный трек
-                finalAudioTrack = audioTrack;
-              }
-            } else {
-              console.log('✅ suppressLocalAudioPlayback is active - browser handles echo cancellation');
-            }
-            
+            // ПЕРЕДАЁМ АУДИО КАК ЕСТЬ - БЕЗ ОБРАБОТКИ!
             audioProducer = await state.sendTransport.produce({
-              track: finalAudioTrack,
+              track: audioTrack,
               appData: {
                 mediaType: 'screen',
                 trackType: 'audio',
                 userId: state.currentUserId,
-                userName: state.currentUserName
+                userName: state.currentUserName,
+                suppressLocalAudioPlayback: audioTrack.getSettings().suppressLocalAudioPlayback
               }
             });
-            console.log('Screen sharing audio producer created:', audioProducer.id);
-          } else {
-            console.log('No audio track in screen share stream');
+            console.log('✅ Screen sharing audio producer created:', audioProducer.id);
           }
 
           // Сохраняем producers
@@ -1732,7 +1635,7 @@ export const useCallStore = create(
             isScreenSharing: true 
           });
 
-          // Обработка событий video producer
+          // Обработка событий
           videoProducer.on('transportclose', () => {
             console.log('Screen sharing video transport closed');
             get().stopScreenShare();
@@ -1743,10 +1646,12 @@ export const useCallStore = create(
             get().stopScreenShare();
           });
 
+          console.log('🎉 Screen sharing started successfully!');
+
         } catch (error) {
           console.error('Error starting screen share:', error);
           
-          // Проверяем, является ли это отменой пользователем
+          // Проверяем отмену пользователем
           const isCancelled = error.message && (
             error.message.includes('отменена') || 
             error.message.includes('cancelled') ||
@@ -1756,19 +1661,17 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          // Очищаем при ошибке
+          // Очистка
           const currentState = get();
           if (currentState.screenShareStream) {
             currentState.screenShareStream.getTracks().forEach(track => track.stop());
           }
           
-          // Показываем ошибку только если это не отмена пользователем
           if (isCancelled) {
             console.log('Screen sharing cancelled by user');
             set({ 
               screenShareStream: null,
               isScreenSharing: false
-              // НЕ устанавливаем error при отмене
             });
           } else {
             set({ 
@@ -1807,33 +1710,13 @@ export const useCallStore = create(
           newProducers.delete('screen-video');
           newProducers.delete('screen-audio');
 
-          // Очищаем screen share audio elements и AudioContext'ы
+          // Очищаем screen share audio elements
           const newAudioElements = new Map(state.audioElements);
-          const newScreenShareContexts = new Map(state.screenShareAudioContexts || new Map());
           
           for (const [key, audioElement] of newAudioElements.entries()) {
             if (key.startsWith('screen-share-audio-')) {
               try {
-                // Получаем userId из ключа
-                const userId = key.replace('screen-share-audio-', '');
-                
-                // Очищаем изолированный AudioContext если есть
-                const contextData = newScreenShareContexts.get(userId);
-                if (contextData) {
-                  try {
-                    contextData.source.disconnect();
-                    contextData.gain.disconnect();
-                    if (contextData.context.state !== 'closed') {
-                      await contextData.context.close();
-                    }
-                    newScreenShareContexts.delete(userId);
-                    console.log('✅ Closed isolated AudioContext for screen share:', userId);
-                  } catch (e) {
-                    console.warn('Error closing screen share AudioContext:', e);
-                  }
-                }
-                
-                // Очищаем audio element
+                // Простая очистка audio element
                 audioElement.pause();
                 audioElement.srcObject = null;
                 if (audioElement.parentNode) {
@@ -1847,20 +1730,12 @@ export const useCallStore = create(
             }
           }
 
-          // Очищаем echo suppressor
-          const echoSuppressor = getEchoSuppressor();
-          if (echoSuppressor.isActive) {
-            echoSuppressor.stop();
-            console.log('Echo suppressor stopped');
-          }
-
           // Очищаем состояние
           set({
             screenShareStream: null,
             isScreenSharing: false,
             producers: newProducers,
-            audioElements: newAudioElements,
-            screenShareAudioContexts: newScreenShareContexts
+            audioElements: newAudioElements
           });
 
           console.log('Screen sharing stopped successfully');
