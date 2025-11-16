@@ -254,13 +254,26 @@
   100% { transform: scale(1); }
 }
 
-.participantItem.speaking {
-  animation: pulse 1.5s infinite;
+@keyframes speaking-glow {
+  0%, 100% {
+    border-color: #23a55a;
+    border-width: 4px;
+    box-shadow: 0 0 15px rgba(35, 165, 90, 0.7),
+                0 0 30px rgba(35, 165, 90, 0.5),
+                inset 0 0 15px rgba(35, 165, 90, 0.3);
+  }
+  50% {
+    border-color: #2dc770;
+    border-width: 5px;
+    box-shadow: 0 0 20px rgba(45, 199, 112, 0.9),
+                0 0 40px rgba(45, 199, 112, 0.6),
+                inset 0 0 20px rgba(45, 199, 112, 0.4);
+  }
 }
 
 .participantItem.speaking .avatarCircle {
-  background: #43b581;
-  box-shadow: 0 0 20px rgba(67, 181, 129, 0.5);
+  border-color: #23a55a;
+  animation: speaking-glow 1.5s ease-in-out infinite;
 }
 
 /* Hover эффекты */

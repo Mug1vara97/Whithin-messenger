@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
+import {useNotifications} from "@/entities/notification/index.js";
+import {NotificationPanel} from "@/widgets/notification-panel/index.js";
 import './NotificationButton.css';
 
 const NotificationButton = () => {
+  const { unreadCount } = useNotifications();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [unreadCount] = useState(0);
-
-  const handleClick = () => {
-    setIsPanelOpen(!isPanelOpen);
-  };
-
-  const handleClose = () => {
-    setIsPanelOpen(false);
-  };
 
   return (
     <>
       <button 
         className="notification-button" 
-        onClick={handleClick}
+        onClick={() => setIsPanelOpen(!isPanelOpen)}
         title="Уведомления"
       >
         <svg 
@@ -34,19 +28,13 @@ const NotificationButton = () => {
           </span>
         )}
       </button>
-      
-      {/* NotificationPanel будет добавлен позже */}
-      {isPanelOpen && (
-        <div className="notification-panel">
-          <div className="notification-panel-content">
-            <h3>Уведомления</h3>
-            <p>Нет новых уведомлений</p>
-            <button onClick={handleClose}>Закрыть</button>
-          </div>
-        </div>
-      )}
+      <NotificationPanel 
+        isOpen={isPanelOpen} 
+        onClose={() => setIsPanelOpen(false)} 
+      />
     </>
   );
 };
 
 export default NotificationButton;
+

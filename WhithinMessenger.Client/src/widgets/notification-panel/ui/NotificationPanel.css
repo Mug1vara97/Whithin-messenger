@@ -1,0 +1,226 @@
+.notification-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 80px;
+}
+
+.notification-panel {
+  background: var(--background-secondary, #36393f);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 400px;
+  max-height: 600px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-tertiary, #2f3136);
+  background: var(--background-primary, #2f3136);
+}
+
+.notification-header h3 {
+  margin: 0;
+  color: var(--text-primary, #dcddde);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.unread-badge {
+  background: var(--accent-color, #5865f2);
+  color: white;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8e9297);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background: var(--background-tertiary, #202225);
+  color: var(--text-primary, #dcddde);
+}
+
+.notification-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.notification-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--background-tertiary, #2f3136);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: var(--background-tertiary, #202225);
+}
+
+.notification-item.unread {
+  background: var(--background-tertiary, #2f3136);
+  border-left: 4px solid var(--accent-color, #5865f2);
+}
+
+.notification-item.unread::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 8px;
+  height: 8px;
+  background: var(--accent-color, #5865f2);
+  border-radius: 50%;
+}
+
+.notification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notification-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notification-type {
+  font-size: 16px;
+  margin-right: auto;
+}
+
+.notification-time {
+  color: var(--text-secondary, #8e9297);
+  font-size: 12px;
+}
+
+.delete-notification {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8e9297);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.notification-item:hover .delete-notification {
+  opacity: 1;
+}
+
+.delete-notification:hover {
+  background: var(--background-tertiary, #202225);
+  color: var(--text-danger, #ed4245);
+}
+
+.notification-text {
+  margin: 0;
+  color: var(--text-primary, #dcddde);
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.no-notifications {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary, #8e9297);
+}
+
+.no-notifications p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.loading-notifications {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary, #8e9297);
+}
+
+.loading-notifications p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.load-more-button {
+  width: 100%;
+  padding: 12px 20px;
+  background: var(--background-tertiary, #2f3136);
+  border: none;
+  color: var(--text-primary, #dcddde);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.load-more-button:hover {
+  background: var(--background-quaternary, #202225);
+}
+
+.load-more-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+  .notification-panel {
+    width: 90%;
+    max-height: 80vh;
+  }
+  
+  .notification-panel-overlay {
+    padding-top: 20px;
+  }
+}
+
+

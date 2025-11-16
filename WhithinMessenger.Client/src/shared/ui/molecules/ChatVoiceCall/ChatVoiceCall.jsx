@@ -38,6 +38,7 @@ const ChatVoiceCall = ({
     userMutedStates,
     showVolumeSliders,
     remoteScreenShares,
+    speakingUsers,
     startCall,
     endCall,
     toggleMute,
@@ -139,7 +140,7 @@ const ChatVoiceCall = ({
   currentUser.isMuted = isMuted;
   currentUser.isAudioEnabled = isAudioEnabled;
   currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
-  currentUser.isSpeaking = false;
+  currentUser.isSpeaking = false; // Текущий пользователь не показывает свое состояние говорения
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = cameraStream;
   currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
@@ -148,8 +149,9 @@ const ChatVoiceCall = ({
   
   // Добавляем всех остальных участников из глобального состояния
   participants.forEach(participant => {
+    const participantId = participant.userId || participant.id || participant.name;
     const videoParticipant = createParticipant(
-      participant.userId || participant.id || participant.name, 
+      participantId, 
       participant.name, 
       participant.avatar || null, 
       'online', 
@@ -157,14 +159,15 @@ const ChatVoiceCall = ({
     );
     videoParticipant.isMuted = participant.isMuted || false;
     videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
-    videoParticipant.isSpeaking = participant.isSpeaking || false;
+    videoParticipant.isSpeaking = speakingUsers?.has(participantId) || false; // Используем состояние из speakingUsers
     videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
     videoParticipant.videoStream = participant.videoStream || null;
     console.log('🎥 Creating display participant:', {
       id: videoParticipant.id,
       name: videoParticipant.name,
       isVideoEnabled: videoParticipant.isVideoEnabled,
-      hasVideoStream: !!videoParticipant.videoStream
+      hasVideoStream: !!videoParticipant.videoStream,
+      isSpeaking: videoParticipant.isSpeaking
     });
     displayParticipants.push(videoParticipant);
   });
@@ -216,7 +219,10 @@ const ChatVoiceCall = ({
             ) : (
               /* Обычное отображение кружков пользователей */
               displayParticipants.map((participant) => (
-                <div key={participant.id} className={styles.participantItem}>
+                <div 
+                  key={participant.id} 
+                  className={`${styles.participantItem} ${participant.isSpeaking ? styles.speaking : ''}`}
+                >
                   <div className={styles.participantAvatarContainer}>
                     <div className={styles.participantAvatar}>
                       <div className={styles.avatarCircle}>
@@ -231,7 +237,7 @@ const ChatVoiceCall = ({
                         )}
                         {participant.isGlobalAudioMuted && (
                           <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
-                            <VolumeOffIcon />
+                            <HeadsetOffIcon />
                           </div>
                         )}
                       </div>

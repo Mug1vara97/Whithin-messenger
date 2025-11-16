@@ -3,6 +3,7 @@ import { AuthProvider } from '../../shared/lib/contexts/AuthContext';
 import { ConnectionProvider } from '../../shared/lib/contexts/ConnectionContext';
 import { ServerProvider } from '../../shared/lib/contexts/ServerContext.jsx';
 import { CallProvider } from '../../shared/lib/contexts/CallContext';
+import { NotificationProvider } from '../../shared/lib/contexts/NotificationContext';
 import { useTokenRefresh } from '../../shared/lib/hooks/useTokenRefresh';
 
 const AppProviders = ({ children }) => {
@@ -12,11 +13,13 @@ const AppProviders = ({ children }) => {
   return (
     <ConnectionProvider>
       <AuthProvider>
-        <ServerProvider>
-          <CallProvider>
-            {children}
-          </CallProvider>
-        </ServerProvider>
+        <NotificationProvider>
+          <ServerProvider>
+            <CallProvider>
+              {children}
+            </CallProvider>
+          </ServerProvider>
+        </NotificationProvider>
       </AuthProvider>
     </ConnectionProvider>
   );

@@ -1487,10 +1487,11 @@ export const useCallStore = create(
               width: { ideal: 1920, max: 1920 },
               height: { ideal: 1080, max: 1080 },
               aspectRatio: 16/9,
-              displaySurface: 'monitor',
+              displaySurface: 'window',
               resizeMode: 'crop-and-scale'
             },
             audio: {
+              suppressLocalAudioPlayback: false,
               echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
