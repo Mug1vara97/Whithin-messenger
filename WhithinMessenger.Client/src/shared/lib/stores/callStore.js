@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
+import { getEchoSuppressor } from '../utils/echoSuppressor';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -1382,6 +1383,13 @@ export const useCallStore = create(
             state.noiseSuppressionManager.cleanup();
           }
           
+          // Очистка echo suppressor
+          const echoSuppressor = getEchoSuppressor();
+          if (echoSuppressor) {
+            echoSuppressor.cleanup();
+            console.log('Echo suppressor cleaned up');
+          }
+          
           // Закрытие audio context
           if (state.audioContext && state.audioContext.state !== 'closed') {
             await state.audioContext.close();
@@ -1498,6 +1506,10 @@ export const useCallStore = create(
           }
 
           console.log('Requesting screen sharing access...');
+          
+          // Запрашиваем демонстрацию с опцией аудио
+          // suppressLocalAudioPlayback: true должен отфильтровать звуки из звонка
+          // Для YouTube/игр - пользователь включает "Поделиться звуком вкладки" в диалоге
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               cursor: 'always',
@@ -1507,15 +1519,9 @@ export const useCallStore = create(
               aspectRatio: 16/9,
               resizeMode: 'crop-and-scale'
             },
-            audio: {
-              suppressLocalAudioPlayback: true, // Подавляем локальное воспроизведение для предотвращения эха
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-              sampleRate: 48000,
-              channelCount: 2,
-              sampleSize: 16
-            }
+            audio: true, // Разрешаем захват звука - браузер предложит опцию
+            // Примечание: audio будет захвачен только если пользователь 
+            // выберет "Поделиться звуком вкладки" в диалоге Chrome/Edge
           });
 
           console.log('Screen sharing access granted');
@@ -1525,21 +1531,27 @@ export const useCallStore = create(
             throw new Error('No video track available');
           }
 
-          // Определяем тип демонстрации (весь экран vs окно/вкладка)
-          const videoSettings = videoTrack.getSettings();
-          const displaySurface = videoSettings.displaySurface; // 'monitor', 'window', 'browser'
-          console.log('Display surface type:', displaySurface);
-          
-          // Если выбран весь экран (monitor) - удаляем аудио дорожку
-          if (displaySurface === 'monitor') {
-            console.log('⚠️ Monitor selected - removing audio track');
-            const audioTracks = stream.getAudioTracks();
-            audioTracks.forEach(track => {
-              track.stop();
-              stream.removeTrack(track);
+          // Проверяем наличие аудио трека
+          const audioTracks = stream.getAudioTracks();
+          if (audioTracks.length > 0) {
+            console.log('✅ User enabled audio sharing - applying echo prevention');
+            
+            // Для вкладок браузера Chrome/Edge автоматически применяет suppressLocalAudioPlayback
+            // Это означает что звук из звонка не должен захватываться
+            const audioTrack = audioTracks[0];
+            const settings = audioTrack.getSettings();
+            console.log('Audio track settings:', {
+              suppressLocalAudioPlayback: settings.suppressLocalAudioPlayback,
+              echoCancellation: settings.echoCancellation,
+              noiseSuppression: settings.noiseSuppression
             });
+            
+            // ВАЖНО: Для предотвращения эха, пользователь должен:
+            // 1. Использовать НАУШНИКИ (не динамики)
+            // 2. Выбрать именно ВКЛАДКУ браузера (не окно, не весь экран)
+            // 3. Включить галочку "Поделиться звуком вкладки"
           } else {
-            console.log('✅ Window/Browser selected - keeping audio track');
+            console.log('ℹ️ No audio track - user did not enable audio sharing');
           }
 
           // Обработка остановки потока пользователем
@@ -1584,8 +1596,35 @@ export const useCallStore = create(
           
           if (audioTrack) {
             console.log('Creating screen sharing audio producer...');
+            
+            let finalAudioTrack = audioTrack;
+            const audioSettings = audioTrack.getSettings();
+            
+            // Если suppressLocalAudioPlayback НЕ активен (окно/монитор, а не вкладка)
+            // применяем наше подавление эха
+            if (!audioSettings.suppressLocalAudioPlayback) {
+              console.log('⚠️ suppressLocalAudioPlayback is disabled - applying custom echo suppression');
+              
+              try {
+                const echoSuppressor = getEchoSuppressor();
+                await echoSuppressor.initialize();
+                
+                // Применяем продвинутое подавление эха
+                const processedStream = await echoSuppressor.suppressEchoAdvanced(audioTrack);
+                finalAudioTrack = processedStream.getAudioTracks()[0];
+                
+                console.log('✅ Echo suppression applied to screen share audio');
+              } catch (error) {
+                console.error('❌ Failed to apply echo suppression:', error);
+                // Если не удалось применить подавление, используем оригинальный трек
+                finalAudioTrack = audioTrack;
+              }
+            } else {
+              console.log('✅ suppressLocalAudioPlayback is active - browser handles echo cancellation');
+            }
+            
             audioProducer = await state.sendTransport.produce({
-              track: audioTrack,
+              track: finalAudioTrack,
               appData: {
                 mediaType: 'screen',
                 trackType: 'audio',
@@ -1700,6 +1739,13 @@ export const useCallStore = create(
                 console.warn('Error removing screen share audio element:', e);
               }
             }
+          }
+
+          // Очищаем echo suppressor
+          const echoSuppressor = getEchoSuppressor();
+          if (echoSuppressor.isActive) {
+            echoSuppressor.stop();
+            console.log('Echo suppressor stopped');
           }
 
           // Очищаем состояние
