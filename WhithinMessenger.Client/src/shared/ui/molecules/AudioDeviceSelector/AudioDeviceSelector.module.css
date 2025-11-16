@@ -178,11 +178,38 @@
   margin-top: 1px;
 }
 
-.hintText {
-  flex: 1;
-}
+  .hintText {
+    flex: 1;
+  }
 
-.warning {
+  .testButton {
+    width: 100%;
+    padding: 10px 16px;
+    background: var(--info-color, #2196f3);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .testButton:hover {
+    background: var(--info-hover, #1976d2);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+  }
+
+  .testButton:active {
+    transform: translateY(0);
+  }
+
+  .warning {
   display: flex;
   align-items: flex-start;
   gap: 12px;

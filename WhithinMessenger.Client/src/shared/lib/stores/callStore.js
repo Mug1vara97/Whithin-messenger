@@ -845,11 +845,6 @@ export const useCallStore = create(
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
           
-          // Применяем выбранное аудио устройство (для предотвращения эха при демонстрации окна)
-          const audioDeviceManager = getAudioDeviceManager();
-          await audioDeviceManager.applyAudioOutput(audioElement);
-          console.log('🔊 Applied audio output device to participant:', userId);
-          
           // Создаем Web Audio API chain с GainNode
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
           const gainNode = audioContext.createGain();
@@ -1512,8 +1507,11 @@ export const useCallStore = create(
 
           console.log('🖥️ Requesting screen sharing access...');
           
-          // НОВЫЙ ПОДХОД: Используем ТОЛЬКО нативные возможности браузера
-          // Никаких кастомных обработок - максимальное качество!
+          // ПРАВИЛЬНОЕ РЕШЕНИЕ:
+          // 1. Вкладка (browser): suppressLocalAudioPlayback фильтрует голоса
+          // 2. Окно (window): захватывается звук ТОЛЬКО этого окна (не Chrome)
+          // 3. Монитор (monitor): захватывается звук ВСЕХ окон (может быть эхо)
+          
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               cursor: 'always',
@@ -1524,16 +1522,10 @@ export const useCallStore = create(
               resizeMode: 'crop-and-scale'
             },
             audio: {
-              // КРИТИЧНО: suppressLocalAudioPlayback подавляет локальные звуки (голоса из звонка)
-              // Работает ТОЛЬКО для вкладок браузера (displaySurface: 'browser')
               suppressLocalAudioPlayback: true,
-              
-              // Отключаем обработки для максимального качества
               echoCancellation: false,
               noiseSuppression: false,
               autoGainControl: false,
-              
-              // Высокое качество аудио
               sampleRate: 48000,
               channelCount: 2
             }
@@ -1556,6 +1548,7 @@ export const useCallStore = create(
 
           // Проверяем аудио трек
           const audioTrack = stream.getAudioTracks()[0];
+          
           if (audioTrack) {
             const audioSettings = audioTrack.getSettings();
             console.log('🔊 Audio track settings:', {
@@ -1565,11 +1558,23 @@ export const useCallStore = create(
               channelCount: audioSettings.channelCount
             });
             
-            if (audioSettings.suppressLocalAudioPlayback) {
-              console.log('✅ suppressLocalAudioPlayback ACTIVE - no echo expected!');
-            } else {
-              console.warn('⚠️ suppressLocalAudioPlayback INACTIVE - user is sharing window/monitor');
-              console.warn('⚠️ User MUST use HEADPHONES to prevent echo!');
+            // ПРАВИЛЬНОЕ ПОНИМАНИЕ:
+            // - Вкладка (browser): suppressLocalAudioPlayback фильтрует голоса
+            // - Окно (window): захватывается звук ТОЛЬКО этого окна
+            // - Монитор (monitor): захватывается звук ВСЕХ окон (может быть эхо)
+            
+            if (videoSettings.displaySurface === 'browser') {
+              if (audioSettings.suppressLocalAudioPlayback) {
+                console.log('✅ Browser Tab + suppressLocalAudioPlayback - perfect! 🎉');
+              } else {
+                console.warn('⚠️ suppressLocalAudioPlayback not active for tab');
+              }
+            } else if (videoSettings.displaySurface === 'window') {
+              console.log('✅ Window sharing - captures ONLY window audio (not Chrome) 🎮');
+              console.log('💡 Participants voices are in Chrome → not captured!');
+            } else if (videoSettings.displaySurface === 'monitor') {
+              console.warn('⚠️ Monitor sharing - captures ALL audio (including Chrome)');
+              console.warn('💡 Use HEADPHONES to prevent echo!');
             }
           } else {
             console.log('ℹ️ No audio track - user did not enable audio sharing');
