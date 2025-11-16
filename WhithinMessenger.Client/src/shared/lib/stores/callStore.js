@@ -1508,7 +1508,7 @@ export const useCallStore = create(
               resizeMode: 'crop-and-scale'
             },
             audio: {
-              suppressLocalAudioPlayback: false,
+              suppressLocalAudioPlayback: true, // Подавляем локальное воспроизведение для предотвращения эха
               echoCancellation: false,
               noiseSuppression: false,
               autoGainControl: false,
