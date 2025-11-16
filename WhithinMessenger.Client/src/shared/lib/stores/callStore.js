@@ -1106,6 +1106,12 @@ export const useCallStore = create(
       
       // Переключение мута для отдельного пользователя
       toggleUserMute: (peerId) => {
+        // Не применяем мут к screen share audio
+        if (peerId.startsWith('screen-share-audio-')) {
+          console.log('Cannot mute screen share audio:', peerId);
+          return;
+        }
+        
         const state = get();
         const audioElement = state.audioElements.get(peerId);
         if (!audioElement) return;
@@ -1136,6 +1142,12 @@ export const useCallStore = create(
       
       // Изменение громкости отдельного пользователя
       changeUserVolume: (peerId, newVolume) => {
+        // Не изменяем громкость screen share audio
+        if (peerId.startsWith('screen-share-audio-')) {
+          console.log('Cannot change volume for screen share audio:', peerId);
+          return;
+        }
+        
         const state = get();
         const audioElement = state.audioElements.get(peerId);
         if (!audioElement) return;
@@ -1227,8 +1239,14 @@ export const useCallStore = create(
           });
         }
         
-        // Управляем HTML Audio элементами
+        // Управляем HTML Audio элементами (кроме screen share audio)
         state.audioElements.forEach((audioElement, peerId) => {
+          // Исключаем screen-share-audio из глобального управления громкостью
+          if (peerId.startsWith('screen-share-audio-')) {
+            console.log('Skipping screen share audio from global volume control:', peerId);
+            return;
+          }
+          
           if (audioElement) {
             if (newMutedState) {
               audioElement.volume = 0;
@@ -1487,14 +1505,13 @@ export const useCallStore = create(
               width: { ideal: 1920, max: 1920 },
               height: { ideal: 1080, max: 1080 },
               aspectRatio: 16/9,
-              displaySurface: 'window',
               resizeMode: 'crop-and-scale'
             },
             audio: {
               suppressLocalAudioPlayback: false,
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
               sampleRate: 48000,
               channelCount: 2,
               sampleSize: 16
@@ -1502,20 +1519,37 @@ export const useCallStore = create(
           });
 
           console.log('Screen sharing access granted');
+          
+          const videoTrack = stream.getVideoTracks()[0];
+          if (!videoTrack) {
+            throw new Error('No video track available');
+          }
+
+          // Определяем тип демонстрации (весь экран vs окно/вкладка)
+          const videoSettings = videoTrack.getSettings();
+          const displaySurface = videoSettings.displaySurface; // 'monitor', 'window', 'browser'
+          console.log('Display surface type:', displaySurface);
+          
+          // Если выбран весь экран (monitor) - удаляем аудио дорожку
+          if (displaySurface === 'monitor') {
+            console.log('⚠️ Monitor selected - removing audio track');
+            const audioTracks = stream.getAudioTracks();
+            audioTracks.forEach(track => {
+              track.stop();
+              stream.removeTrack(track);
+            });
+          } else {
+            console.log('✅ Window/Browser selected - keeping audio track');
+          }
 
           // Обработка остановки потока пользователем
-          stream.getVideoTracks()[0].onended = () => {
+          videoTrack.onended = () => {
             console.log('Screen sharing stopped by user');
             get().stopScreenShare();
           };
 
           // Устанавливаем поток
           set({ screenShareStream: stream });
-
-          const videoTrack = stream.getVideoTracks()[0];
-          if (!videoTrack) {
-            throw new Error('No video track available');
-          }
 
           console.log('Creating screen sharing producer...');
           const videoProducer = await state.sendTransport.produce({
