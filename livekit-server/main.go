@@ -118,11 +118,13 @@ func (s *Server) getUserVoiceState(userID string) *UserVoiceState {
 func (s *Server) generateToken(roomName, participantIdentity, participantName string) (string, error) {
 	at := auth.NewAccessToken(s.config.LiveKitAPIKey, s.config.LiveKitAPISecret)
 	
+	canPublish := true
+	canSubscribe := true
 	grant := &auth.VideoGrant{
 		RoomJoin:     true,
 		Room:         roomName,
-		CanPublish:   true,
-		CanSubscribe: true,
+		CanPublish:   &canPublish,
+		CanSubscribe: &canSubscribe,
 	}
 	
 	at.AddGrant(grant).
