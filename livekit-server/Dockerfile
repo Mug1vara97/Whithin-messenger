@@ -51,20 +51,13 @@ RUN set -eux; \
         exit 1; \
     fi; \
     \
-    # Проверяем формат файла \
-    file_type=$(file /tmp/livekit.tar.gz | cut -d: -f2); \
-    echo "Downloaded file type: $file_type"; \
-    \
-    # Распаковываем архив \
-    if echo "$file_type" | grep -q "gzip"; then \
-        tar -xzf /tmp/livekit.tar.gz -C /tmp/; \
-    elif echo "$file_type" | grep -q "Zip"; then \
+    # Распаковываем архив (известно, что это tar.gz) \
+    echo "Extracting archive..."; \
+    tar -xzf /tmp/livekit.tar.gz -C /tmp/ || { \
+        echo "Failed to extract archive, trying as zip..."; \
         apk add --no-cache unzip; \
         unzip /tmp/livekit.tar.gz -d /tmp/; \
-    else \
-        echo "Unknown archive format: $file_type"; \
-        exit 1; \
-    fi; \
+    }; \
     \
     # Ищем бинарник в разных возможных местах \
     # LiveKit может быть в корне архива или в поддиректории \
