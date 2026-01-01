@@ -98,3 +98,4 @@ EXPOSE 3000 7880 50000-50100/udp 50000-50100/tcp
 # Используем wait для ожидания завершения процессов
 CMD sh -c "livekit-server --config /app/config.yaml & sleep 2 && ./server & wait"
 
+
