@@ -29,11 +29,11 @@ RUN set -eux; \
     ARCH="amd64"; \
     OS="linux"; \
     \
-    # Пробуем разные варианты URL \
+    # Пробуем разные варианты URL (правильный формат: livekit_VERSION_OS_ARCH.tar.gz) \
     for url in \
+        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit_${VERSION}_${OS}_${ARCH}.tar.gz" \
         "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server_${VERSION}_${OS}_${ARCH}.tar.gz" \
-        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server-${OS}-${ARCH}.tar.gz" \
-        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server-linux-amd64.tar.gz"; \
+        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server-${OS}-${ARCH}.tar.gz"; \
     do \
         echo "Trying URL: $url"; \
         if curl -L -f -sS -o /tmp/livekit.tar.gz "$url"; then \
@@ -67,8 +67,15 @@ RUN set -eux; \
     fi; \
     \
     # Ищем бинарник в разных возможных местах \
+    # LiveKit может быть в корне архива или в поддиректории \
     if [ -f /tmp/livekit-server ]; then \
         mv /tmp/livekit-server /usr/local/bin/; \
+    elif [ -f /tmp/livekit ]; then \
+        mv /tmp/livekit /usr/local/bin/livekit-server; \
+    elif [ -d /tmp/livekit_${VERSION}_${OS}_${ARCH} ] && [ -f /tmp/livekit_${VERSION}_${OS}_${ARCH}/livekit-server ]; then \
+        mv /tmp/livekit_${VERSION}_${OS}_${ARCH}/livekit-server /usr/local/bin/; \
+    elif [ -d /tmp/livekit_${VERSION}_${OS}_${ARCH} ] && [ -f /tmp/livekit_${VERSION}_${OS}_${ARCH}/livekit ]; then \
+        mv /tmp/livekit_${VERSION}_${OS}_${ARCH}/livekit /usr/local/bin/livekit-server; \
     elif [ -d /tmp/livekit-server_${VERSION}_${OS}_${ARCH} ] && [ -f /tmp/livekit-server_${VERSION}_${OS}_${ARCH}/livekit-server ]; then \
         mv /tmp/livekit-server_${VERSION}_${OS}_${ARCH}/livekit-server /usr/local/bin/; \
     elif [ -d /tmp/livekit-server-${OS}-${ARCH} ] && [ -f /tmp/livekit-server-${OS}-${ARCH}/livekit-server ]; then \
