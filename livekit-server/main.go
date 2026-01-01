@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -15,8 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"github.com/livekit/protocol/auth"
-	livekit "github.com/livekit/protocol/livekit"
-	"github.com/livekit/server-sdk-go/pkg/roomservice"
 )
 
 type Config struct {
@@ -47,14 +45,16 @@ type Participant struct {
 
 type Server struct {
 	config          *Config
-	roomService     *roomservice.RoomService
+	httpClient      *http.Client
 	userVoiceStates map[string]*UserVoiceState
 	mu              sync.RWMutex
 	upgrader        websocket.Upgrader
 }
 
 func NewServer(cfg *Config) (*Server, error) {
-	roomService := roomservice.NewRoomService(cfg.LiveKitURL, cfg.LiveKitAPIKey, cfg.LiveKitAPISecret)
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -64,7 +64,7 @@ func NewServer(cfg *Config) (*Server, error) {
 
 	return &Server{
 		config:          cfg,
-		roomService:     roomService,
+		httpClient:      httpClient,
 		userVoiceStates: make(map[string]*UserVoiceState),
 		upgrader:        upgrader,
 	}, nil
@@ -131,6 +131,103 @@ func (s *Server) generateToken(roomName, participantIdentity, participantName st
 		SetValidFor(24 * time.Hour)
 
 	return at.ToJWT()
+}
+
+// RoomInfo представляет информацию о комнате LiveKit
+type RoomInfo struct {
+	Name         string         `json:"name"`
+	Participants []ParticipantInfo `json:"participants"`
+}
+
+// ParticipantInfo представляет информацию об участнике
+type ParticipantInfo struct {
+	Identity string `json:"identity"`
+	Name     string `json:"name"`
+}
+
+// getRoomInfo получает информацию о комнате через HTTP API LiveKit
+func (s *Server) getRoomInfo(roomName string) (*RoomInfo, error) {
+	// Получаем базовый URL LiveKit (без ws:// или wss://)
+	baseURL := strings.TrimPrefix(s.config.LiveKitURL, "ws://")
+	baseURL = strings.TrimPrefix(baseURL, "wss://")
+	baseURL = strings.TrimPrefix(baseURL, "http://")
+	baseURL = strings.TrimPrefix(baseURL, "https://")
+	
+	// Формируем URL для HTTP API (LiveKit использует Twirp)
+	apiURL := fmt.Sprintf("http://%s/twirp/livekit.RoomService/ListRooms", baseURL)
+	
+	// Создаем запрос
+	reqBody := map[string]interface{}{
+		"names": []string{roomName},
+	}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	
+	// Добавляем заголовки для аутентификации
+	at := auth.NewAccessToken(s.config.LiveKitAPIKey, s.config.LiveKitAPISecret)
+	at.AddGrant(&auth.VideoGrant{}).SetValidFor(1 * time.Hour)
+	token, err := at.ToJWT()
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	
+	// Выполняем запрос
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		// Если не удалось подключиться, возвращаем пустую комнату
+		// Клиент LiveKit сам получит информацию об участниках через события
+		log.Printf("Failed to get room info from LiveKit: %v", err)
+		return &RoomInfo{
+			Name:         roomName,
+			Participants: []ParticipantInfo{},
+		}, nil
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("LiveKit API error: %s - %s", resp.Status, string(body))
+		// Возвращаем пустую комнату вместо ошибки
+		return &RoomInfo{
+			Name:         roomName,
+			Participants: []ParticipantInfo{},
+		}, nil
+	}
+	
+	var result struct {
+		Rooms []RoomInfo `json:"rooms"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("Failed to decode LiveKit response: %v", err)
+		return &RoomInfo{
+			Name:         roomName,
+			Participants: []ParticipantInfo{},
+		}, nil
+	}
+	
+	// Ищем нужную комнату
+	for _, room := range result.Rooms {
+		if room.Name == roomName {
+			return &room, nil
+		}
+	}
+	
+	// Комната не найдена, возвращаем пустую
+	return &RoomInfo{
+		Name:         roomName,
+		Participants: []ParticipantInfo{},
+	}, nil
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -201,9 +298,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Получаем информацию о комнате
-			room, err := s.roomService.GetRoom(context.Background(), &livekit.GetRoomRequest{
-				Name: roomID,
-			})
+			room, err := s.getRoomInfo(roomID)
 
 			existingPeers := []map[string]interface{}{}
 			if err == nil && room != nil {
@@ -286,9 +381,7 @@ func (s *Server) getChannelParticipants(channelID string) []Participant {
 	participants := []Participant{}
 
 	// Получаем участников из LiveKit комнаты
-	room, err := s.roomService.GetRoom(context.Background(), &livekit.GetRoomRequest{
-		Name: channelID,
-	})
+	room, err := s.getRoomInfo(channelID)
 
 	if err == nil && room != nil {
 		for _, p := range room.Participants {
