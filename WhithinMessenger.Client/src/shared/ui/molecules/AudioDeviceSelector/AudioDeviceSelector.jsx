@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCallStore } from '../../../lib/stores/callStore';
+import { useLiveKitCallStore as useCallStore } from '../../../lib/stores/livekitCallStore';
 import styles from './AudioDeviceSelector.module.css';
 
 /**

@@ -213,3 +213,6 @@ coverage/
 !**/backups/.gitkeep
 !**/ssl/.gitkeep
 
+## TUI Client (Go)
+WhithinMessenger.TUI/
+

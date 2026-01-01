@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
-import { useCallStore } from '../stores/callStore';
+import { useLiveKitCallStore as useCallStore } from '../stores/livekitCallStore';
 
 const CallContext = createContext();
 

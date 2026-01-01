@@ -51,18 +51,25 @@ services:
 
   voice-server:
     build:
-      context: ./server
+      context: ./livekit-server
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-      - "40000-40100:40000-40100/udp"
-      - "40000-40100:40000-40100/tcp"
+      - "7880:7880"
+      - "50000-50100:50000-50100/udp"
+      - "50000-50100:50000-50100/tcp"
     volumes:
       - ./ssl:/app/ssl
+      - ./livekit-server/config.yaml:/app/config.yaml
     environment:
-      - NODE_ENV=production
-      - MEDIASOUP_LISTEN_IP=0.0.0.0
-      - MEDIASOUP_ANNOUNCED_IP=whithin.ru
+      - PORT=3000
+      - LIVEKIT_URL=ws://localhost:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-api_key}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-api_secret}
+      - LIVEKIT_KEYS=${LIVEKIT_KEYS:-api_key: api_secret}
+      - TLS_CERT=/app/ssl/certificate.crt
+      - TLS_KEY=/app/ssl/private.key
+      - CORS_ORIGIN=https://whithin.ru
     networks:
       - app-network
     restart: unless-stopped
