@@ -23,11 +23,66 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates curl tar gzip
 
 # Download and install LiveKit server
-# Используем конкретную версию для стабильности
-RUN curl -L -o /tmp/livekit-server.tar.gz https://github.com/livekit/livekit/releases/download/v1.5.2/livekit-server-linux-amd64.tar.gz && \
-    tar -xzf /tmp/livekit-server.tar.gz -C /usr/local/bin/ && \
+# Используем актуальную версию и пробуем разные форматы URL
+RUN set -eux; \
+    VERSION="1.9.8"; \
+    ARCH="amd64"; \
+    OS="linux"; \
+    \
+    # Пробуем разные варианты URL \
+    for url in \
+        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server_${VERSION}_${OS}_${ARCH}.tar.gz" \
+        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server-${OS}-${ARCH}.tar.gz" \
+        "https://github.com/livekit/livekit/releases/download/v${VERSION}/livekit-server-linux-amd64.tar.gz"; \
+    do \
+        echo "Trying URL: $url"; \
+        if curl -L -f -sS -o /tmp/livekit.tar.gz "$url"; then \
+            echo "Download successful from: $url"; \
+            break; \
+        else \
+            echo "Failed to download from: $url"; \
+            rm -f /tmp/livekit.tar.gz; \
+        fi; \
+    done; \
+    \
+    # Проверяем, что файл скачался \
+    if [ ! -f /tmp/livekit.tar.gz ]; then \
+        echo "Error: Failed to download livekit-server from all URLs"; \
+        exit 1; \
+    fi; \
+    \
+    # Проверяем формат файла \
+    file_type=$(file /tmp/livekit.tar.gz | cut -d: -f2); \
+    echo "Downloaded file type: $file_type"; \
+    \
+    # Распаковываем архив \
+    if echo "$file_type" | grep -q "gzip"; then \
+        tar -xzf /tmp/livekit.tar.gz -C /tmp/; \
+    elif echo "$file_type" | grep -q "Zip"; then \
+        apk add --no-cache unzip; \
+        unzip /tmp/livekit.tar.gz -d /tmp/; \
+    else \
+        echo "Unknown archive format: $file_type"; \
+        exit 1; \
+    fi; \
+    \
+    # Ищем бинарник в разных возможных местах \
+    if [ -f /tmp/livekit-server ]; then \
+        mv /tmp/livekit-server /usr/local/bin/; \
+    elif [ -d /tmp/livekit-server_${VERSION}_${OS}_${ARCH} ] && [ -f /tmp/livekit-server_${VERSION}_${OS}_${ARCH}/livekit-server ]; then \
+        mv /tmp/livekit-server_${VERSION}_${OS}_${ARCH}/livekit-server /usr/local/bin/; \
+    elif [ -d /tmp/livekit-server-${OS}-${ARCH} ] && [ -f /tmp/livekit-server-${OS}-${ARCH}/livekit-server ]; then \
+        mv /tmp/livekit-server-${OS}-${ARCH}/livekit-server /usr/local/bin/; \
+    else \
+        echo "Error: livekit-server binary not found in archive"; \
+        echo "Contents of /tmp:"; \
+        ls -laR /tmp/; \
+        exit 1; \
+    fi; \
+    \
     chmod +x /usr/local/bin/livekit-server && \
-    rm /tmp/livekit-server.tar.gz
+    /usr/local/bin/livekit-server --version && \
+    rm -rf /tmp/livekit*.tar.gz /tmp/livekit-server*
 
 WORKDIR /app
 
