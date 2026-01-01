@@ -20,12 +20,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server .
 FROM alpine:latest
 
 # Install LiveKit server and dependencies
-RUN apk add --no-cache ca-certificates curl
+RUN apk add --no-cache ca-certificates curl tar gzip
 
 # Download and install LiveKit server
-RUN curl -sSL https://github.com/livekit/livekit/releases/latest/download/livekit-server-linux-amd64.tar.gz | \
-    tar -xz -C /usr/local/bin/ && \
-    chmod +x /usr/local/bin/livekit-server
+# Используем конкретную версию для стабильности
+RUN curl -L -o /tmp/livekit-server.tar.gz https://github.com/livekit/livekit/releases/download/v1.5.2/livekit-server-linux-amd64.tar.gz && \
+    tar -xzf /tmp/livekit-server.tar.gz -C /usr/local/bin/ && \
+    chmod +x /usr/local/bin/livekit-server && \
+    rm /tmp/livekit-server.tar.gz
 
 WORKDIR /app
 
