@@ -58,9 +58,20 @@ func NewServer(cfg *Config) (*Server, error) {
 	}
 	
 	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			return true // В продакшене нужно проверять origin
+			// Разрешаем все origins для разработки
+			// В продакшене проверяйте origin
+			origin := r.Header.Get("Origin")
+			log.Printf("WebSocket Origin: %s", origin)
+			if origin == "" {
+				return true // Прямое подключение без Origin (может быть через прокси)
+			}
+			// Разрешаем origins с whithin.ru
+			return strings.Contains(origin, "whithin.ru") || strings.Contains(origin, "localhost")
 		},
+		EnableCompression: true,
 	}
 
 	srv := &Server{
@@ -240,6 +251,18 @@ func (s *Server) getRoomInfo(roomName string) (*RoomInfo, error) {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Printf("WebSocket request: Method=%s, Path=%s, RemoteAddr=%s", r.Method, r.URL.Path, r.RemoteAddr)
+	log.Printf("WebSocket headers: Upgrade=%s, Connection=%s, Sec-WebSocket-Key=%s, Sec-WebSocket-Version=%s", 
+		r.Header.Get("Upgrade"), 
+		r.Header.Get("Connection"), 
+		r.Header.Get("Sec-WebSocket-Key"), 
+		r.Header.Get("Sec-WebSocket-Version"))
+	
+	// Убеждаемся, что это WebSocket upgrade запрос
+	if !websocket.IsWebSocketUpgrade(r) {
+		log.Printf("Not a WebSocket upgrade request")
+		http.Error(w, "Expected WebSocket upgrade", http.StatusBadRequest)
+		return
+	}
 	
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -249,7 +272,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	log.Printf("Client connected: RemoteAddr=%s", conn.RemoteAddr())
+	log.Printf("WebSocket connection established: RemoteAddr=%s", conn.RemoteAddr())
 
 	var currentUserID string
 	var currentRoomID string
@@ -501,16 +524,19 @@ func main() {
 	log.Printf("Server starting on %s", addr)
 	log.Printf("WebSocket endpoint: ws://localhost%s/ws", addr)
 
-	// Добавляем CORS middleware
+	// Добавляем CORS middleware (но не для WebSocket запросов)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions")
-		
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
+		// Для WebSocket запросов не устанавливаем заголовки, т.к. это мешает upgrade
+		if !websocket.IsWebSocketUpgrade(r) {
+			w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions")
+			
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 		}
 		
 		server.mux.ServeHTTP(w, r)
