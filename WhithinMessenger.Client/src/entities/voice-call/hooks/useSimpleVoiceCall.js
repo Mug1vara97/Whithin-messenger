@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { Device } from 'mediasoup-client';
+// import { Device } from 'mediasoup-client'; // Removed - using LiveKit instead
 
 export const useSimpleVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -56,8 +56,9 @@ export const useSimpleVoiceCall = (userId, userName) => {
 
       // Инициализация mediasoup устройства
       if (!device) {
-        const newDevice = new Device();
-        setDevice(newDevice);
+        // const newDevice = new Device(); // Removed - using LiveKit instead
+        // setDevice(newDevice);
+        throw new Error('mediasoup-client is no longer supported. Please use LiveKit API.');
       }
 
       // Здесь можно добавить логику подключения к mediasoup
