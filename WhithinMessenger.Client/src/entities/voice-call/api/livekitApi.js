@@ -29,41 +29,15 @@ class LiveKitApi {
     // Подключаемся к нашему Go серверу через WebSocket (не socket.io!)
     // Преобразуем URL в WebSocket формат
     const wsUrl = serverUrl.replace(/^https?/, serverUrl.startsWith('https') ? 'wss' : 'ws') + '/ws';
+    console.log('Connecting to voice server:', wsUrl);
     this.socket = new WebSocket(wsUrl);
-
-    // Регистрируем базовые обработчики WebSocket
-    this.socket.onopen = () => {
-      this.isConnected = true;
-      console.log('Voice call connection established');
-    };
-
-    this.socket.onclose = () => {
-      console.log('Disconnected from voice server');
-      this.isConnected = false;
-    };
-
-    this.socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    // Обработчик сообщений
-    this.socket.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        // Эмитим событие для обработки в joinRoom
-        if (this.messageHandlers) {
-          this.messageHandlers.forEach(handler => handler(msg));
-        }
-      } catch (error) {
-        console.error('Failed to parse message:', error);
-      }
-    };
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Connection timeout'));
       }, 10000);
 
+      // Регистрируем обработчики в Promise
       this.socket.onopen = () => {
         clearTimeout(timeout);
         this.isConnected = true;
@@ -71,10 +45,31 @@ class LiveKitApi {
         resolve(this.socket);
       };
 
+      this.socket.onclose = () => {
+        console.log('Disconnected from voice server');
+        this.isConnected = false;
+      };
+
       this.socket.onerror = (error) => {
         clearTimeout(timeout);
-        console.error('Failed to connect to voice server:', error);
-        reject(error);
+        console.error('WebSocket error:', error);
+        if (this.isConnected === false) {
+          // Только reject если еще не подключились
+          reject(error);
+        }
+      };
+
+      // Обработчик сообщений
+      this.socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          // Эмитим событие для обработки в joinRoom
+          if (this.messageHandlers) {
+            this.messageHandlers.forEach(handler => handler(msg));
+          }
+        } catch (error) {
+          console.error('Failed to parse message:', error);
+        }
       };
     });
   }

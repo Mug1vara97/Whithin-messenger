@@ -49,6 +49,7 @@ type Server struct {
 	userVoiceStates map[string]*UserVoiceState
 	mu              sync.RWMutex
 	upgrader        websocket.Upgrader
+	mux             *http.ServeMux
 }
 
 func NewServer(cfg *Config) (*Server, error) {
@@ -62,12 +63,17 @@ func NewServer(cfg *Config) (*Server, error) {
 		},
 	}
 
-	return &Server{
+	srv := &Server{
 		config:          cfg,
 		httpClient:      httpClient,
 		userVoiceStates: make(map[string]*UserVoiceState),
 		upgrader:        upgrader,
-	}, nil
+		mux:             http.NewServeMux(),
+	}
+	
+	srv.setupRoutes()
+	
+	return srv, nil
 }
 
 func (s *Server) updateUserVoiceState(userID string, updates map[string]interface{}) {
@@ -233,14 +239,17 @@ func (s *Server) getRoomInfo(roomName string) (*RoomInfo, error) {
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log.Printf("WebSocket request: Method=%s, Path=%s, RemoteAddr=%s", r.Method, r.URL.Path, r.RemoteAddr)
+	
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
+		http.Error(w, fmt.Sprintf("WebSocket upgrade failed: %v", err), http.StatusBadRequest)
 		return
 	}
 	defer conn.Close()
 
-	log.Printf("Client connected: %s", conn.RemoteAddr())
+	log.Printf("Client connected: RemoteAddr=%s", conn.RemoteAddr())
 
 	var currentUserID string
 	var currentRoomID string
@@ -248,9 +257,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		var msg map[string]interface{}
 		if err := conn.ReadJSON(&msg); err != nil {
-			log.Printf("Read error: %v", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Read error: %v", err)
+			} else {
+				log.Printf("Client disconnected: %v", err)
+			}
 			break
 		}
+		
+		log.Printf("Received message: %+v", msg)
 
 		event, ok := msg["event"].(string)
 		if !ok {
@@ -427,8 +442,9 @@ func (s *Server) getChannelParticipants(channelID string) []Participant {
 }
 
 func (s *Server) setupRoutes() {
-	http.HandleFunc("/ws", s.handleWebSocket)
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	s.mux.HandleFunc("/ws", s.handleWebSocket)
+	s.mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", s.config.CORSOrigin)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
@@ -481,23 +497,37 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	server.setupRoutes()
-
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)
+	log.Printf("WebSocket endpoint: ws://localhost%s/ws", addr)
+
+	// Добавляем CORS middleware
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", cfg.CORSOrigin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions")
+		
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		
+		server.mux.ServeHTTP(w, r)
+	})
 
 	// Проверяем наличие SSL сертификатов
 	if _, err := os.Stat(cfg.TLSCert); err == nil {
 		if _, err := os.Stat(cfg.TLSKey); err == nil {
 			log.Println("Starting HTTPS server")
-			if err := http.ListenAndServeTLS(addr, cfg.TLSCert, cfg.TLSKey, nil); err != nil {
+			if err := http.ListenAndServeTLS(addr, cfg.TLSCert, cfg.TLSKey, handler); err != nil {
 				log.Fatalf("Server failed: %v", err)
 			}
 		}
 	}
 
 	log.Println("Starting HTTP server")
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
