@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: whithin_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: 1000-7
     ports:
       - "5432:5432"
     volumes:
@@ -29,7 +29,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=postgres
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=1000-7
     depends_on:
       db:
         condition: service_healthy
@@ -64,9 +64,9 @@ services:
     environment:
       PORT: "3000"
       LIVEKIT_URL: "ws://localhost:7880"
-      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-api_key}"
-      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-api_secret}"
-      LIVEKIT_KEYS: "${LIVEKIT_KEYS:-api_key: api_secret}"
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-devkey_d7f9b3e5c1a4f8d2b6e9c3f5a7d1b4e}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-devsecret_8a2f6e9c3d7b1f5a8e2c6f9a3d7b1e5f8a2c6f9a3d7b1e5f}"
+      LIVEKIT_KEYS: "${LIVEKIT_KEYS:-devkey_d7f9b3e5c1a4f8d2b6e9c3f5a7d1b4e: devsecret_8a2f6e9c3d7b1f5a8e2c6f9a3d7b1e5f8a2c6f9a3d7b1e5f}"
       TLS_CERT: "/app/ssl/certificate.crt"
       TLS_KEY: "/app/ssl/private.key"
       CORS_ORIGIN: "https://whithin.ru"
