@@ -1,7 +1,7 @@
 {
   "name": "voice-chat-server",
   "version": "1.0.0",
-  "description": "Voice chat server using mediasoup",
+  "description": "Voice chat server using LiveKit",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
