@@ -94,6 +94,8 @@ services:
       - backend
       - voice-server
       - livekit
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app-network
     restart: unless-stopped
