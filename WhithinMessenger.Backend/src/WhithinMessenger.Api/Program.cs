@@ -55,6 +55,19 @@ builder.Services.AddCors(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Register NotificationService and IHubContext<Hub> for NotificationHub after SignalR is configured
+builder.Services.AddScoped<Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>>(provider =>
+{
+    return (Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>)provider.GetRequiredService<IHubContext<NotificationHub>>();
+});
+
+builder.Services.AddScoped<WhithinMessenger.Application.Services.INotificationService>(provider =>
+{
+    var notificationRepository = provider.GetRequiredService<WhithinMessenger.Domain.Interfaces.INotificationRepository>();
+    var hubContext = provider.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>>();
+    return new WhithinMessenger.Application.Services.NotificationService(notificationRepository, hubContext);
+});
+
 // JWT Configuration - регистрируется в Infrastructure слое
 
 builder.Services.AddAuthentication(options =>
@@ -90,7 +103,8 @@ builder.Services.AddAuthentication(options =>
                 (path.StartsWithSegments("/chatlisthub") || 
                  path.StartsWithSegments("/groupchathub") || 
                  path.StartsWithSegments("/serverhub") || 
-                 path.StartsWithSegments("/serverlisthub")))
+                 path.StartsWithSegments("/serverlisthub") ||
+                 path.StartsWithSegments("/notificationhub")))
             {
                 context.Token = accessToken;
             }
@@ -192,6 +206,11 @@ app.MapHub<ServerHub>("/serverhub", options =>
 });
 
 app.MapHub<ServerListHub>("/serverlisthub", options =>
+{
+    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+});
+
+app.MapHub<NotificationHub>("/notificationhub", options =>
 {
     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
 });

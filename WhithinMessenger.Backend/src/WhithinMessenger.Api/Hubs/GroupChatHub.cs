@@ -13,6 +13,8 @@ using WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatInfo;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.DeletePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
+using WhithinMessenger.Application.Services;
+using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Api.Hubs;
 using System.Security.Claims;
 
@@ -24,17 +26,23 @@ public class GroupChatHub : Hub
     private readonly IHubContext<ChatListHub> _chatListHubContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<GroupChatHub> _logger;
+    private readonly INotificationService _notificationService;
+    private readonly IChatRepository _chatRepository;
 
     public GroupChatHub(
         IMediator mediator,
         IHubContext<ChatListHub> chatListHubContext,
         IHttpContextAccessor httpContextAccessor,
-        ILogger<GroupChatHub> logger)
+        ILogger<GroupChatHub> logger,
+        INotificationService notificationService,
+        IChatRepository chatRepository)
     {
         _mediator = mediator;
         _chatListHubContext = chatListHubContext;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _notificationService = notificationService;
+        _chatRepository = chatRepository;
     }
 
         public async Task JoinGroup(string chatId)
@@ -372,6 +380,38 @@ public class GroupChatHub : Hub
 
                     // Отправляем ChatUpdated событие для обновления списка чатов
                     await _chatListHubContext.Clients.All.SendAsync("chatupdated", parsedChatId, message, DateTimeOffset.UtcNow);
+
+                    // Создаем уведомления для участников чата
+                    try
+                    {
+                        var chat = await _chatRepository.GetByIdAsync(parsedChatId);
+                        if (chat != null)
+                        {
+                            var chatMembers = await _chatRepository.GetChatMembersAsync(parsedChatId);
+                            var notificationMembers = chatMembers.Where(m => m != userId.Value).ToList();
+                            
+                            var isGroupChat = chat.Type?.TypeName == "Group";
+                            var notificationType = isGroupChat ? "group_message" : "direct_message";
+                            var chatName = chat.Name ?? username;
+                            var notificationContent = isGroupChat
+                                ? $"{username} в {chatName}: {message}"
+                                : $"{username}: {message}";
+
+                            foreach (var memberId in notificationMembers)
+                            {
+                                await _notificationService.CreateNotificationAsync(
+                                    memberId,
+                                    parsedChatId,
+                                    result.MessageId,
+                                    notificationType,
+                                    notificationContent);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error creating notifications for message");
+                    }
                 }
                 else
                 {
