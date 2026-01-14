@@ -152,13 +152,22 @@ class VoiceCallApi {
           // Setup event listeners
           this.setupRoomEventListeners();
           
-          // Wait a bit for event listeners to be registered
-          // Then check for existing remote participants and their tracks
-          setTimeout(() => {
+          // Wait for event listeners to be registered, then check for existing remote participants and their tracks
+          // Use a polling approach to wait for handlers to be registered
+          const checkAndEmitTracks = () => {
+            const handlersCount = this.eventHandlers.get('trackSubscribed')?.length || 0;
             console.log('🔍 Checking for existing remote participants...');
             console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
-            console.log('🔍 TrackSubscribed handlers count:', this.eventHandlers.get('trackSubscribed')?.length || 0);
+            console.log('🔍 TrackSubscribed handlers count:', handlersCount);
             
+            if (handlersCount === 0) {
+              // If no handlers yet, wait a bit more
+              console.log('🔍 No handlers registered yet, waiting...');
+              setTimeout(checkAndEmitTracks, 100);
+              return;
+            }
+            
+            // Handlers are registered, emit events for existing tracks
             this.room.remoteParticipants.forEach((participant) => {
               console.log('🔍 Found existing remote participant:', participant.identity);
               // Check for existing subscribed tracks
@@ -189,7 +198,10 @@ class VoiceCallApi {
                 }
               });
             });
-          }, 100);
+          };
+          
+          // Start checking after a short delay
+          setTimeout(checkAndEmitTracks, 200);
 
           resolve({
             token: response.token,
