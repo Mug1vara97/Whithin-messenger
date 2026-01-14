@@ -551,9 +551,8 @@ export const useCallStore = create(
           console.log('Joining room:', roomId);
           const response = await voiceCallApi.joinRoom(roomId, state.currentUserName, state.currentUserId);
           
-          if (response.routerRtpCapabilities) {
-            await state.initializeDevice(response.routerRtpCapabilities);
-          }
+          // LiveKit doesn't need routerRtpCapabilities or device initialization
+          // Audio/video tracks are managed automatically by LiveKit
           
           if (response.existingPeers) {
             // Сохраняем маппинг для существующих пиров
@@ -589,7 +588,8 @@ export const useCallStore = create(
             }
           }
           
-          // Создаем аудио поток
+          // Для LiveKit аудио публикуется автоматически при подключении к комнате
+          // Но мы все равно инициализируем локальный поток для шумоподавления
           await state.createAudioStream();
           
           // Отправляем начальное состояние микрофона и наушников на сервер
@@ -889,21 +889,18 @@ export const useCallStore = create(
       },
       
       // Создание аудио потока
+      // Для LiveKit аудио публикуется автоматически при подключении к комнате
+      // Этот метод теперь только инициализирует локальный поток и шумоподавление
       createAudioStream: async () => {
         try {
           const state = get();
-          if (!state.sendTransport) return;
           
-          // Закрываем старые producers
-          if (state.producers.size > 0) {
-            state.producers.forEach(producer => {
-              try {
-                producer.close();
-              } catch (e) {
-                console.warn('Error closing producer:', e);
-              }
-            });
-            set({ producers: new Map() });
+          // Для LiveKit не нужен sendTransport - аудио публикуется автоматически
+          // Проверяем, подключены ли мы к LiveKit комнате
+          const room = voiceCallApi.getRoom();
+          if (!room) {
+            console.warn('No LiveKit room available, skipping audio stream creation');
+            return;
           }
           
           // Останавливаем старый поток если есть
@@ -965,22 +962,16 @@ export const useCallStore = create(
           // Устанавливаем состояние микрофона
           audioTrack.enabled = !state.isMuted;
           
-          const producer = await state.sendTransport.produce({
-            track: audioTrack,
-            appData: { userId: state.currentUserId, userName: state.currentUserName }
-          });
-
-          set((state) => {
-            const newProducers = new Map(state.producers);
-            newProducers.set(producer.id, producer);
-            return { producers: newProducers };
-          });
-          
-          // Устанавливаем producer в noise suppression manager
-          noiseSuppressionManager.setProducer(producer);
+          // Для LiveKit публикуем трек через localParticipant
+          // LiveKit автоматически публикует микрофон при подключении, но мы можем обновить трек
+          try {
+            await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+            console.log('Audio track published via LiveKit with noise suppression support');
+          } catch (error) {
+            console.warn('Failed to publish audio track via LiveKit:', error);
+          }
           
           console.log('Audio stream created with noise suppression support');
-          return producer;
         } catch (error) {
           console.error('Failed to create audio stream:', error);
           set({ error: error.message });
@@ -988,7 +979,7 @@ export const useCallStore = create(
       },
       
       // Переключение микрофона
-      toggleMute: () => {
+      toggleMute: async () => {
         const state = get();
         const newMutedState = !state.isMuted;
         
@@ -996,22 +987,24 @@ export const useCallStore = create(
         localStorage.setItem('micMuted', JSON.stringify(newMutedState));
         console.log('💾 Mic state saved to localStorage:', newMutedState);
         
-        if (state.noiseSuppressionManager) {
-          const processedStream = state.noiseSuppressionManager.getProcessedStream();
-          const audioTrack = processedStream?.getAudioTracks()[0];
-          if (audioTrack) {
-            audioTrack.enabled = !newMutedState;
+        // Use LiveKit API to toggle microphone
+        try {
+          await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+        } catch (error) {
+          console.warn('Failed to toggle microphone via LiveKit:', error);
+          // Fallback to local track control
+          if (state.noiseSuppressionManager) {
+            const processedStream = state.noiseSuppressionManager.getProcessedStream();
+            const audioTrack = processedStream?.getAudioTracks()[0];
+            if (audioTrack) {
+              audioTrack.enabled = !newMutedState;
+            }
+          } else if (state.localStream) {
+            const audioTrack = state.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+              audioTrack.enabled = !newMutedState;
+            }
           }
-        } else if (state.localStream) {
-          const audioTrack = state.localStream.getAudioTracks()[0];
-          if (audioTrack) {
-            audioTrack.enabled = !newMutedState;
-          }
-        }
-        
-        // Отправляем состояние мута на сервер
-        if (voiceCallApi.socket) {
-          voiceCallApi.socket.emit('muteState', { isMuted: newMutedState });
         }
         
         set({ isMuted: newMutedState });
