@@ -152,22 +152,13 @@ class VoiceCallApi {
           // Setup event listeners
           this.setupRoomEventListeners();
           
-          // Wait for event listeners to be registered, then check for existing remote participants and their tracks
-          // Use a polling approach to wait for handlers to be registered
-          const checkAndEmitTracks = () => {
-            const handlersCount = this.eventHandlers.get('trackSubscribed')?.length || 0;
+          // Check for existing remote participants and their tracks
+          // Emit events - handlers will process them when registered (callStore or useVoiceCall)
+          setTimeout(() => {
             console.log('🔍 Checking for existing remote participants...');
             console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
-            console.log('🔍 TrackSubscribed handlers count:', handlersCount);
+            console.log('🔍 TrackSubscribed handlers count:', this.eventHandlers.get('trackSubscribed')?.length || 0);
             
-            if (handlersCount === 0) {
-              // If no handlers yet, wait a bit more
-              console.log('🔍 No handlers registered yet, waiting...');
-              setTimeout(checkAndEmitTracks, 100);
-              return;
-            }
-            
-            // Handlers are registered, emit events for existing tracks
             this.room.remoteParticipants.forEach((participant) => {
               console.log('🔍 Found existing remote participant:', participant.identity);
               // Check for existing subscribed tracks
@@ -182,6 +173,7 @@ class VoiceCallApi {
                   });
                   
                   // Emit trackSubscribed event for existing tracks
+                  // Note: This will be handled by callStore.handleNewProducer or useVoiceCall trackSubscribed handler
                   console.log('🔍 Emitting trackSubscribed event...');
                   this.emit('trackSubscribed', {
                     track: publication.track,
@@ -198,10 +190,7 @@ class VoiceCallApi {
                 }
               });
             });
-          };
-          
-          // Start checking after a short delay
-          setTimeout(checkAndEmitTracks, 200);
+          }, 500);
 
           resolve({
             token: response.token,

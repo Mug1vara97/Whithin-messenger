@@ -301,8 +301,132 @@ export const useCallStore = create(
             }));
           });
 
+          // Handle TrackSubscribed events from LiveKit (for callStore)
+          voiceCallApi.on('trackSubscribed', async ({ track, publication, participant, userId, mediaType }) => {
+            console.log('🔊 callStore: Track subscribed event received:', { 
+              trackSid: track?.sid, 
+              kind: track?.kind, 
+              userId, 
+              mediaType,
+              hasMediaStreamTrack: !!track?.mediaStreamTrack
+            });
+            
+            // Only handle audio tracks for voice calls
+            if (track.kind !== 'audio') {
+              return;
+            }
+            
+            // Skip screen share audio (handled separately)
+            if (mediaType === 'screen') {
+              return;
+            }
+            
+            // Check if track has mediaStreamTrack
+            if (!track.mediaStreamTrack) {
+              console.error('callStore: Track has no mediaStreamTrack!', track);
+              return;
+            }
+            
+            const state = get();
+            const targetUserId = userId || participant.identity;
+            
+            // Check if we already have an audio element for this user
+            if (state.audioElements.has(targetUserId)) {
+              console.log('🔊 callStore: Audio element already exists for user:', targetUserId, 'updating...');
+              const existingElement = state.audioElements.get(targetUserId);
+              existingElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+              try {
+                await existingElement.play();
+                console.log('🔊 callStore: Updated audio element playback started');
+              } catch (error) {
+                console.warn('🔊 callStore: Failed to play updated audio element:', error);
+              }
+              return;
+            }
+            
+            // Initialize AudioContext if needed
+            let audioContext = state.audioContext;
+            if (!audioContext || audioContext.state === 'closed') {
+              audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000,
+                latencyHint: 'interactive'
+              });
+              set({ audioContext });
+            }
+            
+            // Resume audio context if suspended
+            if (audioContext.state === 'suspended') {
+              await audioContext.resume();
+            }
+            
+            // Create audio element
+            const audioElement = document.createElement('audio');
+            const mediaStream = new MediaStream([track.mediaStreamTrack]);
+            audioElement.srcObject = mediaStream;
+            audioElement.autoplay = true;
+            audioElement.playsInline = true;
+            audioElement.controls = false;
+            audioElement.style.display = 'none';
+            document.body.appendChild(audioElement);
+            console.log('🔊 callStore: Created audio element for user:', targetUserId);
+            
+            // Create Web Audio API chain: source -> gain
+            const source = audioContext.createMediaStreamSource(mediaStream);
+            const gainNode = audioContext.createGain();
+            
+            // Set initial volume
+            const initialVolume = state.userVolumes.get(targetUserId) || 100;
+            const isMuted = state.userMutedStates.get(targetUserId) || false;
+            const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+            audioElement.volume = audioVolume;
+            gainNode.gain.value = audioVolume;
+            
+            // Connect source -> gain (not to destination to avoid double playback)
+            source.connect(gainNode);
+            
+            // Save references
+            set((state) => {
+              const newGainNodes = new Map(state.gainNodes);
+              const newAudioElements = new Map(state.audioElements);
+              const newUserVolumes = new Map(state.userVolumes);
+              
+              newGainNodes.set(targetUserId, gainNode);
+              newAudioElements.set(targetUserId, audioElement);
+              if (!newUserVolumes.has(targetUserId)) {
+                newUserVolumes.set(targetUserId, 100);
+              }
+              
+              return {
+                gainNodes: newGainNodes,
+                audioElements: newAudioElements,
+                userVolumes: newUserVolumes
+              };
+            });
+            
+            // Try to play audio element
+            try {
+              await audioElement.play();
+              console.log('🔊✅ callStore: Audio playback started for peer:', targetUserId);
+              set({ audioBlocked: false });
+            } catch (error) {
+              console.warn('🔊⚠️ callStore: Auto-play blocked, user interaction required:', error);
+              set({ audioBlocked: true });
+              setTimeout(async () => {
+                try {
+                  await audioElement.play();
+                  console.log('🔊✅ callStore: Audio playback started after delay');
+                  set({ audioBlocked: false });
+                } catch (err) {
+                  console.error('🔊❌ callStore: Audio playback still blocked:', err);
+                }
+              }, 1000);
+            }
+          });
+
           voiceCallApi.on('newProducer', async (producerData) => {
             const state = get();
+            // For LiveKit, newProducer is handled by trackSubscribed
+            // Only use handleNewProducer for legacy mediasoup compatibility
             if (state.device && state.recvTransport) {
               await state.handleNewProducer(producerData);
             }
