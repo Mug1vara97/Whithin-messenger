@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
+import { RoomEvent } from 'livekit-client';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -1370,120 +1371,52 @@ export const useCallStore = create(
       startScreenShare: async () => {
         try {
           const state = get();
-          if (!state.sendTransport) {
-            throw new Error('Transport not ready');
-          }
-
+          
           // Останавливаем существующую демонстрацию экрана, если есть
           if (state.isScreenSharing) {
             await get().stopScreenShare();
           }
 
-          console.log('Requesting screen sharing access...');
-          const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: {
-              cursor: 'always',
-              frameRate: { ideal: 60, max: 60 },
-              width: { ideal: 1920, max: 1920 },
-              height: { ideal: 1080, max: 1080 },
-              aspectRatio: 16/9,
-              displaySurface: 'monitor',
-              resizeMode: 'crop-and-scale'
-            },
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000,
-              channelCount: 2,
-              sampleSize: 16
-            }
-          });
-
-          console.log('Screen sharing access granted');
-
-          // Обработка остановки потока пользователем
-          stream.getVideoTracks()[0].onended = () => {
-            console.log('Screen sharing stopped by user');
-            get().stopScreenShare();
-          };
-
-          // Устанавливаем поток
-          set({ screenShareStream: stream });
-
-          const videoTrack = stream.getVideoTracks()[0];
-          if (!videoTrack) {
-            throw new Error('No video track available');
-          }
-
-          console.log('Creating screen sharing producer...');
-          const videoProducer = await state.sendTransport.produce({
-            track: videoTrack,
-            encodings: [
-              {
-                scaleResolutionDownBy: 1,
-                maxBitrate: 5000000, // 5 Mbps для Full HD
-                maxFramerate: 60
-              }
-            ],
-            codecOptions: {
-              videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
-              videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
-            },
-            appData: {
-              mediaType: 'screen',
-              trackType: 'video',
-              userId: state.currentUserId,
-              userName: state.currentUserName,
-              width: videoTrack.getSettings().width,
-              height: videoTrack.getSettings().height,
-              frameRate: videoTrack.getSettings().frameRate
-            }
-          });
-
-          console.log('Screen sharing video producer created:', videoProducer.id);
-
-          // Создаем отдельный audio producer для демонстрации экрана
-          const audioTrack = stream.getAudioTracks()[0];
-          let audioProducer = null;
+          console.log('Starting screen share via LiveKit...');
           
-          if (audioTrack) {
-            console.log('Creating screen sharing audio producer...');
-            audioProducer = await state.sendTransport.produce({
-              track: audioTrack,
-              appData: {
-                mediaType: 'screen',
-                trackType: 'audio',
-                userId: state.currentUserId,
-                userName: state.currentUserName
+          // Use LiveKit API to start screen share
+          await voiceCallApi.setScreenShareEnabled(true);
+          
+          // Get the screen share stream from LiveKit room
+          const room = voiceCallApi.getRoom();
+          if (room) {
+            // Listen for local track published event to get the stream
+            const handleLocalTrackPublished = (publication) => {
+              // Check if it's a screen share track
+              const isScreenShare = publication.source === 'screen_share' || 
+                                   publication.source === 2; // Track.Source.ScreenShare = 2
+              
+              if (isScreenShare && publication.track) {
+                const stream = new MediaStream([publication.track.mediaStreamTrack]);
+                set({ screenShareStream: stream, isScreenSharing: true });
+                
+                // Handle track ended
+                publication.track.on('ended', () => {
+                  console.log('Screen sharing stopped by user');
+                  get().stopScreenShare();
+                });
+              }
+            };
+            
+            // Check if screen share track already exists
+            room.localParticipant.videoTrackPublications.forEach(publication => {
+              const isScreenShare = publication.source === 'screen_share' || 
+                                   publication.source === 2;
+              if (isScreenShare && publication.track) {
+                handleLocalTrackPublished(publication);
               }
             });
-            console.log('Screen sharing audio producer created:', audioProducer.id);
-          } else {
-            console.log('No audio track in screen share stream');
+            
+            // Listen for new screen share tracks
+            room.on('LocalTrackPublished', handleLocalTrackPublished);
           }
-
-          // Сохраняем producers
-          const newProducers = new Map(state.producers);
-          newProducers.set('screen-video', videoProducer);
-          if (audioProducer) {
-            newProducers.set('screen-audio', audioProducer);
-          }
-          set({ 
-            producers: newProducers,
-            isScreenSharing: true 
-          });
-
-          // Обработка событий video producer
-          videoProducer.on('transportclose', () => {
-            console.log('Screen sharing video transport closed');
-            get().stopScreenShare();
-          });
-
-          videoProducer.on('trackended', () => {
-            console.log('Screen sharing track ended');
-            get().stopScreenShare();
-          });
+          
+          set({ isScreenSharing: true });
 
         } catch (error) {
           console.error('Error starting screen share:', error);
@@ -1498,26 +1431,13 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          // Очищаем при ошибке
-          const currentState = get();
-          if (currentState.screenShareStream) {
-            currentState.screenShareStream.getTracks().forEach(track => track.stop());
-          }
+          set({ isScreenSharing: false });
           
           // Показываем ошибку только если это не отмена пользователем
-          if (isCancelled) {
-            console.log('Screen sharing cancelled by user');
-            set({ 
-              screenShareStream: null,
-              isScreenSharing: false
-              // НЕ устанавливаем error при отмене
-            });
+          if (!isCancelled) {
+            set({ error: 'Failed to start screen sharing: ' + error.message });
           } else {
-            set({ 
-              screenShareStream: null,
-              isScreenSharing: false,
-              error: 'Failed to start screen sharing: ' + error.message 
-            });
+            console.log('Screen sharing cancelled by user');
           }
         }
       },
@@ -1527,52 +1447,19 @@ export const useCallStore = create(
 
         try {
           const state = get();
-          // Уведомляем сервер об остановке демонстрации экрана
-          const videoProducer = state.producers.get('screen-video');
           
-          if (videoProducer && voiceCallApi.socket) {
-            try {
-              await voiceCallApi.stopScreenSharing(videoProducer.id);
-            } catch (error) {
-              console.log('stopScreenShare: voiceCallApi.stopScreenSharing failed:', error.message);
-              // Продолжаем выполнение даже если сервер не ответил
-            }
-          }
+          // Use LiveKit API to stop screen share
+          await voiceCallApi.setScreenShareEnabled(false);
 
           // Останавливаем поток
           if (state.screenShareStream) {
             state.screenShareStream.getTracks().forEach(track => track.stop());
           }
 
-          // Удаляем producers
-          const newProducers = new Map(state.producers);
-          newProducers.delete('screen-video');
-          newProducers.delete('screen-audio');
-
-          // Очищаем screen share audio elements
-          const newAudioElements = new Map(state.audioElements);
-          for (const [key, audioElement] of newAudioElements.entries()) {
-            if (key.startsWith('screen-share-audio-')) {
-              try {
-                audioElement.pause();
-                audioElement.srcObject = null;
-                if (audioElement.parentNode) {
-                  audioElement.parentNode.removeChild(audioElement);
-                }
-                newAudioElements.delete(key);
-                console.log('Removed screen share audio element:', key);
-              } catch (e) {
-                console.warn('Error removing screen share audio element:', e);
-              }
-            }
-          }
-
           // Очищаем состояние
           set({
             screenShareStream: null,
-            isScreenSharing: false,
-            producers: newProducers,
-            audioElements: newAudioElements
+            isScreenSharing: false
           });
 
           console.log('Screen sharing stopped successfully');
@@ -1618,72 +1505,55 @@ export const useCallStore = create(
         console.log('🎥🎥🎥 startVideo called');
         try {
           const state = get();
-          console.log('🎥 startVideo state check:', { sendTransport: !!state.sendTransport, currentUserId: state.currentUserId });
-          if (!state.sendTransport) {
-            throw new Error('Send transport not available');
-          }
+          console.log('🎥 startVideo state check:', { currentUserId: state.currentUserId });
 
-          console.log('Requesting camera access...');
-          const cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: { ideal: 30, max: 60 },
-              facingMode: 'user'
-            },
-            audio: false // Только видео для вебкамеры, аудио отдельно
-          });
-
-          console.log('Camera access granted');
-          set({ cameraStream: cameraStream, isVideoEnabled: true });
+          console.log('Enabling camera via LiveKit...');
           
-          // Обновляем отдельное состояние веб-камеры для текущего пользователя
-          set((state) => {
-            const newVideoStates = new Map(state.participantVideoStates);
-            newVideoStates.set(state.currentUserId, true);
-            return { participantVideoStates: newVideoStates };
-          });
-
-          const videoTrack = cameraStream.getVideoTracks()[0];
-          if (!videoTrack) {
-            throw new Error('No video track available');
-          }
-
-          console.log('Creating video producer...');
-          const videoProducer = await state.sendTransport.produce({
-            track: videoTrack,
-            encodings: [
-              {
-                scaleResolutionDownBy: 1,
-                maxBitrate: 2500000, // 2.5 Mbps для HD
-                maxFramerate: 30
+          // Use LiveKit API to enable camera
+          await voiceCallApi.setCameraEnabled(true);
+          
+          // Get the camera stream from LiveKit room
+          const room = voiceCallApi.getRoom();
+          if (room) {
+            // Listen for local track published event to get the stream
+            const handleLocalTrackPublished = (publication) => {
+              // Check if it's a camera track
+              const isCamera = publication.source === 'camera' || 
+                              publication.source === 1; // Track.Source.Camera = 1
+              
+              if (isCamera && publication.track) {
+                const stream = new MediaStream([publication.track.mediaStreamTrack]);
+                set({ cameraStream: stream, isVideoEnabled: true });
+                
+                // Обновляем отдельное состояние веб-камеры для текущего пользователя
+                set((state) => {
+                  const newVideoStates = new Map(state.participantVideoStates);
+                  newVideoStates.set(state.currentUserId, true);
+                  return { participantVideoStates: newVideoStates };
+                });
+                
+                // Handle track ended
+                publication.track.on('ended', () => {
+                  console.log('Video track ended');
+                  get().stopVideo();
+                });
               }
-            ],
-            codecOptions: {
-              videoGoogleStartBitrate: 1500,
-              videoGoogleMaxBitrate: 2500
-            },
-            appData: {
-              mediaType: 'camera',
-              trackType: 'video',
-              userId: state.currentUserId,
-              userName: state.currentUserName
-            }
-          });
-
-          console.log('Video producer created:', videoProducer.id);
-          set({ videoProducer });
-
-          // Обработка событий video producer
-          videoProducer.on('transportclose', () => {
-            console.log('Video transport closed');
-            get().stopVideo();
-          });
-
-          videoProducer.on('trackended', () => {
-            console.log('Video track ended');
-            get().stopVideo();
-          });
+            };
+            
+            // Check if camera track already exists
+            room.localParticipant.videoTrackPublications.forEach(publication => {
+              const isCamera = publication.source === 'camera' || 
+                              publication.source === 1;
+              if (isCamera && publication.track) {
+                handleLocalTrackPublished(publication);
+              }
+            });
+            
+            // Listen for new camera tracks
+            room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+          }
+          
+          set({ isVideoEnabled: true });
 
         } catch (error) {
           console.error('Error starting video:', error);
@@ -1738,24 +1608,12 @@ export const useCallStore = create(
           });
         });
           
-          // Останавливаем video producer
-          if (state.videoProducer) {
-            try {
-              console.log('🎥 Closing video producer:', state.videoProducer.id);
-              console.log('🎥 Sending stopVideo event to server:', {
-                producerId: state.videoProducer.id
-              });
-              
-              // Отправляем событие на сервер
-              await voiceCallApi.stopVideo(state.videoProducer.id);
-              
-              await state.videoProducer.close();
-              console.log('🎥 Video producer closed successfully');
-            } catch (error) {
-              console.log('🎥 stopVideo: videoProducer.close failed:', error.message);
-            }
-          } else {
-            console.log('🎥 No video producer to close');
+          // Use LiveKit API to disable camera
+          try {
+            await voiceCallApi.setCameraEnabled(false);
+            console.log('🎥 Camera disabled via LiveKit');
+          } catch (error) {
+            console.log('🎥 stopVideo: setCameraEnabled failed:', error.message);
           }
 
 
