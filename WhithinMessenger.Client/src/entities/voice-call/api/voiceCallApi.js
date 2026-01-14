@@ -152,28 +152,44 @@ class VoiceCallApi {
           // Setup event listeners
           this.setupRoomEventListeners();
           
-          // Check for existing remote participants and their tracks
-          this.room.remoteParticipants.forEach((participant) => {
-            console.log('Found existing remote participant:', participant.identity);
-            // Check for existing subscribed tracks
-            participant.trackPublications.forEach((publication) => {
-              if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
-                console.log('Found existing subscribed audio track for participant:', participant.identity);
-                // Emit trackSubscribed event for existing tracks
-                this.emit('trackSubscribed', {
-                  track: publication.track,
-                  publication: publication,
-                  participant: participant,
-                  trackSid: publication.trackSid,
-                  kind: publication.kind,
-                  participantIdentity: participant.identity,
-                  userId: participant.identity,
-                  mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
-                             publication.source === Track.Source.Camera ? 'camera' : 'microphone'
-                });
-              }
+          // Wait a bit for event listeners to be registered
+          // Then check for existing remote participants and their tracks
+          setTimeout(() => {
+            console.log('🔍 Checking for existing remote participants...');
+            console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
+            console.log('🔍 TrackSubscribed handlers count:', this.eventHandlers.get('trackSubscribed')?.length || 0);
+            
+            this.room.remoteParticipants.forEach((participant) => {
+              console.log('🔍 Found existing remote participant:', participant.identity);
+              // Check for existing subscribed tracks
+              participant.trackPublications.forEach((publication) => {
+                if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
+                  console.log('🔍 Found existing subscribed audio track for participant:', participant.identity);
+                  console.log('🔍 Track details:', {
+                    trackSid: publication.trackSid,
+                    hasTrack: !!publication.track,
+                    hasMediaStreamTrack: !!publication.track?.mediaStreamTrack,
+                    trackState: publication.track?.mediaStreamTrack?.readyState
+                  });
+                  
+                  // Emit trackSubscribed event for existing tracks
+                  console.log('🔍 Emitting trackSubscribed event...');
+                  this.emit('trackSubscribed', {
+                    track: publication.track,
+                    publication: publication,
+                    participant: participant,
+                    trackSid: publication.trackSid,
+                    kind: publication.kind,
+                    participantIdentity: participant.identity,
+                    userId: participant.identity,
+                    mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
+                               publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+                  });
+                  console.log('🔍 trackSubscribed event emitted');
+                }
+              });
             });
-          });
+          }, 100);
 
           resolve({
             token: response.token,

@@ -76,10 +76,134 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('peerAudioStateChanged');
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
+      voiceCallApi.off('trackSubscribed'); // Очищаем и этот обработчик
       
       await voiceCallApi.connect(userId, userName);
       
-      // Регистрируем обработчики событий СРАЗУ после подключения
+      // Регистрируем обработчик trackSubscribed ПЕРВЫМ, до других обработчиков
+      // Handle TrackSubscribed events from LiveKit
+      voiceCallApi.on('trackSubscribed', async ({ track, publication, participant, userId, mediaType }) => {
+        console.log('🔊 Track subscribed event received:', { 
+          trackSid: track?.sid, 
+          kind: track?.kind, 
+          userId, 
+          mediaType,
+          hasMediaStreamTrack: !!track?.mediaStreamTrack,
+          trackState: track?.mediaStreamTrack?.readyState
+        });
+        
+        // Only handle audio tracks for voice calls
+        if (track.kind !== 'audio') {
+          console.log('Skipping non-audio track');
+          return;
+        }
+        
+        // Skip screen share audio (handled separately if needed)
+        if (mediaType === 'screen') {
+          console.log('Screen share audio track, skipping standard audio processing');
+          return;
+        }
+        
+        // Check if track has mediaStreamTrack
+        if (!track.mediaStreamTrack) {
+          console.error('Track has no mediaStreamTrack!', track);
+          return;
+        }
+        
+        // Use userId from event or fallback to participant identity
+        const targetUserId = userId || participant.identity;
+        console.log('🔊 Processing audio track for userId:', targetUserId);
+        
+        // Check if we already have an audio element for this user
+        if (audioElementsRef.current.has(targetUserId)) {
+          console.log('🔊 Audio element already exists for user:', targetUserId, 'updating...');
+          const existingElement = audioElementsRef.current.get(targetUserId);
+          existingElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+          try {
+            await existingElement.play();
+            console.log('🔊 Updated audio element playback started');
+          } catch (error) {
+            console.warn('🔊 Failed to play updated audio element:', error);
+          }
+          return;
+        }
+        
+        // Initialize AudioContext if needed
+        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 48000,
+            latencyHint: 'interactive'
+          });
+          console.log('🔊 Created new AudioContext');
+        }
+        
+        // Resume audio context if suspended
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+          console.log('🔊 Resumed AudioContext');
+        }
+        
+        // Create audio element
+        const audioElement = document.createElement('audio');
+        const mediaStream = new MediaStream([track.mediaStreamTrack]);
+        audioElement.srcObject = mediaStream;
+        audioElement.autoplay = true;
+        audioElement.playsInline = true;
+        audioElement.controls = false;
+        audioElement.style.display = 'none';
+        document.body.appendChild(audioElement);
+        console.log('🔊 Created audio element for user:', targetUserId);
+        
+        // Create Web Audio API chain: source -> gain
+        const source = audioContextRef.current.createMediaStreamSource(mediaStream);
+        const gainNode = audioContextRef.current.createGain();
+        
+        // Set initial volume
+        const initialVolume = userVolumes.get(targetUserId) || 100;
+        const isMuted = userMutedStates.get(targetUserId) || false;
+        const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+        audioElement.volume = audioVolume;
+        gainNode.gain.value = audioVolume;
+        
+        // Connect source -> gain (not to destination to avoid double playback with audio element)
+        source.connect(gainNode);
+        console.log('🔊 Connected Web Audio API chain (gain node for volume control)');
+        
+        // Save references
+        gainNodesRef.current.set(targetUserId, gainNode);
+        audioElementsRef.current.set(targetUserId, audioElement);
+        
+        // Initialize volume in state if not set
+        if (!userVolumes.has(targetUserId)) {
+          setUserVolumes(prev => {
+            const newMap = new Map(prev);
+            newMap.set(targetUserId, 100);
+            return newMap;
+          });
+        }
+        
+        // Try to play audio element
+        try {
+          await audioElement.play();
+          console.log('🔊✅ Audio playback started for peer:', targetUserId);
+          setAudioBlocked(false);
+        } catch (error) {
+          console.warn('🔊⚠️ Auto-play blocked, user interaction required:', error);
+          setAudioBlocked(true);
+          // Try again after a delay
+          setTimeout(async () => {
+            try {
+              await audioElement.play();
+              console.log('🔊✅ Audio playback started after delay');
+              setAudioBlocked(false);
+            } catch (err) {
+              console.error('🔊❌ Audio playback still blocked:', err);
+            }
+          }, 1000);
+        }
+      });
+      
+      // Регистрируем остальные обработчики событий СРАЗУ после подключения
       voiceCallApi.on('peerJoined', (peerData) => {
         console.log('Peer joined:', peerData);
         // Сохраняем маппинг socketId -> userId
@@ -220,128 +344,6 @@ export const useVoiceCall = (userId, userName) => {
           console.log('Updated participants:', updated);
           return updated;
         });
-      });
-
-      // Handle TrackSubscribed events from LiveKit
-      voiceCallApi.on('trackSubscribed', async ({ track, publication, participant, userId, mediaType }) => {
-        console.log('🔊 Track subscribed event received:', { 
-          trackSid: track?.sid, 
-          kind: track?.kind, 
-          userId, 
-          mediaType,
-          hasMediaStreamTrack: !!track?.mediaStreamTrack,
-          trackState: track?.mediaStreamTrack?.readyState
-        });
-        
-        // Only handle audio tracks for voice calls
-        if (track.kind !== 'audio') {
-          console.log('Skipping non-audio track');
-          return;
-        }
-        
-        // Skip screen share audio (handled separately if needed)
-        if (mediaType === 'screen') {
-          console.log('Screen share audio track, skipping standard audio processing');
-          return;
-        }
-        
-        // Check if track has mediaStreamTrack
-        if (!track.mediaStreamTrack) {
-          console.error('Track has no mediaStreamTrack!', track);
-          return;
-        }
-        
-        // Use userId from event or fallback to participant identity
-        const targetUserId = userId || participant.identity;
-        console.log('🔊 Processing audio track for userId:', targetUserId);
-        
-        // Check if we already have an audio element for this user
-        if (audioElementsRef.current.has(targetUserId)) {
-          console.log('🔊 Audio element already exists for user:', targetUserId, 'updating...');
-          const existingElement = audioElementsRef.current.get(targetUserId);
-          existingElement.srcObject = new MediaStream([track.mediaStreamTrack]);
-          try {
-            await existingElement.play();
-            console.log('🔊 Updated audio element playback started');
-          } catch (error) {
-            console.warn('🔊 Failed to play updated audio element:', error);
-          }
-          return;
-        }
-        
-        // Initialize AudioContext if needed
-        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 48000,
-            latencyHint: 'interactive'
-          });
-          console.log('🔊 Created new AudioContext');
-        }
-        
-        // Resume audio context if suspended
-        if (audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
-          console.log('🔊 Resumed AudioContext');
-        }
-        
-        // Create audio element
-        const audioElement = document.createElement('audio');
-        const mediaStream = new MediaStream([track.mediaStreamTrack]);
-        audioElement.srcObject = mediaStream;
-        audioElement.autoplay = true;
-        audioElement.playsInline = true;
-        audioElement.controls = false;
-        audioElement.style.display = 'none';
-        document.body.appendChild(audioElement);
-        console.log('🔊 Created audio element for user:', targetUserId);
-        
-        // Create Web Audio API chain: source -> gain -> destination
-        const source = audioContextRef.current.createMediaStreamSource(mediaStream);
-        const gainNode = audioContextRef.current.createGain();
-        
-        // Set initial volume
-        const initialVolume = userVolumes.get(targetUserId) || 100;
-        const isMuted = userMutedStates.get(targetUserId) || false;
-        const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-        audioElement.volume = audioVolume;
-        gainNode.gain.value = audioVolume;
-        
-        // Connect source -> gain (not to destination to avoid double playback with audio element)
-        source.connect(gainNode);
-        console.log('🔊 Connected Web Audio API chain (gain node for volume control)');
-        
-        // Save references
-        gainNodesRef.current.set(targetUserId, gainNode);
-        audioElementsRef.current.set(targetUserId, audioElement);
-        
-        // Initialize volume in state if not set
-        if (!userVolumes.has(targetUserId)) {
-          setUserVolumes(prev => {
-            const newMap = new Map(prev);
-            newMap.set(targetUserId, 100);
-            return newMap;
-          });
-        }
-        
-        // Try to play audio element
-        try {
-          await audioElement.play();
-          console.log('🔊✅ Audio playback started for peer:', targetUserId);
-          setAudioBlocked(false);
-        } catch (error) {
-          console.warn('🔊⚠️ Auto-play blocked, user interaction required:', error);
-          setAudioBlocked(true);
-          // Try again after a delay
-          setTimeout(async () => {
-            try {
-              await audioElement.play();
-              console.log('🔊✅ Audio playback started after delay');
-              setAudioBlocked(false);
-            } catch (err) {
-              console.error('🔊❌ Audio playback still blocked:', err);
-            }
-          }, 1000);
-        }
       });
       
       // Keep newProducer for compatibility (but it won't be used with LiveKit)
