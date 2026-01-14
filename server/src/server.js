@@ -1,14 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
-const mediasoup = require('mediasoup');
-const config = require('./config');
-const Room = require('./Room');
-const Peer = require('./Peer');
+const { AccessToken } = require('livekit-server-sdk');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
-const os = require('os');
 const { Server } = require('socket.io');
 const dotenv = require('dotenv');
 
@@ -40,8 +36,15 @@ app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../public')));
 
-const rooms = new Map();
-const peers = new Map();
+// LiveKit configuration
+const LIVEKIT_URL = process.env.LIVEKIT_URL || 'ws://host.docker.internal:7880';
+const LIVEKIT_EXTERNAL_URL = process.env.LIVEKIT_EXTERNAL_URL || 'wss://whithin.ru';
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars';
+
+// Store active rooms and peers (simplified - no mediasoup)
+const rooms = new Map(); // roomId -> { id, peers: Map<socketId, peer> }
+const peers = new Map(); // socketId -> { id, socket, roomId, name, userId, muted, audioEnabled, speaking }
 
 // Глобальное хранилище состояния пользователей (независимо от WebRTC соединений)
 const userVoiceStates = new Map(); // userId -> { isMuted, isAudioDisabled, channelId, userName }
@@ -104,7 +107,7 @@ function removeUserVoiceState(userId) {
 function getChannelParticipants(channelId) {
     const participants = [];
     
-    // Добавляем активных участников из WebRTC комнаты
+    // Добавляем активных участников из комнаты
     const room = rooms.get(channelId);
     if (room) {
         room.peers.forEach((peer) => {
@@ -117,19 +120,19 @@ function getChannelParticipants(channelId) {
                 userId: realUserId, // Используем настоящий userId
                 name: peer.name,
                 // Приоритизируем сохраненное состояние микрофона и наушников
-                isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.isMuted(),
-                isSpeaking: peer.isSpeaking(), // Состояние говорения только из WebRTC
-                isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.isAudioEnabled(),
-                isActive: true // Активно в WebRTC
+                isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.muted,
+                isSpeaking: peer.speaking || false, // Состояние говорения
+                isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.audioEnabled,
+                isActive: true // Активно в соединении
             };
             participants.push(participant);
         });
     }
     
-    // Добавляем пользователей, которые в канале, но не в активном WebRTC соединении
+    // Добавляем пользователей, которые в канале, но не в активном соединении
     for (const [userId, state] of userVoiceStates.entries()) {
         if (state.channelId === channelId) {
-            // Проверяем, не добавили ли мы уже этого пользователя из WebRTC
+            // Проверяем, не добавили ли мы уже этого пользователя
             const alreadyAdded = participants.some(p => p.userId === userId);
             if (!alreadyAdded) {
                 const participant = {
@@ -138,58 +141,55 @@ function getChannelParticipants(channelId) {
                     isMuted: state.isMuted,
                     isSpeaking: false, // Не в активном соединении
                     isAudioDisabled: state.isAudioDisabled,
-                    isActive: false // Не в активном WebRTC
+                    isActive: false // Не в активном соединении
                 };
                 participants.push(participant);
             }
         }
     }
     
-    // console.log(`[GET_PARTICIPANTS] Channel ${channelId}: ${participants.length} participants (${participants.filter(p => p.isActive).length} active)`);
     return participants;
 }
 
-let workers = [];
-let nextWorkerIndex = 0;
-
-async function runMediasoupWorkers() {
-    const { numWorkers = Object.keys(os.cpus()).length } = config.mediasoup;
-
-    for (let i = 0; i < numWorkers; i++) {
-        const worker = await mediasoup.createWorker({
-            logLevel: config.mediasoup.worker.logLevel,
-            logTags: config.mediasoup.worker.logTags,
-            rtcMinPort: config.mediasoup.worker.rtcMinPort,
-            rtcMaxPort: config.mediasoup.worker.rtcMaxPort,
+// Generate LiveKit access token
+async function generateToken(roomName, participantName, identity) {
+    try {
+        // Validate API key and secret
+        if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+            throw new Error('LiveKit API key or secret is missing');
+        }
+        
+        const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+            identity: identity || participantName,
+            name: participantName,
         });
 
-        worker.on('died', () => {
-            console.error('mediasoup worker died, exiting in 2 seconds... [pid:%d]', worker.pid);
-            setTimeout(() => process.exit(1), 2000);
+        at.addGrant({
+            room: roomName,
+            roomJoin: true,
+            canPublish: true,
+            canSubscribe: true,
+            canPublishData: true,
         });
 
-        workers.push(worker);
+        // toJwt() returns a Promise in SDK v2.x+
+        const jwt = await at.toJwt();
+        
+        if (!jwt || typeof jwt !== 'string') {
+            throw new Error('Failed to generate JWT token');
+        }
+        
+        return jwt;
+    } catch (error) {
+        console.error('Error generating LiveKit token:', error);
+        throw error;
     }
-}
-
-function getMediasoupWorker() {
-    const worker = workers[nextWorkerIndex];
-    nextWorkerIndex = (nextWorkerIndex + 1) % workers.length;
-    return worker;
-}
-
-async function createRoom(roomId, worker) {
-    const mediaCodecs = config.mediasoup.router.mediaCodecs;
-    const router = await worker.createRouter({ mediaCodecs });
-    const room = new Room(roomId, router, io);
-    rooms.set(roomId, room);
-    return room;
 }
 
 io.on('connection', async (socket) => {
     console.log('Client connected:', socket.id);
 
-    // Add voice activity event handlers
+    // Handle voice activity
     socket.on('speaking', ({ speaking }) => {
         const peer = peers.get(socket.id);
         if (!peer || !socket.data?.roomId) return;
@@ -198,12 +198,12 @@ io.on('connection', async (socket) => {
         if (!room) return;
 
         // Only update speaking state if the peer is not muted
-        if (!peer.isMuted()) {
-            peer.setSpeaking(speaking);
+        if (!peer.muted) {
+            peer.speaking = speaking;
             // Broadcast speaking state to all peers in the room
             socket.to(room.id).emit('speakingStateChanged', {
                 peerId: socket.id,
-                speaking: speaking && !peer.isMuted()
+                speaking: speaking && !peer.muted
             });
         }
     });
@@ -215,17 +215,23 @@ io.on('connection', async (socket) => {
         const room = rooms.get(socket.data.roomId);
         if (!room) return;
 
-        peer.setMuted(isMuted);
+        peer.muted = isMuted;
+        
+        // Update global user voice state
+        if (peer.userId) {
+            updateUserVoiceState(peer.userId, { isMuted });
+        }
         
         // If muted, ensure speaking state is false
         if (isMuted) {
-            peer.setSpeaking(false);
+            peer.speaking = false;
         }
 
         // Broadcast mute state to all peers in the room
         socket.to(room.id).emit('peerMuteStateChanged', {
             peerId: socket.id,
-            isMuted
+            isMuted,
+            userId: peer.userId
         });
 
         // Also broadcast speaking state update if needed
@@ -234,6 +240,11 @@ io.on('connection', async (socket) => {
                 peerId: socket.id,
                 speaking: false
             });
+        }
+
+        // Update channel participants list
+        if (peer.userId && room.id) {
+            scheduleChannelUpdate(room.id, 100);
         }
     });
 
@@ -263,8 +274,13 @@ io.on('connection', async (socket) => {
                 return;
             }
 
-            const worker = getMediasoupWorker();
-            const room = await createRoom(roomId, worker);
+            // Create simple room structure
+            const room = {
+                id: roomId,
+                peers: new Map(),
+                createdAt: Date.now()
+            };
+            rooms.set(roomId, room);
             callback({ roomId });
         } catch (error) {
             console.error('Error in createRoom:', error);
@@ -277,15 +293,25 @@ io.on('connection', async (socket) => {
             // Create room if it doesn't exist
             let room = rooms.get(roomId);
             if (!room) {
-                const worker = getMediasoupWorker();
-                room = await createRoom(roomId, worker);
+                room = {
+                    id: roomId,
+                    peers: new Map(),
+                    createdAt: Date.now()
+                };
                 rooms.set(roomId, room);
             }
 
             // Create peer with initial states
-            const peer = new Peer(socket, roomId, name, userId);
-            peer.setMuted(initialMuted); // Use initial mute state
-            peer.setAudioEnabled(initialAudioEnabled); // Use initial audio state
+            const peer = {
+                id: socket.id,
+                socket: socket,
+                roomId: roomId,
+                name: name,
+                userId: userId,
+                muted: initialMuted,
+                audioEnabled: initialAudioEnabled,
+                speaking: false
+            };
             
             // Обновляем глобальное состояние пользователя при подключении к комнате
             updateUserVoiceState(userId, { 
@@ -302,7 +328,7 @@ io.on('connection', async (socket) => {
                 name: peer.name
             });
             peers.set(socket.id, peer);
-            room.addPeer(peer);
+            room.peers.set(socket.id, peer);
 
             // Store room ID in socket data
             socket.data.roomId = roomId;
@@ -318,23 +344,10 @@ io.on('connection', async (socket) => {
                     existingPeers.push({
                         id: existingPeer.id,
                         name: existingPeer.name,
-                        isMuted: existingPeer.isMuted(),
-                        isAudioEnabled: existingPeer.isAudioEnabled(),
-                        isGlobalAudioMuted: userState.isAudioDisabled || false, // Добавляем статус глобального звука
-                        userId: existingPeer.userId // Добавляем userId для загрузки аватара
-                    });
-                }
-            });
-
-            // Get existing producers
-            const existingProducers = [];
-            room.producers.forEach((producerData, producerId) => {
-                if (producerData.peerId !== socket.id) {
-                    existingProducers.push({
-                        producerId,
-                        producerSocketId: producerData.peerId,
-                        kind: producerData.producer.kind,
-                        appData: producerData.producer.appData
+                        isMuted: existingPeer.muted,
+                        isAudioEnabled: existingPeer.audioEnabled,
+                        isGlobalAudioMuted: userState.isAudioDisabled || false,
+                        userId: existingPeer.userId
                     });
                 }
             });
@@ -346,21 +359,30 @@ io.on('connection', async (socket) => {
             socket.to(roomId).emit('peerJoined', {
                 peerId: peer.id,
                 name: peer.name,
-                isMuted: peer.isMuted(),
-                isAudioEnabled: Boolean(peer.isAudioEnabled()),
-                isGlobalAudioMuted: userState.isAudioDisabled || false, // Используем реальное состояние
-                userId: peer.userId // Добавляем userId для загрузки аватара
+                isMuted: peer.muted,
+                isAudioEnabled: peer.audioEnabled,
+                isGlobalAudioMuted: userState.isAudioDisabled || false,
+                userId: peer.userId
             });
 
             console.log(`Peer ${name} (${socket.id}) joined room ${roomId}`);
             console.log('Existing peers:', existingPeers);
-            console.log('Existing producers:', existingProducers);
 
-            // Send router RTP capabilities and existing peers/producers
+            // Generate LiveKit token
+            const token = await generateToken(roomId, name, userId || socket.id);
+            
+            // Debug: log token info
+            console.log(`Generated token for ${name} in room ${roomId}:`, {
+                tokenType: typeof token,
+                tokenLength: token?.length,
+                tokenPreview: token ? token.substring(0, 20) + '...' : 'null'
+            });
+
+            // Send LiveKit token and existing peers
             callback({
-                routerRtpCapabilities: room.router.rtpCapabilities,
-                existingPeers,
-                existingProducers
+                token: token,
+                url: LIVEKIT_EXTERNAL_URL,
+                existingPeers: existingPeers
             });
 
         } catch (error) {
@@ -369,913 +391,16 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('createWebRtcTransport', async (data, callback) => {
-        try {
-            if (!socket.data?.roomId) {
-                throw new Error('Not joined to any room');
-            }
-
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                throw new Error('Peer not found');
-            }
-
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const transport = await room.createWebRtcTransport(config.mediasoup.webRtcTransport);
-            peer.addTransport(transport);
-
-            transport.on('routerclose', () => {
-                transport.close();
-                peer.removeTransport(transport.id);
-            });
-
-            if (callback) {
-                callback({
-                    id: transport.id,
-                    iceParameters: transport.iceParameters,
-                    iceCandidates: transport.iceCandidates,
-                    dtlsParameters: transport.dtlsParameters,
-                });
-            }
-        } catch (error) {
-            console.error('Error in createWebRtcTransport:', error);
-            if (callback) {
-                callback({ error: error.message });
-            }
-        }
-    });
-
-    socket.on('connectTransport', async ({ transportId, dtlsParameters }, callback) => {
-        try {
-            if (!socket.data?.roomId) {
-                throw new Error('Not joined to any room');
-            }
-
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                throw new Error('Peer not found');
-            }
-
-            const transport = peer.getTransport(transportId);
-            if (!transport) {
-                throw new Error('Transport not found');
-            }
-
-            await transport.connect({ dtlsParameters });
-            callback();
-        } catch (error) {
-            console.error('Error in connectTransport:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('produce', async ({ transportId, kind, rtpParameters, appData }, callback) => {
-        try {
-            if (!socket.data?.roomId) {
-                throw new Error('Not joined to any room');
-            }
-
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                throw new Error('Peer not found');
-            }
-
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const transport = peer.getTransport(transportId);
-            if (!transport) {
-                throw new Error('Transport not found');
-            }
-
-            // Check if this is a screen sharing producer
-            if (appData?.mediaType === 'screen') {
-                // Allow both video and audio for screen sharing
-                console.log('=== SCREEN SHARING PRODUCER ===');
-                console.log('Creating screen sharing producer:', { kind, appData });
-                console.log('Track type:', appData?.trackType);
-
-                // For video stream, check if peer is already sharing screen
-                if (kind === 'video' && room.isPeerSharingScreen(socket.id)) {
-                    throw new Error('Already sharing screen');
-                }
-                
-                // For audio stream, allow multiple audio tracks for screen sharing
-                if (kind === 'audio') {
-                    console.log('Screen sharing audio producer allowed');
-                }
-                
-                console.log('Creating screen sharing producer:', { kind, appData });
-
-                let producerOptions = {
-                    kind,
-                    rtpParameters,
-                    appData
-                };
-
-                // Настройки для video producer демонстрации экрана
-                if (kind === 'video') {
-                    producerOptions = {
-                        ...producerOptions,
-                        // Optimize encoding parameters for Full HD screen sharing
-                        encodings: [
-                            {
-                                maxBitrate: 5000000, // 5 Mbps для Full HD
-                                scaleResolutionDownBy: 1, // Без уменьшения разрешения
-                                maxFramerate: 60
-                            }
-                        ],
-                        // Add codec preferences for better quality
-                        codecOptions: {
-                            videoGoogleStartBitrate: 3000,
-                            videoGoogleMinBitrate: 1000,
-                            videoGoogleMaxBitrate: 5000
-                        },
-                        keyFrameRequestDelay: 2000
-                    };
-                }
-                // Настройки для audio producer демонстрации экрана
-                else if (kind === 'audio') {
-                    producerOptions = {
-                        ...producerOptions,
-                        codecOptions: {
-                            opusStereo: true,
-                            opusDtx: true,
-                            opusFec: true,
-                            opusNack: true,
-                            channelsCount: 2,
-                            sampleRate: 48000,
-                            opusMaxAverageBitrate: 128000,
-                            opusMaxPlaybackRate: 48000,
-                            opusPtime: 20,
-                            opusApplication: 'music', // Для демонстрации экрана используем music
-                            opusCbr: false,
-                            opusUseinbandfec: true
-                        },
-                        encodings: [
-                            {
-                                ssrc: Math.floor(Math.random() * 4294967296),
-                                dtx: true,
-                                maxBitrate: 128000,
-                                scalabilityMode: 'S1T1',
-                                numberOfChannels: 2
-                            }
-                        ],
-                        appData: {
-                            ...appData,
-                            audioProcessing: {
-                                echoCancellation: false, // Отключаем для демонстрации экрана
-                                noiseSuppression: false,
-                                autoGainControl: false,
-                                highpassFilter: false,
-                                typingNoiseDetection: false,
-                                monoAudio: false
-                            }
-                        }
-                    };
-                }
-
-                producerOptions.appData = {
-                    ...producerOptions.appData,
-                    userId: peer.userId || peer.id
-                };
-                
-                console.log('Screen sharing producer appData with userId:', {
-                    peerId: peer.id,
-                    peerUserId: peer.userId,
-                    appDataUserId: producerOptions.appData.userId,
-                    appData: producerOptions.appData
-                });
-
-                const producer = await transport.produce(producerOptions);
-
-                console.log('Screen sharing producer created:', { 
-                    id: producer.id, 
-                    kind: producer.kind, 
-                    appData: producer.appData,
-                    trackType: appData?.trackType
-                });
-
-                peer.addProducer(producer);
-                room.addProducer(socket.id, producer);
-
-                // Ensure screen sharing producer is not paused
-                if (producer.paused) {
-                    console.log('Screen sharing producer was paused, resuming:', producer.id);
-                    await producer.resume();
-                }
-
-                producer.on('transportclose', () => {
-                    console.log('Screen sharing producer transport closed:', producer.id);
-                    producer.close();
-                    peer.removeProducer(producer.id);
-                    room.removeProducer(producer.id);
-                    
-                    // Notify peers about closed producer
-                    socket.to(room.id).emit('producerClosed', {
-                        producerId: producer.id,
-                        producerSocketId: socket.id
-                    });
-                });
-
-                producer.on('score', (score) => {
-                    // Monitor and adjust quality based on score
-                    const scores = Array.isArray(score) ? score : [score];
-                    const avgScore = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
-                    
-                    socket.emit('producerScore', {
-                        producerId: producer.id,
-                        score: avgScore
-                    });
-
-                    // Adjust layers based on score
-                    if (avgScore < 5) {
-                        producer.setMaxSpatialLayer(0);
-                    } else if (avgScore < 7) {
-                        producer.setMaxSpatialLayer(1);
-                    } else {
-                        producer.setMaxSpatialLayer(2);
-                    }
-                });
-
-                // Notify other peers in the room about the new screen sharing producer
-                const otherPeers = Array.from(room.getPeers().values())
-                    .filter(p => p.id !== socket.id);
-
-                console.log('Notifying peers about new screen sharing producer:', {
-                    producerId: producer.id,
-                    producerSocketId: socket.id,
-                    kind: producer.kind,
-                    appData: producer.appData
-                });
-
-                for (const otherPeer of otherPeers) {
-                    otherPeer.socket.emit('newProducer', {
-                        producerId: producer.id,
-                        producerSocketId: socket.id,
-                        kind: producer.kind,
-                        appData: producer.appData
-                    });
-                }
-
-                callback({ id: producer.id });
-                return;
-            }
-
-            // Handle regular audio/video producers
-            console.log('Creating regular producer:', { kind, appData });
-
-            let producerOptions = { 
-                kind, 
-                rtpParameters,
-                appData
-            };
-
-            // Add specific settings for audio producers
-            if (kind === 'audio') {
-                producerOptions = {
-                    ...producerOptions,
-                    codecOptions: {
-                        opusStereo: false,
-                        opusDtx: true,
-                        opusFec: true,
-                        opusNack: true,
-                        channelsCount: 1,
-                        sampleRate: 48000,
-                        opusMaxAverageBitrate: 64000,
-                        opusMaxPlaybackRate: 48000,
-                        opusPtime: 20,
-                        opusApplication: 'voip',
-                        opusCbr: true,
-                        opusUseinbandfec: true,
-                        opusMonoAudio: true
-                    },
-                    encodings: [
-                        {
-                            ssrc: Math.floor(Math.random() * 4294967296),
-                            dtx: true,
-                            maxBitrate: 64000,
-                            scalabilityMode: 'S1T1',
-                            numberOfChannels: 1
-                        }
-                    ],
-                    appData: {
-                        ...appData,
-                        audioProcessing: {
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                            highpassFilter: true,
-                            typingNoiseDetection: true,
-                            monoAudio: true
-                        }
-                    }
-                };
-
-                // Modify RTP parameters for better audio quality
-                if (rtpParameters.codecs && kind === 'audio') {
-                    rtpParameters.codecs.forEach(codec => {
-                        if (codec.mimeType.toLowerCase() === 'audio/opus') {
-                            // Для демонстрации экрана используем другие настройки
-                            if (appData?.mediaType === 'screen') {
-                                codec.parameters = {
-                                    ...codec.parameters,
-                                    maxaveragebitrate: 128000,
-                                    maxplaybackrate: 48000,
-                                    application: 'music', // Для демонстрации экрана
-                                    useinbandfec: 1,
-                                    'x-google-min-bitrate': 32,
-                                    'x-google-max-bitrate': 128,
-                                    'x-google-start-bitrate': 64,
-                                    'x-google-echo-cancellation': 0, // Отключаем для демонстрации экрана
-                                    'x-google-noise-suppression': 0,
-                                    'x-google-auto-gain-control': 0,
-                                    'x-google-typing-noise-detection': 0,
-                                    'x-google-conference-mode': 0,
-                                    'x-google-hardware-echo-cancellation': 0,
-                                    'x-google-highpass-filter': 0,
-                                    'x-google-mono-audio': 0,
-                                    channels: 2 // Стерео для демонстрации экрана
-                                };
-                            } else {
-                                // Обычные настройки для голоса
-                                codec.parameters = {
-                                    ...codec.parameters,
-                                    maxaveragebitrate: 64000,
-                                    maxplaybackrate: 48000,
-                                    application: 'voip',
-                                    useinbandfec: 1,
-                                    'x-google-min-bitrate': 8,
-                                    'x-google-max-bitrate': 64,
-                                    'x-google-start-bitrate': 32,
-                                    'x-google-echo-cancellation': 1,
-                                    'x-google-noise-suppression': 1,
-                                    'x-google-noise-suppression-level': 2,
-                                    'x-google-auto-gain-control': 1,
-                                    'x-google-experimental-echo-cancellation': 1,
-                                    'x-google-experimental-noise-suppression': 1,
-                                    'x-google-experimental-auto-gain-control': 1,
-                                    'x-google-typing-noise-detection': 1,
-                                    'x-google-conference-mode': 1,
-                                    'x-google-hardware-echo-cancellation': 1,
-                                    'x-google-highpass-filter': 1,
-                                    'x-google-mono-audio': 1,
-                                    channels: 1
-                                };
-                            }
-                        }
-                    });
-                    producerOptions.rtpParameters = rtpParameters;
-                }
-            }
-
-            producerOptions.appData = {
-                ...producerOptions.appData,
-                userId: peer.userId || peer.id
-            };
-            
-            console.log('Producer appData with userId:', {
-                peerId: peer.id,
-                peerUserId: peer.userId,
-                appDataUserId: producerOptions.appData.userId,
-                appData: producerOptions.appData
-            });
-
-            const producer = await transport.produce(producerOptions);
-
-            console.log('Regular producer created:', { 
-                id: producer.id, 
-                kind: producer.kind, 
-                appData: producer.appData 
-            });
-
-            peer.addProducer(producer);
-            room.addProducer(socket.id, producer);
-
-            // Ensure producer is not paused
-            if (producer.paused) {
-                console.log('Producer was paused, resuming:', producer.id);
-                await producer.resume();
-            }
-
-            producer.on('transportclose', () => {
-                console.log('Producer transport closed:', producer.id);
-                producer.close();
-                peer.removeProducer(producer.id);
-                room.removeProducer(producer.id);
-            });
-
-            producer.on('score', (score) => {
-                socket.emit('producerScore', {
-                    producerId: producer.id,
-                    score
-                });
-            });
-
-            // Add audio-specific event handlers
-            if (kind === 'audio') {
-                producer.on('audiolevelschange', (audioLevels) => {
-                    const level = audioLevels[0]?.level || 0;
-                    const isSpeaking = level > -50; // Adjust threshold as needed
-                    
-                    if (peer.isSpeaking() !== isSpeaking) {
-                        peer.setSpeaking(isSpeaking);
-                        socket.to(room.id).emit('speakingStateChanged', {
-                            peerId: socket.id,
-                            speaking: isSpeaking
-                        });
-                    }
-                });
-            }
-
-            // Notify other peers in the room
-            const otherPeers = Array.from(room.getPeers().values())
-                .filter(p => p.id !== socket.id);
-
-            console.log('Notifying peers about new producer:', {
-                producerId: producer.id,
-                producerSocketId: socket.id,
-                kind: producer.kind,
-                appData: producer.appData,
-                numberOfPeersToNotify: otherPeers.length,
-                peerIds: otherPeers.map(p => p.id)
-            });
-
-            for (const otherPeer of otherPeers) {
-                console.log(`  -> Sending newProducer to peer ${otherPeer.id} (${otherPeer.name})`);
-                otherPeer.socket.emit('newProducer', {
-                    producerId: producer.id,
-                    producerSocketId: socket.id,
-                    kind: producer.kind,
-                    appData: producer.appData
-                });
-            }
-
-            callback({ id: producer.id });
-
-        } catch (error) {
-            console.error('Error in produce:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('consume', async ({ rtpCapabilities, remoteProducerId, transportId }, callback) => {
-        try {
-            console.log('Consume request received:', {
-                remoteProducerId,
-                transportId,
-                peerId: socket.id,
-                roomId: socket.data?.roomId
-            });
-
-            if (!socket.data?.roomId) {
-                throw new Error('Not joined to any room');
-            }
-
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                throw new Error('Peer not found');
-            }
-
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const transport = peer.getTransport(transportId);
-            if (!transport) {
-                console.error('Transport not found:', transportId);
-                console.log('Available transports:', Array.from(peer.transports.keys()));
-                throw new Error('Transport not found');
-            }
-
-            const producer = room.getProducer(remoteProducerId);
-            if (!producer) {
-                console.error('Producer not found:', remoteProducerId);
-                console.log('Available producers:', Array.from(room.producers.keys()));
-                throw new Error('Producer not found');
-            }
-
-            console.log('Creating consumer for producer:', {
-                producerId: producer.id,
-                kind: producer.kind,
-                appData: producer.appData,
-                paused: producer.paused
-            });
-
-            if (!room.router.canConsume({
-                producerId: producer.id,
-                rtpCapabilities
-            })) {
-                console.error('Cannot consume - router capabilities mismatch');
-                throw new Error('Cannot consume');
-            }
-
-            // Optimize consumer settings for screen sharing
-            const consumerOptions = {
-                producerId: producer.id,
-                rtpCapabilities,
-                paused: false // Start unpaused for immediate audio/video
-            };
-
-            // Add specific settings for screen sharing consumers
-            if (producer.appData?.mediaType === 'screen') {
-                consumerOptions.preferredLayers = { spatialLayer: 2, temporalLayer: 2 };
-                consumerOptions.bufferSize = 512 * 1024; // 512KB buffer for screen sharing
-            }
-
-            const consumer = await transport.consume(consumerOptions);
-
-            console.log('Consumer created successfully:', {
-                id: consumer.id,
-                kind: consumer.kind,
-                appData: producer.appData,
-                paused: consumer.paused,
-                producerPaused: consumer.producerPaused
-            });
-
-            peer.addConsumer(consumer);
-            room.addConsumer(socket.id, consumer);
-            
-            console.log('Consumer added to peer and room');
-
-            consumer.on('transportclose', () => {
-                console.log('Consumer transport closed:', consumer.id);
-                consumer.close();
-                peer.removeConsumer(consumer.id);
-                room.removeConsumer(consumer.id);
-            });
-
-            consumer.on('producerclose', () => {
-                console.log('Consumer producer closed:', consumer.id);
-                consumer.close();
-                peer.removeConsumer(consumer.id);
-                room.removeConsumer(consumer.id);
-                socket.emit('consumerClosed', { 
-                    consumerId: consumer.id,
-                    producerId: producer.id,
-                    producerSocketId: room.producers.get(producer.id)?.peerId
-                });
-            });
-
-            consumer.on('score', (score) => {
-                socket.emit('consumerScore', {
-                    consumerId: consumer.id,
-                    score
-                });
-            });
-
-            const response = {
-                id: consumer.id,
-                producerId: producer.id,
-                kind: consumer.kind,
-                rtpParameters: consumer.rtpParameters,
-                type: consumer.type,
-                producerPaused: consumer.producerPaused,
-                appData: producer.appData
-            };
-            
-            console.log('Sending consume response:', response);
-            callback(response);
-
-        } catch (error) {
-            console.error('Error in consume:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('resumeConsumer', async ({ consumerId }, callback) => {
-        try {
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const consumer = room.getConsumer(consumerId);
-            if (!consumer) {
-                throw new Error('Consumer not found');
-            }
-
-            console.log('Resuming consumer:', consumerId);
-            await consumer.resume();
-            callback();
-        } catch (error) {
-            console.error('Error in resumeConsumer:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('resumeProducer', async ({ producerId }, callback) => {
-        try {
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const producer = room.getProducer(producerId);
-            if (!producer) {
-                throw new Error('Producer not found');
-            }
-
-            console.log('Resuming producer:', producerId);
-            if (producer.paused) {
-                await producer.resume();
-                console.log('Producer resumed successfully:', producerId);
-            }
-            callback({ success: true });
-        } catch (error) {
-            console.error('Error in resumeProducer:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('restartConsumer', async ({ consumerId, producerId }, callback) => {
-        try {
-            const room = rooms.get(socket.data.roomId);
-            if (!room) {
-                throw new Error('Room not found');
-            }
-
-            const consumer = room.getConsumer(consumerId);
-            if (!consumer) {
-                throw new Error('Consumer not found');
-            }
-
-            const producer = room.getProducer(producerId);
-            if (!producer) {
-                throw new Error('Producer not found');
-            }
-
-            console.log('Restarting consumer and producer:', { consumerId, producerId });
-            
-            // First restart producer
-            if (producer.paused) {
-                await producer.resume();
-                console.log('Producer resumed for restart:', producerId);
-            } else {
-                await producer.pause();
-                await new Promise(resolve => setTimeout(resolve, 100));
-                await producer.resume();
-                console.log('Producer restarted:', producerId);
-            }
-            
-            // Then restart consumer
-            await consumer.pause();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            await consumer.resume();
-            console.log('Consumer restarted successfully:', consumerId);
-            
-            callback({ success: true });
-        } catch (error) {
-            console.error('Error in restartConsumer:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('stopScreenSharing', async ({ producerId }) => {
-        try {
-            console.log('Stop screen sharing request:', { producerId });
-            
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                console.error('Peer not found for socket:', socket.id);
-                return;
-            }
-
-            const room = rooms.get(socket.data?.roomId);
-            if (!room) {
-                console.error('Room not found for peer:', socket.id);
-                return;
-            }
-
-            // Находим и закрываем producer демонстрации экрана
-            const producer = peer.getProducer(producerId);
-            if (producer && producer.appData?.mediaType === 'screen') {
-                console.log('Found screen sharing producer:', producerId);
-                // Логируем сокеты в комнате
-                const socketsInRoom = Array.from(io.sockets.adapter.rooms.get(room.id) || []);
-                console.log('Sockets in room', room.id, socketsInRoom);
-                // Сначала уведомляем всех участников
-                const eventData = {
-                    producerId,
-                    producerSocketId: socket.id,
-                    mediaType: 'screen',
-                    kind: 'video' // Screen share is also video type
-                };
-                console.log('Sending producerClosed event with data:', eventData);
-                io.to(room.id).emit('producerClosed', eventData);
-                
-                // Удаляем producer из комнаты (это также очистит связанные consumers)
-                room.removeProducer(producerId);
-                
-                // Удаляем producer из пира
-                peer.removeProducer(producerId);
-                
-                // Закрываем producer
-                if (!producer.closed) {
-                    producer.close();
-                }
-
-                console.log('Screen sharing stopped successfully:', { 
-                    peerId: socket.id, 
-                    producerId 
-                });
-            } else {
-                console.error('Screen sharing producer not found:', producerId);
-            }
-        } catch (error) {
-            console.error('Error stopping screen sharing:', error);
-        }
-    });
-
-    // Добавляем обработку остановки вебкамеры
-    socket.on('stopVideo', async ({ producerId }) => {
-        try {
-            console.log('🎥 Stop video request:', { producerId });
-            
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                console.error('Peer not found for socket:', socket.id);
-                return;
-            }
-
-            const room = rooms.get(socket.data?.roomId);
-            if (!room) {
-                console.error('Room not found for peer:', socket.id);
-                return;
-            }
-
-            // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО НА СЕРВЕРЕ ДО ОСТАНОВКИ ВЕБКАМЕРЫ
-            console.log('🔍🔍🔍 СЕРВЕР: АУДИО ДИАГНОСТИКА ДО ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
-            
-            // Проверяем состояние audio producers ДО остановки
-            const audioProducersBefore = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
-            console.log('🔍 СЕРВЕР: Audio producers ДО остановки вебкамеры:', audioProducersBefore.length);
-            audioProducersBefore.forEach(ap => {
-                console.log('🔍 СЕРВЕР: Audio producer ДО:', {
-                    id: ap.id,
-                    kind: ap.kind,
-                    paused: ap.paused,
-                    closed: ap.closed,
-                    appData: ap.appData
-                });
-            });
-            
-            // Находим и закрываем producer вебкамеры
-            const producer = peer.getProducer(producerId);
-            if (producer && producer.appData?.mediaType === 'camera') {
-                console.log('🎥 Found camera producer:', producerId);
-                // Логируем сокеты в комнате
-                const socketsInRoom = Array.from(io.sockets.adapter.rooms.get(room.id) || []);
-                console.log('🎥 Sockets in room', room.id, socketsInRoom);
-                // Сначала уведомляем всех участников
-                const eventData = {
-                    producerId,
-                    producerSocketId: socket.id,
-                    mediaType: 'camera',
-                    kind: 'video' // Добавляем kind для правильной обработки на клиенте
-                };
-                console.log('🎥 Sending producerClosed event with data:', eventData);
-                io.to(room.id).emit('producerClosed', eventData);
-                
-                // Правильно удаляем только video producer из комнаты
-                console.log('🎥 Removing video producer from room:', producerId);
-                room.removeProducer(producerId);
-                
-                // Удаляем producer из пира
-                peer.removeProducer(producerId);
-                
-                // Закрываем producer
-                if (!producer.closed) {
-                    producer.close();
-                }
-
-                // 🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА АУДИО НА СЕРВЕРЕ ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ
-                console.log('🔍🔍🔍 СЕРВЕР: АУДИО ДИАГНОСТИКА ПОСЛЕ ОСТАНОВКИ ВЕБКАМЕРЫ 🔍🔍🔍');
-                
-                // Проверяем состояние audio producers после остановки video
-                const audioProducers = Array.from(peer.producers.values()).filter(p => p.kind === 'audio');
-                console.log('🔍 СЕРВЕР: Audio producers после остановки вебкамеры:', audioProducers.length);
-                audioProducers.forEach(ap => {
-                    console.log('🔍 СЕРВЕР: Audio producer:', {
-                        id: ap.id,
-                        kind: ap.kind,
-                        paused: ap.paused,
-                        closed: ap.closed,
-                        appData: ap.appData
-                    });
-                });
-
-                // Проверяем состояние consumers в комнате
-                console.log('🎥 Consumers in room after video stop:', Array.from(room.consumers.keys()));
-                room.consumers.forEach((consumer, id) => {
-                    console.log('🎥 Consumer:', id, 'kind:', consumer.kind, 'paused:', consumer.paused, 'producerPaused:', consumer.producerPaused, 'closed:', consumer.closed);
-                });
-
-                console.log('🎥 Video stopped successfully:', { 
-                    peerId: socket.id, 
-                    producerId 
-                });
-            } else {
-                console.error('🎥 Camera producer not found:', producerId);
-            }
-        } catch (error) {
-            console.error('Error stopping screen sharing:', error);
-        }
-    });
-
-    socket.on('restartIce', async ({ transportId }, callback) => {
-        try {
-            if (!socket.data?.roomId) {
-                throw new Error('Not joined to any room');
-            }
-
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                throw new Error('Peer not found');
-            }
-
-            const transport = peer.getTransport(transportId);
-            if (!transport) {
-                throw new Error('Transport not found');
-            }
-
-            const iceParameters = await transport.restartIce();
-            callback({ iceParameters });
-        } catch (error) {
-            console.error('Error in restartIce:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('producerClosed', async ({ producerId, producerSocketId, mediaType }) => {
-        try {
-            console.log('Producer closed request:', { producerId, producerSocketId, mediaType });
-            
-            const peer = peers.get(socket.id);
-            if (!peer) {
-                console.error('Peer not found for socket:', socket.id);
-                return;
-            }
-
-            const room = rooms.get(socket.data?.roomId);
-            if (!room) {
-                console.error('Room not found for peer:', socket.id);
-                return;
-            }
-
-            // Находим producer
-            const producer = peer.getProducer(producerId);
-            if (producer) {
-                console.log('Found producer to close:', producerId);
-                
-                // Логируем сокеты в комнате
-                const socketsInRoom = Array.from(io.sockets.adapter.rooms.get(room.id) || []);
-                console.log('Sockets in room', room.id, socketsInRoom);
-                
-                // Сначала уведомляем всех участников
-                const eventData = {
-                    producerId,
-                    producerSocketId: socket.id,
-                    mediaType
-                };
-                console.log('Sending producerClosed event with data:', eventData);
-                io.to(room.id).emit('producerClosed', eventData);
-                
-                // Удаляем producer из комнаты (это также очистит связанные consumers)
-                room.removeProducer(producerId);
-                
-                // Удаляем producer из пира
-                peer.removeProducer(producerId);
-                
-                // Закрываем producer
-                if (!producer.closed) {
-                    producer.close();
-                }
-
-                console.log(`${mediaType} producer closed successfully:`, { 
-                    peerId: socket.id, 
-                    producerId 
-                });
-            } else {
-                console.error(`${mediaType} producer not found:`, producerId);
-            }
-        } catch (error) {
-            console.error(`Error closing ${mediaType} producer:`, error);
-        }
-    });
-
     // Add audio disabled state handling
     socket.on('audioDisabledStateChanged', ({ isAudioDisabled }) => {
         if (!socket.data?.roomId) {
             console.error('Room ID not found for socket:', socket.id);
             return;
+        }
+
+        const peer = peers.get(socket.id);
+        if (peer && peer.userId) {
+            updateUserVoiceState(peer.userId, { isAudioDisabled });
         }
 
         // Broadcast to all peers in the room except the sender
@@ -1290,7 +415,7 @@ io.on('connection', async (socket) => {
         const peer = peers.get(socket.id);
         if (peer) {
             // Update peer's audio state
-            peer.setAudioEnabled(isEnabled);
+            peer.audioEnabled = isEnabled;
             
             // Update global user voice state if provided
             if (userId && isGlobalAudioMuted !== undefined) {
@@ -1315,120 +440,15 @@ io.on('connection', async (socket) => {
                 return;
             }
 
-            const peersArray = Array.from(room.getPeers().entries()).map(([peerId, peer]) => ({
-                peerId,
-                userName: peer.userName,
-                isMuted: peer.isMuted || false
+            const peersArray = Array.from(room.peers.values()).map((peer) => ({
+                peerId: peer.id,
+                userName: peer.name,
+                isMuted: peer.muted || false
             }));
 
             callback(peersArray);
         } catch (error) {
             console.error('Error in getPeers:', error);
-            callback([]);
-        }
-    });
-
-    // Обработчик отключения перенесен ниже
-
-    // Add missing event handlers for client fixes
-    socket.on('checkProducer', ({ roomId, producerId }, callback) => {
-        try {
-            const room = rooms.get(roomId);
-            if (!room) {
-                callback({ exists: false });
-                return;
-            }
-            
-            const producer = room.getProducer(producerId);
-            callback({ 
-                exists: !!producer,
-                paused: producer ? producer.paused : false
-            });
-        } catch (error) {
-            console.error('Error in checkProducer:', error);
-            callback({ exists: false });
-        }
-    });
-
-    socket.on('resumeProducer', ({ producerId }, callback) => {
-        try {
-            const room = rooms.get(socket.data?.roomId);
-            if (!room) {
-                callback({ error: 'Room not found' });
-                return;
-            }
-            
-            const producer = room.getProducer(producerId);
-            if (!producer) {
-                callback({ error: 'Producer not found' });
-                return;
-            }
-
-            if (producer.paused) {
-                producer.resume();
-                console.log('Producer resumed:', producerId);
-            }
-            
-            callback();
-        } catch (error) {
-            console.error('Error in resumeProducer:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('restartProducer', ({ producerId }, callback) => {
-        try {
-            const room = rooms.get(socket.data?.roomId);
-            if (!room) {
-                callback({ error: 'Room not found' });
-                return;
-            }
-            
-            const producer = room.getProducer(producerId);
-            if (!producer) {
-                callback({ error: 'Producer not found' });
-                return;
-            }
-
-            // Force restart by pausing and resuming
-            if (!producer.paused) {
-                producer.pause();
-            }
-            setTimeout(() => {
-                producer.resume();
-                console.log('Producer restarted:', producerId);
-            }, 100);
-            
-            callback();
-        } catch (error) {
-            console.error('Error in restartProducer:', error);
-            callback({ error: error.message });
-        }
-    });
-
-    socket.on('getProducers', ({ roomId }, callback) => {
-        try {
-            const room = rooms.get(roomId);
-            if (!room) {
-                callback([]);
-                return;
-            }
-
-            const producers = [];
-            room.producers.forEach((producerData, producerId) => {
-                if (producerData.peerId !== socket.id) {
-                    producers.push({
-                        producerId,
-                        producerSocketId: producerData.peerId,
-                        kind: producerData.producer.kind,
-                        appData: producerData.producer.appData
-                    });
-                }
-            });
-
-            callback(producers);
-        } catch (error) {
-            console.error('Error in getProducers:', error);
             callback([]);
         }
     });
@@ -1457,7 +477,7 @@ io.on('connection', async (socket) => {
             // Отправляем информацию о всех голосовых каналах (активных и неактивных)
             const allChannelIds = new Set();
             
-            // Собираем ID всех активных WebRTC комнат
+            // Собираем ID всех активных комнат
             rooms.forEach((room, roomId) => {
                 allChannelIds.add(roomId);
             });
@@ -1472,8 +492,6 @@ io.on('connection', async (socket) => {
             // Отправляем информацию о каждом канале
             allChannelIds.forEach(channelId => {
                 const participants = getChannelParticipants(channelId);
-                
-                // console.log(`Channel ${channelId} has ${participants.length} participants (${participants.filter(p => p.isActive).length} active)`);
                 
                 // Отправляем информацию всем подключенным клиентам
                 io.emit('voiceChannelParticipantsUpdate', {
@@ -1508,9 +526,10 @@ io.on('connection', async (socket) => {
             const room = rooms.get(channelId);
             if (room) {
                 // Удаляем пользователя из комнаты
-                const peer = Array.from(room.peers.values()).find(p => p.id === userId);
-                if (peer) {
-                    room.removePeer(peer);
+                const peerToRemove = Array.from(room.peers.values()).find(p => p.userId === userId);
+                if (peerToRemove) {
+                    room.peers.delete(peerToRemove.id);
+                    peers.delete(peerToRemove.id);
                     console.log(`User ${userId} removed from room ${channelId}`);
                 } else {
                     console.log(`User ${userId} not found in room ${channelId}, but room exists`);
@@ -1649,21 +668,8 @@ io.on('connection', async (socket) => {
             }
             
             if (room) {
-                // Уведомляем о закрытии всех producers перед удалением пира
-                peer.producers.forEach((producer, producerId) => {
-                    const mediaType = producer.appData?.mediaType || 'unknown';
-                    io.to(room.id).emit('producerClosed', {
-                        producerId,
-                        producerSocketId: socket.id,
-                        mediaType
-                    });
-                });
-
-                // Close all transports, producers, and consumers
-                peer.close();
-                
                 // Удаляем peer из комнаты
-                room.removePeer(socket.id);
+                room.peers.delete(socket.id);
                 console.log(`Peer ${socket.id} removed from room ${roomId}`);
                 
                 // Если комната пустая, удаляем её и уведомляем всех клиентов
@@ -1697,13 +703,19 @@ io.on('connection', async (socket) => {
     });
 });
 
-async function run() {
-    await runMediasoupWorkers();
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
 
-    const port = config.server.listen.port || 3000;
-    server.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+    console.log('LiveKit configuration:', {
+        url: LIVEKIT_URL,
+        externalUrl: LIVEKIT_EXTERNAL_URL,
+        apiKey: LIVEKIT_API_KEY,
+        secretLength: LIVEKIT_API_SECRET?.length || 0,
+        secretPreview: LIVEKIT_API_SECRET ? LIVEKIT_API_SECRET.substring(0, 10) + '...' : 'missing'
     });
-}
-
-run(); 
+});

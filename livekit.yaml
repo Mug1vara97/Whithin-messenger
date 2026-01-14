@@ -1,0 +1,38 @@
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false
+  # Explicitly set node IP to your server's public IP or domain
+  # Get your server's public IP with: curl ifconfig.me
+  node_ip: "whithin.ru"
+  stun_servers:
+    - stun:185.119.59.23:3478
+    - stun:stun.l.google.com:19302
+  # TURN servers configuration
+  turn_servers:
+    - host: 185.119.59.23
+      port: 3478
+      protocol: udp
+      username: test
+      password: test123
+    - host: 185.119.59.23
+      port: 3478
+      protocol: tcp
+      username: test
+      password: test123
+
+keys:
+  devkey: this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars
+
+development: true
+
+log_level: info
+
+redis: {}
+
+# Webhook configuration (optional)
+# webhook:
+#   urls:
+#     - http://voice-server:3000/webhook

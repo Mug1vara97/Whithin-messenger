@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { voiceCallApi } from '../api/voiceCallApi';
 import { NoiseSuppressionManager } from '../../../shared/lib/utils/noiseSuppression';
+import { RoomEvent, Track } from 'livekit-client';
 
 // 🚨 TEST LOGGING - ДОЛЖНО ПОЯВИТЬСЯ В КОНСОЛИ 🚨
 console.log('🔥🔥🔥 useVoiceCall.js LOADED 🔥🔥🔥');
@@ -43,17 +44,11 @@ export const useVoiceCall = (userId, userName) => {
   const [isScreenSharing, setIsScreenSharing] = useState(false); // Демонстрация экрана
   const [screenShareStream, setScreenShareStream] = useState(null); // Поток демонстрации экрана
 
-  const deviceRef = useRef(null);
-  const sendTransportRef = useRef(null);
-  const recvTransportRef = useRef(null);
-  const producersRef = useRef(new Map());
-  const consumersRef = useRef(new Map());
+  // LiveKit doesn't need mediasoup refs
   const localStreamRef = useRef(null);
-  const handleNewProducerRef = useRef(null);
   const noiseSuppressionRef = useRef(null);
   const audioContextRef = useRef(null);
-  const createAudioStreamRef = useRef(null);
-  const screenProducerRef = useRef(null);
+  const screenShareStreamRef = useRef(null);
   const connectingRef = useRef(false);
   const gainNodesRef = useRef(new Map()); // GainNode для каждого пользователя
   const audioElementsRef = useRef(new Map()); // Audio elements для каждого пользователя
@@ -227,31 +222,108 @@ export const useVoiceCall = (userId, userName) => {
         });
       });
 
-      voiceCallApi.on('newProducer', async (producerData) => {
-        console.log('New producer event received:', producerData);
-        if (handleNewProducerRef.current) {
-          await handleNewProducerRef.current(producerData);
+      // Handle TrackSubscribed events from LiveKit
+      voiceCallApi.on('trackSubscribed', async ({ track, publication, participant, userId, mediaType }) => {
+        console.log('Track subscribed event received:', { track, kind: track.kind, userId, mediaType });
+        
+        // Only handle audio tracks for voice calls
+        if (track.kind !== 'audio') {
+          return;
+        }
+        
+        // Skip screen share audio (handled separately if needed)
+        if (mediaType === 'screen') {
+          console.log('Screen share audio track, skipping standard audio processing');
+          return;
+        }
+        
+        // Use userId from event or fallback to participant identity
+        const targetUserId = userId || participant.identity;
+        
+        // Initialize AudioContext if needed
+        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 48000,
+            latencyHint: 'interactive'
+          });
+        }
+        
+        // Resume audio context if suspended
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+        
+        // Create audio element
+        const audioElement = document.createElement('audio');
+        audioElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+        audioElement.autoplay = true;
+        audioElement.playsInline = true;
+        audioElement.controls = false;
+        audioElement.style.display = 'none';
+        document.body.appendChild(audioElement);
+        
+        // Create Web Audio API chain: source -> gain
+        const source = audioContextRef.current.createMediaStreamSource(new MediaStream([track.mediaStreamTrack]));
+        const gainNode = audioContextRef.current.createGain();
+        
+        // Set initial volume
+        const initialVolume = userVolumes.get(targetUserId) || 100;
+        const isMuted = userMutedStates.get(targetUserId) || false;
+        const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+        audioElement.volume = audioVolume;
+        
+        // Connect source -> gain (not to destination to avoid double playback)
+        source.connect(gainNode);
+        
+        // Save references
+        gainNodesRef.current.set(targetUserId, gainNode);
+        audioElementsRef.current.set(targetUserId, audioElement);
+        
+        // Initialize volume in state if not set
+        if (!userVolumes.has(targetUserId)) {
+          setUserVolumes(prev => {
+            const newMap = new Map(prev);
+            newMap.set(targetUserId, 100);
+            return newMap;
+          });
+        }
+        
+        try {
+          await audioElement.play();
+          console.log('Audio playback started for peer:', targetUserId);
+          setAudioBlocked(false);
+        } catch (error) {
+          console.log('Auto-play blocked, user interaction required:', error);
+          setAudioBlocked(true);
+          setTimeout(async () => {
+            try {
+              await audioElement.play();
+              setAudioBlocked(false);
+            } catch {
+              console.log('Audio playback still blocked');
+            }
+          }, 1000);
         }
       });
+      
+      // Keep newProducer for compatibility (but it won't be used with LiveKit)
+      voiceCallApi.on('newProducer', async (producerData) => {
+        console.log('New producer event received (legacy):', producerData);
+        // This is handled by trackSubscribed now
+      });
 
+      // Handle producerClosed (track unpublished) for cleanup
       voiceCallApi.on('producerClosed', (data) => {
-        console.log('Producer closed:', data);
-        const producerId = data.producerId || data;
-        const producerSocketId = data.producerSocketId;
+        console.log('Producer closed (track unpublished):', data);
+        const producerSocketId = data.producerSocketId || data.participantIdentity;
         
-        // Закрываем consumer
-        const consumer = consumersRef.current.get(producerId);
-        if (consumer) {
-          consumer.close();
-          consumersRef.current.delete(producerId);
-        }
-        
-        // Если есть producerSocketId, получаем userId из маппинга
+        // If we have producerSocketId, get userId from mapping
         if (producerSocketId) {
-          const userId = peerIdToUserIdMapRef.current.get(producerSocketId);
+          const userId = peerIdToUserIdMapRef.current.get(producerSocketId) || producerSocketId;
           console.log('Producer closed for socketId:', producerSocketId, 'userId:', userId);
           
-          if (userId) {
+          // Only cleanup if it's an audio track (video tracks are handled separately)
+          if (data.kind === 'audio' && data.mediaType !== 'screen') {
             // Очищаем audio element
             const audioElement = audioElementsRef.current.get(userId);
             if (audioElement) {
@@ -329,6 +401,7 @@ export const useVoiceCall = (userId, userName) => {
       voiceCallApi.off('peerAudioStateChanged');
       voiceCallApi.off('newProducer');
       voiceCallApi.off('producerClosed');
+      voiceCallApi.off('trackSubscribed');
       console.log('Event handlers cleared');
       
       if (localStreamRef.current) {
@@ -348,21 +421,7 @@ export const useVoiceCall = (userId, userName) => {
         audioContextRef.current = null;
       }
       
-      if (sendTransportRef.current) {
-        sendTransportRef.current.close();
-        sendTransportRef.current = null;
-      }
-      
-      if (recvTransportRef.current) {
-        recvTransportRef.current.close();
-        recvTransportRef.current = null;
-      }
-      
-      consumersRef.current.forEach(consumer => consumer.close());
-      consumersRef.current.clear();
-      
-      producersRef.current.forEach(producer => producer.close());
-      producersRef.current.clear();
+      // LiveKit handles cleanup automatically
       
       // Очистка GainNodes и audio elements
       gainNodesRef.current.forEach(gainNode => {
@@ -404,347 +463,13 @@ export const useVoiceCall = (userId, userName) => {
     }
   }, []);
 
-  // Создание транспортов
-  const createTransports = useCallback(async () => {
-    try {
-      // Создание send transport
-      const sendTransportData = await voiceCallApi.createWebRtcTransport();
-      sendTransportRef.current = deviceRef.current.createSendTransport({
-        id: sendTransportData.id,
-        iceParameters: sendTransportData.iceParameters,
-        iceCandidates: sendTransportData.iceCandidates,
-        dtlsParameters: sendTransportData.dtlsParameters,
-        iceServers: ICE_SERVERS
-      });
-
-      sendTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
-        try {
-          await voiceCallApi.connectTransport(sendTransportData.id, dtlsParameters);
-          callback();
-        } catch (error) {
-          errback(error);
-        }
-      });
-
-      sendTransportRef.current.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-        try {
-          const { id } = await voiceCallApi.produce(sendTransportData.id, kind, rtpParameters, appData);
-          callback({ id });
-        } catch (error) {
-          errback(error);
-        }
-      });
-
-      // Создание recv transport
-      const recvTransportData = await voiceCallApi.createWebRtcTransport();
-      recvTransportRef.current = deviceRef.current.createRecvTransport({
-        id: recvTransportData.id,
-        iceParameters: recvTransportData.iceParameters,
-        iceCandidates: recvTransportData.iceCandidates,
-        dtlsParameters: recvTransportData.dtlsParameters,
-        iceServers: ICE_SERVERS
-      });
-
-      recvTransportRef.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
-        try {
-          await voiceCallApi.connectTransport(recvTransportData.id, dtlsParameters);
-          callback();
-        } catch (error) {
-          errback(error);
-        }
-      });
-
-      console.log('Transports created');
-    } catch (error) {
-      console.error('Failed to create transports:', error);
-      setError(error.message);
-    }
-  }, []);
-
-  // Инициализация устройства
-  const initializeDevice = useCallback(async (routerRtpCapabilities) => {
-    try {
-      deviceRef.current = await voiceCallApi.initializeDevice(routerRtpCapabilities);
-      await createTransports();
-    } catch (error) {
-      console.error('Failed to initialize device:', error);
-      setError(error.message);
-    }
-  }, [createTransports]);
-
-  // Обработка нового producer
-  const handleNewProducer = useCallback(async (producerData) => {
-    try {
-      const consumerData = await voiceCallApi.consume(
-        deviceRef.current.rtpCapabilities,
-        producerData.producerId,
-        recvTransportRef.current.id
-      );
-
-      const consumer = await recvTransportRef.current.consume({
-        id: consumerData.id,
-        producerId: producerData.producerId,
-        kind: producerData.kind,
-        rtpParameters: consumerData.rtpParameters
-      });
-
-      consumersRef.current.set(consumerData.id, consumer);
-      
-      // Используем userId вместо producerSocketId для ключей
-      const socketId = producerData.producerSocketId;
-      const userId = peerIdToUserIdMapRef.current.get(socketId) || socketId;
-      console.log('handleNewProducer: socketId=', socketId, 'userId=', userId);
-      
-      // Проверяем, является ли это демонстрацией экрана
-      const isScreenShare = producerData.appData?.mediaType === 'screen';
-      console.log('handleNewProducer: isScreenShare=', isScreenShare, 'kind=', producerData.kind);
-      
-      // Для демонстрации экрана обрабатываем только видео (аудио обрабатывается отдельно)
-      if (isScreenShare && producerData.kind === 'video') {
-        console.log('Screen share video producer detected, skipping audio processing');
-        return;
-      }
-      
-      // Для аудио демонстрации экрана создаем отдельный AudioContext
-      if (isScreenShare && producerData.kind === 'audio') {
-        console.log('Screen share audio producer detected, creating separate audio processing');
-        console.log('Screen share audio producer data:', producerData);
-        
-        // Создаем отдельный AudioContext для демонстрации экрана
-        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 48000,
-            latencyHint: 'playback' // Для демонстрации экрана используем playback
-          });
-        }
-        
-        // Resume audio context if suspended
-        if (audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
-        }
-        
-        // Создаем audio element для демонстрации экрана
-        const audioElement = document.createElement('audio');
-        audioElement.srcObject = new MediaStream([consumer.track]);
-        audioElement.autoplay = true;
-        audioElement.volume = 1.0; // Полная громкость для демонстрации экрана
-        audioElement.muted = false;
-        
-        // Добавляем в DOM для воспроизведения
-        document.body.appendChild(audioElement);
-        
-        // Сохраняем audio element для демонстрации экрана
-        const screenShareAudioKey = `screen-share-${userId}`;
-        audioElementsRef.current.set(screenShareAudioKey, audioElement);
-        
-        console.log('Screen share audio consumer created:', consumerData.id);
-        return;
-      }
-      
-      // Инициализируем AudioContext если еще не создан (только для аудио)
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 48000,
-          latencyHint: 'interactive'
-        });
-      }
-      
-      // Resume audio context if suspended
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-      }
-      
-      // Создаем audio element
-      const audioElement = document.createElement('audio');
-      audioElement.srcObject = new MediaStream([consumer.track]);
-      audioElement.autoplay = true;
-      audioElement.playsInline = true;
-      audioElement.controls = false;
-      audioElement.style.display = 'none';
-      document.body.appendChild(audioElement);
-      
-      // Создаем Web Audio API chain: source -> gain
-      // НЕ подключаем к destination, чтобы избежать двойного воспроизведения!
-      // Воспроизведение идет только через HTML Audio элемент
-      const source = audioContextRef.current.createMediaStreamSource(new MediaStream([consumer.track]));
-      const gainNode = audioContextRef.current.createGain();
-      
-      // GainNode больше не используется для воспроизведения, только для отслеживания состояния
-      // Устанавливаем начальную громкость HTML Audio элемента
-      const initialVolume = userVolumes.get(userId) || 100;
-      const isMuted = userMutedStates.get(userId) || false;
-      // Если глобально выключен звук, устанавливаем 0, иначе используем индивидуальную громкость
-      const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-      audioElement.volume = audioVolume;
-      
-      // Подключаем source -> gain, но НЕ к destination (только для анализа)
-      source.connect(gainNode);
-      // gainNode.connect(audioContextRef.current.destination); // ОТКЛЮЧЕНО - используем только HTML Audio
-      
-      // Сохраняем ссылки
-      gainNodesRef.current.set(userId, gainNode);
-      audioElementsRef.current.set(userId, audioElement);
-      
-      // Инициализируем громкость в состоянии если еще не установлена
-      if (!userVolumes.has(userId)) {
-        setUserVolumes(prev => {
-          const newMap = new Map(prev);
-          newMap.set(userId, 100);
-          return newMap;
-        });
-      }
-
-      try {
-        await audioElement.play();
-        console.log('Audio playback started for peer:', userId);
-        setAudioBlocked(false);
-      } catch (error) {
-        console.log('Auto-play blocked, user interaction required:', error);
-        setAudioBlocked(true);
-        setTimeout(async () => {
-          try {
-            await audioElement.play();
-            setAudioBlocked(false);
-          } catch {
-            console.log('Audio playback still blocked');
-          }
-        }, 1000);
-      }
-
-      await voiceCallApi.resumeConsumer(consumerData.id);
-      console.log('New consumer created:', consumerData.id);
-    } catch (error) {
-      console.error('Failed to handle new producer:', error);
-    }
-  }, [userVolumes, userMutedStates, isGlobalAudioMuted]);
-  
-  // Обновляем ref при изменении handleNewProducer
-  handleNewProducerRef.current = handleNewProducer;
-
-  // Создание аудио потока
-  const createAudioStream = useCallback(async () => {
-    console.log('createAudioStream called with:', { isMuted, isNoiseSuppressed, noiseSuppressionMode });
-    try {
-      console.log('Creating audio stream...');
-      
-      // Закрываем старые producers перед созданием нового
-      if (producersRef.current.size > 0) {
-        console.log('Closing existing producers:', producersRef.current.size);
-        producersRef.current.forEach(producer => {
-          try {
-            producer.close();
-          } catch (e) {
-            console.warn('Error closing producer:', e);
-          }
-        });
-        producersRef.current.clear();
-      }
-      
-      // Останавливаем старый поток если есть
-      if (localStreamRef.current) {
-        console.log('Stopping existing local stream');
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      
-      // Очищаем старое шумоподавление
-      if (noiseSuppressionRef.current) {
-        console.log('Cleaning up existing noise suppression');
-        noiseSuppressionRef.current.cleanup();
-      }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-          latency: 0,
-          suppressLocalAudioPlayback: true
-        }
-      });
-
-      localStreamRef.current = stream;
-      console.log('Got user media stream');
-      
-      // Инициализация audio context
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 48000,
-          latencyHint: 'interactive'
-        });
-        console.log('Created new AudioContext');
-      }
-      
-      // Resume audio context if suspended
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-        console.log('Resumed AudioContext');
-      }
-      
-      // Инициализация шумоподавления
-      noiseSuppressionRef.current = new NoiseSuppressionManager();
-      await noiseSuppressionRef.current.initialize(stream, audioContextRef.current);
-      
-      // Получаем обработанный поток
-      const processedStream = noiseSuppressionRef.current.getProcessedStream();
-      const audioTrack = processedStream.getAudioTracks()[0];
-      
-      if (!audioTrack) {
-        throw new Error('No audio track in processed stream');
-      }
-      
-      // Применяем шумоподавление если оно было включено
-      if (isNoiseSuppressed) {
-        console.log('Applying noise suppression:', noiseSuppressionMode);
-        const enabled = await noiseSuppressionRef.current.enable(noiseSuppressionMode);
-        if (!enabled) {
-          console.warn('Failed to enable noise suppression, continuing without it');
-        }
-      }
-      
-      // Устанавливаем состояние микрофона
-      audioTrack.enabled = !isMuted;
-      console.log('Audio track muted state:', !audioTrack.enabled);
-      
-      const producer = await sendTransportRef.current.produce({
-        track: audioTrack,
-        appData: { userId, userName }
-      });
-
-      producersRef.current.set(producer.id, producer);
-      console.log('Producer created with ID:', producer.id);
-      
-      // Устанавливаем producer в noise suppression manager
-      if (noiseSuppressionRef.current) {
-        noiseSuppressionRef.current.setProducer(producer);
-      }
-      
-      audioTrack.onended = () => {
-        console.log('Audio track ended');
-      };
-
-      console.log('Audio stream created with noise suppression support');
-      return producer;
-    } catch (error) {
-      console.error('Failed to create audio stream:', error);
-      setError(error.message);
-    }
-  }, [userId, userName, isMuted, isNoiseSuppressed, noiseSuppressionMode]);
-
-  // Обновляем ref при изменении createAudioStream
-  createAudioStreamRef.current = createAudioStream;
+  // LiveKit handles audio/video tracks automatically, no need for mediasoup transports/producers/consumers
 
   // Присоединение к комнате
-  const joinRoom = useCallback(async (roomId) => {
+  const joinRoom = useCallback(async (roomId, initialMuted = false) => {
     try {
       console.log('joinRoom called for roomId:', roomId);
-      console.trace('joinRoom call stack');
-      const response = await voiceCallApi.joinRoom(roomId, userName, userId);
-      
-      if (response.routerRtpCapabilities) {
-        await initializeDevice(response.routerRtpCapabilities);
-      }
+      const response = await voiceCallApi.joinRoom(roomId, userName, userId, initialMuted);
       
       if (response.existingPeers) {
         // Сохраняем маппинг для существующих пиров
@@ -756,8 +481,6 @@ export const useVoiceCall = (userId, userName) => {
           }
         });
         
-        console.log('All peer mappings after loading existing peers:', Array.from(peerIdToUserIdMapRef.current.entries()));
-        
         setParticipants(response.existingPeers.map(peer => ({
           userId: peer.userId,
           peerId: peer.peerId || peer.id,
@@ -768,20 +491,12 @@ export const useVoiceCall = (userId, userName) => {
         })));
       }
       
-      if (response.existingProducers && response.existingProducers.length > 0) {
-        console.log('Processing existing producers:', response.existingProducers);
-        for (const producer of response.existingProducers) {
-          try {
-            await handleNewProducer(producer);
-          } catch (error) {
-            console.error('Failed to process existing producer:', error);
-          }
-        }
-      }
-      
-      // Используем ref вместо прямого вызова
-      if (createAudioStreamRef.current) {
-        await createAudioStreamRef.current();
+      // Get room and set initial mute state
+      const room = voiceCallApi.getRoom();
+      if (room) {
+        // Set initial microphone state
+        await room.localParticipant.setMicrophoneEnabled(!initialMuted);
+        setIsMuted(initialMuted);
       }
       
       // Обновляем текущий звонок
@@ -791,31 +506,19 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Failed to join room:', error);
       setError(error.message);
     }
-  }, [userName, userId, initializeDevice, handleNewProducer]); // Убрали createAudioStream из зависимостей
+  }, [userName, userId]);
 
   // Переключение микрофона
-  const toggleMute = useCallback(() => {
+  const toggleMute = useCallback(async () => {
     const newMutedState = !isMuted;
     
-    if (noiseSuppressionRef.current) {
-      const processedStream = noiseSuppressionRef.current.getProcessedStream();
-      const audioTrack = processedStream?.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !newMutedState;
-        setIsMuted(newMutedState);
-      }
-    } else if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !newMutedState;
-        setIsMuted(newMutedState);
-      }
-    }
-    
-    // Отправляем состояние мута на сервер
-    if (voiceCallApi.socket) {
-      voiceCallApi.socket.emit('muteState', { isMuted: newMutedState });
-      console.log('Mute state sent to server:', newMutedState);
+    try {
+      // Use LiveKit API to toggle microphone
+      await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+      setIsMuted(newMutedState);
+    } catch (error) {
+      console.error('Error toggling mute:', error);
+      setError(error.message);
     }
   }, [isMuted]);
 
@@ -1067,180 +770,54 @@ export const useVoiceCall = (userId, userName) => {
   }, [noiseSuppressionMode]);
 
   // Демонстрация экрана
-    const startScreenShare = useCallback(async () => {
-      try {
-        console.log('🚀🚀🚀 STARTING SCREEN SHARE FUNCTION CALLED 🚀🚀🚀');
+  const startScreenShare = useCallback(async () => {
+    try {
+      console.log('Starting screen share...');
+      
+      // Останавливаем существующую демонстрацию экрана, если есть
+      if (isScreenSharing) {
+        await stopScreenShare();
+      }
+
+      // Use LiveKit API to start screen share
+      await voiceCallApi.setScreenShareEnabled(true);
+      
+      // Get the screen share stream from LiveKit room
+      const room = voiceCallApi.getRoom();
+      if (room) {
+        // Listen for local track published event to get the stream
+        const handleLocalTrackPublished = (publication) => {
+          // Check if it's a screen share track
+          const isScreenShare = publication.source === Track.Source.ScreenShare || 
+                               publication.source === 'screen_share';
+          
+          if (isScreenShare && publication.track) {
+            const stream = new MediaStream([publication.track.mediaStreamTrack]);
+            setScreenShareStream(stream);
+            screenShareStreamRef.current = stream;
+            
+            // Handle track ended
+            publication.track.on('ended', () => {
+              console.log('Screen sharing stopped by user');
+              stopScreenShare();
+            });
+          }
+        };
         
-        if (!sendTransportRef.current) {
-          throw new Error('Transport not ready');
-        }
-
-        // Останавливаем существующую демонстрацию экрана, если есть
-        if (isScreenSharing) {
-          await stopScreenShare();
-        }
-
-        console.log('=== STARTING SCREEN SHARE ===');
-      console.log('Requesting screen sharing access...');
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          cursor: 'always',
-          frameRate: { ideal: 60, max: 60 },
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
-          aspectRatio: 16/9,
-          displaySurface: 'monitor',
-          resizeMode: 'crop-and-scale'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 2,
-          sampleSize: 16
-        }
-      });
-
-      console.log('Screen sharing access granted');
-
-      // Обработка остановки потока пользователем
-      stream.getVideoTracks()[0].onended = () => {
-        console.log('Screen sharing stopped by user');
-        stopScreenShare();
-      };
-
-      // Устанавливаем поток
-      setScreenShareStream(stream);
-
-      const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
-      
-      console.log('Stream tracks:', {
-        videoTracks: stream.getVideoTracks().length,
-        audioTracks: stream.getAudioTracks().length,
-        videoTrack: !!videoTrack,
-        audioTrack: !!audioTrack
-      });
-      
-      if (!videoTrack) {
-        throw new Error('No video track available');
-      }
-
-      console.log('Creating screen sharing producers...');
-      console.log('Video track:', videoTrack);
-      console.log('Audio track:', audioTrack);
-      
-      // Создаем video producer для демонстрации экрана
-      console.log('Creating video producer...');
-      const videoProducer = await sendTransportRef.current.produce({
-        track: videoTrack,
-        encodings: [
-          {
-            scaleResolutionDownBy: 1,
-            maxBitrate: 5000000, // 5 Mbps для Full HD
-            maxFramerate: 60
-          }
-        ],
-        codecOptions: {
-          videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
-          videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
-        },
-        appData: {
-          mediaType: 'screen',
-          trackType: 'video',
-          userId: userId,
-          userName: userName,
-          width: videoTrack.getSettings().width,
-          height: videoTrack.getSettings().height,
-          frameRate: videoTrack.getSettings().frameRate
-        }
-      });
-
-      console.log('Screen sharing video producer created:', videoProducer.id);
-
-      // Создаем audio producer для демонстрации экрана, если есть аудио трек
-      let audioProducer = null;
-      if (audioTrack) {
-        console.log('Creating audio producer...');
-        audioProducer = await sendTransportRef.current.produce({
-          track: audioTrack,
-          encodings: [
-            {
-              ssrc: Math.floor(Math.random() * 4294967296),
-              dtx: true,
-              maxBitrate: 128000, // 128 kbps для аудио демонстрации экрана
-              scalabilityMode: 'S1T1',
-              numberOfChannels: 2
-            }
-          ],
-          codecOptions: {
-            opusStereo: true,
-            opusDtx: true,
-            opusFec: true,
-            opusNack: true,
-            channelsCount: 2,
-            sampleRate: 48000,
-            opusMaxAverageBitrate: 128000,
-            opusMaxPlaybackRate: 48000,
-            opusPtime: 20,
-            opusApplication: 'music', // Для демонстрации экрана используем music вместо voip
-            opusCbr: false,
-            opusUseinbandfec: true
-          },
-          appData: {
-            mediaType: 'screen',
-            trackType: 'audio',
-            userId: userId,
-            userName: userName,
-            audioProcessing: {
-              echoCancellation: false, // Отключаем для демонстрации экрана
-              noiseSuppression: false,
-              autoGainControl: false,
-              highpassFilter: false,
-              typingNoiseDetection: false,
-              monoAudio: false
-            }
+        // Check if screen share track already exists
+        room.localParticipant.videoTrackPublications.forEach(publication => {
+          const isScreenShare = publication.source === Track.Source.ScreenShare || 
+                               publication.source === 'screen_share';
+          if (isScreenShare && publication.track) {
+            handleLocalTrackPublished(publication);
           }
         });
-
-        console.log('Screen sharing audio producer created:', audioProducer.id);
-      } else {
-        console.log('No audio track available for screen sharing');
+        
+        // Listen for new screen share tracks
+        room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
       }
-
-      // Сохраняем producers
-      screenProducerRef.current = { video: videoProducer, audio: audioProducer };
-      console.log('Screen sharing producers saved:', { 
-        video: videoProducer.id, 
-        audio: audioProducer ? audioProducer.id : 'none' 
-      });
+      
       setIsScreenSharing(true);
-
-      // Обработка событий video producer
-      videoProducer.on('transportclose', () => {
-        console.log('Screen sharing video transport closed');
-        stopScreenShare();
-      });
-
-      videoProducer.on('trackended', () => {
-        console.log('Screen sharing video track ended');
-        stopScreenShare();
-      });
-
-      // Обработка событий audio producer, если он есть
-      if (audioProducer) {
-        audioProducer.on('transportclose', () => {
-          console.log('Screen sharing audio transport closed');
-          stopScreenShare();
-        });
-
-        audioProducer.on('trackended', () => {
-          console.log('Screen sharing audio track ended');
-          stopScreenShare();
-        });
-      }
-
     } catch (error) {
       console.error('Error starting screen share:', error);
       
@@ -1254,12 +831,6 @@ export const useVoiceCall = (userId, userName) => {
         error.name === 'AbortError'
       );
       
-      // Очищаем при ошибке
-      if (screenShareStream) {
-        screenShareStream.getTracks().forEach(track => track.stop());
-      }
-      setScreenShareStream(null);
-      screenProducerRef.current = null;
       setIsScreenSharing(false);
       
       // Показываем ошибку только если это не отмена пользователем
@@ -1269,27 +840,18 @@ export const useVoiceCall = (userId, userName) => {
         console.log('Screen sharing cancelled by user');
       }
     }
-  }, [userId, userName, isScreenSharing, screenShareStream, stopScreenShare]);
+  }, [isScreenSharing, stopScreenShare]);
 
   const stopScreenShare = useCallback(async () => {
     console.log('Stopping screen sharing...');
 
     try {
-      // Уведомляем сервер об остановке демонстрации экрана
-      if (screenProducerRef.current && voiceCallApi.socket) {
-        // Останавливаем video producer
-        if (screenProducerRef.current.video) {
-          await voiceCallApi.stopScreenSharing(screenProducerRef.current.video.id);
-        }
-        // Останавливаем audio producer, если есть
-        if (screenProducerRef.current.audio) {
-          await voiceCallApi.stopScreenSharing(screenProducerRef.current.audio.id);
-        }
-      }
+      // Use LiveKit API to stop screen share
+      await voiceCallApi.setScreenShareEnabled(false);
 
       // Останавливаем поток
-      if (screenShareStream) {
-        screenShareStream.getTracks().forEach(track => track.stop());
+      if (screenShareStreamRef.current) {
+        screenShareStreamRef.current.getTracks().forEach(track => track.stop());
       }
 
       // Очищаем audio elements для демонстрации экрана
@@ -1305,12 +867,9 @@ export const useVoiceCall = (userId, userName) => {
         audioElementsRef.current.delete(screenShareAudioKey);
       }
 
-      // Логируем состояние audio elements после очистки
-      console.log('Audio elements after screen share cleanup:', Array.from(audioElementsRef.current.keys()));
-
       // Очищаем состояние
       setScreenShareStream(null);
-      screenProducerRef.current = null;
+      screenShareStreamRef.current = null;
       setIsScreenSharing(false);
 
       console.log('Screen sharing stopped successfully');
@@ -1318,14 +877,9 @@ export const useVoiceCall = (userId, userName) => {
       console.error('Error stopping screen share:', error);
       setError('Failed to stop screen sharing: ' + error.message);
     }
-  }, [screenShareStream, userId]);
+  }, [userId]);
 
   const toggleScreenShare = useCallback(async () => {
-    console.log('🎯🎯🎯 TOGGLE SCREEN SHARE CALLED 🎯🎯🎯', { isScreenSharing });
-    console.log('🔥🔥🔥 TOGGLE FUNCTION EXECUTING 🔥🔥🔥');
-    console.log('🚀🚀🚀 TOGGLE FUNCTION START 🚀🚀🚀');
-    console.log('💥💥💥 TOGGLE FUNCTION MIDDLE 💥💥💥');
-    console.log('🎪🎪🎪 TOGGLE FUNCTION END 🎪🎪🎪');
     if (isScreenSharing) {
       await stopScreenShare();
     } else {

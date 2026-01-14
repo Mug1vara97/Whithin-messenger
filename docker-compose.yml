@@ -49,20 +49,34 @@ services:
       - app-network
     restart: unless-stopped
 
+  livekit:
+    image: livekit/livekit-server:latest
+    network_mode: host
+    environment:
+      LIVEKIT_KEYS: "devkey: this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars"
+      LIVEKIT_CONFIG_FILE: /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+
   voice-server:
     build:
       context: ./server
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-      - "40000-40100:40000-40100/udp"
-      - "40000-40100:40000-40100/tcp"
     volumes:
       - ./ssl:/app/ssl
     environment:
       - NODE_ENV=production
-      - MEDIASOUP_LISTEN_IP=0.0.0.0
-      - MEDIASOUP_ANNOUNCED_IP=whithin.ru
+      - LIVEKIT_URL=ws://host.docker.internal:7880
+      - LIVEKIT_EXTERNAL_URL=wss://whithin.ru
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - livekit
     networks:
       - app-network
     restart: unless-stopped
@@ -79,6 +93,7 @@ services:
       - client
       - backend
       - voice-server
+      - livekit
     networks:
       - app-network
     restart: unless-stopped

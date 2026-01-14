@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-import { Device } from 'mediasoup-client';
+import { Room, RoomEvent, Track, TrackPublication } from 'livekit-client';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -9,14 +9,53 @@ const VOICE_SERVER_CONFIG = {
   rememberUpgrade: false
 };
 
+// ICE серверы для WebRTC
+const ICE_SERVERS = [
+  { urls: ['stun:185.119.59.23:3478'] },
+  { urls: ['stun:stun.l.google.com:19302'] },
+  { urls: ['stun:stun1.l.google.com:19302'] },
+  {
+    urls: ['turn:185.119.59.23:3478?transport=udp'],
+    username: 'test',
+    credential: 'test123'
+  },
+  {
+    urls: ['turn:185.119.59.23:3478?transport=tcp'],
+    username: 'test',
+    credential: 'test123'
+  }
+];
+
+// Конфигурация LiveKit Room
+const getRoomOptions = () => {
+  return {
+    rtcConfig: {
+      iceServers: ICE_SERVERS,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    },
+    adaptiveStream: true,
+    dynacast: true,
+    audioCaptureDefaults: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    }
+  };
+};
+
 class VoiceCallApi {
   constructor() {
     this.socket = null;
-    this.device = null;
+    this.room = null;
     this.isConnected = false;
     this.roomId = null;
     this.userId = null;
     this.userName = null;
+    this.eventHandlers = new Map();
   }
 
   async connect(userId, userName, serverUrl = VOICE_SERVER_URL) {
@@ -56,104 +95,17 @@ class VoiceCallApi {
   }
 
   async disconnect() {
+    if (this.room) {
+      await this.room.disconnect();
+      this.room = null;
+    }
+    
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
     this.isConnected = false;
-    this.device = null;
     this.roomId = null;
-  }
-
-  async initializeDevice(routerRtpCapabilities) {
-    try {
-      if (!this.device) {
-        this.device = new Device();
-      }
-
-      if (!this.device.loaded) {
-        await this.device.load({ routerRtpCapabilities });
-      }
-
-      return this.device;
-    } catch (error) {
-      console.error('Failed to initialize device:', error);
-      throw error;
-    }
-  }
-
-  async createWebRtcTransport() {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('createWebRtcTransport', {}, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  async connectTransport(transportId, dtlsParameters) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('connectTransport', {
-        transportId,
-        dtlsParameters
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  async produce(transportId, kind, rtpParameters, appData) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('produce', {
-        transportId,
-        kind,
-        rtpParameters,
-        appData
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  async consume(rtpCapabilities, remoteProducerId, transportId) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('consume', {
-        rtpCapabilities,
-        remoteProducerId,
-        transportId
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
-  }
-
-  async resumeConsumer(consumerId) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit('resumeConsumer', {
-        consumerId
-      }, (response) => {
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
   }
 
   async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true) {
@@ -164,69 +116,332 @@ class VoiceCallApi {
         userId,
         initialMuted,
         initialAudioEnabled
-      }, (response) => {
+      }, async (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
-        } else {
+          return;
+        }
+
+        try {
           this.roomId = roomId;
-          resolve(response);
+          
+          // Create LiveKit room and connect
+          const roomOptions = getRoomOptions();
+          this.room = new Room(roomOptions);
+          
+          // Increase EventEmitter limit to avoid warnings
+          if (this.room.setMaxListeners) {
+            this.room.setMaxListeners(50);
+          }
+
+          // Connect to LiveKit
+          await this.room.connect(response.url, response.token);
+          console.log('Connected to LiveKit room:', roomId);
+
+          // Set initial microphone state
+          if (initialMuted) {
+            await this.room.localParticipant.setMicrophoneEnabled(false);
+          } else {
+            await this.room.localParticipant.setMicrophoneEnabled(true);
+          }
+
+          // Set initial audio enabled state
+          // Note: LiveKit doesn't have a direct "audio output enabled" concept
+          // This is handled at the application level
+
+          // Setup event listeners
+          this.setupRoomEventListeners();
+
+          resolve({
+            token: response.token,
+            url: response.url,
+            existingPeers: response.existingPeers || []
+          });
+        } catch (error) {
+          console.error('Error connecting to LiveKit:', error);
+          reject(error);
         }
       });
     });
   }
 
-  on(event, callback) {
-    if (this.socket) {
-      this.socket.on(event, callback);
+  setupRoomEventListeners() {
+    if (!this.room) return;
+
+    // Track published (remote participant published a track)
+    this.room.on(RoomEvent.TrackPublished, (publication, participant) => {
+      console.log('Track published:', {
+        trackSid: publication.trackSid,
+        kind: publication.kind,
+        participantIdentity: participant.identity
+      });
+      
+      // Emit newProducer event for compatibility with existing code
+      this.emit('newProducer', {
+        producerId: publication.trackSid,
+        producerSocketId: participant.identity,
+        kind: publication.kind,
+        appData: {
+          userId: participant.identity,
+          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
+                     publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+        }
+      });
+    });
+
+    // Track subscribed (we subscribed to a remote track)
+    this.room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      console.log('Track subscribed:', {
+        trackSid: track.sid,
+        kind: track.kind,
+        participantIdentity: participant.identity
+      });
+      
+      // Emit trackSubscribed event for useVoiceCall to handle
+      this.emit('trackSubscribed', {
+        track,
+        publication,
+        participant,
+        trackSid: track.sid,
+        kind: track.kind,
+        participantIdentity: participant.identity,
+        userId: participant.identity,
+        mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
+                   publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+      });
+    });
+
+    // Track unmuted
+    this.room.on(RoomEvent.TrackUnmuted, (publication, participant) => {
+      console.log('Track unmuted:', {
+        trackSid: publication.trackSid,
+        kind: publication.kind,
+        participantIdentity: participant.identity
+      });
+      
+      // Emit mute state change
+      if (publication.kind === Track.Kind.Audio) {
+        this.emit('peerMuteStateChanged', {
+          peerId: participant.identity,
+          isMuted: false,
+          userId: participant.identity
+        });
+      }
+    });
+
+    // Track muted
+    this.room.on(RoomEvent.TrackMuted, (publication, participant) => {
+      console.log('Track muted:', {
+        trackSid: publication.trackSid,
+        kind: publication.kind,
+        participantIdentity: participant.identity
+      });
+      
+      // Emit mute state change
+      if (publication.kind === Track.Kind.Audio) {
+        this.emit('peerMuteStateChanged', {
+          peerId: participant.identity,
+          isMuted: true,
+          userId: participant.identity
+        });
+      }
+    });
+
+    // Participant connected
+    this.room.on(RoomEvent.ParticipantConnected, (participant) => {
+      console.log('Participant connected:', participant.identity);
+      
+      this.emit('peerJoined', {
+        peerId: participant.identity,
+        name: participant.name || participant.identity,
+        userId: participant.identity,
+        isMuted: !participant.isMicrophoneEnabled,
+        isAudioEnabled: true
+      });
+    });
+
+    // Participant disconnected
+    this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      console.log('Participant disconnected:', participant.identity);
+      
+      this.emit('peerLeft', {
+        peerId: participant.identity,
+        id: participant.identity
+      });
+    });
+
+    // Track unpublished (remote participant stopped publishing)
+    this.room.on(RoomEvent.TrackUnpublished, (publication, participant) => {
+      console.log('Track unpublished:', {
+        trackSid: publication.trackSid,
+        kind: publication.kind,
+        participantIdentity: participant.identity
+      });
+      
+      // Emit producerClosed event for compatibility
+      const mediaType = publication.source === Track.Source.ScreenShare ? 'screen' : 
+                        publication.source === Track.Source.Camera ? 'camera' : 'microphone';
+      
+      this.emit('producerClosed', {
+        producerId: publication.trackSid,
+        producerSocketId: participant.identity,
+        mediaType: mediaType,
+        kind: publication.kind
+      });
+    });
+  }
+
+  // Get local audio track
+  getLocalAudioTrack() {
+    if (!this.room) return null;
+    const audioTrack = this.room.localParticipant.audioTrackPublications.values().next().value;
+    return audioTrack?.track || null;
+  }
+
+  // Get local video track
+  getLocalVideoTrack() {
+    if (!this.room) return null;
+    const videoTrack = this.room.localParticipant.videoTrackPublications.values().next().value;
+    return videoTrack?.track || null;
+  }
+
+  // Get remote tracks for a participant
+  getRemoteTracks(participantIdentity) {
+    if (!this.room) return { audio: null, video: null };
+    
+    const participant = this.room.remoteParticipants.get(participantIdentity);
+    if (!participant) return { audio: null, video: null };
+
+    const audioTrack = participant.audioTrackPublications.values().next().value;
+    const videoTrack = participant.videoTrackPublications.values().next().value;
+
+    return {
+      audio: audioTrack?.track || null,
+      video: videoTrack?.track || null
+    };
+  }
+
+  // Enable/disable microphone
+  async setMicrophoneEnabled(enabled) {
+    if (!this.room) {
+      throw new Error('Not connected to room');
     }
+    
+    await this.room.localParticipant.setMicrophoneEnabled(enabled);
+    
+    // Notify server about mute state
+    if (this.socket) {
+      this.socket.emit('muteState', { isMuted: !enabled });
+    }
+  }
+
+  // Enable/disable camera
+  async setCameraEnabled(enabled) {
+    if (!this.room) {
+      throw new Error('Not connected to room');
+    }
+    
+    await this.room.localParticipant.setCameraEnabled(enabled);
+  }
+
+  // Enable/disable screen share
+  async setScreenShareEnabled(enabled) {
+    if (!this.room) {
+      throw new Error('Not connected to room');
+    }
+    
+    await this.room.localParticipant.setScreenShareEnabled(enabled);
+  }
+
+  // Get room instance
+  getRoom() {
+    return this.room;
+  }
+
+  // Event emitter methods for compatibility
+  on(event, callback) {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event).push(callback);
   }
 
   off(event, callback) {
-    if (this.socket) {
-      this.socket.off(event, callback);
+    if (!this.eventHandlers.has(event)) return;
+    
+    const handlers = this.eventHandlers.get(event);
+    const index = handlers.indexOf(callback);
+    if (index > -1) {
+      handlers.splice(index, 1);
     }
   }
 
-  // Метод для остановки демонстрации экрана
-  async stopScreenSharing(producerId) {
-    return new Promise((resolve, reject) => {
-      // Добавляем таймаут на случай, если сервер не отвечает
-      const timeout = setTimeout(() => {
-        resolve({ success: true }); // Разрешаем промис, чтобы не блокировать UI
-      }, 100); // 1 секунда таймаут
-      
-      this.socket.emit('stopScreenSharing', {
-        producerId
-      }, (response) => {
-        clearTimeout(timeout);
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
+  emit(event, data) {
+    if (!this.eventHandlers.has(event)) return;
+    
+    const handlers = this.eventHandlers.get(event);
+    handlers.forEach(handler => {
+      try {
+        handler(data);
+      } catch (error) {
+        console.error(`Error in event handler for ${event}:`, error);
+      }
     });
   }
 
-  // Метод для остановки вебкамеры
+  // Legacy methods for compatibility (no-op for LiveKit)
+  async initializeDevice(routerRtpCapabilities) {
+    // No-op for LiveKit
+    return null;
+  }
+
+  async createWebRtcTransport() {
+    throw new Error('createWebRtcTransport is not used with LiveKit');
+  }
+
+  async connectTransport(transportId, dtlsParameters) {
+    throw new Error('connectTransport is not used with LiveKit');
+  }
+
+  async produce(transportId, kind, rtpParameters, appData) {
+    throw new Error('produce is not used with LiveKit');
+  }
+
+  async consume(rtpCapabilities, remoteProducerId, transportId) {
+    throw new Error('consume is not used with LiveKit');
+  }
+
+  async resumeConsumer(consumerId) {
+    throw new Error('resumeConsumer is not used with LiveKit');
+  }
+
+  // Methods for stopping screen sharing and video (for compatibility)
+  async stopScreenSharing(producerId) {
+    if (!this.room) {
+      return { success: true };
+    }
+    
+    try {
+      await this.room.localParticipant.setScreenShareEnabled(false);
+      return { success: true };
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+      return { success: true }; // Return success anyway to not block UI
+    }
+  }
+
   async stopVideo(producerId) {
-    return new Promise((resolve, reject) => {
-      // Добавляем таймаут на случай, если сервер не отвечает
-      const timeout = setTimeout(() => {
-        resolve({ success: true }); // Разрешаем промис, чтобы не блокировать UI
-      }, 100); // 1 секунда таймаут
-      
-      this.socket.emit('stopVideo', {
-        producerId
-      }, (response) => {
-        clearTimeout(timeout);
-        if (response && response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      });
-    });
+    if (!this.room) {
+      return { success: true };
+    }
+    
+    try {
+      await this.room.localParticipant.setCameraEnabled(false);
+      return { success: true };
+    } catch (error) {
+      console.error('Error stopping video:', error);
+      return { success: true }; // Return success anyway to not block UI
+    }
   }
 }
 

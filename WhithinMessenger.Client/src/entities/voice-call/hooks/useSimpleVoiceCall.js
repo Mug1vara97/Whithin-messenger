@@ -1,88 +1,54 @@
 import { useState, useEffect, useCallback } from 'react';
-import { io } from 'socket.io-client';
-import { Device } from 'mediasoup-client';
+import { voiceCallApi } from '../api/voiceCallApi';
 
 export const useSimpleVoiceCall = (userId, userName) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [socket, setSocket] = useState(null);
-  const [device, setDevice] = useState(null);
-
   const connect = useCallback(async () => {
     try {
       console.log(`[useSimpleVoiceCall] Connecting for user ${userName}`);
-      
-      const newSocket = io('https://whithin.ru', {
-        transports: ['websocket'],
-        upgrade: false,
-        rememberUpgrade: false
-      });
-
-      setSocket(newSocket);
+      await voiceCallApi.connect(userId, userName);
       setIsConnected(true);
-      
-      return newSocket;
     } catch (error) {
       console.error('Failed to connect to voice server:', error);
       throw error;
     }
-  }, [userName]);
+  }, [userId, userName]);
 
   const disconnect = useCallback(async () => {
     try {
       console.log(`[useSimpleVoiceCall] Disconnecting for user ${userName}`);
-      
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-      }
-      
+      await voiceCallApi.disconnect();
       setIsConnected(false);
     } catch (error) {
       console.error('Failed to disconnect from voice server:', error);
       throw error;
     }
-  }, [socket, userName]);
+  }, [userName]);
 
   const joinRoom = useCallback(async (roomId) => {
     try {
       console.log(`[useSimpleVoiceCall] Joining room ${roomId}`);
-      
-      if (!socket) {
-        throw new Error('Not connected to voice server');
-      }
-
-      // Инициализация mediasoup устройства
-      if (!device) {
-        const newDevice = new Device();
-        setDevice(newDevice);
-      }
-
-      // Здесь можно добавить логику подключения к mediasoup
-      // Пока что просто симулируем успешное подключение
+      await voiceCallApi.joinRoom(roomId, userName, userId);
       return Promise.resolve();
     } catch (error) {
       console.error('Failed to join room:', error);
       throw error;
     }
-  }, [socket, device]);
+  }, [userId, userName]);
 
   const leaveRoom = useCallback(async () => {
     try {
       console.log(`[useSimpleVoiceCall] Leaving room`);
-      
-      if (socket) {
-        socket.emit('leaveRoom');
-      }
-      
+      await voiceCallApi.disconnect();
       return Promise.resolve();
     } catch (error) {
       console.error('Failed to leave room:', error);
       throw error;
     }
-  }, [socket]);
+  }, []);
 
   const startAudio = useCallback(async () => {
     try {
@@ -119,11 +85,9 @@ export const useSimpleVoiceCall = (userId, userName) => {
   // Очистка при размонтировании
   useEffect(() => {
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      voiceCallApi.disconnect().catch(console.error);
     };
-  }, [socket]);
+  }, []);
 
   return {
     isConnected,
