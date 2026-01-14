@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-// import { Device } from 'mediasoup-client'; // Removed - using LiveKit instead
+import { Device } from 'mediasoup-client';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -68,8 +68,7 @@ class VoiceCallApi {
   async initializeDevice(routerRtpCapabilities) {
     try {
       if (!this.device) {
-        // this.device = new Device(); // Removed - using LiveKit instead
-        throw new Error('mediasoup-client is no longer supported. Please use LiveKit API.');
+        this.device = new Device();
       }
 
       if (!this.device.loaded) {

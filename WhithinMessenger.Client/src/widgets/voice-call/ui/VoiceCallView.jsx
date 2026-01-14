@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
-import { AudioDeviceSelector } from '../../../shared/ui/molecules/AudioDeviceSelector';
 import { createParticipant } from '../../../entities/video-call/model/types';
 import { Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
@@ -48,7 +47,6 @@ const VoiceCallView = ({
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
-    speakingUsers,
     startCall,
     endCall,
     toggleMute,
@@ -103,25 +101,23 @@ const VoiceCallView = ({
 
   // Преобразуем участников голосового звонка в формат для видеосетки с мемоизацией
   const videoParticipants = useMemo(() => {
-    // console.log('🔄 useMemo triggered with:', {
-    //   isMuted,
-    //   isAudioEnabled,
-    //   isGlobalAudioMuted,
-    //   isVideoEnabled,
-    //   participantMuteStatesSize: participantMuteStates?.size,
-    //   participantAudioStatesSize: participantAudioStates?.size,
-    //   participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
-    //   participantVideoStatesSize: participantVideoStates?.size,
-    //   speakingUsersSize: speakingUsers?.size,
-    //   speakingUsersArray: speakingUsers ? Array.from(speakingUsers) : []
-    // });
+    console.log('🔄 useMemo triggered with:', {
+      isMuted,
+      isAudioEnabled,
+      isGlobalAudioMuted,
+      isVideoEnabled,
+      participantMuteStatesSize: participantMuteStates?.size,
+      participantAudioStatesSize: participantAudioStates?.size,
+      participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
+      participantVideoStatesSize: participantVideoStates?.size
+    });
     
     // Текущий пользователь (хост)
     const currentUser = createParticipant(userId, userName, null, 'online', 'host');
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
-    currentUser.isSpeaking = false; // Текущий пользователь не может видеть себя говорящим
+    currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
@@ -151,10 +147,9 @@ const VoiceCallView = ({
       videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
       videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
       videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
-      videoParticipant.isSpeaking = speakingUsers?.has(participantUserId) ?? false; // 🎙️ Используем реальные данные анализа голоса
+      videoParticipant.isSpeaking = participant.isSpeaking || false;
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
-      
       videoParticipantsList.push(videoParticipant);
     });
     
@@ -172,8 +167,7 @@ const VoiceCallView = ({
     participantMuteStates,
     participantAudioStates,
     participantGlobalAudioStates,
-    participantVideoStates,
-    speakingUsers // 🎙️ Реагируем на изменения активности голоса
+    participantVideoStates
   ]);
 
 
@@ -259,9 +253,6 @@ const VoiceCallView = ({
                     </div>
                   </div>
                 )}
-
-                {/* Audio Device Selector */}
-                <AudioDeviceSelector className="audio-device-selector" />
 
                 {/* Video Call Grid */}
                 {(participants.length > 0 || isConnected) && (

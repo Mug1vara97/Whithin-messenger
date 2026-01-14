@@ -56,37 +56,30 @@
   left: 0;
   right: 0;
   bottom: 0;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-radius: 8px;
   pointer-events: none;
-  transition: all 0.2s ease;
-  z-index: 10;
+  transition: border-color 0.2s ease;
 }
 
 .video-tile:hover .tile-border {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Speaking animation - яркая зеленая рамка с пульсацией */
+/* Speaking animation - точная копия Discord */
 .video-tile.speaking .tile-border {
   border-color: #23a55a;
-  animation: speaking-glow 1.5s ease-in-out infinite;
+  animation: speaking-glow 2s ease-in-out infinite;
 }
 
 @keyframes speaking-glow {
   0%, 100% {
     border-color: #23a55a;
-    border-width: 3px;
-    box-shadow: 0 0 10px rgba(35, 165, 90, 0.6),
-                0 0 20px rgba(35, 165, 90, 0.4),
-                inset 0 0 10px rgba(35, 165, 90, 0.2);
+    box-shadow: inset 0 0 8px rgba(35, 165, 90, 0.3);
   }
   50% {
     border-color: #2dc770;
-    border-width: 4px;
-    box-shadow: 0 0 15px rgba(45, 199, 112, 0.8),
-                0 0 30px rgba(45, 199, 112, 0.5),
-                inset 0 0 15px rgba(45, 199, 112, 0.3);
+    box-shadow: inset 0 0 12px rgba(35, 165, 90, 0.5);
   }
 }
 

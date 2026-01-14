@@ -147,12 +147,6 @@
       transform: translateY(0);
     }
   }
-
-  /* Audio Device Selector */
-  .audio-device-selector {
-    margin: 16px 32px;
-    animation: slideIn 0.3s ease;
-  }
   
   /* Participants Row */
   .participants-row {

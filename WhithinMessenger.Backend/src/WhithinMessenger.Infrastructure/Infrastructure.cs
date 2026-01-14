@@ -38,7 +38,6 @@ public static class Infrastructure
         services.AddScoped<IServerMemberRepository, ServerMemberRepository>();
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
-        services.AddScoped<INotificationRepository, NotificationRepository>();
         
         // JWT Services
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));

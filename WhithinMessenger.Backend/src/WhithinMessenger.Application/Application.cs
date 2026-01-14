@@ -14,7 +14,6 @@ public static class Application
         services.AddMediatR(x => x.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         
         // FileService регистрируется в Program.cs с использованием IWebHostEnvironment
-        // NotificationService регистрируется в Program.cs после добавления SignalR
         
         return services;
     } 

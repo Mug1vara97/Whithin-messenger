@@ -12,7 +12,6 @@ import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { SettingsModal } from '../../../shared/ui/organisms';
-import { NotificationPanel } from '../../../widgets/notification-panel/ui';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
@@ -434,10 +433,32 @@ const HomePage = () => {
         onClose={handleCloseSettingsModal} 
       />
 
-      <NotificationPanel 
-        isOpen={showNotificationsModal}
-        onClose={handleCloseNotificationsModal}
-      />
+      {showNotificationsModal && (
+        <div 
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseNotificationsModal();
+            }
+          }}
+        >
+          <div className="notifications-modal">
+            <div className="modal-header">
+              <h3>Уведомления</h3>
+              <button 
+                className="modal-close-button"
+                onClick={handleCloseNotificationsModal}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <div className="notifications-content">
+              <p>Нет новых уведомлений</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

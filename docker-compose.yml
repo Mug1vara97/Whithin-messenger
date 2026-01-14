@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: whithin_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1000-7
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
@@ -29,7 +29,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=1000-7
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=postgres
     depends_on:
       db:
         condition: service_healthy
@@ -51,25 +51,18 @@ services:
 
   voice-server:
     build:
-      context: ./livekit-server
+      context: ./server
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-      - "7880:7880"
-      - "50000-50100:50000-50100/udp"
-      - "50000-50100:50000-50100/tcp"
+      - "40000-40100:40000-40100/udp"
+      - "40000-40100:40000-40100/tcp"
     volumes:
       - ./ssl:/app/ssl
-      - ./livekit-server/config.yaml:/app/config.yaml
     environment:
-      PORT: "3000"
-      LIVEKIT_URL: "ws://localhost:7880"
-      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-devkey_d7f9b3e5c1a4f8d2b6e9c3f5a7d1b4e}"
-      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-devsecret_8a2f6e9c3d7b1f5a8e2c6f9a3d7b1e5f8a2c6f9a3d7b1e5f}"
-      LIVEKIT_KEYS: "${LIVEKIT_KEYS:-devkey_d7f9b3e5c1a4f8d2b6e9c3f5a7d1b4e: devsecret_8a2f6e9c3d7b1f5a8e2c6f9a3d7b1e5f8a2c6f9a3d7b1e5f}"
-      TLS_CERT: "/app/ssl/certificate.crt"
-      TLS_KEY: "/app/ssl/private.key"
-      CORS_ORIGIN: "https://whithin.ru"
+      - NODE_ENV=production
+      - MEDIASOUP_LISTEN_IP=0.0.0.0
+      - MEDIASOUP_ANNOUNCED_IP=whithin.ru
     networks:
       - app-network
     restart: unless-stopped

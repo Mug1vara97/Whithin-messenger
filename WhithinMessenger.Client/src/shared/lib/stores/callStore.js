@@ -3,7 +3,6 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
-import { getAudioDeviceManager } from '../utils/audioDeviceManager';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -43,7 +42,6 @@ export const useCallStore = create(
       participantAudioStates: new Map(), // userId -> isAudioEnabled
       participantGlobalAudioStates: new Map(), // userId -> isGlobalAudioMuted
       participantVideoStates: new Map(), // userId -> isVideoEnabled
-      speakingUsers: new Set(), // Пользователи, которые сейчас говорят (userId -> boolean)
       
       // Состояние аудио (загружаем из localStorage)
       isMuted: (() => {
@@ -100,9 +98,6 @@ export const useCallStore = create(
       device: null,
       sendTransport: null,
       recvTransport: null,
-      voiceDetectorNodes: new Map(), // AudioWorkletNode для определения активности голоса (userId -> WorkletNode)
-      voiceDetectorSources: new Map(), // MediaStreamSource для каждого участника (userId -> SourceNode)
-      voiceWorkletLoaded: false, // Флаг загрузки worklet модуля
       producers: new Map(),
       consumers: new Map(),
       localStream: null,
@@ -756,28 +751,22 @@ export const useCallStore = create(
               
               set({ remoteScreenShares: newRemoteScreenShares });
             } else if (producerData.kind === 'audio') {
-              console.log('🔊 Screen share audio producer detected - creating simple audio element');
-              console.log('🔊 User ID:', userId);
-              console.log('🔊 Producer ID:', producerData.producerId);
+              console.log('Screen share audio producer detected, creating audio element');
               
-              // ПРОСТОЙ ПОДХОД: создаём обычный audio element
-              // БЕЗ AudioContext, БЕЗ фильтров, БЕЗ обработок
-              // Максимальное качество и надёжность!
+              // Создаем audio element для screen share audio
               const audioElement = document.createElement('audio');
               audioElement.srcObject = new MediaStream([consumer.track]);
               audioElement.autoplay = true;
-              audioElement.volume = 1.0;
+              audioElement.volume = 1.0; // Полная громкость для screen share audio
+              audioElement.muted = false;
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
               
-              // Помечаем как screen share audio
-              audioElement.setAttribute('data-screen-share-audio', 'true');
-              
-              // Добавляем в DOM
+              // Добавляем в DOM для воспроизведения
               document.body.appendChild(audioElement);
               
-              // Сохраняем для очистки
+              // Сохраняем audio element для screen share audio
               const screenShareAudioKey = `screen-share-audio-${userId}`;
               const currentState = get();
               const newAudioElements = new Map(currentState.audioElements);
@@ -785,8 +774,7 @@ export const useCallStore = create(
               
               set({ audioElements: newAudioElements });
               
-              console.log('✅ Screen share audio created:', screenShareAudioKey);
-              console.log('✅ Playing with native browser audio - no processing!');
+              console.log('Screen share audio element created:', screenShareAudioKey);
             }
             
             return;
@@ -845,9 +833,10 @@ export const useCallStore = create(
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
           
-          // Создаем Web Audio API chain с GainNode
+          // Создаем Web Audio API chain
           const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
           const gainNode = audioContext.createGain();
+          source.connect(gainNode);
           
           // Устанавливаем начальную громкость
           const initialVolume = state.userVolumes.get(userId) || 100;
@@ -855,98 +844,24 @@ export const useCallStore = create(
           const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
           audioElement.volume = audioVolume;
           
-          // 🎙️ Запускаем определение активности голоса через AudioWorklet
-          try {
-            // Загружаем worklet модуль если еще не загружен
-            if (!state.voiceWorkletLoaded) {
-              await audioContext.audioWorklet.addModule('/voice-detector.worklet.js');
-              set({ voiceWorkletLoaded: true });
-              console.log('✅ Voice detector worklet loaded');
+          // Сохраняем ссылки
+          set((state) => {
+            const newGainNodes = new Map(state.gainNodes);
+            const newAudioElements = new Map(state.audioElements);
+            newGainNodes.set(userId, gainNode);
+            newAudioElements.set(userId, audioElement);
+            
+            const newUserVolumes = new Map(state.userVolumes);
+            if (!newUserVolumes.has(userId)) {
+              newUserVolumes.set(userId, 100);
             }
             
-            // Создаем VoiceDetectorNode
-            const voiceDetectorNode = new AudioWorkletNode(audioContext, 'voice-detector', {
-              numberOfInputs: 1,
-              numberOfOutputs: 1,
-              channelCount: 1
-            });
-            
-            // Подключаем цепочку: source -> voiceDetector -> gainNode
-            // voiceDetector только анализирует, не изменяет звук
-            source.connect(voiceDetectorNode);
-            voiceDetectorNode.connect(gainNode);
-            
-            // Обработчик сообщений от worklet (работает в отдельном потоке!)
-            voiceDetectorNode.port.onmessage = (event) => {
-              const { speaking } = event.data;
-              
-              // Обновляем состояние только при изменении
-              const currentState = get();
-              const wasSpeaking = currentState.speakingUsers.has(userId);
-              
-              if (speaking !== wasSpeaking) {
-                set((state) => {
-                  const newSpeakingUsers = new Set(state.speakingUsers);
-                  if (speaking) {
-                    newSpeakingUsers.add(userId);
-                  } else {
-                    newSpeakingUsers.delete(userId);
-                  }
-                  return { speakingUsers: newSpeakingUsers };
-                });
-              }
+            return {
+              gainNodes: newGainNodes,
+              audioElements: newAudioElements,
+              userVolumes: newUserVolumes
             };
-            
-            // Сохраняем ссылки
-            set((state) => {
-              const newGainNodes = new Map(state.gainNodes);
-              const newAudioElements = new Map(state.audioElements);
-              const newVoiceDetectorNodes = new Map(state.voiceDetectorNodes);
-              const newVoiceDetectorSources = new Map(state.voiceDetectorSources);
-              
-              newGainNodes.set(userId, gainNode);
-              newAudioElements.set(userId, audioElement);
-              newVoiceDetectorNodes.set(userId, voiceDetectorNode);
-              newVoiceDetectorSources.set(userId, source);
-              
-              const newUserVolumes = new Map(state.userVolumes);
-              if (!newUserVolumes.has(userId)) {
-                newUserVolumes.set(userId, 100);
-              }
-              
-              return {
-                gainNodes: newGainNodes,
-                audioElements: newAudioElements,
-                voiceDetectorNodes: newVoiceDetectorNodes,
-                voiceDetectorSources: newVoiceDetectorSources,
-                userVolumes: newUserVolumes
-              };
-            });
-            
-            console.log(`✅ [callStore] Voice detection with AudioWorklet STARTED for user: ${userId}`);
-          } catch (error) {
-            console.error(`Failed to setup voice detection for ${userId}:`, error);
-            // Если AudioWorklet не поддерживается, просто подключаем gainNode
-            source.connect(gainNode);
-            
-            set((state) => {
-              const newGainNodes = new Map(state.gainNodes);
-              const newAudioElements = new Map(state.audioElements);
-              newGainNodes.set(userId, gainNode);
-              newAudioElements.set(userId, audioElement);
-              
-              const newUserVolumes = new Map(state.userVolumes);
-              if (!newUserVolumes.has(userId)) {
-                newUserVolumes.set(userId, 100);
-              }
-              
-              return {
-                gainNodes: newGainNodes,
-                audioElements: newAudioElements,
-                userVolumes: newUserVolumes
-              };
-            });
-          }
+          });
 
           try {
             await audioElement.play();
@@ -1114,12 +1029,6 @@ export const useCallStore = create(
       
       // Переключение мута для отдельного пользователя
       toggleUserMute: (peerId) => {
-        // Не применяем мут к screen share audio
-        if (peerId.startsWith('screen-share-audio-')) {
-          console.log('Cannot mute screen share audio:', peerId);
-          return;
-        }
-        
         const state = get();
         const audioElement = state.audioElements.get(peerId);
         if (!audioElement) return;
@@ -1150,12 +1059,6 @@ export const useCallStore = create(
       
       // Изменение громкости отдельного пользователя
       changeUserVolume: (peerId, newVolume) => {
-        // Не изменяем громкость screen share audio
-        if (peerId.startsWith('screen-share-audio-')) {
-          console.log('Cannot change volume for screen share audio:', peerId);
-          return;
-        }
-        
         const state = get();
         const audioElement = state.audioElements.get(peerId);
         if (!audioElement) return;
@@ -1247,14 +1150,8 @@ export const useCallStore = create(
           });
         }
         
-        // Управляем HTML Audio элементами (кроме screen share audio)
+        // Управляем HTML Audio элементами
         state.audioElements.forEach((audioElement, peerId) => {
-          // Исключаем screen-share-audio из глобального управления громкостью
-          if (peerId.startsWith('screen-share-audio-')) {
-            console.log('Skipping screen share audio from global volume control:', peerId);
-            return;
-          }
-          
           if (audioElement) {
             if (newMutedState) {
               audioElement.volume = 0;
@@ -1406,25 +1303,6 @@ export const useCallStore = create(
           state.consumers.forEach(consumer => consumer.close());
           state.producers.forEach(producer => producer.close());
           
-          // Очищаем VoiceDetector worklet nodes
-          state.voiceDetectorNodes.forEach((node, userId) => {
-            try {
-              node.port.close();
-              node.disconnect();
-            } catch (e) {
-              console.warn(`Error disconnecting voice detector for ${userId}:`, e);
-            }
-          });
-          
-          // Очищаем source nodes
-          state.voiceDetectorSources.forEach((source, userId) => {
-            try {
-              source.disconnect();
-            } catch (e) {
-              console.warn(`Error disconnecting source for ${userId}:`, e);
-            }
-          });
-          
           // Очистка GainNodes и audio elements
           state.gainNodes.forEach(gainNode => {
             try {
@@ -1470,10 +1348,6 @@ export const useCallStore = create(
             audioElements: new Map(),
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
-            voiceDetectorNodes: new Map(),
-            voiceDetectorSources: new Map(),
-            voiceWorkletLoaded: false,
-            speakingUsers: new Set(),
             device: null,
             sendTransport: null,
             recvTransport: null,
@@ -1505,14 +1379,7 @@ export const useCallStore = create(
             await get().stopScreenShare();
           }
 
-          console.log('🖥️ Requesting screen sharing access...');
-          
-          // ПРАВИЛЬНОЕ РЕШЕНИЕ:
-          // 1. Вкладка (browser): suppressLocalAudioPlayback фильтрует голоса
-          // 2. Окно (window): захватывается звук ТОЛЬКО этого окна (не Chrome)
-          // 3. Монитор (monitor): захватывается звук ВСЕХ окон (может быть эхо)
-          
-          // === ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЕ CONSTRAINTS ДЛЯ ИЗОЛЯЦИИ АУДИО ===
+          console.log('Requesting screen sharing access...');
           const stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               cursor: 'always',
@@ -1520,145 +1387,23 @@ export const useCallStore = create(
               width: { ideal: 1920, max: 1920 },
               height: { ideal: 1080, max: 1080 },
               aspectRatio: 16/9,
-              resizeMode: 'crop-and-scale',
-              displaySurface: 'window' // Явно просим окно (не монитор)
+              displaySurface: 'monitor',
+              resizeMode: 'crop-and-scale'
             },
             audio: {
-              // === КЛЮЧЕВОЕ: Изоляция аудио от конкретного источника ===
-              suppressLocalAudioPlayback: true, // Блокирует локальное воспроизведение
-              
-              // Отключаем обработку - нам нужен чистый звук приложения
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-              
-              // Качество
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
               sampleRate: 48000,
               channelCount: 2,
-              
-              // === НОВОЕ: Явно указываем источник ===
-              displaySurface: 'window', // Аудио ТОЛЬКО из окна (не системное)
-              logicalSurface: true,      // Логическая поверхность (без фоновых звуков)
-              
-              // Дополнительные ограничения для изоляции
-              latency: 0,
-              
-              // Запрашиваем только звук выбранного источника
-              systemAudio: 'exclude' // НЕ захватывать системный звук (Chrome 105+)
-            },
-            
-            // Предпочитаемые типы источников
-            preferCurrentTab: false, // Не текущую вкладку
-            selfBrowserSurface: 'exclude', // Исключить сам браузер
-            surfaceSwitching: 'include', // Разрешить переключение
-            systemAudio: 'exclude' // Повторяем - НЕ системный звук
-          });
-
-          console.log('✅ Screen sharing access granted');
-          
-          const videoTrack = stream.getVideoTracks()[0];
-          if (!videoTrack) {
-            throw new Error('No video track available');
-          }
-
-          const videoSettings = videoTrack.getSettings();
-          console.log('📹 Video settings:', {
-            displaySurface: videoSettings.displaySurface,
-            width: videoSettings.width,
-            height: videoSettings.height,
-            frameRate: videoSettings.frameRate
-          });
-
-          // === ПРОВЕРЯЕМ АУДИО ТРЕК ===
-          let audioTrack = stream.getAudioTracks()[0];
-          
-          if (audioTrack) {
-            const audioSettings = audioTrack.getSettings();
-            const audioCapabilities = audioTrack.getCapabilities?.() || {};
-            
-            console.log('🔊 Audio track settings:', {
-              displaySurface: videoSettings.displaySurface,
-              suppressLocalAudioPlayback: audioSettings.suppressLocalAudioPlayback,
-              sampleRate: audioSettings.sampleRate,
-              channelCount: audioSettings.channelCount,
-              deviceId: audioSettings.deviceId,
-              groupId: audioSettings.groupId,
-              // Проверяем изоляцию
-              logicalSurface: audioSettings.logicalSurface,
-              cursor: audioSettings.cursor
-            });
-            
-            console.log('🎤 Audio capabilities:', audioCapabilities);
-            
-            // === АНАЛИЗ ИСТОЧНИКА АУДИО ===
-            const isBrowserTab = videoSettings.displaySurface === 'browser';
-            const isWindow = videoSettings.displaySurface === 'window';
-            const isMonitor = videoSettings.displaySurface === 'monitor';
-            const hasSuppression = audioSettings.suppressLocalAudioPlayback === true;
-            
-            console.log('📊 Audio source analysis:', {
-              type: videoSettings.displaySurface,
-              isBrowserTab,
-              isWindow,
-              isMonitor,
-              hasSuppression,
-              isIsolated: (isBrowserTab && hasSuppression) || (isWindow && !audioSettings.deviceId)
-            });
-            
-            // === РЕШЕНИЕ НА ОСНОВЕ ИСТОЧНИКА ===
-            if (isBrowserTab) {
-              // 🟢 ВКЛАДКА БРАУЗЕРА - ЛУЧШИЙ ВАРИАНТ
-              if (hasSuppression) {
-                console.log('✅ Browser Tab + suppressLocalAudioPlayback = NO ECHO! 🎉');
-                console.log('💡 Participant voices are automatically filtered by browser');
-              } else {
-                console.warn('⚠️ Browser Tab but suppressLocalAudioPlayback not active');
-                console.warn('⚠️ Echo may occur! Consider using newer browser');
-              }
-              
-            } else if (isWindow) {
-              // 🟡 ОКНО ПРИЛОЖЕНИЯ - ЗАВИСИТ ОТ БРАУЗЕРА
-              console.log('🔍 Application Window detected');
-              
-              // Проверяем, изолировано ли аудио
-              if (audioSettings.deviceId) {
-                console.warn('⚠️ Window has deviceId - may capture SYSTEM audio!');
-                console.warn('⚠️ This means participant voices might be included');
-                
-                // Спрашиваем пользователя
-                console.log('❓ OPTIONS:');
-                console.log('   1. Keep audio (may have echo)');
-                console.log('   2. Remove audio (no echo, but no game sound)');
-                console.log('   3. Share Browser Tab instead (best)');
-                
-                // По умолчанию ОСТАВЛЯЕМ (пользователь сам решит)
-                console.log('💡 Keeping audio - user can stop if echo occurs');
-                
-              } else {
-                console.log('✅ Window audio appears isolated (no deviceId)');
-                console.log('💡 This should capture only application audio');
-              }
-              
-            } else if (isMonitor) {
-              // 🔴 ВЕСЬ МОНИТОР - ВСЕГДА СИСТЕМНЫЙ ЗВУК
-              console.warn('⚠️ MONITOR sharing detected!');
-              console.warn('⚠️ System audio WILL include participant voices → ECHO!');
-              
-              // Удаляем аудио для мониторов
-              console.log('🔇 Removing audio to prevent echo');
-              audioTrack.stop();
-              stream.removeTrack(audioTrack);
-              audioTrack = null;
-              
-              console.log('💡 Recommendation: Share Application Window or Browser Tab instead');
+              sampleSize: 16
             }
-            
-          } else {
-            console.log('ℹ️ No audio track - user did not enable audio sharing');
-          }
+          });
 
-          // Обработка остановки потока
-          videoTrack.onended = () => {
+          console.log('Screen sharing access granted');
+
+          // Обработка остановки потока пользователем
+          stream.getVideoTracks()[0].onended = () => {
             console.log('Screen sharing stopped by user');
             get().stopScreenShare();
           };
@@ -1666,7 +1411,12 @@ export const useCallStore = create(
           // Устанавливаем поток
           set({ screenShareStream: stream });
 
-          console.log('Creating screen sharing video producer...');
+          const videoTrack = stream.getVideoTracks()[0];
+          if (!videoTrack) {
+            throw new Error('No video track available');
+          }
+
+          console.log('Creating screen sharing producer...');
           const videoProducer = await state.sendTransport.produce({
             track: videoTrack,
             encodings: [
@@ -1677,39 +1427,40 @@ export const useCallStore = create(
               }
             ],
             codecOptions: {
-              videoGoogleStartBitrate: 3000,
-              videoGoogleMaxBitrate: 5000
+              videoGoogleStartBitrate: 3000, // Начальный битрейт 3 Mbps
+              videoGoogleMaxBitrate: 5000 // Максимальный битрейт 5 Mbps
             },
             appData: {
               mediaType: 'screen',
               trackType: 'video',
               userId: state.currentUserId,
               userName: state.currentUserName,
-              width: videoSettings.width,
-              height: videoSettings.height,
-              frameRate: videoSettings.frameRate
+              width: videoTrack.getSettings().width,
+              height: videoTrack.getSettings().height,
+              frameRate: videoTrack.getSettings().frameRate
             }
           });
 
-          console.log('✅ Screen sharing video producer created:', videoProducer.id);
+          console.log('Screen sharing video producer created:', videoProducer.id);
 
-          // Создаем audio producer (если есть)
+          // Создаем отдельный audio producer для демонстрации экрана
+          const audioTrack = stream.getAudioTracks()[0];
           let audioProducer = null;
+          
           if (audioTrack) {
             console.log('Creating screen sharing audio producer...');
-            
-            // ПЕРЕДАЁМ АУДИО КАК ЕСТЬ - БЕЗ ОБРАБОТКИ!
             audioProducer = await state.sendTransport.produce({
               track: audioTrack,
               appData: {
                 mediaType: 'screen',
                 trackType: 'audio',
                 userId: state.currentUserId,
-                userName: state.currentUserName,
-                suppressLocalAudioPlayback: audioTrack.getSettings().suppressLocalAudioPlayback
+                userName: state.currentUserName
               }
             });
-            console.log('✅ Screen sharing audio producer created:', audioProducer.id);
+            console.log('Screen sharing audio producer created:', audioProducer.id);
+          } else {
+            console.log('No audio track in screen share stream');
           }
 
           // Сохраняем producers
@@ -1723,7 +1474,7 @@ export const useCallStore = create(
             isScreenSharing: true 
           });
 
-          // Обработка событий
+          // Обработка событий video producer
           videoProducer.on('transportclose', () => {
             console.log('Screen sharing video transport closed');
             get().stopScreenShare();
@@ -1734,12 +1485,10 @@ export const useCallStore = create(
             get().stopScreenShare();
           });
 
-          console.log('🎉 Screen sharing started successfully!');
-
         } catch (error) {
           console.error('Error starting screen share:', error);
           
-          // Проверяем отмену пользователем
+          // Проверяем, является ли это отменой пользователем
           const isCancelled = error.message && (
             error.message.includes('отменена') || 
             error.message.includes('cancelled') ||
@@ -1749,17 +1498,19 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          // Очистка
+          // Очищаем при ошибке
           const currentState = get();
           if (currentState.screenShareStream) {
             currentState.screenShareStream.getTracks().forEach(track => track.stop());
           }
           
+          // Показываем ошибку только если это не отмена пользователем
           if (isCancelled) {
             console.log('Screen sharing cancelled by user');
             set({ 
               screenShareStream: null,
               isScreenSharing: false
+              // НЕ устанавливаем error при отмене
             });
           } else {
             set({ 
@@ -1800,18 +1551,16 @@ export const useCallStore = create(
 
           // Очищаем screen share audio elements
           const newAudioElements = new Map(state.audioElements);
-          
           for (const [key, audioElement] of newAudioElements.entries()) {
             if (key.startsWith('screen-share-audio-')) {
               try {
-                // Простая очистка audio element
                 audioElement.pause();
                 audioElement.srcObject = null;
                 if (audioElement.parentNode) {
                   audioElement.parentNode.removeChild(audioElement);
                 }
                 newAudioElements.delete(key);
-                console.log('✅ Removed screen share audio element:', key);
+                console.log('Removed screen share audio element:', key);
               } catch (e) {
                 console.warn('Error removing screen share audio element:', e);
               }
@@ -2164,72 +1913,6 @@ export const useCallStore = create(
           console.error('Error stopping video:', error);
           set({ error: 'Failed to stop video: ' + error.message });
         }
-      },
-
-      // ========== Audio Device Management ==========
-      
-      /**
-       * Получить список доступных аудио устройств вывода
-       */
-      getAudioOutputDevices: async () => {
-        const audioDeviceManager = getAudioDeviceManager();
-        return await audioDeviceManager.getAudioOutputDevices();
-      },
-
-      /**
-       * Установить устройство вывода для голосов участников
-       * @param {string} deviceId - ID устройства или 'default'
-       */
-      setParticipantsAudioDevice: async (deviceId) => {
-        const audioDeviceManager = getAudioDeviceManager();
-        audioDeviceManager.setParticipantsOutputDevice(deviceId);
-        
-        // Применяем к существующим audio элементам
-        const state = get();
-        const updatePromises = [];
-        
-        state.audioElements.forEach((audioElement, userId) => {
-          // Применяем только к элементам участников (не к screen share audio)
-          if (!userId.startsWith('screen-share-audio-')) {
-            updatePromises.push(audioDeviceManager.applyAudioOutput(audioElement, deviceId));
-          }
-        });
-        
-        await Promise.all(updatePromises);
-        console.log('✅ Audio output device updated for all participants');
-      },
-
-      /**
-       * Автоматически выбрать наушники (если доступны)
-       */
-      autoSelectHeadphones: async () => {
-        const audioDeviceManager = getAudioDeviceManager();
-        const headphones = await audioDeviceManager.autoSelectHeadphones();
-        
-        if (headphones) {
-          // Применяем к существующим audio элементам
-          await get().setParticipantsAudioDevice(headphones.deviceId);
-          console.log('🎧 Headphones selected:', headphones.label);
-          return headphones;
-        }
-        
-        return null;
-      },
-
-      /**
-       * Получить текущее устройство вывода для участников
-       */
-      getCurrentAudioDevice: async () => {
-        const audioDeviceManager = getAudioDeviceManager();
-        return await audioDeviceManager.getCurrentDeviceInfo();
-      },
-
-      /**
-       * Проверить, поддерживается ли выбор аудио устройства
-       */
-      isAudioDeviceSelectionSupported: () => {
-        const audioDeviceManager = getAudioDeviceManager();
-        return audioDeviceManager.isSinkIdSupported();
       }
     }),
     {

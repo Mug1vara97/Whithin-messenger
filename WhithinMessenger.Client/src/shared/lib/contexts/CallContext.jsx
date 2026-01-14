@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
-import { useLiveKitCallStore as useCallStore } from '../stores/livekitCallStore';
+import { useCallStore } from '../stores/callStore';
 
 const CallContext = createContext();
 
@@ -46,7 +46,6 @@ export const CallProvider = ({ children }) => {
   const participantAudioStates = useCallStore(state => state.participantAudioStates);
   const participantGlobalAudioStates = useCallStore(state => state.participantGlobalAudioStates);
   const participantVideoStates = useCallStore(state => state.participantVideoStates);
-  const speakingUsers = useCallStore(state => state.speakingUsers);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {
@@ -128,7 +127,6 @@ export const CallProvider = ({ children }) => {
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
-    speakingUsers, // Пользователи, которые сейчас говорят
     
     // Методы
     initializeCall: callStore.initializeCall,
@@ -181,7 +179,6 @@ export const CallProvider = ({ children }) => {
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
-    speakingUsers,
     callStore
   ]);
 
