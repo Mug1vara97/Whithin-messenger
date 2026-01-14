@@ -151,6 +151,29 @@ class VoiceCallApi {
 
           // Setup event listeners
           this.setupRoomEventListeners();
+          
+          // Check for existing remote participants and their tracks
+          this.room.remoteParticipants.forEach((participant) => {
+            console.log('Found existing remote participant:', participant.identity);
+            // Check for existing subscribed tracks
+            participant.trackPublications.forEach((publication) => {
+              if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
+                console.log('Found existing subscribed audio track for participant:', participant.identity);
+                // Emit trackSubscribed event for existing tracks
+                this.emit('trackSubscribed', {
+                  track: publication.track,
+                  publication: publication,
+                  participant: participant,
+                  trackSid: publication.trackSid,
+                  kind: publication.kind,
+                  participantIdentity: participant.identity,
+                  userId: participant.identity,
+                  mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
+                             publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+                });
+              }
+            });
+          });
 
           resolve({
             token: response.token,
@@ -250,6 +273,25 @@ class VoiceCallApi {
     // Participant connected
     this.room.on(RoomEvent.ParticipantConnected, (participant) => {
       console.log('Participant connected:', participant.identity);
+      
+      // Check for existing tracks that are already subscribed
+      participant.trackPublications.forEach((publication) => {
+        if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
+          console.log('Found existing subscribed audio track for participant:', participant.identity);
+          // Emit trackSubscribed event for existing tracks
+          this.emit('trackSubscribed', {
+            track: publication.track,
+            publication: publication,
+            participant: participant,
+            trackSid: publication.trackSid,
+            kind: publication.kind,
+            participantIdentity: participant.identity,
+            userId: participant.identity,
+            mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
+                       publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+          });
+        }
+      });
       
       this.emit('peerJoined', {
         peerId: participant.identity,

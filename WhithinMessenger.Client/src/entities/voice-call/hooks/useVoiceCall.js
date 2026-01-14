@@ -224,10 +224,18 @@ export const useVoiceCall = (userId, userName) => {
 
       // Handle TrackSubscribed events from LiveKit
       voiceCallApi.on('trackSubscribed', async ({ track, publication, participant, userId, mediaType }) => {
-        console.log('Track subscribed event received:', { track, kind: track.kind, userId, mediaType });
+        console.log('🔊 Track subscribed event received:', { 
+          trackSid: track?.sid, 
+          kind: track?.kind, 
+          userId, 
+          mediaType,
+          hasMediaStreamTrack: !!track?.mediaStreamTrack,
+          trackState: track?.mediaStreamTrack?.readyState
+        });
         
         // Only handle audio tracks for voice calls
         if (track.kind !== 'audio') {
+          console.log('Skipping non-audio track');
           return;
         }
         
@@ -237,8 +245,29 @@ export const useVoiceCall = (userId, userName) => {
           return;
         }
         
+        // Check if track has mediaStreamTrack
+        if (!track.mediaStreamTrack) {
+          console.error('Track has no mediaStreamTrack!', track);
+          return;
+        }
+        
         // Use userId from event or fallback to participant identity
         const targetUserId = userId || participant.identity;
+        console.log('🔊 Processing audio track for userId:', targetUserId);
+        
+        // Check if we already have an audio element for this user
+        if (audioElementsRef.current.has(targetUserId)) {
+          console.log('🔊 Audio element already exists for user:', targetUserId, 'updating...');
+          const existingElement = audioElementsRef.current.get(targetUserId);
+          existingElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+          try {
+            await existingElement.play();
+            console.log('🔊 Updated audio element playback started');
+          } catch (error) {
+            console.warn('🔊 Failed to play updated audio element:', error);
+          }
+          return;
+        }
         
         // Initialize AudioContext if needed
         if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -246,24 +275,28 @@ export const useVoiceCall = (userId, userName) => {
             sampleRate: 48000,
             latencyHint: 'interactive'
           });
+          console.log('🔊 Created new AudioContext');
         }
         
         // Resume audio context if suspended
         if (audioContextRef.current.state === 'suspended') {
           await audioContextRef.current.resume();
+          console.log('🔊 Resumed AudioContext');
         }
         
         // Create audio element
         const audioElement = document.createElement('audio');
-        audioElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+        const mediaStream = new MediaStream([track.mediaStreamTrack]);
+        audioElement.srcObject = mediaStream;
         audioElement.autoplay = true;
         audioElement.playsInline = true;
         audioElement.controls = false;
         audioElement.style.display = 'none';
         document.body.appendChild(audioElement);
+        console.log('🔊 Created audio element for user:', targetUserId);
         
-        // Create Web Audio API chain: source -> gain
-        const source = audioContextRef.current.createMediaStreamSource(new MediaStream([track.mediaStreamTrack]));
+        // Create Web Audio API chain: source -> gain -> destination
+        const source = audioContextRef.current.createMediaStreamSource(mediaStream);
         const gainNode = audioContextRef.current.createGain();
         
         // Set initial volume
@@ -271,9 +304,11 @@ export const useVoiceCall = (userId, userName) => {
         const isMuted = userMutedStates.get(targetUserId) || false;
         const audioVolume = isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
         audioElement.volume = audioVolume;
+        gainNode.gain.value = audioVolume;
         
-        // Connect source -> gain (not to destination to avoid double playback)
+        // Connect source -> gain (not to destination to avoid double playback with audio element)
         source.connect(gainNode);
+        console.log('🔊 Connected Web Audio API chain (gain node for volume control)');
         
         // Save references
         gainNodesRef.current.set(targetUserId, gainNode);
@@ -288,19 +323,22 @@ export const useVoiceCall = (userId, userName) => {
           });
         }
         
+        // Try to play audio element
         try {
           await audioElement.play();
-          console.log('Audio playback started for peer:', targetUserId);
+          console.log('🔊✅ Audio playback started for peer:', targetUserId);
           setAudioBlocked(false);
         } catch (error) {
-          console.log('Auto-play blocked, user interaction required:', error);
+          console.warn('🔊⚠️ Auto-play blocked, user interaction required:', error);
           setAudioBlocked(true);
+          // Try again after a delay
           setTimeout(async () => {
             try {
               await audioElement.play();
+              console.log('🔊✅ Audio playback started after delay');
               setAudioBlocked(false);
-            } catch {
-              console.log('Audio playback still blocked');
+            } catch (err) {
+              console.error('🔊❌ Audio playback still blocked:', err);
             }
           }, 1000);
         }
@@ -537,6 +575,7 @@ export const useVoiceCall = (userId, userName) => {
     console.log('toggleUserMute called for:', peerId);
     console.log('Available audio elements:', Array.from(audioElementsRef.current.keys()));
     const audioElement = audioElementsRef.current.get(peerId);
+    const gainNode = gainNodesRef.current.get(peerId);
     if (!audioElement) {
       console.error('Audio element not found for peer:', peerId);
       return;
@@ -550,12 +589,18 @@ export const useVoiceCall = (userId, userName) => {
       const currentVolume = userVolumes.get(peerId) || 100;
       previousVolumesRef.current.set(peerId, currentVolume);
       audioElement.volume = 0;
+      if (gainNode) {
+        gainNode.gain.value = 0;
+      }
       // НЕ меняем userVolumes, чтобы ползунок остался на месте
     } else {
       // Размутиваем - восстанавливаем звук на текущую позицию ползунка
       const currentVolume = userVolumes.get(peerId) || 100;
       const audioVolume = isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
       audioElement.volume = audioVolume;
+      if (gainNode) {
+        gainNode.gain.value = audioVolume;
+      }
       // НЕ меняем userVolumes, ползунок уже на нужном месте
     }
 
@@ -630,12 +675,16 @@ export const useVoiceCall = (userId, userName) => {
       console.log('Audio state (headphones) sent to server, isEnabled:', !newMutedState);
     }
     
-    // Управляем только HTML Audio элементами (GainNode больше не используется для воспроизведения)
+    // Управляем HTML Audio элементами и GainNodes
     audioElementsRef.current.forEach((audioElement, peerId) => {
+      const gainNode = gainNodesRef.current.get(peerId);
       if (audioElement) {
         if (newMutedState) {
-          // Мутим HTML Audio элемент
+          // Мутим HTML Audio элемент и gainNode
           audioElement.volume = 0;
+          if (gainNode) {
+            gainNode.gain.value = 0;
+          }
           console.log(`HTML Audio muted for peer: ${peerId}`);
         } else {
           // Размутиваем с индивидуальной громкостью
@@ -643,6 +692,9 @@ export const useVoiceCall = (userId, userName) => {
           const isIndividuallyMuted = userMutedStates.get(peerId) || false;
           const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
           audioElement.volume = audioVolume;
+          if (gainNode) {
+            gainNode.gain.value = audioVolume;
+          }
           console.log(`HTML Audio unmuted for peer: ${peerId}, volume: ${audioVolume}`);
         }
       }
