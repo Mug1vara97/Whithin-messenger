@@ -1107,24 +1107,27 @@ export const useCallStore = create(
                   // Отключаем автоматически опубликованный микрофон
                   await room.localParticipant.setMicrophoneEnabled(false);
                   
-                  // Отключаем старую публикацию микрофона
+                  // Получаем существующую публикацию микрофона
                   const microphonePublication = room.localParticipant.getTrackPublication('microphone');
+                  
                   if (microphonePublication && microphonePublication.track) {
-                    await room.localParticipant.unpublishTrack(microphonePublication.track);
+                    // Используем replaceTrack на существующем треке (предотвращает утечки памяти)
+                    console.log('Replacing existing microphone track with noise suppression using replaceTrack');
+                    await microphonePublication.track.replaceTrack(processedTrack);
+                    console.log('Audio track with noise suppression replaced via LiveKit');
+                  } else {
+                    // Если публикации нет, публикуем новый трек
+                    console.log('No existing microphone publication, publishing new track with noise suppression');
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    await room.localParticipant.publishTrack(processedTrack, {
+                      source: Track.Source.Microphone,
+                      name: 'microphone'
+                    });
+                    console.log('Audio track with noise suppression published via LiveKit');
                   }
-                  
-                  // Небольшая задержка для завершения unpublish
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                  
-                  // Публикуем обработанный трек
-                  await room.localParticipant.publishTrack(processedTrack, {
-                    source: Track.Source.Microphone,
-                    name: 'microphone'
-                  });
                   
                   // Включаем микрофон с обработанным треком
                   await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-                  console.log('Audio track with noise suppression published via LiveKit');
                 } catch (error) {
                   console.warn('Failed to publish processed track via LiveKit:', error);
                   // В случае ошибки используем обычный трек
@@ -1449,29 +1452,29 @@ export const useCallStore = create(
               
               if (trackToPublish) {
                 try {
-                  // Отключаем текущий микрофон
                   const wasMuted = state.isMuted;
-                  await localParticipant.setMicrophoneEnabled(false);
                   
-                  // Отключаем старую публикацию микрофона
+                  // Получаем существующую публикацию микрофона
                   const microphonePublication = localParticipant.getTrackPublication('microphone');
+                  
                   if (microphonePublication && microphonePublication.track) {
-                    await localParticipant.unpublishTrack(microphonePublication.track);
+                    // Используем replaceTrack на существующем треке (предотвращает утечки памяти)
+                    console.log('Replacing existing microphone track using replaceTrack');
+                    await microphonePublication.track.replaceTrack(trackToPublish);
+                    console.log('LiveKit track replaced with noise suppression:', newState, 'track readyState:', trackToPublish.readyState);
+                  } else {
+                    // Если публикации нет, публикуем новый трек
+                    console.log('No existing microphone publication, publishing new track');
+                    await localParticipant.setMicrophoneEnabled(false);
+                    await localParticipant.publishTrack(trackToPublish, {
+                      source: Track.Source.Microphone,
+                      name: 'microphone'
+                    });
+                    console.log('LiveKit track published with noise suppression:', newState, 'track readyState:', trackToPublish.readyState);
                   }
                   
-                  // Небольшая задержка для завершения unpublish
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                  
-                  // Публикуем новый трек
-                  await localParticipant.publishTrack(trackToPublish, {
-                    source: Track.Source.Microphone,
-                    name: 'microphone'
-                  });
-                  
-                  // Включаем микрофон с новым треком (если не был выключен)
+                  // Восстанавливаем состояние микрофона
                   await localParticipant.setMicrophoneEnabled(!wasMuted);
-                  
-                  console.log('LiveKit track replaced with noise suppression:', newState, 'track readyState:', trackToPublish.readyState);
                 } catch (error) {
                   console.warn('Failed to replace LiveKit track:', error);
                   // В случае ошибки просто включаем микрофон обратно
@@ -1520,21 +1523,26 @@ export const useCallStore = create(
                   if (newTrack) {
                     try {
                       const wasMuted = state.isMuted;
-                      await localParticipant.setMicrophoneEnabled(false);
                       const microphonePublication = localParticipant.getTrackPublication('microphone');
+                      
                       if (microphonePublication && microphonePublication.track) {
-                        await localParticipant.unpublishTrack(microphonePublication.track);
+                        // Используем replaceTrack на существующем треке (предотвращает утечки памяти)
+                        console.log('Replacing existing microphone track with new noise suppression mode using replaceTrack');
+                        await microphonePublication.track.replaceTrack(newTrack);
+                        console.log('LiveKit track replaced with new noise suppression mode:', mode);
+                      } else {
+                        // Если публикации нет, публикуем новый трек
+                        console.log('No existing microphone publication, publishing new track');
+                        await localParticipant.setMicrophoneEnabled(false);
+                        await localParticipant.publishTrack(newTrack, {
+                          source: Track.Source.Microphone,
+                          name: 'microphone'
+                        });
+                        console.log('LiveKit track published with new noise suppression mode:', mode);
                       }
                       
-                      // Небольшая задержка для завершения unpublish
-                      await new Promise(resolve => setTimeout(resolve, 100));
-                      
-                      await localParticipant.publishTrack(newTrack, {
-                        source: Track.Source.Microphone,
-                        name: 'microphone'
-                      });
+                      // Восстанавливаем состояние микрофона
                       await localParticipant.setMicrophoneEnabled(!wasMuted);
-                      console.log('LiveKit track replaced with new noise suppression mode:', mode);
                     } catch (error) {
                       console.warn('Failed to replace LiveKit track:', error);
                       await localParticipant.setMicrophoneEnabled(!state.isMuted);
