@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
-import { RoomEvent } from 'livekit-client';
+import { RoomEvent, Track } from 'livekit-client';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -156,6 +156,16 @@ export const useCallStore = create(
               newMap.set(socketId, peerData.userId);
               set({ peerIdToUserIdMap: newMap });
             }
+            
+            // Обновляем participantGlobalAudioStates для реактивности UI
+            set((state) => {
+              const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+              if (peerData.isGlobalAudioMuted !== undefined) {
+                newGlobalAudioStates.set(peerData.userId, peerData.isGlobalAudioMuted);
+                console.log('Updated participantGlobalAudioStates for user:', peerData.userId, 'isGlobalAudioMuted:', peerData.isGlobalAudioMuted);
+              }
+              return { participantGlobalAudioStates: newGlobalAudioStates };
+            });
             
             set((state) => ({
               participants: [...state.participants.filter(p => p.userId !== peerData.userId), {
@@ -1032,11 +1042,10 @@ export const useCallStore = create(
             state.localStream.getTracks().forEach(track => track.stop());
           }
           
-          // ШУМОПОДАВЛЕНИЕ ВРЕМЕННО ОТКЛЮЧЕНО
           // Очищаем старое шумоподавление (если было инициализировано ранее)
-          // if (state.noiseSuppressionManager) {
-          //   state.noiseSuppressionManager.cleanup();
-          // }
+          if (state.noiseSuppressionManager) {
+            state.noiseSuppressionManager.cleanup();
+          }
           
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -1066,14 +1075,14 @@ export const useCallStore = create(
             await audioContext.resume();
           }
           
-          // ШУМОПОДАВЛЕНИЕ ВРЕМЕННО ОТКЛЮЧЕНО
-          // TODO: Интегрировать шумоподавление с LiveKit через publishTrack/replaceTrack
-          // const noiseSuppressionManager = new NoiseSuppressionManager();
-          // await noiseSuppressionManager.initialize(stream, audioContext);
-          // set({ noiseSuppressionManager });
+          // Инициализация шумоподавления
+          const noiseSuppressionManager = new NoiseSuppressionManager();
+          await noiseSuppressionManager.initialize(stream, audioContext);
+          set({ noiseSuppressionManager });
           
-          // Получаем оригинальный трек (без шумоподавления)
-          const audioTrack = stream.getAudioTracks()[0];
+          // Получаем обработанный трек (с шумоподавлением, если включено)
+          const processedStream = noiseSuppressionManager.getProcessedStream();
+          const audioTrack = processedStream ? processedStream.getAudioTracks()[0] : stream.getAudioTracks()[0];
           
           if (!audioTrack) {
             throw new Error('No audio track in stream');
@@ -1082,16 +1091,56 @@ export const useCallStore = create(
           // Устанавливаем состояние микрофона
           audioTrack.enabled = !state.isMuted;
           
-          // Для LiveKit публикуем трек через localParticipant
-          // LiveKit автоматически публикует микрофон при подключении, но мы можем обновить трек
-          try {
-            await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-            console.log('Audio track published via LiveKit (noise suppression disabled)');
-          } catch (error) {
-            console.warn('Failed to publish audio track via LiveKit:', error);
+          // Если шумоподавление включено по умолчанию, включаем его
+          const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
+          const isNoiseSuppressed = savedNoiseSuppression ? JSON.parse(savedNoiseSuppression) : false;
+          if (isNoiseSuppressed) {
+            await noiseSuppressionManager.enable(state.noiseSuppressionMode || 'rnnoise');
+            set({ isNoiseSuppressed: true });
+            
+            // Публикуем обработанный трек в LiveKit
+            const processedStream = noiseSuppressionManager.getProcessedStream();
+            if (processedStream) {
+              const processedTrack = processedStream.getAudioTracks()[0];
+              if (processedTrack) {
+                try {
+                  // Отключаем автоматически опубликованный микрофон
+                  await room.localParticipant.setMicrophoneEnabled(false);
+                  
+                  // Отключаем старую публикацию микрофона
+                  const microphonePublication = room.localParticipant.getTrackPublication('microphone');
+                  if (microphonePublication && microphonePublication.track) {
+                    await room.localParticipant.unpublishTrack(microphonePublication.track);
+                  }
+                  
+                  // Публикуем обработанный трек
+                  await room.localParticipant.publishTrack(processedTrack, {
+                    source: Track.Source.Microphone,
+                    name: 'microphone'
+                  });
+                  
+                  // Включаем микрофон с обработанным треком
+                  await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+                  console.log('Audio track with noise suppression published via LiveKit');
+                } catch (error) {
+                  console.warn('Failed to publish processed track via LiveKit:', error);
+                  // В случае ошибки используем обычный трек
+                  await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+                }
+              }
+            }
+          } else {
+            // Для LiveKit публикуем трек через localParticipant
+            // LiveKit автоматически публикует микрофон при подключении, но мы можем обновить трек
+            try {
+              await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+              console.log('Audio track published via LiveKit');
+            } catch (error) {
+              console.warn('Failed to publish audio track via LiveKit:', error);
+            }
           }
           
-          console.log('Audio stream created (noise suppression disabled)');
+          console.log('Audio stream created with noise suppression support');
         } catch (error) {
           console.error('Failed to create audio stream:', error);
           set({ error: error.message });
@@ -1291,92 +1340,143 @@ export const useCallStore = create(
       },
       
       // Переключение шумоподавления
-      // ВРЕМЕННО ОТКЛЮЧЕНО - требуется интеграция с LiveKit через publishTrack/replaceTrack
       toggleNoiseSuppression: async () => {
-        console.warn('Noise suppression is temporarily disabled - requires LiveKit integration');
-        return false;
-        // try {
-        //   const state = get();
-        //   if (!state.noiseSuppressionManager || !state.noiseSuppressionManager.isInitialized()) {
-        //     console.error('Noise suppression not initialized');
-        //     return false;
-        //   }
+        try {
+          const state = get();
+          if (!state.noiseSuppressionManager || !state.noiseSuppressionManager.isInitialized()) {
+            console.error('Noise suppression not initialized');
+            return false;
+          }
 
-        //   const newState = !state.isNoiseSuppressed;
-        //   let success = false;
+          const newState = !state.isNoiseSuppressed;
+          let success = false;
 
-        //   if (newState) {
-        //     success = await state.noiseSuppressionManager.enable(state.noiseSuppressionMode);
-        //   } else {
-        //     success = await state.noiseSuppressionManager.disable();
-        //   }
+          if (newState) {
+            success = await state.noiseSuppressionManager.enable(state.noiseSuppressionMode);
+          } else {
+            success = await state.noiseSuppressionManager.disable();
+          }
 
-        //   if (success) {
-        //     set({ isNoiseSuppressed: newState });
-        //     localStorage.setItem('noiseSuppression', JSON.stringify(newState));
+          if (success) {
+            set({ isNoiseSuppressed: newState });
+            localStorage.setItem('noiseSuppression', JSON.stringify(newState));
             
-        //     // Обновляем состояние микрофона для обработанного трека
-        //     if (state.noiseSuppressionManager) {
-        //       const processedStream = state.noiseSuppressionManager.getProcessedStream();
-        //       const audioTrack = processedStream?.getAudioTracks()[0];
-        //       if (audioTrack) {
-        //         audioTrack.enabled = !state.isMuted;
-        //       }
-        //     }
+            // Обновляем состояние микрофона для обработанного трека
+            if (state.noiseSuppressionManager) {
+              const processedStream = state.noiseSuppressionManager.getProcessedStream();
+              const audioTrack = processedStream?.getAudioTracks()[0];
+              if (audioTrack) {
+                audioTrack.enabled = !state.isMuted;
+              }
+            }
             
-        //     return true;
-        //   }
+            // Обновляем трек в LiveKit через unpublishTrack и publishTrack
+            const room = voiceCallApi.getRoom();
+            if (room) {
+              const localParticipant = room.localParticipant;
+              const processedStream = state.noiseSuppressionManager.getProcessedStream();
+              if (processedStream) {
+                const newTrack = processedStream.getAudioTracks()[0];
+                if (newTrack) {
+                  try {
+                    // Отключаем текущий микрофон
+                    const wasMuted = state.isMuted;
+                    await localParticipant.setMicrophoneEnabled(false);
+                    
+                    // Отключаем старую публикацию микрофона
+                    const microphonePublication = localParticipant.getTrackPublication('microphone');
+                    if (microphonePublication && microphonePublication.track) {
+                      await localParticipant.unpublishTrack(microphonePublication.track);
+                    }
+                    
+                    // Публикуем новый трек из обработанного потока
+                    await localParticipant.publishTrack(newTrack, {
+                      source: Track.Source.Microphone,
+                      name: 'microphone'
+                    });
+                    
+                    // Включаем микрофон с новым треком (если не был выключен)
+                    await localParticipant.setMicrophoneEnabled(!wasMuted);
+                    
+                    console.log('LiveKit track replaced with noise suppression:', newState);
+                  } catch (error) {
+                    console.warn('Failed to replace LiveKit track:', error);
+                    // В случае ошибки просто включаем микрофон обратно
+                    await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                  }
+                }
+              }
+            }
+            
+            return true;
+          }
           
-        //   return false;
-        // } catch (error) {
-        //   console.error('Error toggling noise suppression:', error);
-        //   return false;
-        // }
+          return false;
+        } catch (error) {
+          console.error('Error toggling noise suppression:', error);
+          return false;
+        }
       },
       
       // Изменение режима шумоподавления
-      // ВРЕМЕННО ОТКЛЮЧЕНО - требуется интеграция с LiveKit через publishTrack/replaceTrack
       changeNoiseSuppressionMode: async (mode) => {
-        console.warn('Noise suppression is temporarily disabled - requires LiveKit integration');
-        return false;
-        // try {
-        //   const state = get();
-        //   if (!state.noiseSuppressionManager || !state.noiseSuppressionManager.isInitialized()) {
-        //     console.error('Noise suppression not initialized');
-        //     return false;
-        //   }
+        try {
+          const state = get();
+          if (!state.noiseSuppressionManager || !state.noiseSuppressionManager.isInitialized()) {
+            console.error('Noise suppression not initialized');
+            return false;
+          }
 
-        //   let success = false;
-
-        //   if (!state.isNoiseSuppressed) {
-        //     success = await state.noiseSuppressionManager.enable(mode);
-        //   } else if (mode !== state.noiseSuppressionMode) {
-        //     success = await state.noiseSuppressionManager.enable(mode);
-        //   } else {
-        //     return true; // Режим уже установлен
-        //   }
-
-        //   if (success) {
-        //     set({ noiseSuppressionMode: mode, isNoiseSuppressed: true });
-        //     localStorage.setItem('noiseSuppression', JSON.stringify(true));
-            
-        //     // Обновляем состояние микрофона для обработанного трека
-        //     if (state.noiseSuppressionManager) {
-        //       const processedStream = state.noiseSuppressionManager.getProcessedStream();
-        //       const audioTrack = processedStream?.getAudioTracks()[0];
-        //       if (audioTrack) {
-        //         audioTrack.enabled = !state.isMuted;
-        //       }
-        //     }
-            
-        //     return true;
-        //   }
-          
-        //   return false;
-        // } catch (error) {
-        //   console.error('Error changing noise suppression mode:', error);
-        //   return false;
-        // }
+          // Если шумоподавление включено, переключаем режим
+          if (state.isNoiseSuppressed) {
+            // Сначала отключаем текущий режим
+            await state.noiseSuppressionManager.disable();
+            // Затем включаем новый режим
+            const success = await state.noiseSuppressionManager.enable(mode);
+            if (success) {
+              set({ noiseSuppressionMode: mode });
+              
+              // Обновляем трек в LiveKit
+              const room = voiceCallApi.getRoom();
+              if (room) {
+                const localParticipant = room.localParticipant;
+                const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                if (processedStream) {
+                  const newTrack = processedStream.getAudioTracks()[0];
+                  if (newTrack) {
+                    try {
+                      const wasMuted = state.isMuted;
+                      await localParticipant.setMicrophoneEnabled(false);
+                      const microphonePublication = localParticipant.getTrackPublication('microphone');
+                      if (microphonePublication && microphonePublication.track) {
+                        await localParticipant.unpublishTrack(microphonePublication.track);
+                      }
+                      await localParticipant.publishTrack(newTrack, {
+                        source: Track.Source.Microphone,
+                        name: 'microphone'
+                      });
+                      await localParticipant.setMicrophoneEnabled(!wasMuted);
+                      console.log('LiveKit track replaced with new noise suppression mode:', mode);
+                    } catch (error) {
+                      console.warn('Failed to replace LiveKit track:', error);
+                      await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                    }
+                  }
+                }
+              }
+              
+              return true;
+            }
+            return false;
+          } else {
+            // Если шумоподавление выключено, просто сохраняем режим
+            set({ noiseSuppressionMode: mode });
+            return true;
+          }
+        } catch (error) {
+          console.error('Error changing noise suppression mode:', error);
+          return false;
+        }
       },
       
       // Завершение звонка
