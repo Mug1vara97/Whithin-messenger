@@ -1113,6 +1113,9 @@ export const useCallStore = create(
                     await room.localParticipant.unpublishTrack(microphonePublication.track);
                   }
                   
+                  // Небольшая задержка для завершения unpublish
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                  
                   // Публикуем обработанный трек
                   await room.localParticipant.publishTrack(processedTrack, {
                     source: Track.Source.Microphone,
@@ -1374,37 +1377,108 @@ export const useCallStore = create(
             const room = voiceCallApi.getRoom();
             if (room) {
               const localParticipant = room.localParticipant;
-              const processedStream = state.noiseSuppressionManager.getProcessedStream();
-              if (processedStream) {
-                const newTrack = processedStream.getAudioTracks()[0];
-                if (newTrack) {
-                  try {
-                    // Отключаем текущий микрофон
-                    const wasMuted = state.isMuted;
-                    await localParticipant.setMicrophoneEnabled(false);
-                    
-                    // Отключаем старую публикацию микрофона
-                    const microphonePublication = localParticipant.getTrackPublication('microphone');
-                    if (microphonePublication && microphonePublication.track) {
-                      await localParticipant.unpublishTrack(microphonePublication.track);
+              let trackToPublish = null;
+              
+              if (newState) {
+                // При включении шумоподавления используем обработанный трек
+                const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                if (processedStream) {
+                  trackToPublish = processedStream.getAudioTracks()[0];
+                }
+              } else {
+                // При отключении шумоподавления используем оригинальный трек из localStream
+                // Это гарантирует, что мы используем активный трек из getUserMedia
+                if (state.localStream) {
+                  const originalTrack = state.localStream.getAudioTracks()[0];
+                  if (originalTrack && originalTrack.readyState === 'live') {
+                    trackToPublish = originalTrack;
+                    console.log('Using original track from localStream for LiveKit, readyState:', originalTrack.readyState);
+                  } else {
+                    console.warn('Original track from localStream is not live (readyState:', originalTrack?.readyState, '), trying noise suppression manager');
+                    // Fallback на оригинальный поток из noiseSuppressionManager
+                    const originalStream = state.noiseSuppressionManager.getOriginalStream();
+                    if (originalStream) {
+                      const managerOriginalTrack = originalStream.getAudioTracks()[0];
+                      if (managerOriginalTrack && managerOriginalTrack.readyState === 'live') {
+                        trackToPublish = managerOriginalTrack;
+                        console.log('Using original track from noiseSuppressionManager');
+                      } else {
+                        // Последний fallback - обработанный поток (passthrough)
+                        const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                        if (processedStream) {
+                          trackToPublish = processedStream.getAudioTracks()[0];
+                          console.log('Using processed stream as fallback');
+                        }
+                      }
+                    } else {
+                      // Последний fallback - обработанный поток (passthrough)
+                      const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                      if (processedStream) {
+                        trackToPublish = processedStream.getAudioTracks()[0];
+                        console.log('Using processed stream as fallback (no original stream)');
+                      }
                     }
-                    
-                    // Публикуем новый трек из обработанного потока
-                    await localParticipant.publishTrack(newTrack, {
-                      source: Track.Source.Microphone,
-                      name: 'microphone'
-                    });
-                    
-                    // Включаем микрофон с новым треком (если не был выключен)
-                    await localParticipant.setMicrophoneEnabled(!wasMuted);
-                    
-                    console.log('LiveKit track replaced with noise suppression:', newState);
-                  } catch (error) {
-                    console.warn('Failed to replace LiveKit track:', error);
-                    // В случае ошибки просто включаем микрофон обратно
-                    await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                  }
+                } else {
+                  console.warn('localStream not available, trying noise suppression manager');
+                  // Fallback на оригинальный поток из noiseSuppressionManager
+                  const originalStream = state.noiseSuppressionManager.getOriginalStream();
+                  if (originalStream) {
+                    const originalTrack = originalStream.getAudioTracks()[0];
+                    if (originalTrack && originalTrack.readyState === 'live') {
+                      trackToPublish = originalTrack;
+                      console.log('Using original track from noiseSuppressionManager');
+                    } else {
+                      // Последний fallback - обработанный поток (passthrough)
+                      const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                      if (processedStream) {
+                        trackToPublish = processedStream.getAudioTracks()[0];
+                        console.log('Using processed stream as fallback');
+                      }
+                    }
+                  } else {
+                    // Последний fallback - обработанный поток (passthrough)
+                    const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                    if (processedStream) {
+                      trackToPublish = processedStream.getAudioTracks()[0];
+                      console.log('Using processed stream as final fallback');
+                    }
                   }
                 }
+              }
+              
+              if (trackToPublish) {
+                try {
+                  // Отключаем текущий микрофон
+                  const wasMuted = state.isMuted;
+                  await localParticipant.setMicrophoneEnabled(false);
+                  
+                  // Отключаем старую публикацию микрофона
+                  const microphonePublication = localParticipant.getTrackPublication('microphone');
+                  if (microphonePublication && microphonePublication.track) {
+                    await localParticipant.unpublishTrack(microphonePublication.track);
+                  }
+                  
+                  // Небольшая задержка для завершения unpublish
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                  
+                  // Публикуем новый трек
+                  await localParticipant.publishTrack(trackToPublish, {
+                    source: Track.Source.Microphone,
+                    name: 'microphone'
+                  });
+                  
+                  // Включаем микрофон с новым треком (если не был выключен)
+                  await localParticipant.setMicrophoneEnabled(!wasMuted);
+                  
+                  console.log('LiveKit track replaced with noise suppression:', newState, 'track readyState:', trackToPublish.readyState);
+                } catch (error) {
+                  console.warn('Failed to replace LiveKit track:', error);
+                  // В случае ошибки просто включаем микрофон обратно
+                  await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                }
+              } else {
+                console.warn('No track available to publish in LiveKit');
               }
             }
             
@@ -1451,6 +1525,10 @@ export const useCallStore = create(
                       if (microphonePublication && microphonePublication.track) {
                         await localParticipant.unpublishTrack(microphonePublication.track);
                       }
+                      
+                      // Небольшая задержка для завершения unpublish
+                      await new Promise(resolve => setTimeout(resolve, 100));
+                      
                       await localParticipant.publishTrack(newTrack, {
                         source: Track.Source.Microphone,
                         name: 'microphone'

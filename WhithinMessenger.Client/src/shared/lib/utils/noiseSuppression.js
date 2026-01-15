@@ -151,6 +151,10 @@ export class NoiseSuppressionManager {
     return this.processedStream;
   }
 
+  getOriginalStream() {
+    return this.originalStream;
+  }
+
   async enable(mode = 'rnnoise') {
     try {
       if (!this._isInitialized) {
