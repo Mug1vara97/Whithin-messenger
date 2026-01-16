@@ -14,6 +14,8 @@ namespace WhithinMessenger.Application.Services
         bool IsVideoFile(string contentType);
         bool IsAudioFile(string contentType);
         string GetMediaFolderPath(string contentType);
+        string GetFullPath(string relativePath);
+        string GetFullPathForFolder(string folderPath);
     }
 }
 

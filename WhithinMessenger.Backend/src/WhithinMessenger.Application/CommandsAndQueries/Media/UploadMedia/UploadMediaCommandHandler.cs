@@ -1,6 +1,5 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Hosting;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
@@ -14,22 +13,19 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     private readonly IMediaFileRepository _mediaFileRepository;
     private readonly IMessageRepository _messageRepository;
     private readonly ILogger<UploadMediaCommandHandler> _logger;
-    private readonly IWebHostEnvironment _environment;
 
     public UploadMediaCommandHandler(
         IFileService fileService,
         IVideoConverterService videoConverterService,
         IMediaFileRepository mediaFileRepository,
         IMessageRepository messageRepository,
-        ILogger<UploadMediaCommandHandler> logger,
-        IWebHostEnvironment environment)
+        ILogger<UploadMediaCommandHandler> logger)
     {
         _fileService = fileService;
         _videoConverterService = videoConverterService;
         _mediaFileRepository = mediaFileRepository;
         _messageRepository = messageRepository;
         _logger = logger;
-        _environment = environment;
     }
 
     public async Task<UploadMediaResult> Handle(UploadMediaCommand request, CancellationToken cancellationToken)
@@ -57,12 +53,12 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
             {
                 try
                 {
-                    var fullFilePath = Path.Combine(_environment.WebRootPath, filePath);
+                    var fullFilePath = _fileService.GetFullPath(filePath);
                     if (_videoConverterService.NeedsConversion(fullFilePath))
                     {
                         _logger.LogInformation("Video needs conversion, starting conversion: {FilePath}", fullFilePath);
                         
-                        var outputFolder = Path.Combine(_environment.WebRootPath, "uploads", folderPath);
+                        var outputFolder = _fileService.GetFullPathForFolder(folderPath);
                         var convertedFileNameResult = await _videoConverterService.ConvertVideoToH264Async(
                             fullFilePath, 
                             outputFolder, 
@@ -116,7 +112,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
             var savedMessage = await _messageRepository.AddAsync(message, cancellationToken);
 
             // Получаем размер файла (может измениться после конвертации)
-            var finalFilePath = Path.Combine(_environment.WebRootPath, filePath);
+            var finalFilePath = _fileService.GetFullPath(filePath);
             var finalFileSize = File.Exists(finalFilePath) 
                 ? new FileInfo(finalFilePath).Length 
                 : request.File.Length;

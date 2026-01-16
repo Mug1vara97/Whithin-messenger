@@ -211,5 +211,15 @@ namespace WhithinMessenger.Application.Services
 
             return thumbnail;
         }
+
+        public string GetFullPath(string relativePath)
+        {
+            return Path.Combine(_webRootPath, relativePath);
+        }
+
+        public string GetFullPathForFolder(string folderPath)
+        {
+            return Path.Combine(_webRootPath, "uploads", folderPath);
+        }
     }
 }
