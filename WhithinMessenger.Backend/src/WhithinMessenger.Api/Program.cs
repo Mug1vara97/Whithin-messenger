@@ -27,6 +27,12 @@ builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(p
     return new WhithinMessenger.Application.Services.FileService(logger, env.WebRootPath);
 });
 
+builder.Services.AddScoped<WhithinMessenger.Application.Services.IVideoConverterService>(provider =>
+{
+    var logger = provider.GetRequiredService<ILogger<WhithinMessenger.Application.Services.VideoConverterService>>();
+    return new WhithinMessenger.Application.Services.VideoConverterService(logger);
+});
+
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = true;

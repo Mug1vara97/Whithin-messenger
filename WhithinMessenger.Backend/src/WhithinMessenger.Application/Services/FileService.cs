@@ -29,6 +29,15 @@ namespace WhithinMessenger.Application.Services
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
+                    await stream.FlushAsync(); // Ensure all data is written
+                }
+
+                // Verify file was saved correctly
+                var savedFileInfo = new FileInfo(filePath);
+                if (savedFileInfo.Length != file.Length)
+                {
+                    _logger.LogWarning("File size mismatch after save: expected {ExpectedSize}, got {ActualSize} for {FileName}", 
+                        file.Length, savedFileInfo.Length, file.FileName);
                 }
 
                 return Path.Combine("uploads", folderPath, fileName).Replace("\\", "/");
@@ -204,7 +213,3 @@ namespace WhithinMessenger.Application.Services
         }
     }
 }
-
-
-
-

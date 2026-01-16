@@ -1,4 +1,4 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -23,6 +23,13 @@ RUN dotnet publish "./WhithinMessenger.Api.csproj" -c $BUILD_CONFIGURATION -o /a
 FROM base AS final
 USER root
 WORKDIR /app
+
+# Устанавливаем FFmpeg для конвертации видео
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=publish /app/publish .
 
 # Создаем структуру папок для uploads

@@ -44,6 +44,51 @@ const MediaFile = ({ mediaFile }) => {
     }
 
     if (mediaFile.contentType.startsWith('video/')) {
+      const videoUrl = `${BASE_URL}/${mediaFile.filePath}`;
+      const [videoError, setVideoError] = useState(false);
+      
+      // Если ошибка воспроизведения - показываем fallback с кнопкой скачивания
+      if (videoError) {
+        return (
+          <div className="media-video-container">
+            <div className="media-video-error" style={{
+              padding: '20px',
+              textAlign: 'center',
+              backgroundColor: '#2f3136',
+              borderRadius: '8px',
+              border: '1px solid #40444b'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎥</div>
+              <p style={{ color: '#dcddde', marginBottom: '8px', fontSize: '14px' }}>
+                Видео не может быть воспроизведено в браузере
+              </p>
+              <p style={{ color: '#72767d', marginBottom: '16px', fontSize: '12px' }}>
+                Возможно, используется неподдерживаемый формат (HEVC/H.265)
+              </p>
+              <a
+                href={videoUrl}
+                download={mediaFile.originalFileName || 'video.mp4'}
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 20px',
+                  backgroundColor: '#5865f2',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#4752c4'}
+                onMouseOut={(e) => e.target.style.backgroundColor = '#5865f2'}
+              >
+                📥 Скачать видео
+              </a>
+            </div>
+          </div>
+        );
+      }
+      
       return (
         <div className="media-video-container">
           {videoLoading && (
@@ -53,7 +98,7 @@ const MediaFile = ({ mediaFile }) => {
             </div>
           )}
           <video
-            src={`${BASE_URL}/${mediaFile.filePath}`}
+            src={videoUrl}
             controls
             className={`media-video ${videoLoading ? 'media-loading' : ''}`}
             preload="metadata"
@@ -64,7 +109,7 @@ const MediaFile = ({ mediaFile }) => {
             onError={(e) => {
               console.error('❌ MediaFile - ошибка загрузки видео:', e);
               setVideoLoading(false);
-              setError('Ошибка загрузки видео');
+              setVideoError(true);
             }}
           >
             Ваш браузер не поддерживает видео.
