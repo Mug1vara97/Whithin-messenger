@@ -73,17 +73,20 @@ public class VideoConverterService : IVideoConverterService
             _logger.LogInformation("Starting video conversion: {InputFile} -> {OutputFile}", inputFilePath, outputFilePath);
 
             // Конвертируем в H.264 (AVC) с совместимыми настройками для браузеров
-            await FFMpegArguments
+            var conversionTask = FFMpegArguments
                 .FromFileInput(inputFilePath)
                 .OutputToFile(outputFilePath, overwrite: true, options => options
                     .WithVideoCodec(VideoCodec.LibX264)
                     .WithConstantRateFactor(23) // Качество: 18-28 (меньше = лучше качество, больше размер)
-                    .WithPreset(FFMpegCore.Enums.Speed.VeryFast) // Быстрая конвертация
+                    .WithSpeedPreset(Speed.VeryFast) // Быстрая конвертация
                     .WithAudioCodec(AudioCodec.Aac)
                     .WithVariableBitrate(4)
                     .ForceFormat("mp4")
                 )
-                .ProcessAsynchronously(true, cancellationToken);
+                .ProcessAsynchronously(true);
+
+            // Ожидаем завершения с поддержкой отмены
+            await conversionTask.WaitAsync(cancellationToken);
 
             if (!File.Exists(outputFilePath))
             {
