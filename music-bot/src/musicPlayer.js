@@ -40,6 +40,23 @@ class MusicPlayer {
       
       await this.room.localParticipant.publishTrack(this.audioTrack, options);
       
+      // Send a few silent frames immediately to ensure track is unmuted
+      // This helps the track be recognized as active/unmuted
+      const silentSamples = new Int16Array(this.chunkSize / this.bytesPerSample);
+      const silentFrame = new AudioFrame(
+        silentSamples,
+        this.sampleRate,
+        this.channels,
+        silentSamples.length / this.channels
+      );
+      for (let i = 0; i < 3; i++) {
+        try {
+          await this.audioSource.captureFrame(silentFrame);
+        } catch (error) {
+          // Ignore errors for initial silent frames
+        }
+      }
+      
       console.log('[MusicPlayer] Audio track published and ready');
     } catch (error) {
       console.error('[MusicPlayer] Error starting music player:', error);
@@ -212,15 +229,8 @@ class MusicPlayer {
     // Clear buffer
     this.audioBuffer = Buffer.alloc(0);
     
-    if (this.audioTrack) {
-      try {
-        // Mute the track instead of unpublishing to keep connection
-        this.audioTrack.setMuted(true);
-      } catch (error) {
-        console.error('[MusicPlayer] Error muting track:', error);
-      }
-    }
-    
+    // Stop sending audio frames (effectively mutes the track)
+    // The track remains published but no audio data is sent
     this.isPlaying = false;
     this.isPaused = false;
     this.currentSource = null;
@@ -243,14 +253,8 @@ class MusicPlayer {
       }
     }
     
-    if (this.audioTrack) {
-      try {
-        this.audioTrack.setMuted(true);
-      } catch (error) {
-        console.error('[MusicPlayer] Error muting track:', error);
-      }
-    }
-    
+    // Pause sending audio frames (effectively mutes the track)
+    // The isPaused flag is already checked in the data handler (line 124)
     this.isPaused = true;
     console.log('[MusicPlayer] Music paused');
   }
@@ -271,14 +275,7 @@ class MusicPlayer {
       }
     }
     
-    if (this.audioTrack) {
-      try {
-        this.audioTrack.setMuted(false);
-      } catch (error) {
-        console.error('[MusicPlayer] Error unmuting track:', error);
-      }
-    }
-    
+    // Resume sending audio frames (effectively unmutes the track)
     this.isPaused = false;
     console.log('[MusicPlayer] Music resumed');
   }
