@@ -15,8 +15,10 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { MusicBotControls } from '../../../shared/ui/molecules';
 import './VoiceCallView.css';
 
 // Определяет, является ли banner путём к изображению или цветом
@@ -94,6 +96,7 @@ const VoiceCallView = ({
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [showMusicBotPanel, setShowMusicBotPanel] = useState(false);
 
   // Логирование состояния демонстрации экрана
   // console.log('VoiceCallView screen share state:', { 
@@ -370,6 +373,14 @@ const VoiceCallView = ({
                       <button 
                         className="toolbar-button" 
                         type="button" 
+                        aria-label="Показать музыкального бота"
+                        onClick={() => setShowMusicBotPanel(!showMusicBotPanel)}
+                      >
+                        <MusicNoteIcon sx={{ fontSize: 24 }} />
+                      </button>
+                      <button 
+                        className="toolbar-button" 
+                        type="button" 
                         aria-label="Показать чат"
                         onClick={() => setShowChatPanel(!showChatPanel)}
                       >
@@ -379,6 +390,13 @@ const VoiceCallView = ({
                   </div>
                 </div>
               </div>
+
+              {/* Music Bot Controls */}
+              {showMusicBotPanel && (
+                <div className="music-bot-container">
+                  <MusicBotControls roomId={channelId} />
+                </div>
+              )}
 
               {/* Bottom Controls */}
               <div className="bottom-controls">

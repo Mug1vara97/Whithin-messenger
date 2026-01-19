@@ -382,6 +382,26 @@
   color: var(--text);
   display: block;
   margin-bottom: 4px;
+}
+
+.bot-message {
+  background-color: rgba(88, 101, 242, 0.1);
+  border-left: 3px solid rgba(88, 101, 242, 0.5);
+}
+
+.bot-message.bot-error {
+  background-color: rgba(237, 66, 69, 0.1);
+  border-left-color: rgba(237, 66, 69, 0.5);
+}
+
+.bot-message.bot-command {
+  background-color: rgba(88, 101, 242, 0.05);
+  border-left-color: rgba(88, 101, 242, 0.3);
+}
+
+.bot-message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
   font-size: 14px;
   font-weight: 600;
 }

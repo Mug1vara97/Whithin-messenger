@@ -18,6 +18,7 @@ import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
 import { Call, Mic, Stop, AttachFile } from '@mui/icons-material';
+import { musicBotApi } from '../../../entities/music-bot';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -98,8 +99,32 @@ const ChatRoom = ({
   const [chatParticipants, setChatParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
+  const [botMessages, setBotMessages] = useState([]);
 
   const inputRef = useRef(null);
+
+  // Подписка на сообщения от бота
+  useEffect(() => {
+    if (!chatId) return;
+
+    const unsubscribe = musicBotApi.onBotMessage((data) => {
+      // Сравниваем roomId с chatId (оба могут быть строками или числами)
+      const dataRoomId = String(data.roomId || '');
+      const currentChatId = String(chatId || '');
+      if (dataRoomId === currentChatId) {
+        // Добавляем сообщение от бота в список
+        setBotMessages(prev => [...prev, {
+          id: Date.now(),
+          message: data.message,
+          timestamp: new Date().toISOString()
+        }]);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [chatId]);
 
   const loadChatInfo = useCallback(() => {
     if (!chatId || !connection) return;
@@ -280,6 +305,39 @@ const ChatRoom = ({
   const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+
+    // Проверяем, является ли сообщение командой бота
+    const trimmedMessage = newMessage.trim();
+    if (trimmedMessage.startsWith('!')) {
+      // Это команда бота
+      const commandParts = trimmedMessage.substring(1).split(/\s+/);
+      const command = commandParts[0];
+      const args = commandParts.slice(1);
+
+      // Отправляем команду боту
+      // Для команд бота используем chatId как roomId
+      try {
+        musicBotApi.sendCommand(String(chatId), command, args);
+        // Добавляем визуальное подтверждение в чат
+        setBotMessages(prev => [...prev, {
+          id: Date.now(),
+          message: `Команда отправлена: !${command} ${args.join(' ')}`,
+          timestamp: new Date().toISOString(),
+          isCommand: true
+        }]);
+      } catch (error) {
+        console.error('Error sending bot command:', error);
+        setBotMessages(prev => [...prev, {
+          id: Date.now(),
+          message: `Ошибка отправки команды: ${error.message}`,
+          timestamp: new Date().toISOString(),
+          isError: true
+        }]);
+      }
+
+      setNewMessage('');
+      return;
+    }
 
     let success = false;
 
@@ -860,6 +918,21 @@ const ChatRoom = ({
             </div>
           </div>
         )}
+
+        {/* Сообщения от бота */}
+        {botMessages.map((botMsg) => (
+          <div
+            key={botMsg.id}
+            className={`message bot-message ${botMsg.isError ? 'bot-error' : ''} ${botMsg.isCommand ? 'bot-command' : ''}`}
+          >
+            <div className="message-content">
+              <strong className="message-username">Music Bot</strong>
+              <div className="message-text bot-message-text">
+                {botMsg.message}
+              </div>
+            </div>
+          </div>
+        ))}
         
         <div ref={messagesEndRef} />
       </div>
