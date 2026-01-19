@@ -321,16 +321,6 @@ export const useCallStore = create(
               hasMediaStreamTrack: !!track?.mediaStreamTrack
             });
             
-            // Only handle audio tracks for voice calls
-            if (track.kind !== 'audio') {
-              return;
-            }
-            
-            // Skip screen share audio (handled separately)
-            if (mediaType === 'screen') {
-              return;
-            }
-            
             // Check if track has mediaStreamTrack
             if (!track.mediaStreamTrack) {
               console.error('callStore: Track has no mediaStreamTrack!', track);
@@ -339,6 +329,81 @@ export const useCallStore = create(
             
             const state = get();
             const targetUserId = userId || participant.identity;
+            
+            // Handle VIDEO tracks (screen share and camera)
+            if (track.kind === 'video') {
+              console.log('🎥 callStore: Video track subscribed:', { mediaType, targetUserId });
+              
+              // Skip own video tracks
+              if (targetUserId === state.currentUserId) {
+                console.log('🎥 callStore: Skipping own video track');
+                return;
+              }
+              
+              const videoStream = new MediaStream([track.mediaStreamTrack]);
+              
+              if (mediaType === 'screen') {
+                // Screen share video
+                console.log('🖥️ callStore: Remote screen share detected for user:', targetUserId);
+                
+                const newRemoteScreenShares = new Map(state.remoteScreenShares);
+                newRemoteScreenShares.set(track.sid, {
+                  stream: videoStream,
+                  producerId: track.sid,
+                  userId: targetUserId,
+                  userName: participant.name || targetUserId,
+                  socketId: participant.identity
+                });
+                
+                set({ remoteScreenShares: newRemoteScreenShares });
+                console.log('🖥️ callStore: Remote screen share added, total:', newRemoteScreenShares.size);
+              } else if (mediaType === 'camera') {
+                // Camera video
+                console.log('📹 callStore: Remote camera video detected for user:', targetUserId);
+                
+                // Update participant video states
+                set((state) => {
+                  const newVideoStates = new Map(state.participantVideoStates);
+                  newVideoStates.set(targetUserId, true);
+                  return { participantVideoStates: newVideoStates };
+                });
+                
+                // Update participant with video stream
+                set((state) => ({
+                  participants: state.participants.map(p => 
+                    p.userId === targetUserId 
+                      ? { ...p, isVideoEnabled: true, videoStream: videoStream }
+                      : p
+                  )
+                }));
+                
+                console.log('📹 callStore: Participant video updated for:', targetUserId);
+              }
+              
+              return; // Exit after handling video
+            }
+            
+            // Handle AUDIO tracks
+            // Skip screen share audio (handled separately if needed)
+            if (mediaType === 'screen') {
+              console.log('🔊 callStore: Screen share audio track, creating audio element');
+              // Create audio element for screen share audio
+              const audioElement = document.createElement('audio');
+              audioElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+              audioElement.autoplay = true;
+              audioElement.volume = 1.0;
+              audioElement.playsInline = true;
+              audioElement.style.display = 'none';
+              document.body.appendChild(audioElement);
+              
+              try {
+                await audioElement.play();
+                console.log('🔊 callStore: Screen share audio playback started');
+              } catch (error) {
+                console.warn('🔊 callStore: Screen share audio autoplay blocked:', error);
+              }
+              return;
+            }
             
             // Check if we already have an audio element for this user
             if (state.audioElements.has(targetUserId)) {
