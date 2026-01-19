@@ -18,7 +18,21 @@ app.listen(PORT, () => {
 
 // Initialize bot
 const bot = new MusicBot();
-bot.initialize();
+bot.initialize().catch((error) => {
+  console.error('[MusicBot] Fatal error during initialization:', error);
+  // Don't exit - let the bot try to reconnect
+});
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('[MusicBot] Uncaught Exception:', error);
+  // Don't exit - log and continue
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[MusicBot] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit - log and continue
+});
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

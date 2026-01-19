@@ -94,35 +94,48 @@ class MusicPlayer {
       let audioStream;
       
       try {
-        // Check if play-dl token needs refresh
-        if (play.is_expired()) {
-          console.log('[MusicPlayer] Refreshing play-dl token...');
-          await play.refreshToken();
+        // Try play-dl first (works for YouTube, Spotify, SoundCloud, etc.)
+        // play-dl doesn't require explicit initialization in newer versions
+        console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
+        
+        // Try to get stream directly
+        let streamInfo;
+        try {
+          streamInfo = await play.stream(url);
+        } catch (streamError) {
+          // If direct stream fails, try alternative URL format for YouTube
+          console.log('[MusicPlayer] Direct stream failed, trying alternative URL format...');
+          const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
+          if (youtubeIdMatch) {
+            const videoId = youtubeIdMatch[1];
+            const directUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            console.log(`[MusicPlayer] Trying alternative YouTube URL format: ${directUrl}`);
+            try {
+              streamInfo = await play.stream(directUrl);
+            } catch (altError) {
+              // If alternative URL also fails, try with video_info
+              console.log('[MusicPlayer] Alternative URL failed, trying video_info approach...');
+              try {
+                const { video_basic_info } = require('play-dl');
+                const videoInfo = await video_basic_info(directUrl);
+                streamInfo = await play.stream_from_info(videoInfo);
+              } catch (infoError) {
+                throw streamError; // Use original error
+              }
+            }
+          } else {
+            throw streamError; // Not a YouTube URL
+          }
         }
         
-        // Try play-dl first (works for YouTube, Spotify, SoundCloud, etc.)
-        console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
-        const streamInfo = await play.stream(url);
+        if (!streamInfo || !streamInfo.stream) {
+          throw new Error('play-dl returned invalid stream info');
+        }
         audioStream = streamInfo.stream;
         console.log(`[MusicPlayer] Successfully got stream via play-dl`);
       } catch (playError) {
         console.error('[MusicPlayer] Error with play-dl:', playError);
-        
-        // Fallback to ytdl-core only for YouTube URLs if play-dl fails
-        if (ytdl.validateURL(url)) {
-          try {
-            console.log(`[MusicPlayer] Falling back to ytdl-core for YouTube URL`);
-            audioStream = ytdl(url, {
-              filter: 'audioonly',
-              quality: 'highestaudio',
-            });
-          } catch (ytdlError) {
-            console.error('[MusicPlayer] Error with ytdl-core:', ytdlError);
-            throw new Error(`Failed to get audio stream: ${playError.message || playError}`);
-          }
-        } else {
-          throw new Error(`Unsupported URL format or failed to get stream: ${playError.message || playError}`);
-        }
+        throw new Error(`Failed to get audio stream: ${playError.message || playError}. Please try a different URL or check if the URL is valid.`);
       }
       
       // Create ffmpeg process to convert audio to raw PCM format
@@ -145,8 +158,39 @@ class MusicPlayer {
         }
       });
       
-      // Pipe audio stream to ffmpeg
-      audioStream.pipe(this.ffmpegProcess.stdin);
+      // Pipe audio stream to ffmpeg with error handling
+      try {
+        audioStream.pipe(this.ffmpegProcess.stdin);
+        
+        // Handle pipe errors
+        audioStream.on('error', (pipeError) => {
+          console.error('[MusicPlayer] Error in audio stream pipe:', pipeError);
+          if (this.ffmpegProcess) {
+            try {
+              this.ffmpegProcess.kill();
+            } catch (killError) {
+              // Ignore
+            }
+            this.ffmpegProcess = null;
+          }
+        });
+        
+        this.ffmpegProcess.stdin.on('error', (stdinError) => {
+          console.error('[MusicPlayer] Error in ffmpeg stdin:', stdinError);
+          // Ignore - usually means ffmpeg closed
+        });
+      } catch (pipeError) {
+        console.error('[MusicPlayer] Error setting up pipe:', pipeError);
+        if (this.ffmpegProcess) {
+          try {
+            this.ffmpegProcess.kill();
+          } catch (killError) {
+            // Ignore
+          }
+          this.ffmpegProcess = null;
+        }
+        throw pipeError;
+      }
       
       // Reset buffer
       this.audioBuffer = Buffer.alloc(0);
@@ -238,11 +282,16 @@ class MusicPlayer {
       // This prevents the bot from crashing
       if (this.queue.length > 0) {
         console.log('[MusicPlayer] Attempting to play next track after error');
-        setTimeout(() => this.playNext(), 1000);
+        setTimeout(() => {
+          this.playNext().catch(err => {
+            console.error('[MusicPlayer] Error in playNext after play error:', err);
+          });
+        }, 1000);
       } else {
         // Send error message if no queue
         console.error('[MusicPlayer] Failed to play and queue is empty');
       }
+      // Don't rethrow - we've handled the error
     }
   }
 
