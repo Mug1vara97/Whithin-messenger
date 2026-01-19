@@ -140,6 +140,35 @@ const VideoCallGrid = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Определяет, является ли banner путём к изображению или цветом
+  const isBannerImage = (banner) => {
+    if (!banner) return false;
+    
+    // Если начинается с #, это цвет
+    if (banner.startsWith('#')) return false;
+    
+    // Если содержит расширения изображений, это путь к файлу
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+    const lowerBanner = banner.toLowerCase();
+    if (imageExtensions.some(ext => lowerBanner.includes(ext))) return true;
+    
+    // Если начинается с http://, https://, /uploads/, /api/, это путь
+    if (banner.startsWith('http://') || 
+        banner.startsWith('https://') || 
+        banner.startsWith('/uploads/') || 
+        banner.startsWith('/api/') ||
+        banner.startsWith('uploads/')) {
+      return true;
+    }
+    
+    // Если это валидный hex-цвет (например, #5865f2), это цвет
+    const hexColorPattern = /^#[0-9A-Fa-f]{6}$/;
+    if (hexColorPattern.test(banner)) return false;
+    
+    // По умолчанию считаем цветом, если не похоже на путь
+    return false;
+  };
+
   // Создаем расширенный список участников, включая демонстрации экрана
   const extendedParticipants = useMemo(() => {
     const screenShareParticipants = [];
@@ -331,16 +360,25 @@ const VideoCallGrid = ({
                 participantId={participant.id}
                 isLocal={participant.isCurrentUser || false}
               />
-            ) : participant.banner ? (
-              // Если есть баннер, показываем его как фон
-              <div style={{ 
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                backgroundImage: `url(${participant.banner})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              }}>
+            ) : participant.banner || participant.avatarColor ? (
+              // Если есть баннер или цвет аватара, показываем фон
+              (() => {
+                const bannerIsImage = isBannerImage(participant.banner);
+                const bannerColor = participant.banner && !bannerIsImage ? participant.banner : null;
+                const backgroundColor = bannerColor || participant.avatarColor || getAvatarColor(participant.name);
+                
+                return (
+                  <div style={{ 
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                    backgroundColor: backgroundColor,
+                    ...(bannerIsImage && participant.banner ? {
+                      backgroundImage: `url(${participant.banner})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    } : {})
+                  }}>
                 {participant.avatar ? (
                   <img 
                     src={participant.avatar} 
@@ -348,9 +386,9 @@ const VideoCallGrid = ({
                     className="tile-avatar-bg"
                     style={{
                       position: 'absolute',
-                      bottom: '10px',
+                      top: '50%',
                       left: '50%',
-                      transform: 'translateX(-50%)',
+                      transform: 'translate(-50%, -50%)',
                       width: isSmall ? '60px' : '100px',
                       height: isSmall ? '60px' : '100px',
                       borderRadius: '50%',
@@ -363,9 +401,9 @@ const VideoCallGrid = ({
                     className="avatar-placeholder"
                     style={{ 
                       position: 'absolute',
-                      bottom: '10px',
+                      top: '50%',
                       left: '50%',
-                      transform: 'translateX(-50%)',
+                      transform: 'translate(-50%, -50%)',
                       width: isSmall ? '60px' : '100px',
                       height: isSmall ? '60px' : '100px',
                       borderRadius: '50%',
@@ -382,9 +420,29 @@ const VideoCallGrid = ({
                     {getInitials(participant.name)}
                   </div>
                 )}
-              </div>
+                  </div>
+                );
+              })()
             ) : participant.avatar ? (
-              <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <img 
+                  src={participant.avatar} 
+                  alt={participant.name} 
+                  className="tile-avatar-bg"
+                  style={{
+                    width: isSmall ? '80px' : '120px',
+                    height: isSmall ? '80px' : '120px',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
             ) : (
               <div 
                 className="avatar-placeholder"

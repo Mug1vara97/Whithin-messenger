@@ -7,6 +7,35 @@ import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 
+// Определяет, является ли banner путём к изображению или цветом
+const isBannerImage = (banner) => {
+  if (!banner) return false;
+  
+  // Если начинается с #, это цвет
+  if (banner.startsWith('#')) return false;
+  
+  // Если содержит расширения изображений, это путь к файлу
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+  const lowerBanner = banner.toLowerCase();
+  if (imageExtensions.some(ext => lowerBanner.includes(ext))) return true;
+  
+  // Если начинается с http://, https://, /uploads/, /api/, это путь
+  if (banner.startsWith('http://') || 
+      banner.startsWith('https://') || 
+      banner.startsWith('/uploads/') || 
+      banner.startsWith('/api/') ||
+      banner.startsWith('uploads/')) {
+    return true;
+  }
+  
+  // Если это валидный hex-цвет (например, #5865f2), это цвет
+  const hexColorPattern = /^#[0-9A-Fa-f]{6}$/;
+  if (hexColorPattern.test(banner)) return false;
+  
+  // По умолчанию считаем цветом, если не похоже на путь
+  return false;
+};
+
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
   { urls: ['stun:185.119.59.23:3478'] },
@@ -174,10 +203,16 @@ export const useCallStore = create(
             try {
               const profile = await userApi.getProfile(peerData.userId);
               if (profile) {
+                // Определяем, является ли banner изображением или цветом
+                const bannerIsImage = isBannerImage(profile.banner);
+                const bannerValue = profile.banner 
+                  ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
+                  : null;
+                
                 profileData = {
                   avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
                   avatarColor: profile.avatarColor || '#5865f2',
-                  banner: profile.banner ? `${MEDIA_BASE_URL}${profile.banner}` : null
+                  banner: bannerValue
                 };
                 console.log('📸 Loaded profile for participant:', peerData.userId, profileData);
               }
@@ -868,10 +903,16 @@ export const useCallStore = create(
               try {
                 const profile = await userApi.getProfile(peer.userId);
                 if (profile) {
+                  // Определяем, является ли banner изображением или цветом
+                  const bannerIsImage = isBannerImage(profile.banner);
+                  const bannerValue = profile.banner 
+                    ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
+                    : null;
+                  
                   const profileData = {
                     avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
                     avatarColor: profile.avatarColor || '#5865f2',
-                    banner: profile.banner ? `${MEDIA_BASE_URL}${profile.banner}` : null
+                    banner: bannerValue
                   };
                   
                   // Обновляем участника с данными профиля
