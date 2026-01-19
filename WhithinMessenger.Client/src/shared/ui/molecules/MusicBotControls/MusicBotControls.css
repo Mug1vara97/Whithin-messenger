@@ -7,6 +7,8 @@
   padding: 8px;
   margin: 8px 0;
   transition: all 0.3s ease;
+  z-index: 100;
+  pointer-events: auto;
 }
 
 .music-bot-controls.expanded {
@@ -25,6 +27,10 @@
   color: white;
   cursor: pointer;
   transition: background 0.2s;
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .music-bot-add-button:hover:not(:disabled) {

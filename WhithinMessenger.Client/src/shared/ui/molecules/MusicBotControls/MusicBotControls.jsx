@@ -85,12 +85,19 @@ const MusicBotControls = ({ roomId, className = '' }) => {
 
   if (!isBotInRoom && !showPanel) {
     return (
-      <div className={`music-bot-controls ${className}`}>
+      <div className={`music-bot-controls ${className}`} style={{ pointerEvents: 'auto', zIndex: 1000 }}>
         <button
           className="music-bot-add-button"
-          onClick={handleAddBot}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[MusicBotControls] Add bot button clicked');
+            handleAddBot();
+          }}
           disabled={isLoading}
           title="Добавить музыкального бота"
+          type="button"
+          style={{ pointerEvents: 'auto', zIndex: 1001 }}
         >
           {isLoading ? (
             <CircularProgress size={20} color="inherit" />
