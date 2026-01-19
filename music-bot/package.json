@@ -7,15 +7,20 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"
   },
-  "keywords": ["music", "bot", "livekit", "discord"],
+  "keywords": [
+    "music",
+    "bot",
+    "livekit",
+    "discord"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@livekit/rtc-node": "^0.13.18",
-    "@livekit/server-sdk": "^2.5.0",
     "dotenv": "^16.4.0",
     "express": "^4.18.2",
     "fluent-ffmpeg": "^2.1.2",
+    "livekit-server-sdk": "^2.15.0",
     "play-dl": "^1.9.6",
     "socket.io-client": "^4.7.4",
     "ytdl-core": "^4.11.5"
