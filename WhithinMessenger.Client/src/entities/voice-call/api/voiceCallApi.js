@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-import { Room, RoomEvent, Track, TrackPublication } from 'livekit-client';
+import { Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -43,6 +43,16 @@ const getRoomOptions = () => {
       autoGainControl: true,
       sampleRate: 48000,
       channelCount: 1
+    },
+    videoCaptureDefaults: {
+      resolution: VideoPresets.h720.resolution,
+      frameRate: 30
+    },
+    publishDefaults: {
+      videoCodec: 'vp9',
+      videoEncoding: VideoPresets.h720.encoding,
+      simulcast: true,
+      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h180]
     }
   };
 };
@@ -400,7 +410,26 @@ class VoiceCallApi {
       throw new Error('Not connected to room');
     }
     
-    await this.room.localParticipant.setCameraEnabled(enabled);
+    if (enabled) {
+      // Включаем камеру с настройками качества
+      // VideoCaptureOptions: разрешение и частота кадров для захвата
+      // TrackPublishOptions: кодек, битрейт, simulcast для публикации
+      await this.room.localParticipant.setCameraEnabled(
+        true,
+        {
+          resolution: VideoPresets.h720.resolution,
+          frameRate: 30
+        },
+        {
+          videoCodec: 'vp9',
+          videoEncoding: VideoPresets.h720.encoding,
+          simulcast: true,
+          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h180]
+        }
+      );
+    } else {
+      await this.room.localParticipant.setCameraEnabled(false);
+    }
   }
 
   // Enable/disable screen share
@@ -409,7 +438,24 @@ class VoiceCallApi {
       throw new Error('Not connected to room');
     }
     
-    await this.room.localParticipant.setScreenShareEnabled(enabled);
+    if (enabled) {
+      // Включаем демонстрацию экрана с настройками качества
+      await this.room.localParticipant.setScreenShareEnabled(
+        true,
+        {
+          resolution: VideoPresets.h1080.resolution,
+          frameRate: 30
+        },
+        {
+          videoCodec: 'vp9',
+          videoEncoding: VideoPresets.h1080.encoding,
+          simulcast: true,
+          videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
+        }
+      );
+    } else {
+      await this.room.localParticipant.setScreenShareEnabled(false);
+    }
   }
 
   // Get room instance

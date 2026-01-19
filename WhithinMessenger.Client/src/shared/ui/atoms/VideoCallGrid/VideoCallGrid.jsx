@@ -9,12 +9,12 @@ import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
 // Компонент для управления video элементом
-const VideoElement = React.memo(({ stream, participantId }) => {
+const VideoElement = React.memo(({ stream, participantId, isLocal = false }) => {
   const videoRef = useRef(null);
   
   useEffect(() => {
     if (videoRef.current && stream) {
-      console.log('🎥 VideoElement: Setting stream for participant:', participantId);
+      console.log('🎥 VideoElement: Setting stream for participant:', participantId, 'isLocal:', isLocal);
       videoRef.current.srcObject = stream;
       videoRef.current.play().catch(error => {
         if (error.name !== 'AbortError') {
@@ -22,12 +22,12 @@ const VideoElement = React.memo(({ stream, participantId }) => {
         }
       });
     }
-  }, [stream, participantId]);
+  }, [stream, participantId, isLocal]);
   
   return (
     <video
       ref={videoRef}
-      className="tile-video tile-video-mirrored"
+      className={`tile-video ${isLocal ? 'tile-video-mirrored' : ''}`}
       autoPlay
       muted
       playsInline
@@ -292,6 +292,7 @@ const VideoCallGrid = ({
               <VideoElement 
                 stream={participant.videoStream}
                 participantId={participant.id}
+                isLocal={participant.isCurrentUser || false}
               />
             ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
