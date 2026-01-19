@@ -1,5 +1,5 @@
 const { Room, RoomEvent } = require('@livekit/rtc-node');
-const { AccessToken } = require('@livekit/server-sdk');
+const { AccessToken } = require('livekit-server-sdk');
 const { io } = require('socket.io-client');
 const { MusicPlayer } = require('./musicPlayer');
 const { CommandHandler } = require('./commandHandler');
@@ -62,7 +62,13 @@ class MusicBot {
       // Listen for room join requests
       this.socket.on('botJoinRoom', async (data) => {
         const { roomId, channelId } = data;
-        await this.joinRoom(roomId || channelId);
+        const targetRoomId = roomId || channelId;
+        console.log(`[MusicBot] Received botJoinRoom event:`, { roomId, channelId, targetRoomId, fullData: data });
+        if (!targetRoomId) {
+          console.error('[MusicBot] No roomId or channelId provided in botJoinRoom event');
+          return;
+        }
+        await this.joinRoom(targetRoomId);
       });
 
       // Listen for room leave requests
@@ -74,6 +80,11 @@ class MusicBot {
       // Listen for commands
       this.socket.on('botCommand', async (data) => {
         const { roomId, command, args, userId } = data;
+        console.log(`[MusicBot] Received botCommand event:`, { roomId, command, args, userId, fullData: data });
+        if (!roomId) {
+          console.error('[MusicBot] No roomId provided in botCommand event');
+          return;
+        }
         await this.handleCommand(roomId, command, args, userId);
       });
     });
@@ -194,9 +205,21 @@ class MusicBot {
   }
 
   async handleCommand(roomId, command, args, userId) {
+    console.log(`[MusicBot] handleCommand called:`, { roomId, command, args, userId });
+    console.log(`[MusicBot] Current rooms:`, Array.from(this.rooms.keys()));
+    
     const roomData = this.rooms.get(roomId);
     if (!roomData) {
-      console.log(`[MusicBot] Bot not in room: ${roomId}`);
+      console.log(`[MusicBot] Bot not in room: ${roomId}. Available rooms:`, Array.from(this.rooms.keys()));
+      // Try to find room by string comparison
+      const roomIdStr = String(roomId);
+      for (const [key, value] of this.rooms.entries()) {
+        if (String(key) === roomIdStr) {
+          console.log(`[MusicBot] Found room by string comparison: ${key}`);
+          await value.handler.handleCommand(command, args, userId);
+          return;
+        }
+      }
       return;
     }
 
