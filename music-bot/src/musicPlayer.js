@@ -96,7 +96,6 @@ class MusicPlayer {
       
       try {
         // Try play-dl first (works for YouTube, Spotify, SoundCloud, etc.)
-        // play-dl doesn't require explicit initialization in newer versions
         console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
         
         // Normalize YouTube URL - remove playlist parameter and use standard format
@@ -108,14 +107,32 @@ class MusicPlayer {
           console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
         }
         
-        // Try to get stream directly
+        // For YouTube, use video_basic_info + stream_from_info (more reliable)
         let streamInfo;
-        try {
+        const isYouTube = /youtube\.com|youtu\.be/.test(normalizedUrl);
+        
+        if (isYouTube) {
+          try {
+            console.log('[MusicPlayer] Using video_basic_info approach for YouTube...');
+            const videoInfo = await video_basic_info(normalizedUrl);
+            if (!videoInfo || !videoInfo.video_details) {
+              throw new Error('Failed to get video info');
+            }
+            console.log(`[MusicPlayer] Got video info: ${videoInfo.video_details.title}`);
+            streamInfo = await stream_from_info(videoInfo, { quality: 2 }); // quality: 2 = high quality audio
+            console.log('[MusicPlayer] Successfully got stream via stream_from_info');
+          } catch (infoError) {
+            console.error('[MusicPlayer] video_basic_info approach failed:', infoError.message);
+            // Fallback to direct stream
+            console.log('[MusicPlayer] Falling back to direct play.stream...');
+            streamInfo = await play.stream(normalizedUrl, { 
+              quality: 2,
+              discordPlayerCompatibility: true 
+            });
+          }
+        } else {
+          // For other platforms (Spotify, SoundCloud, etc.), use direct stream
           streamInfo = await play.stream(normalizedUrl);
-        } catch (streamError) {
-          console.error('[MusicPlayer] play.stream failed:', streamError.message);
-          // Try with search if it's not a URL (for future search support)
-          throw streamError;
         }
         
         if (!streamInfo || !streamInfo.stream) {
