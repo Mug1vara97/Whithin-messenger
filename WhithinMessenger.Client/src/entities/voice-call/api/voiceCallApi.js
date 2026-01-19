@@ -269,12 +269,24 @@ class VoiceCallApi {
         participantIdentity: participant.identity
       });
       
-      // Emit mute state change
+      // Emit mute state change for audio
       if (publication.kind === Track.Kind.Audio) {
         this.emit('peerMuteStateChanged', {
           peerId: participant.identity,
           isMuted: false,
           userId: participant.identity
+        });
+      }
+      
+      // Emit video state change for video
+      if (publication.kind === Track.Kind.Video) {
+        console.log('🎥 Video track unmuted for participant:', participant.identity);
+        this.emit('peerVideoStateChanged', {
+          peerId: participant.identity,
+          isVideoEnabled: true,
+          userId: participant.identity,
+          track: publication.track,
+          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 'camera'
         });
       }
     });
@@ -287,12 +299,24 @@ class VoiceCallApi {
         participantIdentity: participant.identity
       });
       
-      // Emit mute state change
+      // Emit mute state change for audio
       if (publication.kind === Track.Kind.Audio) {
         this.emit('peerMuteStateChanged', {
           peerId: participant.identity,
           isMuted: true,
           userId: participant.identity
+        });
+      }
+      
+      // Emit video state change for video
+      if (publication.kind === Track.Kind.Video) {
+        console.log('🎥 Video track muted for participant:', participant.identity);
+        this.emit('peerVideoStateChanged', {
+          peerId: participant.identity,
+          isVideoEnabled: false,
+          userId: participant.identity,
+          track: null,
+          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 'camera'
         });
       }
     });

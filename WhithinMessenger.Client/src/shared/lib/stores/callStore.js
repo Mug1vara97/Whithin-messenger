@@ -498,6 +498,68 @@ export const useCallStore = create(
             }
           });
 
+          // Handle video state changes (camera muted/unmuted)
+          voiceCallApi.on('peerVideoStateChanged', ({ peerId, isVideoEnabled, userId, track, mediaType }) => {
+            console.log('🎥 callStore: peerVideoStateChanged received:', { peerId, isVideoEnabled, userId, mediaType });
+            
+            const state = get();
+            const targetUserId = userId || peerId;
+            
+            // Skip own video state changes
+            if (targetUserId === state.currentUserId) {
+              console.log('🎥 callStore: Skipping own video state change');
+              return;
+            }
+            
+            if (mediaType === 'camera') {
+              // Update participant video states
+              set((state) => {
+                const newVideoStates = new Map(state.participantVideoStates);
+                newVideoStates.set(targetUserId, isVideoEnabled);
+                return { participantVideoStates: newVideoStates };
+              });
+              
+              if (isVideoEnabled && track && track.mediaStreamTrack) {
+                // Video enabled - update with new stream
+                const videoStream = new MediaStream([track.mediaStreamTrack]);
+                set((state) => ({
+                  participants: state.participants.map(p => 
+                    p.userId === targetUserId 
+                      ? { ...p, isVideoEnabled: true, videoStream: videoStream }
+                      : p
+                  )
+                }));
+                console.log('📹 callStore: Participant video enabled for:', targetUserId);
+              } else {
+                // Video disabled - clear stream
+                set((state) => ({
+                  participants: state.participants.map(p => 
+                    p.userId === targetUserId 
+                      ? { ...p, isVideoEnabled: false, videoStream: null }
+                      : p
+                  )
+                }));
+                console.log('📹 callStore: Participant video disabled for:', targetUserId);
+              }
+            } else if (mediaType === 'screen') {
+              // Handle screen share mute/unmute
+              if (!isVideoEnabled) {
+                // Screen share stopped - remove from remoteScreenShares
+                console.log('🖥️ callStore: Screen share stopped for user:', targetUserId);
+                set((state) => {
+                  const newRemoteScreenShares = new Map(state.remoteScreenShares);
+                  // Remove all screen shares from this user
+                  for (const [key, value] of newRemoteScreenShares.entries()) {
+                    if (value.userId === targetUserId) {
+                      newRemoteScreenShares.delete(key);
+                    }
+                  }
+                  return { remoteScreenShares: newRemoteScreenShares };
+                });
+              }
+            }
+          });
+
           voiceCallApi.on('newProducer', async (producerData) => {
             const state = get();
             // For LiveKit, newProducer is handled by trackSubscribed
