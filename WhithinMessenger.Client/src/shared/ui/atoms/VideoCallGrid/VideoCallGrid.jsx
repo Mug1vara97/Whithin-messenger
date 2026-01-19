@@ -13,16 +13,35 @@ const VideoElement = React.memo(({ stream, participantId, isLocal = false }) => 
   const videoRef = useRef(null);
   
   useEffect(() => {
-    if (videoRef.current && stream) {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    if (stream) {
       console.log('🎥 VideoElement: Setting stream for participant:', participantId, 'isLocal:', isLocal);
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(error => {
+      videoElement.srcObject = stream;
+      videoElement.play().catch(error => {
         if (error.name !== 'AbortError') {
           console.warn('Camera video play error:', error);
         }
       });
+    } else {
+      // Очищаем srcObject когда stream null
+      console.log('🎥 VideoElement: Clearing stream for participant:', participantId);
+      videoElement.srcObject = null;
     }
+    
+    // Cleanup при размонтировании или изменении stream
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
+    };
   }, [stream, participantId, isLocal]);
+  
+  // Не рендерим видео если нет потока или он неактивен
+  if (!stream || !stream.active) {
+    return null;
+  }
   
   return (
     <video
@@ -40,16 +59,34 @@ const ScreenShareElement = React.memo(({ stream, participantId }) => {
   const videoRef = useRef(null);
   
   useEffect(() => {
-    if (videoRef.current && stream) {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    
+    if (stream && stream.active) {
       console.log('🖥️ ScreenShareElement: Setting stream for participant:', participantId);
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(error => {
+      videoElement.srcObject = stream;
+      videoElement.play().catch(error => {
         if (error.name !== 'AbortError') {
           console.warn('Screen share video play error:', error);
         }
       });
+    } else {
+      console.log('🖥️ ScreenShareElement: Clearing stream for participant:', participantId);
+      videoElement.srcObject = null;
     }
+    
+    // Cleanup при размонтировании
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
+    };
   }, [stream, participantId]);
+  
+  // Не рендерим если нет активного потока
+  if (!stream || !stream.active) {
+    return null;
+  }
   
   return (
     <video
@@ -283,12 +320,12 @@ const VideoCallGrid = ({
         <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
           {/* Background with avatar, video, or screen share */}
           <div className="tile-background">
-            {isScreenShare ? (
+            {isScreenShare && participant.stream && participant.stream.active ? (
               <ScreenShareElement 
                 stream={participant.stream} 
                 participantId={participant.id}
               />
-            ) : participant.isVideoEnabled && participant.videoStream ? (
+            ) : participant.isVideoEnabled && participant.videoStream && participant.videoStream.active ? (
               <VideoElement 
                 stream={participant.videoStream}
                 participantId={participant.id}

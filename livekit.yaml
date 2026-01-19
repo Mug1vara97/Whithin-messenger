@@ -1,16 +1,19 @@
 port: 7880
+
 rtc:
   tcp_port: 7881
   port_range_start: 50000
-  port_range_end: 50100
+  port_range_end: 50200
   use_external_ip: false
-  # Explicitly set node IP to your server's public IP or domain
-  # Get your server's public IP with: curl ifconfig.me
   node_ip: "whithin.ru"
+  
+  # STUN серверы для NAT traversal
   stun_servers:
     - stun:185.119.59.23:3478
     - stun:stun.l.google.com:19302
-  # TURN servers configuration
+    - stun:stun1.l.google.com:19302
+  
+  # TURN серверы для надежного соединения
   turn_servers:
     - host: 185.119.59.23
       port: 3478
@@ -22,6 +25,65 @@ rtc:
       protocol: tcp
       username: test
       password: test123
+  
+  # Оптимизация пакетов
+  packet_buffer_size: 500
+  pli_throttle:
+    low_quality: 500ms
+    mid_quality: 1s
+    high_quality: 1s
+  
+  # Congestion control для адаптивного качества
+  congestion_control:
+    enabled: true
+    probe_mode: padding
+
+# Настройки комнат
+room:
+  # Пустые комнаты удаляются через 5 минут
+  empty_timeout: 3000
+  # Максимальное количество участников
+  # Автоматическое создание комнат
+  auto_create: true
+  # Включить шифрование
+  enable_end_to_end_encryption: false
+  
+  # Настройки публикации видео по умолчанию
+  playout_delay:
+    enabled: true
+    min: 100
+    max: 2000
+
+# Ограничения видео (максимальные битрейты)
+limit:
+  # Максимальный битрейт для видео (5 Mbps)
+  max_video_bitrate: 5000000
+  # Максимальный битрейт для демонстрации экрана (8 Mbps для высокого качества)
+  max_screen_share_bitrate: 8000000
+  # Максимальный битрейт для аудио
+  max_audio_bitrate: 128000
+  # Максимальное количество треков на участника
+  num_tracks: 10
+
+# Настройки кодеков
+video:
+  # Поддерживаемые кодеки (VP9 для лучшего качества/сжатия)
+  codecs:
+    - mime: video/VP9
+      fmtp_line: "profile-id=0"
+    - mime: video/VP8
+    - mime: video/H264
+      fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+  
+  # Настройки Dynacast (адаптивная передача)
+  dynacast_pause_delay: 4s
+
+# Настройки аудио
+audio:
+  # Активное распознавание говорящего
+  active_speaker_update_interval: 300ms
+  # Минимальный уровень для определения голоса
+  active_speaker_min_level: 10
 
 keys:
   devkey: this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars
@@ -30,9 +92,12 @@ development: true
 
 log_level: info
 
-redis: {}
+# Redis для масштабирования (опционально, нужен только при нескольких серверах)
+# redis:
+#   address: "127.0.0.1:6379"
+#   db: 0
 
-# Webhook configuration (optional)
+# Webhook (опционально)
 # webhook:
 #   urls:
 #     - http://voice-server:3000/webhook

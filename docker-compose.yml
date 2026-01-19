@@ -1,4 +1,21 @@
 services:
+  # Redis для LiveKit (опционально - нужен только при нескольких серверах)
+  # redis:
+  #   image: redis:7-alpine
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+
   db:
     image: postgres:16
     environment:
@@ -55,8 +72,24 @@ services:
     environment:
       LIVEKIT_KEYS: "devkey: this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars"
       LIVEKIT_CONFIG_FILE: /etc/livekit.yaml
+      # Оптимизация производительности
+      GOMAXPROCS: "4"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
+    # Выделение ресурсов для видео обработки
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    # Приоритет процесса
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     restart: unless-stopped
 
   voice-server:
@@ -103,6 +136,7 @@ services:
       - DOMAIN=whithin.ru
 
 volumes:
+  # redis_data:  # Раскомментировать если используете Redis
   postgres_data:
     driver: local
     driver_opts:
