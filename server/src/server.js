@@ -746,6 +746,8 @@ io.on('connection', async (socket) => {
         }
         
         // Emit event that bot should listen to
+        // Отправляем событие всем подключенным клиентам (включая бота)
+        console.log(`[Server] Broadcasting botJoinRoom event to all clients:`, { roomId, channelId: roomId });
         io.emit('botJoinRoom', { roomId, channelId: roomId });
     });
 

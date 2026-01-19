@@ -81,7 +81,11 @@ class MusicBot {
           console.error('[MusicBot] No roomId or channelId provided in botJoinRoom event');
           return;
         }
-        await this.joinRoom(targetRoomId);
+        try {
+          await this.joinRoom(targetRoomId);
+        } catch (error) {
+          console.error(`[MusicBot] Error joining room ${targetRoomId}:`, error);
+        }
       });
 
       // Listen for room leave requests
@@ -142,11 +146,17 @@ class MusicBot {
       const handler = new CommandHandler(player, roomId, this.socket);
       
       // Connect to room
-      await room.connect(this.LIVEKIT_URL, token, {
-        autoSubscribe: true,
-        dynacast: true
-      });
-      console.log(`[MusicBot] Connected to LiveKit room: ${roomId}`);
+      console.log(`[MusicBot] Connecting to LiveKit at: ${this.LIVEKIT_URL} with room: ${roomId}`);
+      try {
+        await room.connect(this.LIVEKIT_URL, token, {
+          autoSubscribe: true,
+          dynacast: true
+        });
+        console.log(`[MusicBot] Connected to LiveKit room: ${roomId}`);
+      } catch (connectError) {
+        console.error(`[MusicBot] Error connecting to LiveKit room ${roomId}:`, connectError);
+        throw connectError;
+      }
       
       // Set up room event handlers
       room.on(RoomEvent.Disconnected, () => {
