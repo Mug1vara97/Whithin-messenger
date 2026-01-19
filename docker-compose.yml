@@ -122,13 +122,17 @@ services:
       - "3001:3001"
     environment:
       - NODE_ENV=production
-      - LIVEKIT_URL=wss://whithin.ru
+      - LIVEKIT_URL=ws://host.docker.internal:7880
+      - LIVEKIT_EXTERNAL_URL=wss://whithin.ru
       - LIVEKIT_API_KEY=devkey
       - LIVEKIT_API_SECRET=this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars
       - VOICE_SERVER_URL=https://voice-server:3000
       - BOT_USER_ID=music-bot-001
       - BOT_USER_NAME=Music Bot
       - BOT_PORT=3001
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - voice-server
       - livekit

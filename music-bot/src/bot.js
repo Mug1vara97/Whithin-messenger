@@ -1,3 +1,9 @@
+// Disable SSL certificate validation for internal Docker connections
+// This must be set before requiring any modules that use TLS
+if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 const { Room, RoomEvent } = require('@livekit/rtc-node');
 const { AccessToken } = require('livekit-server-sdk');
 const { io } = require('socket.io-client');
@@ -12,6 +18,7 @@ class MusicBot {
     
     // Configuration
     this.LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://whithin.ru';
+    this.LIVEKIT_EXTERNAL_URL = process.env.LIVEKIT_EXTERNAL_URL || this.LIVEKIT_URL;
     this.LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
     this.LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars';
     this.VOICE_SERVER_URL = process.env.VOICE_SERVER_URL || 'https://whithin.ru';
