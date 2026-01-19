@@ -3,7 +3,7 @@ FROM node:18-bullseye AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # ЭТАП 2: Финальный образ
 FROM node:18-bullseye-slim
