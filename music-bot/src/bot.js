@@ -187,7 +187,13 @@ class MusicBot {
       });
       
       // Start publishing audio track
-      await player.start();
+      try {
+        await player.start();
+        console.log(`[MusicBot] Audio track started for room: ${roomId}`);
+      } catch (startError) {
+        console.error(`[MusicBot] Error starting audio track for room ${roomId}:`, startError);
+        throw startError;
+      }
       
       // Store room data
       this.rooms.set(roomId, { room, player, handler });
@@ -195,6 +201,7 @@ class MusicBot {
       // Notify voice server
       if (this.socket) {
         this.socket.emit('botJoinedRoom', { roomId, botId: this.BOT_USER_ID });
+        console.log(`[MusicBot] Notified server that bot joined room: ${roomId}`);
       }
       
       console.log(`[MusicBot] Bot successfully joined room: ${roomId}`);

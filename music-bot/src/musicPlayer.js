@@ -66,6 +66,12 @@ class MusicPlayer {
 
   async play(url) {
     try {
+      // Ensure audio track is started before playing
+      if (!this.audioTrack || !this.audioSource) {
+        console.log('[MusicPlayer] Audio track not started, starting now...');
+        await this.start();
+      }
+
       if (this.isPlaying && !this.isPaused) {
         console.log('[MusicPlayer] Already playing, adding to queue');
         this.addToQueue(url);
@@ -80,12 +86,8 @@ class MusicPlayer {
         this.ffmpegProcess = null;
       }
 
-      // Unpublish existing track if any
-      if (this.audioTrack) {
-        await this.room.localParticipant.unpublishTrack(this.audioTrack);
-        this.audioTrack.stop();
-        this.audioTrack = null;
-      }
+      // Don't unpublish track - keep it published and just change the audio source
+      // The track should remain published throughout playback
 
       // Determine source type and get audio stream
       let audioStream;
@@ -289,6 +291,17 @@ class MusicPlayer {
     if (this.queue.length === 0) {
       console.log('[MusicPlayer] Queue is empty');
       return;
+    }
+    
+    // Ensure audio track is started before playing
+    if (!this.audioTrack || !this.audioSource) {
+      console.log('[MusicPlayer] Audio track not started in playNext, starting now...');
+      try {
+        await this.start();
+      } catch (error) {
+        console.error('[MusicPlayer] Error starting audio track in playNext:', error);
+        return;
+      }
     }
     
     this.currentIndex++;
