@@ -99,41 +99,23 @@ class MusicPlayer {
         // play-dl doesn't require explicit initialization in newer versions
         console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
         
+        // Normalize YouTube URL - remove playlist parameter and use standard format
+        let normalizedUrl = url;
+        const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
+        if (youtubeIdMatch) {
+          const videoId = youtubeIdMatch[1];
+          normalizedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
+        }
+        
         // Try to get stream directly
         let streamInfo;
         try {
-          streamInfo = await play.stream(url);
+          streamInfo = await play.stream(normalizedUrl);
         } catch (streamError) {
-          // If direct stream fails, try alternative URL format for YouTube
-          console.log('[MusicPlayer] Direct stream failed, trying alternative URL format...');
-          const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
-          if (youtubeIdMatch) {
-            const videoId = youtubeIdMatch[1];
-            const directUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            console.log(`[MusicPlayer] Trying alternative YouTube URL format: ${directUrl}`);
-            try {
-              streamInfo = await play.stream(directUrl);
-            } catch (altError) {
-              // If alternative URL also fails, try with video_info
-              console.log('[MusicPlayer] Alternative URL failed, trying video_info approach...');
-              try {
-                const videoInfo = await video_basic_info(directUrl);
-                console.log('[MusicPlayer] Got video info, attempting stream_from_info...');
-                if (videoInfo && videoInfo.video_details) {
-                  streamInfo = await stream_from_info(videoInfo);
-                  console.log('[MusicPlayer] Successfully got stream via stream_from_info');
-                } else {
-                  console.error('[MusicPlayer] Invalid video info structure:', videoInfo);
-                  throw new Error('Invalid video info returned');
-                }
-              } catch (infoError) {
-                console.error('[MusicPlayer] video_info approach failed:', infoError);
-                throw streamError; // Use original error
-              }
-            }
-          } else {
-            throw streamError; // Not a YouTube URL
-          }
+          console.error('[MusicPlayer] play.stream failed:', streamError.message);
+          // Try with search if it's not a URL (for future search support)
+          throw streamError;
         }
         
         if (!streamInfo || !streamInfo.stream) {
