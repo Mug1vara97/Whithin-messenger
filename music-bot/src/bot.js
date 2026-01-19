@@ -30,14 +30,20 @@ class MusicBot {
 
   async connectToVoiceServer() {
     return new Promise((resolve, reject) => {
-      this.socket = io(this.VOICE_SERVER_URL, {
+      const connectOptions = {
         transports: ['websocket'],
         upgrade: false,
-        rememberUpgrade: false
-      });
+        rememberUpgrade: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity
+      };
+
+      this.socket = io(this.VOICE_SERVER_URL, connectOptions);
 
       this.socket.on('connect', () => {
-        console.log('[MusicBot] Connected to voice server');
+        console.log('[MusicBot] Connected to voice server:', this.VOICE_SERVER_URL);
         this.isConnected = true;
         
         // Register bot as a special user
@@ -55,8 +61,9 @@ class MusicBot {
       });
 
       this.socket.on('connect_error', (error) => {
-        console.error('[MusicBot] Connection error:', error);
-        reject(error);
+        console.error('[MusicBot] Connection error to', this.VOICE_SERVER_URL, ':', error.message);
+        // Не отклоняем промис, чтобы бот продолжал работать и пытался переподключиться
+        // reject(error);
       });
 
       // Listen for room join requests
