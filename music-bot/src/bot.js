@@ -30,6 +30,8 @@ class MusicBot {
 
   async connectToVoiceServer() {
     return new Promise((resolve, reject) => {
+      // Socket.IO автоматически определяет протокол (ws:// для http://, wss:// для https://)
+      // Но для внутренних подключений в Docker нужно использовать правильный URL
       const connectOptions = {
         transports: ['websocket'],
         upgrade: false,
@@ -37,9 +39,13 @@ class MusicBot {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: Infinity
+        reconnectionAttempts: Infinity,
+        rejectUnauthorized: false, // Для внутренних подключений в Docker (игнорируем SSL ошибки)
+        forceNew: true,
+        path: '/socket.io/'
       };
 
+      console.log('[MusicBot] Attempting to connect to:', this.VOICE_SERVER_URL);
       this.socket = io(this.VOICE_SERVER_URL, connectOptions);
 
       this.socket.on('connect', () => {

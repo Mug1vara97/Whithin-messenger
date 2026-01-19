@@ -125,7 +125,7 @@ services:
       - LIVEKIT_URL=wss://whithin.ru
       - LIVEKIT_API_KEY=devkey
       - LIVEKIT_API_SECRET=this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars
-      - VOICE_SERVER_URL=http://voice-server:3000
+      - VOICE_SERVER_URL=https://voice-server:3000
       - BOT_USER_ID=music-bot-001
       - BOT_USER_NAME=Music Bot
       - BOT_PORT=3001

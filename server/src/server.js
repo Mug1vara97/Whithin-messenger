@@ -21,10 +21,11 @@ const options = {
 const server = https.createServer(options, app);
 const io = new Server(server, {
     cors: {
-        origin: ["https://whithin.ru"],
+        origin: ["https://whithin.ru", "http://voice-server:3000", "http://music-bot:3001"],
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    allowEIO3: true
 });
 
 // Configure CORS for Express
