@@ -2,7 +2,7 @@ import apiClient from '../../../shared/lib/api/apiClient';
 
 export const userApi = {
   async getProfile(userId) {
-    const response = await apiClient.get(`/user/profile/${userId}`);
+    const response = await apiClient.get(`/profile/${userId}/profile`);
     return response.data;
   },
 
