@@ -1,6 +1,7 @@
 const { AudioSource, AudioFrame, LocalAudioTrack, TrackPublishOptions, TrackSource } = require('@livekit/rtc-node');
 const { spawn } = require('child_process');
 const play = require('play-dl');
+const { video_basic_info, stream_from_info } = require('play-dl');
 const ytdl = require('ytdl-core');
 
 class MusicPlayer {
@@ -116,10 +117,17 @@ class MusicPlayer {
               // If alternative URL also fails, try with video_info
               console.log('[MusicPlayer] Alternative URL failed, trying video_info approach...');
               try {
-                const { video_basic_info } = require('play-dl');
                 const videoInfo = await video_basic_info(directUrl);
-                streamInfo = await play.stream_from_info(videoInfo);
+                console.log('[MusicPlayer] Got video info, attempting stream_from_info...');
+                if (videoInfo && videoInfo.video_details) {
+                  streamInfo = await stream_from_info(videoInfo);
+                  console.log('[MusicPlayer] Successfully got stream via stream_from_info');
+                } else {
+                  console.error('[MusicPlayer] Invalid video info structure:', videoInfo);
+                  throw new Error('Invalid video info returned');
+                }
               } catch (infoError) {
+                console.error('[MusicPlayer] video_info approach failed:', infoError);
                 throw streamError; // Use original error
               }
             }
@@ -280,15 +288,23 @@ class MusicPlayer {
       
       // Don't throw - log error and try next track if available
       // This prevents the bot from crashing
-      if (this.queue.length > 0) {
+      // But prevent infinite retry loop - only retry if queue has different items
+      const hasOtherTracks = this.queue.length > 1 || 
+                            (this.queue.length === 1 && this.queue[0] !== url);
+      
+      if (hasOtherTracks) {
         console.log('[MusicPlayer] Attempting to play next track after error');
         setTimeout(() => {
           this.playNext().catch(err => {
             console.error('[MusicPlayer] Error in playNext after play error:', err);
           });
-        }, 1000);
+        }, 2000); // Increased delay to prevent rapid retries
+      } else if (this.queue.length === 1 && this.queue[0] === url) {
+        // Same track failed, remove it to prevent infinite loop
+        console.error('[MusicPlayer] Removing failed track from queue to prevent infinite loop');
+        this.queue = [];
+        this.currentIndex = -1;
       } else {
-        // Send error message if no queue
         console.error('[MusicPlayer] Failed to play and queue is empty');
       }
       // Don't rethrow - we've handled the error
@@ -366,6 +382,22 @@ class MusicPlayer {
       return;
     }
     
+    // Prevent infinite loop - if we've tried to play the same track multiple times, skip it
+    if (this.currentIndex >= 0 && this.currentIndex < this.queue.length) {
+      const currentUrl = this.queue[this.currentIndex];
+      const retryCount = this._retryCount || new Map();
+      const count = retryCount.get(currentUrl) || 0;
+      if (count >= 3) {
+        console.error(`[MusicPlayer] Skipping ${currentUrl} after ${count} failed attempts`);
+        this.queue.splice(this.currentIndex, 1);
+        if (this.currentIndex >= this.queue.length) {
+          this.currentIndex = 0;
+        }
+        retryCount.delete(currentUrl);
+        this._retryCount = retryCount;
+      }
+    }
+    
     // Ensure audio track is started before playing
     if (!this.audioTrack || !this.audioSource) {
       console.log('[MusicPlayer] Audio track not started in playNext, starting now...');
@@ -377,13 +409,32 @@ class MusicPlayer {
       }
     }
     
+    if (this.queue.length === 0) {
+      console.log('[MusicPlayer] Queue is empty after cleanup');
+      return;
+    }
+    
     this.currentIndex++;
     if (this.currentIndex >= this.queue.length) {
       this.currentIndex = 0; // Loop
     }
     
     const nextUrl = this.queue[this.currentIndex];
-    await this.play(nextUrl);
+    
+    // Track retry count
+    const retryCount = this._retryCount || new Map();
+    retryCount.set(nextUrl, (retryCount.get(nextUrl) || 0) + 1);
+    this._retryCount = retryCount;
+    
+    try {
+      await this.play(nextUrl);
+      // Reset retry count on success
+      retryCount.delete(nextUrl);
+      this._retryCount = retryCount;
+    } catch (error) {
+      console.error('[MusicPlayer] Error in playNext:', error);
+      // Retry count is already incremented, will be checked on next call
+    }
   }
 
   async addToQueue(url) {
