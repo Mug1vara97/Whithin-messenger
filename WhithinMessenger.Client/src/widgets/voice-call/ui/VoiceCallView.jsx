@@ -15,6 +15,8 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
+import { userApi } from '../../../entities/user/api/userApi';
+import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import './VoiceCallView.css';
 
 const VoiceCallView = ({
@@ -62,6 +64,7 @@ const VoiceCallView = ({
 
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
 
   // Логирование состояния демонстрации экрана
   // console.log('VoiceCallView screen share state:', { 
@@ -91,6 +94,25 @@ const VoiceCallView = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, channelName, userId, userName]); // Убрали startCall из зависимостей
 
+  // Загружаем профиль текущего пользователя
+  useEffect(() => {
+    if (userId) {
+      userApi.getProfile(userId)
+        .then(profile => {
+          if (profile) {
+            setCurrentUserProfile({
+              avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
+              avatarColor: profile.avatarColor || '#5865f2',
+              banner: profile.banner ? `${MEDIA_BASE_URL}${profile.banner}` : null
+            });
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to load current user profile:', error);
+        });
+    }
+  }, [userId]);
+
   useEffect(() => {
     return () => {
       // НЕ завершаем звонок при размонтировании компонента
@@ -113,7 +135,7 @@ const VoiceCallView = ({
     });
     
     // Текущий пользователь (хост)
-    const currentUser = createParticipant(userId, userName, null, 'online', 'host');
+    const currentUser = createParticipant(userId, userName, currentUserProfile?.avatar || null, 'online', 'host');
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
@@ -121,6 +143,8 @@ const VoiceCallView = ({
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
+    currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
+    currentUser.banner = currentUserProfile?.banner || null;
     
     console.log('🧑 Current user state:', {
       isMuted: currentUser.isMuted,
@@ -150,6 +174,9 @@ const VoiceCallView = ({
       videoParticipant.isSpeaking = participant.isSpeaking || false;
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
+      // Добавляем данные профиля
+      videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
+      videoParticipant.banner = participant.banner || null;
       videoParticipantsList.push(videoParticipant);
     });
     
@@ -167,7 +194,8 @@ const VoiceCallView = ({
     participantMuteStates,
     participantAudioStates,
     participantGlobalAudioStates,
-    participantVideoStates
+    participantVideoStates,
+    currentUserProfile
   ]);
 
 

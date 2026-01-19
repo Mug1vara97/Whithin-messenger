@@ -331,13 +331,65 @@ const VideoCallGrid = ({
                 participantId={participant.id}
                 isLocal={participant.isCurrentUser || false}
               />
+            ) : participant.banner ? (
+              // Если есть баннер, показываем его как фон
+              <div style={{ 
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                backgroundImage: `url(${participant.banner})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}>
+                {participant.avatar ? (
+                  <img 
+                    src={participant.avatar} 
+                    alt={participant.name} 
+                    className="tile-avatar-bg"
+                    style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: isSmall ? '60px' : '100px',
+                      height: isSmall ? '60px' : '100px',
+                      borderRadius: '50%',
+                      border: '3px solid white',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  <div 
+                    className="avatar-placeholder"
+                    style={{ 
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: isSmall ? '60px' : '100px',
+                      height: isSmall ? '60px' : '100px',
+                      borderRadius: '50%',
+                      backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: isSmall ? '24px' : '40px',
+                      fontWeight: '600',
+                      color: 'white',
+                      border: '3px solid white'
+                    }}
+                  >
+                    {getInitials(participant.name)}
+                  </div>
+                )}
+              </div>
             ) : participant.avatar ? (
               <img src={participant.avatar} alt={participant.name} className="tile-avatar-bg" />
             ) : (
               <div 
                 className="avatar-placeholder"
                 style={{ 
-                  backgroundColor: getAvatarColor(participant.name),
+                  backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
                   width: '100%',
                   height: '100%',
                   display: 'flex',

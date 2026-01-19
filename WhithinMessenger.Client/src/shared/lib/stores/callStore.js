@@ -4,6 +4,8 @@ import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
 import { RoomEvent, Track } from 'livekit-client';
+import { userApi } from '../../../entities/user/api/userApi';
+import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -148,7 +150,7 @@ export const useCallStore = create(
           await voiceCallApi.connect(userId, userName);
           
           // Регистрируем обработчики событий
-          voiceCallApi.on('peerJoined', (peerData) => {
+          voiceCallApi.on('peerJoined', async (peerData) => {
             console.log('Peer joined:', peerData);
             const socketId = peerData.peerId || peerData.id;
             if (socketId && peerData.userId) {
@@ -167,6 +169,22 @@ export const useCallStore = create(
               return { participantGlobalAudioStates: newGlobalAudioStates };
             });
             
+            // Загружаем профиль участника
+            let profileData = null;
+            try {
+              const profile = await userApi.getProfile(peerData.userId);
+              if (profile) {
+                profileData = {
+                  avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
+                  avatarColor: profile.avatarColor || '#5865f2',
+                  banner: profile.banner ? `${MEDIA_BASE_URL}${profile.banner}` : null
+                };
+                console.log('📸 Loaded profile for participant:', peerData.userId, profileData);
+              }
+            } catch (error) {
+              console.warn('Failed to load profile for participant:', peerData.userId, error);
+            }
+            
             set((state) => ({
               participants: [...state.participants.filter(p => p.userId !== peerData.userId), {
                 userId: peerData.userId,
@@ -175,7 +193,10 @@ export const useCallStore = create(
                 isMuted: peerData.isMuted || false,
                 isAudioEnabled: peerData.isAudioEnabled !== undefined ? peerData.isAudioEnabled : true,
                 isGlobalAudioMuted: peerData.isGlobalAudioMuted || false, // Добавляем статус глобального звука
-                isSpeaking: false
+                isSpeaking: false,
+                avatar: profileData?.avatar || null,
+                avatarColor: profileData?.avatarColor || '#5865f2',
+                banner: profileData?.banner || null
               }]
             }));
 
@@ -825,6 +846,7 @@ export const useCallStore = create(
               }
             });
             
+            // Сначала устанавливаем участников без профилей
             set({
               peerIdToUserIdMap: newMap,
               participants: response.existingPeers.map(peer => ({
@@ -834,8 +856,38 @@ export const useCallStore = create(
                 isMuted: peer.isMuted || false,
                 isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
                 isGlobalAudioMuted: peer.isGlobalAudioMuted || false, // Добавляем статус глобального звука
-                isSpeaking: false
+                isSpeaking: false,
+                avatar: null,
+                avatarColor: '#5865f2',
+                banner: null
               }))
+            });
+            
+            // Затем асинхронно загружаем профили для всех участников
+            Promise.all(response.existingPeers.map(async (peer) => {
+              try {
+                const profile = await userApi.getProfile(peer.userId);
+                if (profile) {
+                  const profileData = {
+                    avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
+                    avatarColor: profile.avatarColor || '#5865f2',
+                    banner: profile.banner ? `${MEDIA_BASE_URL}${profile.banner}` : null
+                  };
+                  
+                  // Обновляем участника с данными профиля
+                  set((state) => ({
+                    participants: state.participants.map(p => 
+                      p.userId === peer.userId 
+                        ? { ...p, ...profileData }
+                        : p
+                    )
+                  }));
+                }
+              } catch (error) {
+                console.warn('Failed to load profile for existing peer:', peer.userId, error);
+              }
+            })).catch(error => {
+              console.warn('Error loading profiles for existing peers:', error);
             });
           }
           
