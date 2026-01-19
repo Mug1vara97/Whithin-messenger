@@ -90,25 +90,38 @@ class MusicPlayer {
       // The track should remain published throughout playback
 
       // Determine source type and get audio stream
+      // Use play-dl for all sources (including YouTube) as it's more reliable
       let audioStream;
       
-      if (ytdl.validateURL(url)) {
-        // YouTube URL
-        audioStream = ytdl(url, {
-          filter: 'audioonly',
-          quality: 'highestaudio',
-        });
-      } else {
-        // Try play-dl for other sources
-        try {
-          if (play.is_expired()) {
-            await play.refreshToken();
+      try {
+        // Check if play-dl token needs refresh
+        if (play.is_expired()) {
+          console.log('[MusicPlayer] Refreshing play-dl token...');
+          await play.refreshToken();
+        }
+        
+        // Try play-dl first (works for YouTube, Spotify, SoundCloud, etc.)
+        console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
+        const streamInfo = await play.stream(url);
+        audioStream = streamInfo.stream;
+        console.log(`[MusicPlayer] Successfully got stream via play-dl`);
+      } catch (playError) {
+        console.error('[MusicPlayer] Error with play-dl:', playError);
+        
+        // Fallback to ytdl-core only for YouTube URLs if play-dl fails
+        if (ytdl.validateURL(url)) {
+          try {
+            console.log(`[MusicPlayer] Falling back to ytdl-core for YouTube URL`);
+            audioStream = ytdl(url, {
+              filter: 'audioonly',
+              quality: 'highestaudio',
+            });
+          } catch (ytdlError) {
+            console.error('[MusicPlayer] Error with ytdl-core:', ytdlError);
+            throw new Error(`Failed to get audio stream: ${playError.message || playError}`);
           }
-          const streamInfo = await play.stream(url);
-          audioStream = streamInfo.stream;
-        } catch (playError) {
-          console.error('[MusicPlayer] Error with play-dl:', playError);
-          throw new Error('Unsupported URL format or failed to get stream');
+        } else {
+          throw new Error(`Unsupported URL format or failed to get stream: ${playError.message || playError}`);
         }
       }
       
@@ -218,7 +231,18 @@ class MusicPlayer {
       console.error('[MusicPlayer] Error playing audio:', error);
       this.isPlaying = false;
       this.isPaused = false;
-      throw error;
+      this.currentSource = null;
+      this.audioBuffer = Buffer.alloc(0);
+      
+      // Don't throw - log error and try next track if available
+      // This prevents the bot from crashing
+      if (this.queue.length > 0) {
+        console.log('[MusicPlayer] Attempting to play next track after error');
+        setTimeout(() => this.playNext(), 1000);
+      } else {
+        // Send error message if no queue
+        console.error('[MusicPlayer] Failed to play and queue is empty');
+      }
     }
   }
 
@@ -313,13 +337,18 @@ class MusicPlayer {
     await this.play(nextUrl);
   }
 
-  addToQueue(url) {
+  async addToQueue(url) {
     this.queue.push(url);
     console.log(`[MusicPlayer] Added to queue: ${url} (${this.queue.length} items)`);
     
     // If nothing is playing, start playing
     if (!this.isPlaying && this.currentIndex === -1) {
-      this.playNext();
+      try {
+        await this.playNext();
+      } catch (error) {
+        console.error('[MusicPlayer] Error in playNext from addToQueue:', error);
+        // Don't throw - just log the error
+      }
     }
   }
 

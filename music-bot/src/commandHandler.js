@@ -17,8 +17,13 @@ class CommandHandler {
             return;
           }
           const url = args.join(' ');
-          await this.player.addToQueue(url);
-          this.sendMessage(`Added to queue: ${url}`);
+          try {
+            await this.player.addToQueue(url);
+            this.sendMessage(`Added to queue: ${url}`);
+          } catch (error) {
+            console.error('[CommandHandler] Error adding to queue:', error);
+            this.sendMessage(`❌ Error adding to queue: ${error.message || 'Unknown error'}`);
+          }
           break;
           
         case 'pause':
