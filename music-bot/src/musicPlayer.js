@@ -1,8 +1,5 @@
 const { AudioSource, AudioFrame, LocalAudioTrack, TrackPublishOptions, TrackSource } = require('@livekit/rtc-node');
 const { spawn } = require('child_process');
-const play = require('play-dl');
-const { video_basic_info, stream_from_info } = require('play-dl');
-const ytdl = require('ytdl-core');
 
 class MusicPlayer {
   constructor(room) {
@@ -11,6 +8,7 @@ class MusicPlayer {
     this.audioSource = null;
     this.currentSource = null;
     this.ffmpegProcess = null;
+    this.ytdlpProcess = null;
     this.isPlaying = false;
     this.isPaused = false;
     this.queue = [];
@@ -82,6 +80,10 @@ class MusicPlayer {
       console.log(`[MusicPlayer] Playing: ${url}`);
       
       // Stop current playback if any
+      if (this.ytdlpProcess) {
+        this.ytdlpProcess.kill();
+        this.ytdlpProcess = null;
+      }
       if (this.ffmpegProcess) {
         this.ffmpegProcess.kill();
         this.ffmpegProcess = null;
@@ -91,71 +93,65 @@ class MusicPlayer {
       // The track should remain published throughout playback
 
       // Determine source type and get audio stream
-      // Use play-dl for all sources (including YouTube) as it's more reliable
-      let audioStream;
+      // Use yt-dlp for all sources (YouTube, Spotify, SoundCloud, etc.)
+      console.log(`[MusicPlayer] Attempting to get stream via yt-dlp for: ${url}`);
       
-      try {
-        // Try play-dl first (works for YouTube, Spotify, SoundCloud, etc.)
-        console.log(`[MusicPlayer] Attempting to get stream via play-dl for: ${url}`);
-        
-        // Normalize YouTube URL - remove playlist parameter and use standard format
-        let normalizedUrl = url;
-        const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
-        if (youtubeIdMatch) {
-          const videoId = youtubeIdMatch[1];
-          normalizedUrl = `https://www.youtube.com/watch?v=${videoId}`;
-          console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
-        }
-        
-        // For YouTube, use video_basic_info + stream_from_info (more reliable)
-        let streamInfo;
-        const isYouTube = /youtube\.com|youtu\.be/.test(normalizedUrl);
-        
-        if (isYouTube) {
-          try {
-            console.log('[MusicPlayer] Using video_basic_info approach for YouTube...');
-            const videoInfo = await video_basic_info(normalizedUrl);
-            if (!videoInfo || !videoInfo.video_details) {
-              throw new Error('Failed to get video info');
-            }
-            console.log(`[MusicPlayer] Got video info: ${videoInfo.video_details.title}`);
-            streamInfo = await stream_from_info(videoInfo, { quality: 2 }); // quality: 2 = high quality audio
-            console.log('[MusicPlayer] Successfully got stream via stream_from_info');
-          } catch (infoError) {
-            console.error('[MusicPlayer] video_basic_info approach failed:', infoError.message);
-            // Fallback to direct stream
-            console.log('[MusicPlayer] Falling back to direct play.stream...');
-            streamInfo = await play.stream(normalizedUrl, { 
-              quality: 2,
-              discordPlayerCompatibility: true 
-            });
-          }
-        } else {
-          // For other platforms (Spotify, SoundCloud, etc.), use direct stream
-          streamInfo = await play.stream(normalizedUrl);
-        }
-        
-        if (!streamInfo || !streamInfo.stream) {
-          throw new Error('play-dl returned invalid stream info');
-        }
-        audioStream = streamInfo.stream;
-        console.log(`[MusicPlayer] Successfully got stream via play-dl`);
-      } catch (playError) {
-        console.error('[MusicPlayer] Error with play-dl:', playError);
-        throw new Error(`Failed to get audio stream: ${playError.message || playError}. Please try a different URL or check if the URL is valid.`);
+      // Normalize YouTube URL - remove playlist parameter and use standard format
+      let normalizedUrl = url;
+      const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
+      if (youtubeIdMatch) {
+        const videoId = youtubeIdMatch[1];
+        normalizedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
       }
       
+      // Create yt-dlp process to extract audio stream
+      // yt-dlp outputs directly to stdout, which we'll pipe to ffmpeg
+      this.ytdlpProcess = spawn('yt-dlp', [
+        '-f', 'bestaudio/best',    // Best audio format, fallback to best
+        '--no-playlist',           // Don't download playlists
+        '--extract-audio',          // Extract audio only
+        '--audio-format', 'best',  // Best audio format
+        '--audio-quality', '0',    // Best quality (0 = best)
+        '-o', '-',                  // Output to stdout
+        '--no-warnings',            // Suppress warnings
+        '--quiet',                  // Quiet mode
+        normalizedUrl
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      
       // Create ffmpeg process to convert audio to raw PCM format
-      // Output: Raw PCM 16-bit, 48kHz, stereo (for AudioSource)
+      // Input from yt-dlp stdout, output: Raw PCM 16-bit, 48kHz, stereo (for AudioSource)
       this.ffmpegProcess = spawn('ffmpeg', [
-        '-i', 'pipe:0',           // Input from stdin
-        '-f', 's16le',             // Output format: signed 16-bit little-endian PCM
+        '-i', 'pipe:0',             // Input from stdin (yt-dlp output)
+        '-f', 's16le',               // Output format: signed 16-bit little-endian PCM
         '-ar', String(this.sampleRate),  // Sample rate: 48kHz
         '-ac', String(this.channels),    // Channels: stereo
-        '-acodec', 'pcm_s16le',   // Audio codec: PCM 16-bit
-        '-loglevel', 'error',     // Reduce ffmpeg output
-        'pipe:1'                   // Output to stdout
+        '-acodec', 'pcm_s16le',     // Audio codec: PCM 16-bit
+        '-loglevel', 'error',       // Reduce ffmpeg output
+        'pipe:1'                     // Output to stdout
       ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      
+      // Pipe yt-dlp output to ffmpeg input
+      this.ytdlpProcess.stdout.pipe(this.ffmpegProcess.stdin);
+      
+      // Handle yt-dlp errors
+      this.ytdlpProcess.stderr.on('data', (data) => {
+        const errorMsg = data.toString();
+        if (errorMsg.includes('ERROR') || errorMsg.includes('WARNING')) {
+          console.error(`[MusicPlayer] yt-dlp error: ${errorMsg}`);
+        }
+      });
+      
+      this.ytdlpProcess.on('error', (error) => {
+        console.error('[MusicPlayer] yt-dlp process error:', error);
+        throw new Error(`Failed to start yt-dlp: ${error.message}. Make sure yt-dlp is installed.`);
+      });
+      
+      this.ytdlpProcess.on('exit', (code) => {
+        if (code !== 0 && code !== null) {
+          console.error(`[MusicPlayer] yt-dlp exited with code ${code}`);
+        }
+      });
       
       // Handle ffmpeg errors
       this.ffmpegProcess.stderr.on('data', (data) => {
@@ -165,39 +161,27 @@ class MusicPlayer {
         }
       });
       
-      // Pipe audio stream to ffmpeg with error handling
-      try {
-        audioStream.pipe(this.ffmpegProcess.stdin);
-        
-        // Handle pipe errors
-        audioStream.on('error', (pipeError) => {
-          console.error('[MusicPlayer] Error in audio stream pipe:', pipeError);
-          if (this.ffmpegProcess) {
-            try {
-              this.ffmpegProcess.kill();
-            } catch (killError) {
-              // Ignore
-            }
-            this.ffmpegProcess = null;
-          }
-        });
-        
-        this.ffmpegProcess.stdin.on('error', (stdinError) => {
-          console.error('[MusicPlayer] Error in ffmpeg stdin:', stdinError);
-          // Ignore - usually means ffmpeg closed
-        });
-      } catch (pipeError) {
-        console.error('[MusicPlayer] Error setting up pipe:', pipeError);
-        if (this.ffmpegProcess) {
-          try {
-            this.ffmpegProcess.kill();
-          } catch (killError) {
-            // Ignore
-          }
-          this.ffmpegProcess = null;
+      // Handle ffmpeg stdin errors (from yt-dlp pipe)
+      this.ffmpegProcess.stdin.on('error', (stdinError) => {
+        console.error('[MusicPlayer] Error in ffmpeg stdin:', stdinError);
+        // Ignore - usually means ffmpeg closed
+      });
+      
+      // Handle yt-dlp stdout errors
+      this.ytdlpProcess.stdout.on('error', (stdoutError) => {
+        console.error('[MusicPlayer] Error in yt-dlp stdout:', stdoutError);
+      });
+      
+      // Handle ffmpeg process errors
+      this.ffmpegProcess.on('error', (ffmpegError) => {
+        console.error('[MusicPlayer] FFmpeg process error:', ffmpegError);
+      });
+      
+      this.ffmpegProcess.on('exit', (code) => {
+        if (code !== 0 && code !== null) {
+          console.error(`[MusicPlayer] FFmpeg exited with code ${code}`);
         }
-        throw pipeError;
-      }
+      });
       
       // Reset buffer
       this.audioBuffer = Buffer.alloc(0);
@@ -311,6 +295,10 @@ class MusicPlayer {
   }
 
   async stop() {
+    if (this.ytdlpProcess) {
+      this.ytdlpProcess.kill();
+      this.ytdlpProcess = null;
+    }
     if (this.ffmpegProcess) {
       this.ffmpegProcess.kill();
       this.ffmpegProcess = null;
