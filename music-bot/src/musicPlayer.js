@@ -107,15 +107,14 @@ class MusicPlayer {
       
       // Create yt-dlp process to extract audio stream
       // yt-dlp outputs directly to stdout, which we'll pipe to ffmpeg
+      // Use bestaudio format directly (no --extract-audio needed for stdout)
       this.ytdlpProcess = spawn('yt-dlp', [
-        '-f', 'bestaudio/best',    // Best audio format, fallback to best
+        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]',  // Best audio format, fallback to best low-res video
         '--no-playlist',           // Don't download playlists
-        '--extract-audio',          // Extract audio only
-        '--audio-format', 'best',  // Best audio format
-        '--audio-quality', '0',    // Best quality (0 = best)
         '-o', '-',                  // Output to stdout
         '--no-warnings',            // Suppress warnings
         '--quiet',                  // Quiet mode
+        '--no-check-certificates',  // Skip SSL certificate check (for Docker)
         normalizedUrl
       ], { stdio: ['pipe', 'pipe', 'pipe'] });
       
@@ -144,12 +143,20 @@ class MusicPlayer {
       
       this.ytdlpProcess.on('error', (error) => {
         console.error('[MusicPlayer] yt-dlp process error:', error);
+        // Clean up processes
+        if (this.ffmpegProcess) {
+          this.ffmpegProcess.kill();
+          this.ffmpegProcess = null;
+        }
+        this.ytdlpProcess = null;
         throw new Error(`Failed to start yt-dlp: ${error.message}. Make sure yt-dlp is installed.`);
       });
       
-      this.ytdlpProcess.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
-          console.error(`[MusicPlayer] yt-dlp exited with code ${code}`);
+      this.ytdlpProcess.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
+          console.error(`[MusicPlayer] yt-dlp exited with code ${code}, signal: ${signal}`);
+          // If yt-dlp fails, ffmpeg will also fail - handle in ffmpeg exit handler
+          // Don't throw here to avoid double error handling
         }
       });
       
@@ -177,9 +184,44 @@ class MusicPlayer {
         console.error('[MusicPlayer] FFmpeg process error:', ffmpegError);
       });
       
-      this.ffmpegProcess.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
-          console.error(`[MusicPlayer] FFmpeg exited with code ${code}`);
+      this.ffmpegProcess.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
+          console.error(`[MusicPlayer] FFmpeg exited with code ${code}, signal: ${signal}`);
+          // If ffmpeg exits with error, yt-dlp likely also failed
+          // Clean up and handle error
+          if (this.ytdlpProcess) {
+            this.ytdlpProcess.kill();
+            this.ytdlpProcess = null;
+          }
+          // Error handling will be done in the catch block
+          if (!this.isPlaying) {
+            // Already handled
+            return;
+          }
+          // Trigger error handling
+          const error = new Error(`FFmpeg process exited with code ${code}`);
+          this.isPlaying = false;
+          this.isPaused = false;
+          this.currentSource = null;
+          this.audioBuffer = Buffer.alloc(0);
+          
+          // Try next track or remove failed one
+          const currentUrl = this.queue[this.currentIndex];
+          const hasOtherTracks = this.queue.length > 1 || 
+                                (this.queue.length === 1 && this.queue[0] !== currentUrl);
+          
+          if (hasOtherTracks) {
+            console.log('[MusicPlayer] Attempting to play next track after ffmpeg error');
+            setTimeout(() => {
+              this.playNext().catch(err => {
+                console.error('[MusicPlayer] Error in playNext after ffmpeg error:', err);
+              });
+            }, 2000);
+          } else if (this.queue.length === 1 && this.queue[0] === currentUrl) {
+            console.error('[MusicPlayer] Removing failed track from queue to prevent infinite loop');
+            this.queue = [];
+            this.currentIndex = -1;
+          }
         }
       });
       
@@ -234,22 +276,27 @@ class MusicPlayer {
       this.isPaused = false;
       this.currentSource = url;
       
-      // Handle stream end
+      // Handle stream end (only for successful completion)
+      // Error cases are handled in 'exit' event handler
       this.ffmpegProcess.on('close', (code) => {
-        if (code !== 0 && code !== null) {
-          console.error(`[MusicPlayer] FFmpeg process exited with code ${code}`);
-        } else {
-          console.log('[MusicPlayer] Stream ended');
-        }
-        this.ffmpegProcess = null;
-        this.audioBuffer = Buffer.alloc(0);
-        this.isPlaying = false;
-        this.isPaused = false;
-        this.currentSource = null;
-        
-        // Play next in queue
-        if (this.queue.length > 0) {
-          setTimeout(() => this.playNext(), 500);
+        // Only handle successful completion here
+        // Errors are handled in 'exit' event
+        if (code === 0 || code === null) {
+          console.log('[MusicPlayer] Stream ended successfully');
+          this.ffmpegProcess = null;
+          if (this.ytdlpProcess) {
+            this.ytdlpProcess.kill();
+            this.ytdlpProcess = null;
+          }
+          this.audioBuffer = Buffer.alloc(0);
+          this.isPlaying = false;
+          this.isPaused = false;
+          this.currentSource = null;
+          
+          // Play next in queue
+          if (this.queue.length > 0) {
+            setTimeout(() => this.playNext(), 500);
+          }
         }
       });
       
