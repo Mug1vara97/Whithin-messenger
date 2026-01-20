@@ -453,7 +453,7 @@
 }
 
 /* 3 users - узкий контейнер (1 колонка) */
-@container call-container (max-width: 500px) {
+@container call-container (max-width: 600px) {
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
   }
@@ -660,7 +660,7 @@
 }
 
 /* 9 users - очень узкий контейнер (1 колонка) */
-@container call-container (max-width: 400px) {
+@container call-container (max-width: 500px) {
   .video-grid[data-user-count="9"] .video-tile {
     width: 100%;
   }
