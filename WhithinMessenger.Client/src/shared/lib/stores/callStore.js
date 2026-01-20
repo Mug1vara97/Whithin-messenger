@@ -234,8 +234,8 @@ export const useCallStore = create(
         voiceCallApi.socket.off('speakingStateChanged');
         
         // Слушаем состояния говорения от сервера
-        voiceCallApi.socket.on('speakingStateChanged', ({ peerId, speaking }) => {
-          console.log('[VAD] Received speaking state from server:', { peerId, speaking });
+        voiceCallApi.socket.on('speakingStateChanged', ({ peerId, userId: eventUserId, speaking }) => {
+          console.log('[VAD] Received speaking state from server:', { peerId, userId: eventUserId, speaking });
           
           // Не обновляем состояние для локального пользователя (он обновляется через локальный VAD)
           const currentState = get();
@@ -243,18 +243,42 @@ export const useCallStore = create(
             return;
           }
           
-          // Находим userId по peerId (socket.id) используя peerIdToUserIdMap
-          let userId = currentState.peerIdToUserIdMap?.get(peerId);
+          // Определяем userId
+          // 1. Используем userId из события если он есть
+          let userId = eventUserId;
           
-          // Если не нашли в map, ищем среди участников
+          // 2. Если нет, ищем в peerIdToUserIdMap
           if (!userId) {
-            const participant = currentState.participants.find(p => 
-              p.socketId === peerId || p.peerId === peerId || p.id === peerId
-            );
-            userId = participant?.userId || participant?.id || peerId;
+            userId = currentState.peerIdToUserIdMap?.get(peerId);
           }
           
-          console.log('[VAD] Mapped peerId to userId:', { peerId, userId, speaking });
+          // 3. Если не нашли, ищем среди участников по peerId
+          if (!userId) {
+            const participant = currentState.participants.find(p => 
+              p.peerId === peerId || p.socketId === peerId
+            );
+            if (participant) {
+              userId = participant.userId || participant.id;
+            }
+          }
+          
+          // 4. Если всё ещё не нашли userId, используем peerId
+          if (!userId) {
+            console.warn('[VAD] Could not find userId for peerId, participants:', 
+              currentState.participants.map(p => ({ peerId: p.peerId, userId: p.userId }))
+            );
+            userId = peerId;
+          }
+          
+          // Сохраняем маппинг для будущих запросов
+          if (userId && userId !== peerId && !currentState.peerIdToUserIdMap?.has(peerId)) {
+            const newMap = new Map(currentState.peerIdToUserIdMap);
+            newMap.set(peerId, userId);
+            set({ peerIdToUserIdMap: newMap });
+            console.log('[VAD] Added mapping peerId -> userId:', { peerId, userId });
+          }
+          
+          console.log('[VAD] Using userId:', { peerId, userId, speaking });
           
           // Проверяем состояние мьюта удалённого участника
           const participantIsMuted = currentState.participantMuteStates?.get(userId);
@@ -351,10 +375,16 @@ export const useCallStore = create(
           voiceCallApi.on('peerJoined', async (peerData) => {
             console.log('Peer joined:', peerData);
             const socketId = peerData.peerId || peerData.id;
-            if (socketId && peerData.userId) {
+            const peerUserId = peerData.userId;
+            
+            // Обновляем маппинг peerId -> userId
+            if (socketId && peerUserId) {
               const newMap = new Map(get().peerIdToUserIdMap);
-              newMap.set(socketId, peerData.userId);
+              newMap.set(socketId, peerUserId);
               set({ peerIdToUserIdMap: newMap });
+              console.log('[VAD] peerJoined: Added mapping', { socketId, userId: peerUserId });
+            } else {
+              console.warn('[VAD] peerJoined: Missing socketId or userId', { socketId, userId: peerUserId, peerData });
             }
             
             // Обновляем participantGlobalAudioStates для реактивности UI
@@ -1050,8 +1080,10 @@ export const useCallStore = create(
               const socketId = peer.peerId || peer.id;
               if (socketId && peer.userId) {
                 newMap.set(socketId, peer.userId);
+                console.log('[VAD] existingPeers: Added mapping', { socketId, userId: peer.userId });
               }
             });
+            console.log('[VAD] existingPeers mappings:', Array.from(newMap.entries()));
             
             // Сначала устанавливаем участников без профилей
             set({

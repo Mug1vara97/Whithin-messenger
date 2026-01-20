@@ -204,6 +204,7 @@ io.on('connection', async (socket) => {
             // Broadcast speaking state to all peers in the room
             socket.to(room.id).emit('speakingStateChanged', {
                 peerId: socket.id,
+                userId: peer.userId, // Добавляем userId для правильного сопоставления
                 speaking: speaking && !peer.muted
             });
         }
@@ -239,6 +240,7 @@ io.on('connection', async (socket) => {
         if (isMuted) {
             socket.to(room.id).emit('speakingStateChanged', {
                 peerId: socket.id,
+                userId: peer.userId, // Добавляем userId для правильного сопоставления
                 speaking: false
             });
         }
