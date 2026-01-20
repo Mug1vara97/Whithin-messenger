@@ -689,7 +689,8 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
               prev.isScreenSharing !== next.isScreenSharing ||
               prev.isMuted !== next.isMuted ||
               prev.isAudioEnabled !== next.isAudioEnabled ||
-              prev.isGlobalAudioMuted !== next.isGlobalAudioMuted) {
+              prev.isGlobalAudioMuted !== next.isGlobalAudioMuted ||
+              prev.isSpeaking !== next.isSpeaking) {
             return false;
           }
         }

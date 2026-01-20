@@ -8,6 +8,9 @@
   position: relative;
   min-height: 0; /* Позволяет сжиматься */
   overflow: hidden; /* Предотвращает переполнение */
+  /* Container Queries - адаптация по размеру контейнера, а не viewport */
+  container-type: inline-size;
+  container-name: call-container;
 }
 
 .video-grid-wrapper {
@@ -413,7 +416,8 @@
   max-width: 600px;
 }
 
-@media (min-width: 1600px) {
+/* Container Query - адаптация по размеру контейнера звонков */
+@container call-container (min-width: 800px) {
   .video-grid[data-user-count="2"] {
     flex-direction: row;
   }
@@ -468,8 +472,8 @@
   width: 50%;
 }
 
-/* 5 users - 3-2 layout for wide screens */
-@media (min-width: 1660px) {
+/* 5 users - 3-2 layout for wide containers */
+@container call-container (min-width: 900px) {
   .video-grid[data-user-count="5"] {
     max-width: 1400px;
   }
@@ -495,7 +499,7 @@
   width: calc(50% - 4px);
 }
 
-@media (min-width: 1660px) {
+@container call-container (min-width: 900px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: calc(33.333% - 5.33px);
   }
@@ -517,7 +521,7 @@
   width: 50%;
 }
 
-@media (min-width: 1300px) {
+@container call-container (min-width: 750px) {
   .video-grid[data-user-count="7"] {
     max-width: 1400px;
   }
@@ -543,7 +547,7 @@
   width: calc(50% - 4px);
 }
 
-@media (min-width: 1300px) {
+@container call-container (min-width: 750px) {
   .video-grid[data-user-count="8"] {
     max-width: 1400px;
   }
@@ -945,92 +949,26 @@
   transform: scale(0.95);
 }
 
-/* ===== АДАПТИВНЫЕ СТИЛИ ===== */
+/* ===== АДАПТИВНЫЕ СТИЛИ (Container Queries) ===== */
 
-/* Адаптивные размеры для маленьких контейнеров */
-@media (max-height: 400px) {
+/* Адаптивные размеры для маленьких контейнеров по ширине */
+@container call-container (max-width: 600px) {
   .video-tile {
-    max-height: 80% !important;
-    min-height: 60% !important;
-  }
-  
-  .small-tile {
-    max-height: 40% !important;
-    min-height: 30% !important;
-  }
-  
-  .focused-tile {
-    max-height: 80% !important;
-    min-height: 60% !important;
+    max-width: 100% !important;
   }
   
   .video-grid {
-    padding: 0 20px !important;
+    padding: 0 8px !important;
   }
   
   .focused-view {
     padding: 10px !important;
-    gap: 8px !important;
   }
 }
 
-@media (max-height: 300px) {
+@container call-container (max-width: 400px) {
   .video-tile {
-    max-height: 70% !important;
-    min-height: 50% !important;
-  }
-  
-  .small-tile {
-    max-height: 35% !important;
-    min-height: 25% !important;
-  }
-  
-  .focused-tile {
-    max-height: 70% !important;
-    min-height: 50% !important;
-  }
-  
-  .video-grid {
-    padding: 0 30px !important;
-  }
-  
-  .focused-view {
-    padding: 8px !important;
-    gap: 6px !important;
-  }
-}
-
-@media (max-height: 250px) {
-  .video-tile {
-    max-height: 60% !important;
-    min-height: 40% !important;
-  }
-  
-  .small-tile {
-    max-height: 30% !important;
-    min-height: 20% !important;
-  }
-  
-  .focused-tile {
-    max-height: 60% !important;
-    min-height: 40% !important;
-  }
-  
-  .video-grid {
-    padding: 0 40px !important;
-  }
-  
-  .focused-view {
-    padding: 6px !important;
-    gap: 4px !important;
-  }
-}
-
-/* Адаптивные размеры для маленьких контейнеров по ширине */
-@media (max-width: 400px) {
-  .video-tile {
-    max-width: 200px !important;
-    min-width: 150px !important;
+    max-width: 100% !important;
   }
   
   .small-tile {
@@ -1043,30 +981,20 @@
   }
   
   .video-grid {
-    padding: 20px 0 !important;
-  }
-  
-  .focused-view {
-    padding: 10px !important;
-  }
-}
-
-@media (max-width: 300px) {
-  .video-tile {
-    max-width: 150px !important;
-    min-width: 100px !important;
-  }
-  
-  .small-tile {
-    max-width: 80px !important;
-    min-width: 60px !important;
-  }
-  
-  .video-grid {
-    padding: 30px 0 !important;
+    padding: 8px !important;
+    gap: 4px;
   }
   
   .focused-view {
     padding: 8px !important;
+    gap: 6px !important;
+  }
+  
+  /* При узком контейнере показываем 1 тайл в ряду для 2+ пользователей */
+  .video-grid[data-user-count="2"] .video-tile,
+  .video-grid[data-user-count="3"] .video-tile,
+  .video-grid[data-user-count="4"] .video-tile {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
