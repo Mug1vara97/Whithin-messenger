@@ -154,9 +154,24 @@ export const useCallStore = create(
       
       // Voice Activity Detection (VAD) функции
       updateSpeakingState: (userId, isSpeaking) => {
+        const state = get();
+        // Не обновляем состояние говорения если микрофон замьючен (для локального пользователя)
+        if (userId === state.currentUserId && state.isMuted && isSpeaking) {
+          return; // Игнорируем speaking=true когда мьют включен
+        }
+        
+        set((prevState) => {
+          const newSpeakingStates = new Map(prevState.participantSpeakingStates);
+          newSpeakingStates.set(userId, isSpeaking);
+          return { participantSpeakingStates: newSpeakingStates };
+        });
+      },
+      
+      // Сброс состояния говорения для пользователя
+      resetSpeakingState: (userId) => {
         set((state) => {
           const newSpeakingStates = new Map(state.participantSpeakingStates);
-          newSpeakingStates.set(userId, isSpeaking);
+          newSpeakingStates.set(userId, false);
           return { participantSpeakingStates: newSpeakingStates };
         });
       },
@@ -178,6 +193,15 @@ export const useCallStore = create(
           threshold: 15,
           holdTime: 200,
           onSpeakingChange: (isSpeaking) => {
+            // Проверяем состояние мьюта перед обновлением
+            const currentState = get();
+            if (currentState.isMuted) {
+              // Если замьючен, всегда устанавливаем speaking = false
+              if (currentState.participantSpeakingStates.get(userId)) {
+                get().resetSpeakingState(userId);
+              }
+              return;
+            }
             get().updateSpeakingState(userId, isSpeaking);
           }
         });
@@ -1530,6 +1554,20 @@ export const useCallStore = create(
         }
         
         set({ isMuted: newMutedState });
+        
+        // Сбрасываем состояние говорения при мьюте
+        if (newMutedState) {
+          const userId = state.currentUserId;
+          if (userId) {
+            get().resetSpeakingState(userId);
+            // Также принудительно сбрасываем VAD детектор
+            const vadDetector = get().localVoiceActivityDetector;
+            if (vadDetector && vadDetector.forceReset) {
+              vadDetector.forceReset();
+            }
+            console.log('[VAD] Reset speaking state due to mute for user:', userId);
+          }
+        }
         
         // Воспроизводим звук мьюта/размьюта (только локально)
         if (newMutedState) {

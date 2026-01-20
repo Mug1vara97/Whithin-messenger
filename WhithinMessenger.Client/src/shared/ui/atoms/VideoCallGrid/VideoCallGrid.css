@@ -59,7 +59,7 @@
   border: 2px solid transparent;
   border-radius: 8px;
   pointer-events: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .video-tile:hover .tile-border {
@@ -68,49 +68,23 @@
 
 /* Speaking animation - точная копия Discord */
 .video-tile.speaking .tile-border {
-  border-color: #23a55a;
-  border-width: 3px;
-  animation: speaking-glow 1.5s ease-in-out infinite;
-  box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3);
+  border: 3px solid #23a55a !important;
+  box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3), 0 0 12px rgba(35, 165, 90, 0.5);
+  animation: speaking-glow 1.2s ease-in-out infinite;
 }
 
 @keyframes speaking-glow {
   0%, 100% {
-    border-color: #23a55a;
-    box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3), 0 0 15px rgba(35, 165, 90, 0.4);
+    box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3), 0 0 12px rgba(35, 165, 90, 0.5);
   }
   50% {
-    border-color: #2dc770;
-    box-shadow: 0 0 0 3px rgba(45, 199, 112, 0.4), 0 0 25px rgba(35, 165, 90, 0.6);
+    box-shadow: 0 0 0 3px rgba(45, 199, 112, 0.5), 0 0 20px rgba(35, 165, 90, 0.7);
   }
 }
 
-/* Пульсация для говорящего участника */
+/* Плавный переход для говорящего участника */
 .video-tile.speaking {
-  transform: scale(1.005);
-  transition: transform 0.2s ease;
-}
-
-.video-tile.speaking::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  border-radius: 10px;
-  background: transparent;
-  pointer-events: none;
-  animation: speaking-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes speaking-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(35, 165, 90, 0);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(35, 165, 90, 0.2);
-  }
+  z-index: 10;
 }
 
 /* Tile content */

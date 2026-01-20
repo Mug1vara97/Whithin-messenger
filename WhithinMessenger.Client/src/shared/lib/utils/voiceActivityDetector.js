@@ -16,11 +16,13 @@ export class VoiceActivityDetector {
     // Настройки детекции
     this.threshold = options.threshold || 15; // Порог громкости для определения говорения (0-255)
     this.smoothingFactor = options.smoothingFactor || 0.3; // Сглаживание для предотвращения "дрожания"
-    this.holdTime = options.holdTime || 200; // Время удержания состояния "говорит" (мс)
+    this.holdTime = options.holdTime || 300; // Время удержания состояния "говорит" (мс) - увеличено для стабильности
+    this.debounceTime = options.debounceTime || 100; // Минимальное время между переключениями состояния (мс)
     
     // Состояние
     this.isSpeaking = false;
     this.lastSpeakingTime = 0;
+    this.lastStateChangeTime = 0;
     this.smoothedVolume = 0;
     
     // Коллбэки
@@ -96,16 +98,21 @@ export class VoiceActivityDetector {
     // Определяем, говорит ли пользователь
     const now = Date.now();
     const wasSpeaking = this.isSpeaking;
+    let newSpeakingState = this.isSpeaking;
     
     if (this.smoothedVolume > this.threshold) {
-      this.isSpeaking = true;
+      newSpeakingState = true;
       this.lastSpeakingTime = now;
     } else if (now - this.lastSpeakingTime > this.holdTime) {
-      this.isSpeaking = false;
+      newSpeakingState = false;
     }
     
-    // Вызываем коллбэк при изменении состояния
-    if (wasSpeaking !== this.isSpeaking) {
+    // Применяем дебаунс - не меняем состояние слишком часто
+    const timeSinceLastChange = now - this.lastStateChangeTime;
+    
+    if (wasSpeaking !== newSpeakingState && timeSinceLastChange >= this.debounceTime) {
+      this.isSpeaking = newSpeakingState;
+      this.lastStateChangeTime = now;
       this.onSpeakingChange(this.isSpeaking);
     }
     
@@ -136,12 +143,33 @@ export class VoiceActivityDetector {
       this.source = null;
     }
     
+    // Сбрасываем состояние и уведомляем если было активно
+    if (this.isSpeaking) {
+      this.isSpeaking = false;
+      this.onSpeakingChange(false);
+    }
+    
     this.analyser = null;
     this.dataArray = null;
-    this.isSpeaking = false;
     this.smoothedVolume = 0;
+    this.lastSpeakingTime = 0;
+    this.lastStateChangeTime = 0;
     
     console.log('[VAD] Stopped voice activity detection');
+  }
+  
+  /**
+   * Принудительный сброс состояния говорения
+   * Используется при мьюте микрофона
+   */
+  forceReset() {
+    if (this.isSpeaking) {
+      this.isSpeaking = false;
+      this.lastSpeakingTime = 0;
+      this.lastStateChangeTime = Date.now();
+      this.onSpeakingChange(false);
+      console.log('[VAD] Force reset speaking state');
+    }
   }
   
   /**
