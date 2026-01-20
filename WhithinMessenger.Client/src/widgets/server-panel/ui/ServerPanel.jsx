@@ -295,10 +295,18 @@ const ServerPanel = ({
   // Получаем баннер из данных сервера
   const serverBanner = useMemo(() => {
     if (!server) return null;
-    return {
-      banner: server.banner,
-      bannerColor: server.bannerColor
+    
+    // Проверяем оба варианта (с маленькой и большой буквы, так как C# может вернуть с большой)
+    const banner = server.banner || server.Banner;
+    const bannerColor = server.bannerColor || server.BannerColor;
+    
+    const result = {
+      banner: banner,
+      bannerColor: bannerColor
     };
+    
+    console.log('ServerPanel: serverBanner computed:', result, 'from server:', server);
+    return result;
   }, [server]);
 
   // Сбрасываем ошибку загрузки баннера при смене сервера
@@ -826,6 +834,14 @@ const ServerPanel = ({
     );
   }
 
+  // Логирование для отладки
+  console.log('ServerPanel render:', {
+    server,
+    serverBanner,
+    hasBanner: !!(serverBanner?.banner || serverBanner?.bannerColor),
+    bannerUrl: serverBanner?.banner ? `${BASE_URL}${serverBanner.banner}` : null
+  });
+
   return (
     <div className="server-panel">
       <div className={`server-panel-header ${(serverBanner?.banner || serverBanner?.bannerColor) ? 'with-banner' : ''}`}>
@@ -842,6 +858,7 @@ const ServerPanel = ({
                   setBannerLoadError(true);
                 }}
                 onLoad={() => {
+                  console.log('ServerPanel: Banner image loaded successfully');
                   setBannerLoadError(false);
                 }}
               />
