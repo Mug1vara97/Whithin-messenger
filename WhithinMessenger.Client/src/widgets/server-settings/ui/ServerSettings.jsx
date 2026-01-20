@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaImage, FaTrash, FaUpload } from 'react-icons/fa';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import { tokenManager } from '../../../shared/lib/utils/tokenManager';
+import { tokenManager } from '../../../shared/lib/services/tokenManager';
 import { Button } from '../../../shared/ui/atoms/Button';
 import { FormField } from '../../../shared/ui/atoms/FormField';
 import './ServerSettings.css';
