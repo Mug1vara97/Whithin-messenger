@@ -416,8 +416,17 @@
   max-width: 600px;
 }
 
-/* Container Query - адаптация по размеру контейнера звонков */
-@container call-container (min-width: 1600px) {
+/* ============================================
+   Container Query - адаптация по размеру контейнера звонков
+   Breakpoints:
+   - < 500px: Узкий контейнер (1 колонка)
+   - 500px - 700px: Средний контейнер (2 колонки)
+   - 700px - 1000px: Широкий контейнер (2-3 колонки)
+   - > 1000px: Очень широкий контейнер (3-4 колонки)
+   ============================================ */
+
+/* 2 users - горизонтально на широких контейнерах */
+@container call-container (min-width: 600px) {
   .video-grid[data-user-count="2"] {
     flex-direction: row;
   }
@@ -443,6 +452,17 @@
   width: 50%;
 }
 
+/* 3 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="3"] .video-tile {
+    width: 100%;
+  }
+  
+  .video-grid[data-user-count="3"] .video-tile:nth-child(3) {
+    width: 100%;
+  }
+}
+
 /* 4 users - 2x2 grid */
 .video-grid[data-user-count="4"] {
   flex-direction: row;
@@ -452,6 +472,13 @@
 
 .video-grid[data-user-count="4"] .video-tile {
   width: calc(50% - 4px);
+}
+
+/* 4 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="4"] .video-tile {
+    width: 100%;
+  }
 }
 
 /* 5 users - 2-2-1 layout by default */
@@ -472,8 +499,19 @@
   width: 50%;
 }
 
+/* 5 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="5"] .video-tile {
+    width: 100%;
+  }
+  
+  .video-grid[data-user-count="5"] .video-tile:nth-child(5) {
+    width: 100%;
+  }
+}
+
 /* 5 users - 3-2 layout for wide containers */
-@container call-container (min-width: 1660px) {
+@container call-container (min-width: 800px) {
   .video-grid[data-user-count="5"] {
     max-width: 1400px;
   }
@@ -488,7 +526,7 @@
   }
 }
 
-/* 6 users - 3x2 grid */
+/* 6 users - 2x3 grid by default */
 .video-grid[data-user-count="6"] {
   flex-direction: row;
   flex-wrap: wrap;
@@ -499,7 +537,15 @@
   width: calc(50% - 4px);
 }
 
-@container call-container (min-width: 1660px) {
+/* 6 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="6"] .video-tile {
+    width: 100%;
+  }
+}
+
+/* 6 users - 3x2 grid for wide containers */
+@container call-container (min-width: 750px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: calc(33.333% - 5.33px);
   }
@@ -521,7 +567,19 @@
   width: 50%;
 }
 
-@container call-container (min-width: 1300px) {
+/* 7 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="7"] .video-tile {
+    width: 100%;
+  }
+  
+  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
+    width: 100%;
+  }
+}
+
+/* 7 users - 3 колонки для широких контейнеров */
+@container call-container (min-width: 750px) {
   .video-grid[data-user-count="7"] {
     max-width: 1400px;
   }
@@ -547,7 +605,15 @@
   width: calc(50% - 4px);
 }
 
-@container call-container (min-width: 1300px) {
+/* 8 users - узкий контейнер (1 колонка) */
+@container call-container (max-width: 500px) {
+  .video-grid[data-user-count="8"] .video-tile {
+    width: 100%;
+  }
+}
+
+/* 8 users - 3 колонки для широких контейнеров */
+@container call-container (min-width: 750px) {
   .video-grid[data-user-count="8"] {
     max-width: 1400px;
   }
@@ -562,6 +628,18 @@
   }
 }
 
+/* 8 users - 4 колонки для очень широких контейнеров */
+@container call-container (min-width: 1100px) {
+  .video-grid[data-user-count="8"] .video-tile {
+    width: calc(25% - 6px);
+  }
+
+  .video-grid[data-user-count="8"] .video-tile:nth-child(7),
+  .video-grid[data-user-count="8"] .video-tile:nth-child(8) {
+    width: calc(25% - 6px);
+  }
+}
+
 /* 9 users - 3x3 grid */
 .video-grid[data-user-count="9"] {
   flex-direction: row;
@@ -572,6 +650,20 @@
 
 .video-grid[data-user-count="9"] .video-tile {
   width: calc(33.333% - 5.33px);
+}
+
+/* 9 users - узкий контейнер (2 колонки) */
+@container call-container (max-width: 600px) {
+  .video-grid[data-user-count="9"] .video-tile {
+    width: calc(50% - 4px);
+  }
+}
+
+/* 9 users - очень узкий контейнер (1 колонка) */
+@container call-container (max-width: 400px) {
+  .video-grid[data-user-count="9"] .video-tile {
+    width: 100%;
+  }
 }
 
 /* Pagination arrows */
