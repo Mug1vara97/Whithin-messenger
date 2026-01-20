@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
+import { VoiceActivityDetector } from '../utils/voiceActivityDetector';
 import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
@@ -74,6 +75,7 @@ export const useCallStore = create(
       participantAudioStates: new Map(), // userId -> isAudioEnabled
       participantGlobalAudioStates: new Map(), // userId -> isGlobalAudioMuted
       participantVideoStates: new Map(), // userId -> isVideoEnabled
+      participantSpeakingStates: new Map(), // userId -> isSpeaking (Voice Activity Detection)
       
       // Состояние аудио (загружаем из localStorage)
       isMuted: (() => {
@@ -138,6 +140,8 @@ export const useCallStore = create(
       gainNodes: new Map(),
       audioElements: new Map(),
       previousVolumes: new Map(),
+      voiceActivityDetectors: new Map(), // userId -> VoiceActivityDetector
+      localVoiceActivityDetector: null, // VAD для локального пользователя
       
       // Флаги состояния
       connecting: false,
@@ -147,6 +151,111 @@ export const useCallStore = create(
       clearError: () => set({ error: null }),
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
+      
+      // Voice Activity Detection (VAD) функции
+      updateSpeakingState: (userId, isSpeaking) => {
+        set((state) => {
+          const newSpeakingStates = new Map(state.participantSpeakingStates);
+          newSpeakingStates.set(userId, isSpeaking);
+          return { participantSpeakingStates: newSpeakingStates };
+        });
+      },
+      
+      // Инициализация VAD для локального пользователя
+      initializeLocalVAD: async (stream, audioContext) => {
+        const state = get();
+        const userId = state.currentUserId;
+        
+        if (!userId || !stream) return;
+        
+        // Очищаем старый детектор
+        if (state.localVoiceActivityDetector) {
+          state.localVoiceActivityDetector.cleanup();
+        }
+        
+        const detector = new VoiceActivityDetector({
+          audioContext,
+          threshold: 15,
+          holdTime: 200,
+          onSpeakingChange: (isSpeaking) => {
+            get().updateSpeakingState(userId, isSpeaking);
+          }
+        });
+        
+        await detector.start(stream, audioContext);
+        set({ localVoiceActivityDetector: detector });
+        console.log('[VAD] Initialized local voice activity detector for user:', userId);
+      },
+      
+      // Инициализация VAD для удалённого участника
+      initializeRemoteVAD: async (userId, stream, audioContext) => {
+        const state = get();
+        
+        if (!userId || !stream) return;
+        
+        // Очищаем старый детектор для этого пользователя
+        const existingDetector = state.voiceActivityDetectors.get(userId);
+        if (existingDetector) {
+          existingDetector.cleanup();
+        }
+        
+        const detector = new VoiceActivityDetector({
+          audioContext,
+          threshold: 12, // Немного ниже порог для удаленных участников
+          holdTime: 250,
+          onSpeakingChange: (isSpeaking) => {
+            get().updateSpeakingState(userId, isSpeaking);
+          }
+        });
+        
+        await detector.start(stream, audioContext);
+        
+        const newDetectors = new Map(state.voiceActivityDetectors);
+        newDetectors.set(userId, detector);
+        set({ voiceActivityDetectors: newDetectors });
+        console.log('[VAD] Initialized remote voice activity detector for user:', userId);
+      },
+      
+      // Очистка VAD для участника
+      cleanupVAD: (userId) => {
+        const state = get();
+        
+        const detector = state.voiceActivityDetectors.get(userId);
+        if (detector) {
+          detector.cleanup();
+          const newDetectors = new Map(state.voiceActivityDetectors);
+          newDetectors.delete(userId);
+          
+          const newSpeakingStates = new Map(state.participantSpeakingStates);
+          newSpeakingStates.delete(userId);
+          
+          set({ 
+            voiceActivityDetectors: newDetectors,
+            participantSpeakingStates: newSpeakingStates
+          });
+          console.log('[VAD] Cleaned up voice activity detector for user:', userId);
+        }
+      },
+      
+      // Очистка всех VAD
+      cleanupAllVAD: () => {
+        const state = get();
+        
+        if (state.localVoiceActivityDetector) {
+          state.localVoiceActivityDetector.cleanup();
+        }
+        
+        for (const detector of state.voiceActivityDetectors.values()) {
+          detector.cleanup();
+        }
+        
+        set({
+          localVoiceActivityDetector: null,
+          voiceActivityDetectors: new Map(),
+          participantSpeakingStates: new Map()
+        });
+        console.log('[VAD] Cleaned up all voice activity detectors');
+      },
       
       // Инициализация звонка
       initializeCall: async (userId, userName) => {
@@ -266,6 +375,9 @@ export const useCallStore = create(
                   console.warn('Error disconnecting gain node:', e);
                 }
               }
+              
+              // Очищаем Voice Activity Detector для этого пользователя
+              get().cleanupVAD(userId);
               
               // Очищаем состояния
               set((state) => {
@@ -1217,6 +1329,14 @@ export const useCallStore = create(
               userVolumes: newUserVolumes
             };
           });
+          
+          // Инициализация Voice Activity Detection (VAD) для удалённого участника
+          try {
+            const remoteStream = new MediaStream([consumer.track]);
+            await get().initializeRemoteVAD(userId, remoteStream, audioContext);
+          } catch (vadError) {
+            console.warn('[VAD] Failed to initialize remote VAD for user:', userId, vadError);
+          }
 
           try {
             await audioElement.play();
@@ -1299,6 +1419,13 @@ export const useCallStore = create(
           const noiseSuppressionManager = new NoiseSuppressionManager();
           await noiseSuppressionManager.initialize(stream, audioContext);
           set({ noiseSuppressionManager });
+          
+          // Инициализация Voice Activity Detection (VAD) для локального пользователя
+          try {
+            await get().initializeLocalVAD(stream, audioContext);
+          } catch (vadError) {
+            console.warn('[VAD] Failed to initialize local VAD:', vadError);
+          }
           
           // Получаем обработанный трек (с шумоподавлением, если включено)
           const processedStream = noiseSuppressionManager.getProcessedStream();
@@ -1812,6 +1939,9 @@ export const useCallStore = create(
           if (state.noiseSuppressionManager) {
             state.noiseSuppressionManager.cleanup();
           }
+          
+          // Очистка всех Voice Activity Detectors
+          get().cleanupAllVAD();
           
           // Закрытие audio context
           if (state.audioContext && state.audioContext.state !== 'closed') {

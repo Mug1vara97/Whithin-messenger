@@ -1,5 +1,5 @@
 const { AudioSource, AudioFrame, LocalAudioTrack, TrackPublishOptions, TrackSource } = require('@livekit/rtc-node');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 
 class MusicPlayer {
   constructor(room) {
@@ -8,7 +8,6 @@ class MusicPlayer {
     this.audioSource = null;
     this.currentSource = null;
     this.ffmpegProcess = null;
-    this.ytdlpProcess = null;
     this.isPlaying = false;
     this.isPaused = false;
     this.queue = [];
@@ -80,10 +79,6 @@ class MusicPlayer {
       console.log(`[MusicPlayer] Playing: ${url}`);
       
       // Stop current playback if any
-      if (this.ytdlpProcess) {
-        this.ytdlpProcess.kill();
-        this.ytdlpProcess = null;
-      }
       if (this.ffmpegProcess) {
         this.ffmpegProcess.kill();
         this.ffmpegProcess = null;
@@ -105,60 +100,43 @@ class MusicPlayer {
         console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
       }
       
-      // Create yt-dlp process to extract audio stream
-      // yt-dlp outputs directly to stdout, which we'll pipe to ffmpeg
-      // Use bestaudio format directly (no --extract-audio needed for stdout)
-      this.ytdlpProcess = spawn('yt-dlp', [
-        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]',  // Best audio format, fallback to best low-res video
-        '--no-playlist',           // Don't download playlists
-        '-o', '-',                  // Output to stdout
-        '--no-warnings',            // Suppress warnings
-        '--quiet',                  // Quiet mode
-        '--no-check-certificates',  // Skip SSL certificate check (for Docker)
-        normalizedUrl
-      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      // Get stream URL from yt-dlp first, then pass it to ffmpeg
+      // This is more reliable than piping stdout
+      const { execSync } = require('child_process');
+      let streamUrl;
+      try {
+        console.log('[MusicPlayer] Getting stream URL from yt-dlp...');
+        const urlOutput = execSync(`yt-dlp -f "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]" --get-url --no-playlist --no-warnings --quiet --no-check-certificates "${normalizedUrl}"`, {
+          encoding: 'utf8',
+          timeout: 30000, // 30 second timeout
+          maxBuffer: 1024 * 1024 // 1MB buffer
+        });
+        streamUrl = urlOutput.trim().split('\n')[0]; // Get first URL (in case multiple)
+        console.log(`[MusicPlayer] Got stream URL: ${streamUrl.substring(0, 100)}...`);
+      } catch (urlError) {
+        console.error('[MusicPlayer] Error getting stream URL from yt-dlp:', urlError.message);
+        throw new Error(`Failed to get stream URL: ${urlError.message}`);
+      }
       
-      // Create ffmpeg process to convert audio to raw PCM format
-      // Input from yt-dlp stdout, output: Raw PCM 16-bit, 48kHz, stereo (for AudioSource)
+      if (!streamUrl || !streamUrl.startsWith('http')) {
+        throw new Error('Invalid stream URL received from yt-dlp');
+      }
+      
+      // Create ffmpeg process to download and convert audio to raw PCM format
+      // Input from stream URL, output: Raw PCM 16-bit, 48kHz, stereo (for AudioSource)
       this.ffmpegProcess = spawn('ffmpeg', [
-        '-i', 'pipe:0',             // Input from stdin (yt-dlp output)
+        '-i', streamUrl,             // Input from stream URL
         '-f', 's16le',               // Output format: signed 16-bit little-endian PCM
         '-ar', String(this.sampleRate),  // Sample rate: 48kHz
         '-ac', String(this.channels),    // Channels: stereo
         '-acodec', 'pcm_s16le',     // Audio codec: PCM 16-bit
         '-loglevel', 'error',       // Reduce ffmpeg output
-        'pipe:1'                     // Output to stdout
+        '-reconnect', '1',           // Reconnect on errors
+        '-reconnect_at_eof', '1',    // Reconnect at EOF
+        '-reconnect_streamed', '1',   // Reconnect for streamed media
+        '-reconnect_delay_max', '2',  // Max delay between reconnects
+        'pipe:1'                      // Output to stdout
       ], { stdio: ['pipe', 'pipe', 'pipe'] });
-      
-      // Pipe yt-dlp output to ffmpeg input
-      this.ytdlpProcess.stdout.pipe(this.ffmpegProcess.stdin);
-      
-      // Handle yt-dlp errors
-      this.ytdlpProcess.stderr.on('data', (data) => {
-        const errorMsg = data.toString();
-        if (errorMsg.includes('ERROR') || errorMsg.includes('WARNING')) {
-          console.error(`[MusicPlayer] yt-dlp error: ${errorMsg}`);
-        }
-      });
-      
-      this.ytdlpProcess.on('error', (error) => {
-        console.error('[MusicPlayer] yt-dlp process error:', error);
-        // Clean up processes
-        if (this.ffmpegProcess) {
-          this.ffmpegProcess.kill();
-          this.ffmpegProcess = null;
-        }
-        this.ytdlpProcess = null;
-        throw new Error(`Failed to start yt-dlp: ${error.message}. Make sure yt-dlp is installed.`);
-      });
-      
-      this.ytdlpProcess.on('exit', (code, signal) => {
-        if (code !== 0 && code !== null && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
-          console.error(`[MusicPlayer] yt-dlp exited with code ${code}, signal: ${signal}`);
-          // If yt-dlp fails, ffmpeg will also fail - handle in ffmpeg exit handler
-          // Don't throw here to avoid double error handling
-        }
-      });
       
       // Handle ffmpeg errors
       this.ffmpegProcess.stderr.on('data', (data) => {
@@ -166,17 +144,6 @@ class MusicPlayer {
         if (errorMsg.includes('error') || errorMsg.includes('Error')) {
           console.error('[MusicPlayer] FFmpeg error:', errorMsg);
         }
-      });
-      
-      // Handle ffmpeg stdin errors (from yt-dlp pipe)
-      this.ffmpegProcess.stdin.on('error', (stdinError) => {
-        console.error('[MusicPlayer] Error in ffmpeg stdin:', stdinError);
-        // Ignore - usually means ffmpeg closed
-      });
-      
-      // Handle yt-dlp stdout errors
-      this.ytdlpProcess.stdout.on('error', (stdoutError) => {
-        console.error('[MusicPlayer] Error in yt-dlp stdout:', stdoutError);
       });
       
       // Handle ffmpeg process errors
@@ -187,12 +154,7 @@ class MusicPlayer {
       this.ffmpegProcess.on('exit', (code, signal) => {
         if (code !== 0 && code !== null && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
           console.error(`[MusicPlayer] FFmpeg exited with code ${code}, signal: ${signal}`);
-          // If ffmpeg exits with error, yt-dlp likely also failed
           // Clean up and handle error
-          if (this.ytdlpProcess) {
-            this.ytdlpProcess.kill();
-            this.ytdlpProcess = null;
-          }
           // Error handling will be done in the catch block
           if (!this.isPlaying) {
             // Already handled
@@ -284,10 +246,6 @@ class MusicPlayer {
         if (code === 0 || code === null) {
           console.log('[MusicPlayer] Stream ended successfully');
           this.ffmpegProcess = null;
-          if (this.ytdlpProcess) {
-            this.ytdlpProcess.kill();
-            this.ytdlpProcess = null;
-          }
           this.audioBuffer = Buffer.alloc(0);
           this.isPlaying = false;
           this.isPaused = false;
@@ -342,10 +300,6 @@ class MusicPlayer {
   }
 
   async stop() {
-    if (this.ytdlpProcess) {
-      this.ytdlpProcess.kill();
-      this.ytdlpProcess = null;
-    }
     if (this.ffmpegProcess) {
       this.ffmpegProcess.kill();
       this.ffmpegProcess = null;

@@ -81,6 +81,7 @@ const VoiceCallView = ({
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
+    participantSpeakingStates,
     startCall,
     endCall,
     toggleMute,
@@ -173,7 +174,8 @@ const VoiceCallView = ({
       participantMuteStatesSize: participantMuteStates?.size,
       participantAudioStatesSize: participantAudioStates?.size,
       participantGlobalAudioStatesSize: participantGlobalAudioStates?.size,
-      participantVideoStatesSize: participantVideoStates?.size
+      participantVideoStatesSize: participantVideoStates?.size,
+      participantSpeakingStatesSize: participantSpeakingStates?.size
     });
     
     // Текущий пользователь (хост)
@@ -181,7 +183,8 @@ const VoiceCallView = ({
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
-    currentUser.isSpeaking = false; // Можно добавить логику определения говорит ли пользователь
+    // Используем Voice Activity Detection для определения говорения (если микрофон не замьючен)
+    currentUser.isSpeaking = !isMuted && (participantSpeakingStates?.get(userId) || false);
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
@@ -191,7 +194,8 @@ const VoiceCallView = ({
     console.log('🧑 Current user state:', {
       isMuted: currentUser.isMuted,
       isAudioEnabled: currentUser.isAudioEnabled,
-      isGlobalAudioMuted: currentUser.isGlobalAudioMuted
+      isGlobalAudioMuted: currentUser.isGlobalAudioMuted,
+      isSpeaking: currentUser.isSpeaking
     });
     
     const videoParticipantsList = [currentUser];
@@ -213,7 +217,9 @@ const VoiceCallView = ({
       videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
       videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
       videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
-      videoParticipant.isSpeaking = participant.isSpeaking || false;
+      // Используем Voice Activity Detection для определения говорения (если микрофон не замьючен)
+      const participantIsMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+      videoParticipant.isSpeaking = !participantIsMuted && (participantSpeakingStates?.get(participantUserId) || participant.isSpeaking || false);
       videoParticipant.isVideoEnabled = participantVideoStates?.get(participantUserId) ?? participant.isVideoEnabled ?? false;
       videoParticipant.videoStream = participant.videoStream; // Добавляем видео поток
       // Добавляем данные профиля
@@ -237,6 +243,7 @@ const VoiceCallView = ({
     participantAudioStates,
     participantGlobalAudioStates,
     participantVideoStates,
+    participantSpeakingStates,
     currentUserProfile
   ]);
 
