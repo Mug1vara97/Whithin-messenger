@@ -26,6 +26,9 @@ export const useServer = (serverId) => {
         serverId: serverData.serverId,
         name: serverData.name,
         ownerId: serverData.ownerId,
+        avatar: serverData.avatar,
+        banner: serverData.banner,
+        bannerColor: serverData.bannerColor,
         categories: serverData.categories,
         userRoles: serverData.userRoles
       };

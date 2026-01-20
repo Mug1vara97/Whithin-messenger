@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import tokenManager from '../../../shared/lib/services/tokenManager';
+
+// Хелпер для получения заголовков авторизации
+const getAuthHeaders = () => {
+  const token = tokenManager.getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
 import { CategoriesList } from '../../categories-list';
 import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, UserPanel, AddMemberModal } from '../../../shared/ui/molecules';
 import { 
@@ -47,13 +54,19 @@ const ServerPanel = ({
     
     try {
       const response = await fetch(`${BASE_URL}/api/server/${selectedServer.serverId}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        }
       });
       
       if (response.ok) {
         const serverData = await response.json();
         console.log('ServerPanel: Received server data:', serverData);
         setServer(serverData);
+      } else {
+        console.error('ServerPanel: Failed to fetch server data, status:', response.status);
       }
     } catch (error) {
       console.error('Error fetching server data:', error);
@@ -292,27 +305,28 @@ const ServerPanel = ({
   }, [serverConnection, onServerDataUpdated]); // Возвращаем onServerDataUpdated
 
 
-  // Получаем баннер из данных сервера
+  // Получаем баннер из данных сервера (используем server или selectedServer)
   const serverBanner = useMemo(() => {
-    if (!server) return null;
+    const serverData = server || selectedServer;
+    if (!serverData) return null;
     
     // Проверяем оба варианта (с маленькой и большой буквы, так как C# может вернуть с большой)
-    const banner = server.banner || server.Banner;
-    const bannerColor = server.bannerColor || server.BannerColor;
+    const banner = serverData.banner || serverData.Banner;
+    const bannerColor = serverData.bannerColor || serverData.BannerColor;
     
     const result = {
       banner: banner,
       bannerColor: bannerColor
     };
     
-    console.log('ServerPanel: serverBanner computed:', result, 'from server:', server);
+    console.log('ServerPanel: serverBanner computed:', result, 'from serverData:', serverData);
     return result;
-  }, [server]);
+  }, [server, selectedServer]);
 
   // Сбрасываем ошибку загрузки баннера при смене сервера
   useEffect(() => {
     setBannerLoadError(false);
-  }, [server?.banner]);
+  }, [server?.banner, selectedServer?.banner]);
 
   useEffect(() => {
     if (selectedServer) {
@@ -837,6 +851,7 @@ const ServerPanel = ({
   // Логирование для отладки
   console.log('ServerPanel render:', {
     server,
+    selectedServer,
     serverBanner,
     hasBanner: !!(serverBanner?.banner || serverBanner?.bannerColor),
     bannerUrl: serverBanner?.banner ? `${BASE_URL}${serverBanner.banner}` : null
