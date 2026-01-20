@@ -190,8 +190,8 @@ export const useCallStore = create(
         
         const detector = new VoiceActivityDetector({
           audioContext,
-          threshold: 25, // Увеличен порог для меньшей чувствительности
-          holdTime: 300,
+          threshold: 30, // Увеличен порог для меньшей чувствительности
+          holdTime: 350,
           onSpeakingChange: (isSpeaking) => {
             // Проверяем состояние мьюта перед обновлением
             const currentState = get();
@@ -200,9 +200,21 @@ export const useCallStore = create(
               if (currentState.participantSpeakingStates.get(userId)) {
                 get().resetSpeakingState(userId);
               }
+              // Отправляем speaking: false на сервер
+              if (voiceCallApi.socket) {
+                voiceCallApi.socket.emit('speaking', { speaking: false });
+              }
               return;
             }
+            
+            // Обновляем локальное состояние
             get().updateSpeakingState(userId, isSpeaking);
+            
+            // Отправляем состояние на сервер для рассылки всем участникам
+            if (voiceCallApi.socket) {
+              voiceCallApi.socket.emit('speaking', { speaking: isSpeaking });
+              console.log('[VAD] Sent speaking state to server:', isSpeaking);
+            }
           }
         });
         
@@ -211,39 +223,57 @@ export const useCallStore = create(
         console.log('[VAD] Initialized local voice activity detector for user:', userId);
       },
       
-      // Инициализация VAD для удалённого участника
-      initializeRemoteVAD: async (userId, stream, audioContext) => {
-        const state = get();
-        
-        if (!userId || !stream) return;
-        
-        // Очищаем старый детектор для этого пользователя
-        const existingDetector = state.voiceActivityDetectors.get(userId);
-        if (existingDetector) {
-          existingDetector.cleanup();
+      // Слушать состояние говорения от сервера для удалённых участников
+      initializeSpeakingStateListener: () => {
+        if (!voiceCallApi.socket) {
+          console.warn('[VAD] Socket not available for speaking state listener');
+          return;
         }
         
-        const detector = new VoiceActivityDetector({
-          audioContext,
-          threshold: 20, // Порог для удаленных участников
-          holdTime: 300,
-          onSpeakingChange: (isSpeaking) => {
-            // Проверяем состояние мьюта удалённого участника
-            const currentState = get();
-            const participantIsMuted = currentState.participantMuteStates?.get(userId);
-            if (participantIsMuted && isSpeaking) {
-              return; // Не показываем индикацию если участник замьючен
-            }
-            get().updateSpeakingState(userId, isSpeaking);
+        // Удаляем предыдущий обработчик если есть
+        voiceCallApi.socket.off('speakingStateChanged');
+        
+        // Слушаем состояния говорения от сервера
+        voiceCallApi.socket.on('speakingStateChanged', ({ peerId, speaking }) => {
+          console.log('[VAD] Received speaking state from server:', { peerId, speaking });
+          
+          // Не обновляем состояние для локального пользователя (он обновляется через локальный VAD)
+          const currentState = get();
+          if (peerId === voiceCallApi.socket?.id) {
+            return;
           }
+          
+          // Находим userId по peerId (socket.id) используя peerIdToUserIdMap
+          let userId = currentState.peerIdToUserIdMap?.get(peerId);
+          
+          // Если не нашли в map, ищем среди участников
+          if (!userId) {
+            const participant = currentState.participants.find(p => 
+              p.socketId === peerId || p.peerId === peerId || p.id === peerId
+            );
+            userId = participant?.userId || participant?.id || peerId;
+          }
+          
+          console.log('[VAD] Mapped peerId to userId:', { peerId, userId, speaking });
+          
+          // Проверяем состояние мьюта удалённого участника
+          const participantIsMuted = currentState.participantMuteStates?.get(userId);
+          if (participantIsMuted && speaking) {
+            console.log('[VAD] Skipping speaking state for muted participant:', userId);
+            return; // Не показываем индикацию если участник замьючен
+          }
+          
+          get().updateSpeakingState(userId, speaking);
         });
         
-        await detector.start(stream, audioContext);
-        
-        const newDetectors = new Map(state.voiceActivityDetectors);
-        newDetectors.set(userId, detector);
-        set({ voiceActivityDetectors: newDetectors });
-        console.log('[VAD] Initialized remote voice activity detector for user:', userId);
+        console.log('[VAD] Speaking state listener initialized');
+      },
+      
+      // Инициализация VAD для удалённого участника (устарело - теперь состояние приходит от сервера)
+      initializeRemoteVAD: async (userId, stream, audioContext) => {
+        // Больше не используем локальный VAD для удалённых участников
+        // Состояние говорения приходит от сервера через speakingStateChanged событие
+        console.log('[VAD] Remote VAD skipped for user (using server state):', userId);
       },
       
       // Очистка VAD для участника
@@ -1457,6 +1487,13 @@ export const useCallStore = create(
             console.warn('[VAD] Failed to initialize local VAD:', vadError);
           }
           
+          // Инициализация слушателя состояния говорения от сервера (для удалённых участников)
+          try {
+            get().initializeSpeakingStateListener();
+          } catch (listenerError) {
+            console.warn('[VAD] Failed to initialize speaking state listener:', listenerError);
+          }
+          
           // Получаем обработанный трек (с шумоподавлением, если включено)
           const processedStream = noiseSuppressionManager.getProcessedStream();
           const audioTrack = processedStream ? processedStream.getAudioTracks()[0] : stream.getAudioTracks()[0];
@@ -1973,6 +2010,7 @@ export const useCallStore = create(
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
             voiceCallApi.socket.off('globalAudioState');
+            voiceCallApi.socket.off('speakingStateChanged');
           }
           
           if (state.localStream) {

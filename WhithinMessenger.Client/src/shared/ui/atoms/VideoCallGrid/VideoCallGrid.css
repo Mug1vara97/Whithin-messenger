@@ -417,7 +417,7 @@
 }
 
 /* Container Query - адаптация по размеру контейнера звонков */
-@container call-container (min-width: 800px) {
+@container call-container (min-width: 1600px) {
   .video-grid[data-user-count="2"] {
     flex-direction: row;
   }
@@ -473,7 +473,7 @@
 }
 
 /* 5 users - 3-2 layout for wide containers */
-@container call-container (min-width: 900px) {
+@container call-container (min-width: 1660px) {
   .video-grid[data-user-count="5"] {
     max-width: 1400px;
   }
@@ -499,7 +499,7 @@
   width: calc(50% - 4px);
 }
 
-@container call-container (min-width: 900px) {
+@container call-container (min-width: 1660px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: calc(33.333% - 5.33px);
   }
@@ -521,7 +521,7 @@
   width: 50%;
 }
 
-@container call-container (min-width: 750px) {
+@container call-container (min-width: 1300px) {
   .video-grid[data-user-count="7"] {
     max-width: 1400px;
   }
@@ -547,7 +547,7 @@
   width: calc(50% - 4px);
 }
 
-@container call-container (min-width: 750px) {
+@container call-container (min-width: 1300px) {
   .video-grid[data-user-count="8"] {
     max-width: 1400px;
   }

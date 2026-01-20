@@ -14,10 +14,10 @@ export class VoiceActivityDetector {
     this.isRunning = false;
     
     // Настройки детекции
-    this.threshold = options.threshold || 25; // Порог громкости для определения говорения (0-255) - увеличен для меньшей чувствительности
-    this.smoothingFactor = options.smoothingFactor || 0.4; // Сглаживание для предотвращения "дрожания"
-    this.holdTime = options.holdTime || 350; // Время удержания состояния "говорит" (мс)
-    this.debounceTime = options.debounceTime || 150; // Минимальное время между переключениями состояния (мс)
+    this.threshold = options.threshold || 30; // Порог громкости для определения говорения (0-255) - увеличен для меньшей чувствительности
+    this.smoothingFactor = options.smoothingFactor || 0.5; // Сглаживание для предотвращения "дрожания"
+    this.holdTime = options.holdTime || 400; // Время удержания состояния "говорит" (мс)
+    this.debounceTime = options.debounceTime || 200; // Минимальное время между переключениями состояния (мс)
     
     // Состояние
     this.isSpeaking = false;
