@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
@@ -14,11 +15,13 @@ public class ServerController : ControllerBase
 {
     private readonly IServerRepository _serverRepository;
     private readonly IMediator _mediator;
+    private readonly IWebHostEnvironment _environment;
 
-    public ServerController(IServerRepository serverRepository, IMediator mediator)
+    public ServerController(IServerRepository serverRepository, IMediator mediator, IWebHostEnvironment environment)
     {
         _serverRepository = serverRepository;
         _mediator = mediator;
+        _environment = environment;
     }
 
     [HttpGet("servers")]
@@ -176,7 +179,51 @@ public class ServerController : ControllerBase
                 return Forbid("Только владелец сервера может загружать баннер");
             }
 
-            return Ok(new { banner = "/uploads/banners/placeholder.jpg" });
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "Файл не выбран" });
+            }
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                return BadRequest(new { error = "Неподдерживаемый тип файла" });
+            }
+
+            if (file.Length > 10 * 1024 * 1024)
+            {
+                return BadRequest(new { error = "Файл слишком большой (максимум 10MB)" });
+            }
+
+            // Удаляем старый баннер если есть
+            if (!string.IsNullOrEmpty(server.Banner))
+            {
+                var oldFilePath = Path.Combine(_environment.WebRootPath, server.Banner.TrimStart('/'));
+                if (System.IO.File.Exists(oldFilePath))
+                {
+                    System.IO.File.Delete(oldFilePath);
+                }
+            }
+
+            var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "banners");
+            if (!Directory.Exists(uploadsPath))
+            {
+                Directory.CreateDirectory(uploadsPath);
+            }
+
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsPath, fileName);
+            var relativePath = $"/uploads/banners/{fileName}";
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            server.Banner = relativePath;
+            await _serverRepository.UpdateAsync(server);
+
+            return Ok(new { banner = relativePath });
         }
         catch (Exception ex)
         {
@@ -240,7 +287,51 @@ public class ServerController : ControllerBase
                 return Forbid("Только владелец сервера может загружать аватар");
             }
 
-            return Ok(new { avatar = "/uploads/avatars/placeholder.jpg" });
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "Файл не выбран" });
+            }
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                return BadRequest(new { error = "Неподдерживаемый тип файла" });
+            }
+
+            if (file.Length > 5 * 1024 * 1024)
+            {
+                return BadRequest(new { error = "Файл слишком большой (максимум 5MB)" });
+            }
+
+            // Удаляем старый аватар если есть
+            if (!string.IsNullOrEmpty(server.Avatar))
+            {
+                var oldFilePath = Path.Combine(_environment.WebRootPath, server.Avatar.TrimStart('/'));
+                if (System.IO.File.Exists(oldFilePath))
+                {
+                    System.IO.File.Delete(oldFilePath);
+                }
+            }
+
+            var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "avatars");
+            if (!Directory.Exists(uploadsPath))
+            {
+                Directory.CreateDirectory(uploadsPath);
+            }
+
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsPath, fileName);
+            var relativePath = $"/uploads/avatars/{fileName}";
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            server.Avatar = relativePath;
+            await _serverRepository.UpdateAsync(server);
+
+            return Ok(new { avatar = relativePath });
         }
         catch (Exception ex)
         {
