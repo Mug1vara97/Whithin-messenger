@@ -318,6 +318,11 @@ const VideoCallGrid = ({
     const showSlider = showVolumeSliders.get(participant.id) || false;
     const isScreenShare = participant.isScreenShare || false;
     
+    // Debug: логируем состояние говорения для текущего пользователя
+    if (participant.isCurrentUser && isSpeaking) {
+      console.log('🎤 [VideoCallGrid] Current user is speaking, applying .speaking class');
+    }
+    
     const handleVolumeClick = (e) => {
       e.stopPropagation();
       if (onToggleUserMute) {

@@ -67,24 +67,51 @@
 }
 
 /* Speaking animation - точная копия Discord */
-.video-tile.speaking .tile-border {
-  border: 3px solid #23a55a !important;
-  box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3), 0 0 12px rgba(35, 165, 90, 0.5);
-  animation: speaking-glow 1.2s ease-in-out infinite;
-}
-
-@keyframes speaking-glow {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(35, 165, 90, 0.3), 0 0 12px rgba(35, 165, 90, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 0 3px rgba(45, 199, 112, 0.5), 0 0 20px rgba(35, 165, 90, 0.7);
-  }
-}
-
-/* Плавный переход для говорящего участника */
+/* Используем inset box-shadow - он не обрезается overflow:hidden */
 .video-tile.speaking {
   z-index: 10;
+  box-shadow: inset 0 0 0 3px #23a55a, inset 0 0 20px rgba(35, 165, 90, 0.6) !important;
+  animation: speaking-tile-glow 1.2s ease-in-out infinite !important;
+}
+
+/* Зелёный оверлей для дополнительной индикации */
+.video-tile.speaking::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(35, 165, 90, 0.15) 0%, rgba(35, 165, 90, 0.05) 100%);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 8px;
+  animation: speaking-overlay-pulse 1.2s ease-in-out infinite;
+}
+
+/* Дополнительная рамка через tile-border для усиления эффекта */
+.video-tile.speaking .tile-border {
+  border: 3px solid #23a55a !important;
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(35, 165, 90, 0.4);
+}
+
+@keyframes speaking-tile-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 0 3px #23a55a, inset 0 0 20px rgba(35, 165, 90, 0.6);
+  }
+  50% {
+    box-shadow: inset 0 0 0 4px #2dc770, inset 0 0 30px rgba(35, 165, 90, 0.8);
+  }
+}
+
+@keyframes speaking-overlay-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Tile content */
