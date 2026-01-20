@@ -190,8 +190,8 @@ export const useCallStore = create(
         
         const detector = new VoiceActivityDetector({
           audioContext,
-          threshold: 15,
-          holdTime: 200,
+          threshold: 25, // Увеличен порог для меньшей чувствительности
+          holdTime: 300,
           onSpeakingChange: (isSpeaking) => {
             // Проверяем состояние мьюта перед обновлением
             const currentState = get();
@@ -225,9 +225,15 @@ export const useCallStore = create(
         
         const detector = new VoiceActivityDetector({
           audioContext,
-          threshold: 12, // Немного ниже порог для удаленных участников
-          holdTime: 250,
+          threshold: 20, // Порог для удаленных участников
+          holdTime: 300,
           onSpeakingChange: (isSpeaking) => {
+            // Проверяем состояние мьюта удалённого участника
+            const currentState = get();
+            const participantIsMuted = currentState.participantMuteStates?.get(userId);
+            if (participantIsMuted && isSpeaking) {
+              return; // Не показываем индикацию если участник замьючен
+            }
             get().updateSpeakingState(userId, isSpeaking);
           }
         });
