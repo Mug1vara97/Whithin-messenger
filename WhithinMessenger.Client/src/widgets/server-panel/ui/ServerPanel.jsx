@@ -26,7 +26,6 @@ const ServerPanel = ({
   const { user } = useAuthContext();
   
   const [server, setServer] = useState(null);
-  const [serverBanner, setServerBanner] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [selectedCategoryForChannel, setSelectedCategoryForChannel] = useState(null);
@@ -36,6 +35,7 @@ const ServerPanel = ({
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, type: null, data: null });
   const [serverConnection, setServerConnection] = useState(null);
+  const [bannerLoadError, setBannerLoadError] = useState(false);
   const connectionRef = useRef(null);
   const currentServerRef = useRef(null);
   
@@ -292,31 +292,25 @@ const ServerPanel = ({
   }, [serverConnection, onServerDataUpdated]); // Возвращаем onServerDataUpdated
 
 
-  const fetchServerBanner = useCallback(async () => {
-    if (!selectedServer?.serverId) return;
-    
-    try {
-      const response = await fetch(`${BASE_URL}/api/server/${selectedServer.serverId}/banner`, {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setServerBanner(data);
-      } else {
-        setServerBanner(null);
-      }
-    } catch (error) {
-      console.error('Error fetching server banner:', error);
-      setServerBanner(null);
-    }
-  }, [selectedServer?.serverId]);
+  // Получаем баннер из данных сервера
+  const serverBanner = useMemo(() => {
+    if (!server) return null;
+    return {
+      banner: server.banner,
+      bannerColor: server.bannerColor
+    };
+  }, [server]);
+
+  // Сбрасываем ошибку загрузки баннера при смене сервера
+  useEffect(() => {
+    setBannerLoadError(false);
+  }, [server?.banner]);
 
   useEffect(() => {
     if (selectedServer) {
       fetchServerData();
-      fetchServerBanner();
     }
-  }, [selectedServer, fetchServerData, fetchServerBanner]); // Возвращаем функции
+  }, [selectedServer, fetchServerData]);
 
 
   useEffect(() => {
@@ -836,13 +830,32 @@ const ServerPanel = ({
     <div className="server-panel">
       <div className={`server-panel-header ${(serverBanner?.banner || serverBanner?.bannerColor) ? 'with-banner' : ''}`}>
         {(serverBanner?.banner || serverBanner?.bannerColor) && (
-          <div 
-            className="server-panel-banner"
-            style={{
-              backgroundImage: serverBanner?.banner ? `url(${BASE_URL}${serverBanner.banner})` : 'none',
-              backgroundColor: serverBanner?.bannerColor || '#3f3f3f'
-            }}
-          />
+          <>
+            {/* Скрытое изображение для проверки загрузки */}
+            {serverBanner?.banner && !bannerLoadError && (
+              <img
+                src={`${BASE_URL}${serverBanner.banner}`}
+                alt=""
+                style={{ display: 'none' }}
+                onError={() => {
+                  console.warn('ServerPanel: Banner image failed to load:', serverBanner.banner);
+                  setBannerLoadError(true);
+                }}
+                onLoad={() => {
+                  setBannerLoadError(false);
+                }}
+              />
+            )}
+            <div 
+              className="server-panel-banner"
+              style={{
+                backgroundImage: (serverBanner?.banner && !bannerLoadError) 
+                  ? `url(${BASE_URL}${serverBanner.banner})` 
+                  : 'none',
+                backgroundColor: serverBanner?.bannerColor || '#3f3f3f'
+              }}
+            />
+          </>
         )}
         <div className="server-info" onClick={() => setShowDropdown(!showDropdown)}>
           <h3>{currentServer.Name || currentServer.name}</h3>

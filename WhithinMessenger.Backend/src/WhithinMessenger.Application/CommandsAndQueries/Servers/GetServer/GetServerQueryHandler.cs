@@ -122,6 +122,9 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
             {
                 ServerId = server.Id,
                 server.Name,
+                server.Avatar,
+                server.Banner,
+                server.BannerColor,
                 Categories = resultCategories,
                 OwnerId = server.OwnerId,
                 UserRoles = userRoleIds

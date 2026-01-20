@@ -235,6 +235,17 @@ const ServerSettingsPage = () => {
                 src={`${BASE_URL}${server.avatar}`}
                 alt={server.name}
                 className="avatar-image"
+                onError={(e) => {
+                  // Если аватар не загрузился, показываем инициалы
+                  e.target.style.display = 'none';
+                  const parent = e.target.parentElement;
+                  if (parent && !parent.querySelector('.avatar-fallback')) {
+                    const fallback = document.createElement('span');
+                    fallback.className = 'avatar-fallback';
+                    fallback.textContent = server.name?.charAt(0)?.toUpperCase() || 'С';
+                    parent.appendChild(fallback);
+                  }
+                }}
               />
             ) : (
               server.name?.charAt(0).toUpperCase() || 'С'

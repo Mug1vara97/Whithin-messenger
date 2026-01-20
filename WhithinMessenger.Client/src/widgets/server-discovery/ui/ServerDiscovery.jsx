@@ -114,6 +114,10 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
                   backgroundImage: server.banner ? `url(${BASE_URL}${server.banner})` : 'none',
                   backgroundColor: server.bannerColor || '#3f3f3f'
                 }}
+                onError={(e) => {
+                  // Если баннер не загрузился, убираем backgroundImage
+                  e.target.style.backgroundImage = 'none';
+                }}
               >
                 {!server.banner && (
                   <div className="server-name-placeholder">
@@ -122,10 +126,21 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
                         src={`${BASE_URL}${server.avatar}`}
                         alt={server.name}
                         className="server-avatar"
+                        onError={(e) => {
+                          // Если аватар не загрузился, показываем инициалы
+                          e.target.style.display = 'none';
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector('.server-initials')) {
+                            const initials = document.createElement('div');
+                            initials.className = 'server-initials';
+                            initials.textContent = server.name?.charAt(0)?.toUpperCase() || '?';
+                            parent.appendChild(initials);
+                          }
+                        }}
                       />
                     ) : (
                       <div className="server-initials">
-                        {server.name.charAt(0).toUpperCase()}
+                        {server.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                     )}
                   </div>

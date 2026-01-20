@@ -145,8 +145,21 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                               borderRadius: 'inherit',
                               objectFit: 'cover'
                             }}
+                            onError={(e) => {
+                              // Если изображение не загрузилось, показываем инициалы
+                              e.target.style.display = 'none';
+                              const parent = e.target.parentElement;
+                              if (parent && !parent.querySelector('.server-fallback')) {
+                                const fallback = document.createElement('span');
+                                fallback.className = 'server-fallback';
+                                fallback.textContent = server.name?.charAt(0)?.toUpperCase() || '?';
+                                parent.appendChild(fallback);
+                              }
+                            }}
                           />
-                        ) : server.name}
+                        ) : (
+                          <span>{server.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                        )}
                       </Link>
                     </li>
                   )}
