@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { FaImage, FaTrash, FaUpload } from 'react-icons/fa';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { tokenManager } from '../../../shared/lib/utils/tokenManager';
 import { Button } from '../../../shared/ui/atoms/Button';
 import { FormField } from '../../../shared/ui/atoms/FormField';
 import './ServerSettings.css';
+
+// Хелпер для получения заголовков авторизации
+const getAuthHeaders = () => {
+  const token = tokenManager.getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
 
 const ServerSettings = ({ 
   connection, 
@@ -45,6 +52,7 @@ const ServerSettings = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           banner: bannerUrl,
@@ -65,7 +73,8 @@ const ServerSettings = ({
   const handleBannerRemove = async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/server/${serverId}/banner`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {
@@ -92,6 +101,7 @@ const ServerSettings = ({
     try {
       const response = await fetch(`${BASE_URL}/api/server/${serverId}/banner`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -118,6 +128,7 @@ const ServerSettings = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           bannerColor: isDefaultColor ? null : bannerColor
@@ -155,6 +166,7 @@ const ServerSettings = ({
       
       const response = await fetch(`${BASE_URL}/api/server/${serverId}/avatar`, {
         method: 'PUT',
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -180,7 +192,8 @@ const ServerSettings = ({
 
     try {
       const response = await fetch(`${BASE_URL}/api/server/${serverId}/avatar`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {
