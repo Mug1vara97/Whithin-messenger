@@ -98,7 +98,6 @@
 
 .server-dropdown {
   position: absolute;
-  top: 100%;
   left: 12px;
   right: 12px;
   background-color: var(--background);
@@ -107,7 +106,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
   padding: 8px 0;
-  margin-top: 4px;
 }
 
 .dropdown-item {
