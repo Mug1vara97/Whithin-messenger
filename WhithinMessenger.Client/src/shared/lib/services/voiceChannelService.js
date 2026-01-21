@@ -118,6 +118,27 @@ class VoiceChannelService {
         isDeafened: isAudioDisabled
       });
     });
+
+    // Обработка глобального изменения состояния наушников
+    this.socket.on('globalAudioState', (data) => {
+      console.log('[VoiceChannelService] Global audio state changed:', data);
+      const { userId, isGlobalAudioMuted } = data;
+      
+      // Находим все каналы, где находится этот пользователь
+      const state = useCallStore.getState();
+      state.voiceChannelParticipants.forEach((participants, channelId) => {
+        const participant = participants.find(p => 
+          (p.odUserId === userId) || (p.userId === userId)
+        );
+        if (participant) {
+          useCallStore.getState().updateVoiceChannelParticipant(channelId, userId, {
+            isGlobalAudioMuted,
+            isAudioDisabled: isGlobalAudioMuted,
+            isDeafened: isGlobalAudioMuted
+          });
+        }
+      });
+    });
   }
 
   disconnect() {

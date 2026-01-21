@@ -439,22 +439,37 @@ io.on('connection', async (socket) => {
     // Add audio state handling
     socket.on('audioState', ({ isEnabled, isGlobalAudioMuted, userId }) => {
         const peer = peers.get(socket.id);
-        if (peer) {
-            // Update peer's audio state
-            peer.audioEnabled = isEnabled;
-            
-            // Update global user voice state if provided
-            if (userId && isGlobalAudioMuted !== undefined) {
-                updateUserVoiceState(userId, { isAudioDisabled: isGlobalAudioMuted });
-            }
-            
-            // Broadcast to all peers in the room except sender
-            socket.to(peer.roomId).emit('peerAudioStateChanged', {
-                peerId: socket.id,
-                isEnabled,
-                isGlobalAudioMuted,
-                userId: userId || peer.userId
-            });
+        if (!peer || !socket.data?.roomId) return;
+
+        const room = rooms.get(peer.roomId);
+        if (!room) return;
+
+        // Update peer's audio state
+        peer.audioEnabled = isEnabled;
+        
+        // Update global user voice state if provided
+        const realUserId = userId || peer.userId;
+        if (realUserId && isGlobalAudioMuted !== undefined) {
+            updateUserVoiceState(realUserId, { isAudioDisabled: isGlobalAudioMuted });
+        }
+        
+        // Broadcast to all peers in the room (including sender for consistency)
+        io.to(room.id).emit('peerAudioStateChanged', {
+            peerId: socket.id,
+            isEnabled,
+            isGlobalAudioMuted,
+            userId: realUserId
+        });
+        
+        // Also emit global event for all clients (even those not in the call)
+        io.emit('globalAudioState', {
+            userId: realUserId,
+            isGlobalAudioMuted: isGlobalAudioMuted || false
+        });
+
+        // Update channel participants list (like muteState does)
+        if (realUserId && room.id) {
+            scheduleChannelUpdate(room.id, 100);
         }
     });
 
