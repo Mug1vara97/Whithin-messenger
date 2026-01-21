@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
-import { VolumeUp, HeadsetOffIcon } from '@mui/icons-material';
+import { VolumeUp } from '@mui/icons-material';
+import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import { useCallStore } from '../../../lib/stores/callStore';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import './ChannelItem.css';
