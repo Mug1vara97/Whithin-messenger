@@ -95,13 +95,67 @@ class VoiceCallApi {
           const { useCallStore } = await import('../../../shared/lib/stores/callStore');
           const callStore = useCallStore.getState();
           
+          // Получаем название канала из текущего звонка или пытаемся найти в данных сервера
+          let channelName = callStore.currentCall?.channelName || null;
+          
+          // Если название не найдено, пытаемся получить из данных сервера
+          if (!channelName || channelName === sourceChannelId) {
+            try {
+              // Пытаемся получить название канала из window или через глобальный контекст
+              if (window.__serverData__) {
+                const serverData = window.__serverData__;
+                const allChannels = serverData.categories?.flatMap(cat => cat.chats || cat.Chats || []) || [];
+                const foundChannel = allChannels.find(chat => 
+                  (chat.chatId || chat.ChatId || chat.chat_id) === channelId
+                );
+                if (foundChannel) {
+                  channelName = foundChannel.name || foundChannel.Name || foundChannel.groupName || channelId;
+                }
+              }
+              
+              // Если не нашли в window, пытаемся получить через API
+              if (!channelName || channelName === channelId) {
+                const { serverApi } = await import('../../server/api/serverApi');
+                // Пытаемся найти serverId из URL
+                const serverId = window.location.pathname.match(/\/server\/([^\/]+)/)?.[1];
+                
+                if (serverId) {
+                  try {
+                    const serverData = await serverApi.getServerById(serverId);
+                    const allChannels = serverData.categories?.flatMap(cat => cat.chats || cat.Chats || []) || [];
+                    const foundChannel = allChannels.find(chat => 
+                      (chat.chatId || chat.ChatId || chat.chat_id) === channelId
+                    );
+                    if (foundChannel) {
+                      channelName = foundChannel.name || foundChannel.Name || foundChannel.groupName || channelId;
+                    }
+                  } catch (apiErr) {
+                    console.warn('Failed to get channel name from API:', apiErr);
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('Failed to get channel name from server data:', err);
+            }
+          }
+          
+          // Если не удалось получить название, используем channelId
+          if (!channelName || channelName === channelId) {
+            channelName = channelId;
+          }
+          
+          // Эмитим событие для обновления интерфейса (HomePage может слушать это событие)
+          window.dispatchEvent(new CustomEvent('voiceChannelSwitched', {
+            detail: { channelId, channelName, sourceChannelId }
+          }));
+          
           // Выходим из текущей комнаты через callStore
           await callStore.leaveRoom();
           
-          // Присоединяемся к новому каналу через callStore
-          await callStore.joinRoom(channelId);
+          // Присоединяемся к новому каналу через callStore с названием
+          await callStore.joinRoom(channelId, channelName);
           
-          console.log('switchToChannel: Successfully switched to channel', channelId);
+          console.log('switchToChannel: Successfully switched to channel', channelId, 'with name', channelName);
         } catch (error) {
           console.error('switchToChannel: Failed to switch channel:', error);
         }

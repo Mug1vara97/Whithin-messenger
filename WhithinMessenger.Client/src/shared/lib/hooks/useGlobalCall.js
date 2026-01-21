@@ -36,8 +36,8 @@ export const useGlobalCall = (userId = null, userName = null) => {
         await callContext.initializeCall(user.id || user.userId, user.username || user.name);
       }
 
-      // Присоединяемся к комнате
-      await callContext.joinRoom(roomId);
+      // Присоединяемся к комнате с названием
+      await callContext.joinRoom(roomId, roomName);
       
       console.log(`Started call in room: ${roomName} (${roomId})`);
       return true;

@@ -195,6 +195,28 @@ const HomePage = () => {
     }
   }, [serverId, channelId, serverData, serverDataFromPanel, navigate]);
 
+  // Слушаем событие переключения канала для обновления интерфейса
+  useEffect(() => {
+    const handleVoiceChannelSwitched = (event) => {
+      const { channelId: newChannelId, channelName: newChannelName } = event.detail;
+      
+      // Если переключились в канал, который сейчас открыт, обновляем selectedChat
+      if (selectedChat && (selectedChat.chatId || selectedChat.chat_id) === newChannelId) {
+        setSelectedChat(prev => ({
+          ...prev,
+          groupName: newChannelName,
+          name: newChannelName,
+          Name: newChannelName
+        }));
+      }
+    };
+    
+    window.addEventListener('voiceChannelSwitched', handleVoiceChannelSwitched);
+    return () => {
+      window.removeEventListener('voiceChannelSwitched', handleVoiceChannelSwitched);
+    };
+  }, [selectedChat]);
+
   useEffect(() => {
     if (chatId && chats && chats.length > 0) {
 

@@ -1185,7 +1185,7 @@ export const useCallStore = create(
       },
       
       // Присоединение к комнате
-      joinRoom: async (roomId) => {
+      joinRoom: async (roomId, channelName = null) => {
         const state = get();
         
         // Проверяем соединение
@@ -1195,7 +1195,7 @@ export const useCallStore = create(
         }
         
         try {
-          console.log('Joining room:', roomId);
+          console.log('Joining room:', roomId, 'channelName:', channelName);
           
           // Получаем профиль пользователя для передачи аватара
           let userAvatar = null;
@@ -1316,7 +1316,16 @@ export const useCallStore = create(
             console.log('📤 Initial audio state sent to server:', !currentState.isGlobalAudioMuted);
           }
           
-          set({ currentRoomId: roomId, isInCall: true, currentCall: { channelId: roomId, channelName: roomId } });
+          // Используем переданное название канала или пытаемся получить из текущего звонка
+          const finalChannelName = channelName || state.currentCall?.channelName || roomId;
+          set({ 
+            currentRoomId: roomId, 
+            isInCall: true, 
+            currentCall: { 
+              channelId: roomId, 
+              channelName: finalChannelName 
+            } 
+          });
           
           // Обновляем voiceChannelParticipants для отображения в списке каналов
           const afterJoinState = get();
