@@ -58,12 +58,14 @@ class VoiceChannelService {
     // Подписываемся на события обновления участников
     this.socket.on('userJoinedVoiceChannel', (data) => {
       console.log('[VoiceChannelService] User joined voice channel:', data);
-      const { channelId, userId, userName, isMuted, avatar, avatarColor } = data;
+      const { channelId, userId, userName, isMuted, isAudioDisabled, avatar, avatarColor } = data;
       
       useCallStore.getState().addVoiceChannelParticipant(channelId, {
         odUserId: userId,
         userName,
         isMuted: isMuted || false,
+        isAudioDisabled: isAudioDisabled || false,
+        isDeafened: isAudioDisabled || false,
         avatar: avatar || null,
         avatarColor: avatarColor || '#5865f2'
       });
@@ -85,6 +87,8 @@ class VoiceChannelService {
         userName: p.name || p.userName,
         isMuted: p.isMuted || false,
         isSpeaking: p.isSpeaking || false,
+        isAudioDisabled: p.isAudioDisabled || false,
+        isDeafened: p.isAudioDisabled || false,
         avatar: p.avatar || null,
         avatarColor: p.avatarColor || '#5865f2'
       }));
@@ -94,7 +98,8 @@ class VoiceChannelService {
       const hasChanged = formattedParticipants.length !== currentParticipants.length ||
         formattedParticipants.some((p, i) => {
           const curr = currentParticipants[i];
-          return !curr || p.odUserId !== curr.odUserId || p.isMuted !== curr.isMuted || p.isSpeaking !== curr.isSpeaking;
+          return !curr || p.odUserId !== curr.odUserId || p.isMuted !== curr.isMuted || 
+                 p.isSpeaking !== curr.isSpeaking || p.isAudioDisabled !== curr.isAudioDisabled;
         });
       
       if (hasChanged) {
@@ -104,11 +109,13 @@ class VoiceChannelService {
 
     this.socket.on('voiceChannelParticipantStateChanged', (data) => {
       console.log('[VoiceChannelService] Voice channel participant state changed:', data);
-      const { channelId, userId: odUserId, isMuted, isSpeaking } = data;
+      const { channelId, userId: odUserId, isMuted, isSpeaking, isAudioDisabled } = data;
       
       useCallStore.getState().updateVoiceChannelParticipant(channelId, odUserId, {
         isMuted,
-        isSpeaking
+        isSpeaking,
+        isAudioDisabled,
+        isDeafened: isAudioDisabled
       });
     });
   }

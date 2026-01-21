@@ -219,7 +219,15 @@
   color: var(--text-muted);
 }
 
-.voice-participant-muted-icon {
+.voice-participant-status-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.voice-participant-muted-icon,
+.voice-participant-deafened-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -227,7 +235,13 @@
   flex-shrink: 0;
 }
 
-.voice-participant-muted-icon svg {
+.voice-participant-muted-icon svg,
+.voice-participant-deafened-icon svg {
   width: 14px;
   height: 14px;
+}
+
+.voice-participant.deafened .voice-participant-name {
+  color: var(--text-muted);
+  opacity: 0.7;
 }

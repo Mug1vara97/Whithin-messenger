@@ -374,7 +374,8 @@ io.on('connection', async (socket) => {
                 channelId: roomId,
                 userId: peer.userId,
                 userName: peer.name,
-                isMuted: peer.muted
+                isMuted: peer.muted,
+                isAudioDisabled: !peer.audioEnabled
             });
 
             // Также отправляем обновленный список участников канала
