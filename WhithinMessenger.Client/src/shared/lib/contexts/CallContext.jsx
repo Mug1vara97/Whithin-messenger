@@ -133,6 +133,7 @@ export const CallProvider = ({ children }) => {
     // Методы
     initializeCall: callStore.initializeCall,
     joinRoom: callStore.joinRoom,
+    leaveRoom: callStore.leaveRoom,
     endCall: callStore.endCall,
     toggleMute: callStore.toggleMute,
     toggleUserMute: callStore.toggleUserMute,

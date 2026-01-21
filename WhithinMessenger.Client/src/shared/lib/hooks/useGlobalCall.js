@@ -23,37 +23,20 @@ export const useGlobalCall = (userId = null, userName = null) => {
     try {
       // Проверяем, есть ли активный звонок в другом канале
       if (callContext.isConnected && callContext.currentRoomId && callContext.currentRoomId !== roomId) {
-        console.log(`useGlobalCall: Active call in different channel (${callContext.currentRoomId}), ending it first before joining ${roomId}`);
-        // Сначала отключаемся от текущего канала
-        const previousRoomId = callContext.currentRoomId;
-        await callContext.endCall();
-        
-        // Ждем, пока соединение полностью закроется (максимум 3 секунды)
-        let waitCount = 0;
-        const maxWait = 30; // 30 * 100ms = 3 секунды
-        while (callContext.isConnected && waitCount < maxWait) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          waitCount++;
-        }
-        
-        if (callContext.isConnected) {
-          console.warn('useGlobalCall: Connection still active after endCall, waiting additional time');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        console.log(`useGlobalCall: Disconnected from previous room (${previousRoomId}), ready to join new room (${roomId})`);
+        console.log(`useGlobalCall: Active call in different channel (${callContext.currentRoomId}), leaving it first before joining ${roomId}`);
+        // Быстро выходим из текущей комнаты, сохраняя соединение
+        await callContext.leaveRoom();
+        // Небольшая задержка для завершения выхода из комнаты
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       // Инициализируем звонок если еще не подключены
       if (!callContext.isConnected) {
         console.log('useGlobalCall: Initializing call connection');
         await callContext.initializeCall(user.id || user.userId, user.username || user.name);
-        // Не проверяем isConnected здесь - initializeCall сам установит соединение
-        // Если соединение не установилось, joinRoom выдаст ошибку
       }
 
       // Присоединяемся к комнате
-      // joinRoom сам проверит, что соединение установлено
       await callContext.joinRoom(roomId);
       
       console.log(`Started call in room: ${roomName} (${roomId})`);

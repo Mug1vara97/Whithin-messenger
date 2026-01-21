@@ -118,8 +118,27 @@ class VoiceCallApi {
     this.roomId = null;
   }
 
+  // Выход из комнаты без закрытия соединения (для быстрого переключения между каналами)
+  async leaveRoom() {
+    if (this.room) {
+      await this.room.disconnect();
+      this.room = null;
+      this.roomId = null;
+    }
+    // Сокет остается подключенным для быстрого переподключения
+  }
+
   async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
     return new Promise((resolve, reject) => {
+      // Если уже есть активная комната, выходим из неё перед присоединением к новой
+      if (this.room && this.roomId !== roomId) {
+        console.log(`joinRoom: Leaving current room (${this.roomId}) before joining new room (${roomId})`);
+        this.room.disconnect().catch(err => {
+          console.warn('Error disconnecting from previous room:', err);
+        });
+        this.room = null;
+      }
+      
       this.socket.emit('join', {
         roomId,
         name,
@@ -136,6 +155,17 @@ class VoiceCallApi {
 
         try {
           this.roomId = roomId;
+          
+          // Если комната уже существует и это та же комната, не создаем новую
+          if (this.room && this.roomId === roomId) {
+            console.log('joinRoom: Already in this room, skipping reconnection');
+            resolve({
+              token: response.token,
+              url: response.url,
+              existingPeers: response.existingPeers || []
+            });
+            return;
+          }
           
           // Create LiveKit room and connect
           const roomOptions = getRoomOptions();

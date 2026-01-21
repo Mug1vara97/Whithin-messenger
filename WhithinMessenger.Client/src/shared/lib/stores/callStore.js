@@ -1186,37 +1186,12 @@ export const useCallStore = create(
       
       // Присоединение к комнате
       joinRoom: async (roomId) => {
-        let state = get();
+        const state = get();
         
-        // Проверяем соединение как в callStore, так и в voiceCallApi
-        const isActuallyConnected = state.isConnected || (voiceCallApi.socket && voiceCallApi.isConnected);
-        
-        if (!isActuallyConnected) {
-          console.warn('joinRoom: Not connected, waiting for connection...');
-          let waitCount = 0;
-          const maxWait = 50; // 50 * 100ms = 5 секунд
-          while (!state.isConnected && !voiceCallApi.isConnected && waitCount < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            state = get();
-            waitCount++;
-          }
-          
-          // Проверяем еще раз после ожидания
-          const stillNotConnected = !state.isConnected && !voiceCallApi.isConnected;
-          if (stillNotConnected) {
-            console.error('joinRoom: Still not connected after waiting, cannot join room');
-            // Попытаемся переподключиться
-            if (state.currentUserId && state.currentUserName) {
-              console.log('joinRoom: Attempting to reconnect...');
-              await get().initializeCall(state.currentUserId, state.currentUserName);
-              state = get();
-              if (!state.isConnected && !voiceCallApi.isConnected) {
-                throw new Error('Not connected to voice server');
-              }
-            } else {
-              throw new Error('Not connected to voice server');
-            }
-          }
+        // Проверяем соединение
+        if (!state.isConnected && !voiceCallApi.isConnected) {
+          console.error('joinRoom: Not connected to voice server');
+          throw new Error('Not connected to voice server');
         }
         
         try {
@@ -2239,6 +2214,84 @@ export const useCallStore = create(
         } catch (error) {
           console.error('Error changing noise suppression mode:', error);
           return false;
+        }
+      },
+      
+      // Быстрый выход из комнаты без закрытия соединения (для переключения между каналами)
+      leaveRoom: async () => {
+        try {
+          const state = get();
+          
+          if (!state.currentRoomId) {
+            return;
+          }
+          
+          console.log('leaveRoom: Leaving room', state.currentRoomId);
+          
+          // Очищаем voiceChannelParticipants для текущего канала
+          get().clearVoiceChannelParticipants(state.currentRoomId);
+          
+          // Останавливаем локальные треки
+          if (state.localStream) {
+            state.localStream.getTracks().forEach(track => track.stop());
+          }
+          
+          // Очистка шумоподавления
+          if (state.noiseSuppressionManager) {
+            state.noiseSuppressionManager.cleanup();
+          }
+          
+          // Очистка всех Voice Activity Detectors
+          get().cleanupAllVAD();
+          
+          // Очищаем audio elements и gain nodes
+          state.audioElements.forEach(audioElement => {
+            try {
+              audioElement.pause();
+              audioElement.srcObject = null;
+              if (audioElement.parentNode) {
+                audioElement.parentNode.removeChild(audioElement);
+              }
+            } catch (e) {
+              console.warn('Error removing audio element:', e);
+            }
+          });
+          
+          state.gainNodes.forEach(gainNode => {
+            try {
+              gainNode.disconnect();
+            } catch (e) {
+              console.warn('Error disconnecting gain node:', e);
+            }
+          });
+          
+          // Выходим из комнаты LiveKit, но сохраняем соединение
+          await voiceCallApi.leaveRoom();
+          
+          // Очищаем состояние комнаты, но сохраняем соединение
+          set({
+            isInCall: false,
+            currentRoomId: null,
+            currentCall: null,
+            participants: [],
+            participantMuteStates: new Map(),
+            participantAudioStates: new Map(),
+            participantGlobalAudioStates: new Map(),
+            participantVideoStates: new Map(),
+            userVolumes: new Map(),
+            userMutedStates: new Map(),
+            showVolumeSliders: new Map(),
+            gainNodes: new Map(),
+            audioElements: new Map(),
+            previousVolumes: new Map(),
+            peerIdToUserIdMap: new Map(),
+            remoteScreenShares: new Map()
+          });
+          
+          console.log('leaveRoom: Left room successfully, connection preserved');
+        } catch (error) {
+          console.error('Failed to leave room:', error);
+          throw error;
         }
       },
       
