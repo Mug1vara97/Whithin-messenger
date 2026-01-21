@@ -435,6 +435,9 @@ export const useCallStore = create(
           
           await voiceCallApi.connect(userId, userName);
           
+          // Устанавливаем isConnected сразу после успешного подключения
+          set({ isConnected: true });
+          
           // Регистрируем обработчики событий
           voiceCallApi.on('peerJoined', async (peerData) => {
             console.log('Peer joined:', peerData);
@@ -1183,10 +1186,37 @@ export const useCallStore = create(
       
       // Присоединение к комнате
       joinRoom: async (roomId) => {
-        const state = get();
-        if (!state.isConnected) {
-          console.error('Not connected to voice server');
-          return;
+        let state = get();
+        
+        // Проверяем соединение как в callStore, так и в voiceCallApi
+        const isActuallyConnected = state.isConnected || (voiceCallApi.socket && voiceCallApi.isConnected);
+        
+        if (!isActuallyConnected) {
+          console.warn('joinRoom: Not connected, waiting for connection...');
+          let waitCount = 0;
+          const maxWait = 50; // 50 * 100ms = 5 секунд
+          while (!state.isConnected && !voiceCallApi.isConnected && waitCount < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            state = get();
+            waitCount++;
+          }
+          
+          // Проверяем еще раз после ожидания
+          const stillNotConnected = !state.isConnected && !voiceCallApi.isConnected;
+          if (stillNotConnected) {
+            console.error('joinRoom: Still not connected after waiting, cannot join room');
+            // Попытаемся переподключиться
+            if (state.currentUserId && state.currentUserName) {
+              console.log('joinRoom: Attempting to reconnect...');
+              await get().initializeCall(state.currentUserId, state.currentUserName);
+              state = get();
+              if (!state.isConnected && !voiceCallApi.isConnected) {
+                throw new Error('Not connected to voice server');
+              }
+            } else {
+              throw new Error('Not connected to voice server');
+            }
+          }
         }
         
         try {

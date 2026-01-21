@@ -48,21 +48,12 @@ export const useGlobalCall = (userId = null, userName = null) => {
       if (!callContext.isConnected) {
         console.log('useGlobalCall: Initializing call connection');
         await callContext.initializeCall(user.id || user.userId, user.username || user.name);
-        
-        // Ждем, пока соединение установится
-        let waitCount = 0;
-        const maxWait = 50; // 50 * 100ms = 5 секунд
-        while (!callContext.isConnected && waitCount < maxWait) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          waitCount++;
-        }
-        
-        if (!callContext.isConnected) {
-          throw new Error('Failed to establish connection to voice server');
-        }
+        // Не проверяем isConnected здесь - initializeCall сам установит соединение
+        // Если соединение не установилось, joinRoom выдаст ошибку
       }
 
       // Присоединяемся к комнате
+      // joinRoom сам проверит, что соединение установлено
       await callContext.joinRoom(roomId);
       
       console.log(`Started call in room: ${roomName} (${roomId})`);
