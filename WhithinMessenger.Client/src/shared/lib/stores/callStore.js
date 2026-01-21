@@ -505,6 +505,9 @@ export const useCallStore = create(
                 odUserId: peerData.userId,
                 userName: peerData.name || peerData.userName,
                 isMuted: peerData.isMuted || false,
+                isGlobalAudioMuted: peerData.isGlobalAudioMuted || false,
+                isAudioDisabled: peerData.isGlobalAudioMuted || false,
+                isDeafened: peerData.isGlobalAudioMuted || false,
                 avatar: profileData?.avatar || null,
                 avatarColor: profileData?.avatarColor || '#5865f2'
               });
@@ -657,6 +660,16 @@ export const useCallStore = create(
                 return p;
               })
             }));
+            
+            // Обновляем voiceChannelParticipants
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId && isGlobalAudioMuted !== undefined) {
+              get().updateVoiceChannelParticipant(currentRoomId, userId, {
+                isGlobalAudioMuted,
+                isAudioDisabled: isGlobalAudioMuted,
+                isDeafened: isGlobalAudioMuted
+              });
+            }
           });
 
           // Handle TrackSubscribed events from LiveKit (for callStore)
@@ -1109,6 +1122,16 @@ export const useCallStore = create(
               console.log('Updated participants:', updatedParticipants);
               return { participants: updatedParticipants };
             });
+            
+            // Обновляем voiceChannelParticipants
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId) {
+              get().updateVoiceChannelParticipant(currentRoomId, userId, {
+                isGlobalAudioMuted,
+                isAudioDisabled: isGlobalAudioMuted,
+                isDeafened: isGlobalAudioMuted
+              });
+            }
           });
 
           // Временное решение: слушаем событие globalAudioState от сервера
@@ -1132,6 +1155,16 @@ export const useCallStore = create(
                 console.log('Updated participants with globalAudioState:', updatedParticipants);
                 return { participants: updatedParticipants };
               });
+              
+              // Обновляем voiceChannelParticipants
+              const currentRoomId = get().currentRoomId;
+              if (currentRoomId) {
+                get().updateVoiceChannelParticipant(currentRoomId, userId, {
+                  isGlobalAudioMuted,
+                  isAudioDisabled: isGlobalAudioMuted,
+                  isDeafened: isGlobalAudioMuted
+                });
+              }
             });
           }
           
@@ -1286,6 +1319,9 @@ export const useCallStore = create(
             odUserId: afterJoinState.currentUserId,
             userName: afterJoinState.currentUserName,
             isMuted: afterJoinState.isMuted,
+            isGlobalAudioMuted: afterJoinState.isGlobalAudioMuted || false,
+            isAudioDisabled: afterJoinState.isGlobalAudioMuted || false,
+            isDeafened: afterJoinState.isGlobalAudioMuted || false,
             avatar: null,
             avatarColor: '#5865f2'
           };
@@ -1308,6 +1344,9 @@ export const useCallStore = create(
               odUserId: p.userId,
               userName: p.name || p.userName,
               isMuted: p.isMuted,
+              isGlobalAudioMuted: p.isGlobalAudioMuted || false,
+              isAudioDisabled: p.isGlobalAudioMuted || false,
+              isDeafened: p.isGlobalAudioMuted || false,
               avatar: p.avatar,
               avatarColor: p.avatarColor || '#5865f2'
             }))
