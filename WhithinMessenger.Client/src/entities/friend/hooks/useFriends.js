@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { friendApi } from '../api';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuth } from '../../../shared/lib/hooks/useAuth';
+import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 
 export const useFriends = () => {
   const [friends, setFriends] = useState([]);
@@ -16,7 +17,16 @@ export const useFriends = () => {
       setLoading(true);
       setError(null);
       const friendsData = await friendApi.getFriends();
-      setFriends(friendsData);
+      
+      // Форматируем данные друзей: добавляем полный URL для аватаров
+      const formattedFriends = friendsData.map(friend => ({
+        ...friend,
+        avatar: friend.avatar 
+          ? (friend.avatar.startsWith('http') ? friend.avatar : `${MEDIA_BASE_URL}${friend.avatar}`)
+          : null
+      }));
+      
+      setFriends(formattedFriends);
     } catch (err) {
       setError(err.message);
       console.error('Error fetching friends:', err);

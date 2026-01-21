@@ -6,8 +6,8 @@ export const memberApi = {
     return connection.invoke("GetServerMembers", serverId);
   },
 
-  kickMember: (connection, serverId, memberId, currentUserId) => {
-    return connection.invoke("KickMember", serverId, memberId, currentUserId);
+  kickMember: (connection, serverId, memberId) => {
+    return connection.invoke("KickMember", serverId, memberId);
   },
 
   openPrivateChat: async (currentUserId, targetUserId) => {

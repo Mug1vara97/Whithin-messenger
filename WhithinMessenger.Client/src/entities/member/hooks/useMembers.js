@@ -31,17 +31,17 @@ export const useMembers = (connection, serverId, userId) => {
   }, [connection, serverId]);
 
   const kickMember = useCallback(async (memberId) => {
-    if (!connection || !serverId || !userId) return;
+    if (!connection || !serverId) return;
 
     try {
       setError(null);
-      await memberApi.kickMember(connection, serverId, memberId, userId);
+      await memberApi.kickMember(connection, serverId, memberId);
     } catch (err) {
       console.error('Error kicking member:', err);
       setError(err.message);
       throw err;
     }
-  }, [connection, serverId, userId]);
+  }, [connection, serverId]);
 
   const openPrivateChat = useCallback(async (targetUserId) => {
     if (!userId) return;

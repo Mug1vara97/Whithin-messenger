@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import './UserAvatar.css';
 
 const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
+  const [imageError, setImageError] = useState(false);
+  
   // Обработка размеров
   const getSize = (size) => {
     switch (size) {
@@ -18,6 +20,8 @@ const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
   };
   
   const avatarSize = getSize(size);
+  const displayInitials = !avatarUrl || imageError;
+  
   return (
     <div 
       className="user-avatar"
@@ -32,13 +36,15 @@ const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
         color: 'white',
         fontSize: `${Math.max(12, avatarSize * 0.35)}px`,
         fontWeight: 'bold',
-        flexShrink: 0
+        flexShrink: 0,
+        overflow: 'hidden'
       }}
     >
-      {avatarUrl ? (
+      {!displayInitials ? (
         <img 
           src={avatarUrl.startsWith('http') ? avatarUrl : `${BASE_URL}${avatarUrl}`} 
           alt="User avatar" 
+          onError={() => setImageError(true)}
           style={{
             width: '100%',
             height: '100%',
@@ -47,7 +53,7 @@ const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
           }}
         />
       ) : (
-        username?.charAt(0).toUpperCase()
+        username?.charAt(0).toUpperCase() || '?'
       )}
     </div>
   );

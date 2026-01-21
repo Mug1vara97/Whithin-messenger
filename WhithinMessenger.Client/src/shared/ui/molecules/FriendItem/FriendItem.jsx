@@ -63,7 +63,7 @@ const FriendItem = ({
       <div className="friend-item__avatar">
         <UserAvatar
           username={friend.username || friend.requesterUsername}
-          avatar={friend.avatar || friend.requesterAvatar}
+          avatarUrl={friend.avatar || friend.requesterAvatar}
           avatarColor={friend.avatarColor || friend.requesterAvatarColor}
           size="medium"
         />
