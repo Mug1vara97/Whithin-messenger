@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
@@ -22,28 +22,29 @@ const ChannelItem = ({
 
   const channelId = channel.chatId || channel.ChatId;
 
-  // Получаем только нужные данные из callStore - подписываемся только если это голосовой канал
-  const currentRoomId = useCallStore(state => isVoiceChannel ? state.currentRoomId : null);
-  const participants = useCallStore(state => isVoiceChannel ? state.participants : []);
-  const channelParticipantsFromMap = useCallStore(state => 
-    isVoiceChannel ? (state.voiceChannelParticipants?.get?.(channelId) || []) : []
-  );
-  const participantSpeakingStates = useCallStore(state => 
-    isVoiceChannel ? state.participantSpeakingStates : null
-  );
-
-  const isCurrentVoiceChannel = isVoiceChannel && currentRoomId === channelId;
-  
-  // Используем участников из voiceChannelParticipants (для всех каналов) 
-  // или из participants (для текущего канала, если voiceChannelParticipants пуст)
-  const voiceParticipants = useMemo(() => {
+  // Для голосовых каналов получаем данные из store
+  // Используем getState() вместо подписки чтобы избежать бесконечных ререндеров
+  const getVoiceParticipants = () => {
     if (!isVoiceChannel) return [];
     
-    if (channelParticipantsFromMap.length > 0) {
-      return channelParticipantsFromMap;
+    const state = useCallStore.getState();
+    const currentRoomId = state.currentRoomId;
+    const isCurrentChannel = currentRoomId === channelId;
+    
+    // Получаем участников из voiceChannelParticipants или из participants
+    const fromMap = state.voiceChannelParticipants?.get?.(channelId);
+    if (fromMap && fromMap.length > 0) {
+      return fromMap;
     }
-    return isCurrentVoiceChannel ? participants : [];
-  }, [isVoiceChannel, channelParticipantsFromMap, isCurrentVoiceChannel, participants]);
+    return isCurrentChannel ? state.participants : [];
+  };
+  
+  // Подписываемся только на currentRoomId для минимальных обновлений
+  const currentRoomId = useCallStore(state => state.currentRoomId);
+  
+  // Получаем участников через getState() - без подписки на изменения
+  const voiceParticipants = getVoiceParticipants();
+  const participantSpeakingStates = useCallStore.getState().participantSpeakingStates;
 
   const handleClick = () => {
     if (onClick) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
@@ -28,58 +28,53 @@ const CategoriesList = ({
     setLocalCategories(categories);
   }, [categories]);
 
-  // Получаем список голосовых каналов
-  const voiceChannelIds = useMemo(() => {
-    const ids = [];
+  // Подключаемся к voice-server для получения участников голосовых каналов
+  // Используем serverId как стабильную зависимость
+  const voiceServiceInitializedRef = useRef(false);
+  
+  useEffect(() => {
+    // Подключаемся только один раз при монтировании
+    if (voiceServiceInitializedRef.current) return;
+    
+    // Проверяем есть ли голосовые каналы
+    const hasVoiceChannels = localCategories.some(category => {
+      const chats = category.chats || category.Chats || [];
+      return chats.some(chat => 
+        chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4
+      );
+    });
+    
+    if (!hasVoiceChannels) return;
+    
+    voiceServiceInitializedRef.current = true;
+    voiceChannelService.connect();
+    
+    // Подписываемся на все голосовые каналы
     localCategories.forEach(category => {
       const chats = category.chats || category.Chats || [];
       chats.forEach(chat => {
         const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
         if (isVoice) {
-          ids.push(chat.chatId || chat.ChatId);
+          const channelId = chat.chatId || chat.ChatId;
+          voiceChannelService.subscribeToChannel(channelId);
         }
       });
     });
-    return ids;
-  }, [localCategories]);
-
-  // Храним предыдущие ID для сравнения
-  const prevVoiceChannelIdsRef = useRef([]);
-  const isConnectedRef = useRef(false);
-
-  // Подключаемся к voice-server и запрашиваем участников голосовых каналов
-  useEffect(() => {
-    if (voiceChannelIds.length === 0) return;
-
-    // Сравниваем с предыдущими ID чтобы избежать лишних вызовов
-    const prevIds = prevVoiceChannelIdsRef.current;
-    const idsChanged = voiceChannelIds.length !== prevIds.length || 
-      voiceChannelIds.some((id, i) => id !== prevIds[i]);
-
-    if (!idsChanged && isConnectedRef.current) {
-      return; // Ничего не изменилось
-    }
-
-    prevVoiceChannelIdsRef.current = [...voiceChannelIds];
-
-    // Подключаемся к voice-server только один раз
-    if (!isConnectedRef.current) {
-      voiceChannelService.connect();
-      isConnectedRef.current = true;
-    }
-
-    // Запрашиваем участников для всех голосовых каналов
-    voiceChannelIds.forEach(channelId => {
-      voiceChannelService.subscribeToChannel(channelId);
-    });
-
+    
     return () => {
-      // Отписываемся от каналов при размонтировании
-      voiceChannelIds.forEach(channelId => {
-        voiceChannelService.unsubscribeFromChannel(channelId);
+      // Отписываемся при размонтировании
+      localCategories.forEach(category => {
+        const chats = category.chats || category.Chats || [];
+        chats.forEach(chat => {
+          const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
+          if (isVoice) {
+            const channelId = chat.chatId || chat.ChatId;
+            voiceChannelService.unsubscribeFromChannel(channelId);
+          }
+        });
       });
     };
-  }, [voiceChannelIds.join(',')]);
+  }, []); // Пустой массив зависимостей - запускаем только при монтировании
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
