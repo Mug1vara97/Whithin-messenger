@@ -120,11 +120,20 @@ class VoiceCallApi {
 
   // Выход из комнаты без закрытия соединения (для быстрого переключения между каналами)
   async leaveRoom() {
+    const previousRoomId = this.roomId;
+    
     if (this.room) {
       await this.room.disconnect();
       this.room = null;
       this.roomId = null;
     }
+    
+    // Отправляем событие на сервер о выходе из канала
+    if (this.socket && this.socket.connected && previousRoomId) {
+      this.socket.emit('leave', { roomId: previousRoomId });
+      console.log('leaveRoom: Sent leave event for room:', previousRoomId);
+    }
+    
     // Сокет остается подключенным для быстрого переподключения
   }
 

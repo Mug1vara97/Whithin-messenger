@@ -692,6 +692,70 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Обработчик выхода из комнаты (без отключения сокета)
+    socket.on('leave', ({ roomId }) => {
+        console.log('Client leaving room:', socket.id, roomId);
+        
+        const peer = peers.get(socket.id);
+        if (!peer) {
+            console.log(`Peer ${socket.id} not found`);
+            return;
+        }
+        
+        const actualRoomId = roomId || peer.roomId;
+        const room = rooms.get(actualRoomId);
+        
+        if (!room) {
+            console.log(`Room ${actualRoomId} not found for peer ${socket.id}`);
+            return;
+        }
+        
+        // Важно: Удаляем информацию о пользователе из глобального состояния
+        if (peer.userId) {
+            // Получаем текущее состояние пользователя
+            const userState = getUserVoiceState(peer.userId);
+            if (userState.channelId === actualRoomId) {
+                console.log(`Removing user ${peer.userId} from voice channel ${actualRoomId} due to leave`);
+                
+                // Обновляем состояние - пользователь покинул канал
+                updateUserVoiceState(peer.userId, { channelId: null });
+                
+                // Уведомляем всех клиентов о выходе пользователя
+                io.emit('userLeftVoiceChannel', {
+                    channelId: actualRoomId,
+                    userId: peer.userId
+                });
+                
+                // Также отправляем обновленный список участников
+                scheduleChannelUpdate(actualRoomId, 100);
+            }
+        }
+        
+        // Удаляем peer из комнаты
+        room.peers.delete(socket.id);
+        peers.delete(socket.id);
+        socket.data.roomId = null;
+        console.log(`Peer ${socket.id} removed from room ${actualRoomId}`);
+        
+        // Если комната пустая, удаляем её и уведомляем всех клиентов
+        if (room.peers.size === 0) {
+            rooms.delete(actualRoomId);
+            console.log(`Empty room ${actualRoomId} removed`);
+            
+            // Уведомляем всех клиентов о том, что комната стала пустой
+            io.emit('voiceChannelParticipantsUpdate', {
+                channelId: actualRoomId,
+                participants: []
+            });
+        } else {
+            // Уведомляем остальных участников о выходе
+            socket.to(room.id).emit('peerLeft', { peerId: socket.id });
+            
+            // Отправляем обновленный список участников
+            scheduleChannelUpdate(actualRoomId, 100);
+        }
+    });
+
     // Обработчик отключения сокета
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);

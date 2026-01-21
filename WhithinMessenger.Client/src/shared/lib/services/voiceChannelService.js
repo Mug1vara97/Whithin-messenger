@@ -60,6 +60,20 @@ class VoiceChannelService {
       console.log('[VoiceChannelService] User joined voice channel:', data);
       const { channelId, userId, userName, isMuted, isAudioDisabled, avatar, avatarColor } = data;
       
+      // Удаляем пользователя из всех других каналов перед добавлением в новый
+      const state = useCallStore.getState();
+      state.voiceChannelParticipants.forEach((participants, existingChannelId) => {
+        if (existingChannelId !== channelId) {
+          const hasUser = participants.some(p => 
+            (p.odUserId === userId) || (p.userId === userId)
+          );
+          if (hasUser) {
+            console.log(`[VoiceChannelService] Removing user ${userId} from channel ${existingChannelId} before adding to ${channelId}`);
+            state.removeVoiceChannelParticipant(existingChannelId, userId);
+          }
+        }
+      });
+      
       useCallStore.getState().addVoiceChannelParticipant(channelId, {
         odUserId: userId,
         userName,
@@ -93,8 +107,25 @@ class VoiceChannelService {
         avatarColor: p.avatarColor || '#5865f2'
       }));
       
+      // Удаляем всех пользователей из этого канала из других каналов
+      const state = useCallStore.getState();
+      formattedParticipants.forEach(participant => {
+        const userId = participant.odUserId;
+        state.voiceChannelParticipants.forEach((existingParticipants, existingChannelId) => {
+          if (existingChannelId !== channelId) {
+            const hasUser = existingParticipants.some(p => 
+              (p.odUserId === userId) || (p.userId === userId)
+            );
+            if (hasUser) {
+              console.log(`[VoiceChannelService] Removing user ${userId} from channel ${existingChannelId} (now in ${channelId})`);
+              state.removeVoiceChannelParticipant(existingChannelId, userId);
+            }
+          }
+        });
+      });
+      
       // Проверяем, изменились ли данные перед обновлением
-      const currentParticipants = useCallStore.getState().voiceChannelParticipants?.get?.(channelId) || [];
+      const currentParticipants = state.voiceChannelParticipants?.get?.(channelId) || [];
       const hasChanged = formattedParticipants.length !== currentParticipants.length ||
         formattedParticipants.some((p, i) => {
           const curr = currentParticipants[i];
@@ -103,7 +134,7 @@ class VoiceChannelService {
         });
       
       if (hasChanged) {
-        useCallStore.getState().setVoiceChannelParticipants(channelId, formattedParticipants);
+        state.setVoiceChannelParticipants(channelId, formattedParticipants);
       }
     });
 

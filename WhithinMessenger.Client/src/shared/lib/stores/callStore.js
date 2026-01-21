@@ -2226,10 +2226,16 @@ export const useCallStore = create(
             return;
           }
           
-          console.log('leaveRoom: Leaving room', state.currentRoomId);
+          const roomIdToLeave = state.currentRoomId;
+          console.log('leaveRoom: Leaving room', roomIdToLeave);
           
           // Очищаем voiceChannelParticipants для текущего канала
-          get().clearVoiceChannelParticipants(state.currentRoomId);
+          get().clearVoiceChannelParticipants(roomIdToLeave);
+          
+          // Удаляем текущего пользователя из списка участников канала
+          if (state.currentUserId) {
+            get().removeVoiceChannelParticipant(roomIdToLeave, state.currentUserId);
+          }
           
           // Останавливаем локальные треки
           if (state.localStream) {
