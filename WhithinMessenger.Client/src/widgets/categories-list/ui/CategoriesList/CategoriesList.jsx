@@ -3,7 +3,6 @@ import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
-import { voiceCallApi } from '../../../../entities/voice-call/api/voiceCallApi';
 import './CategoriesList.css';
 
 const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
@@ -351,9 +350,9 @@ const CategoriesList = ({
         
         console.log('Moving participant:', { userId, sourceChannelId, targetChannelId });
         
-        // Вызываем API для переключения пользователя в другой канал
+        // Переключаем пользователя через voiceChannelService (работает даже если мы сами не в звонке)
         try {
-          await voiceCallApi.switchUserToChannel(userId, targetChannelId);
+          await voiceChannelService.switchUserToChannel(userId, targetChannelId);
           console.log('Participant moved successfully');
         } catch (error) {
           console.error('Failed to move participant:', error);

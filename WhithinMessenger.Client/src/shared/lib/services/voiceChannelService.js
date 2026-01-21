@@ -230,6 +230,29 @@ class VoiceChannelService {
       this.subscribeToChannel(channelId);
     });
   }
+
+  // Админ-действие: переместить пользователя в другой голосовой канал
+  // Работает даже если текущий клиент не в звонке (важно для drag&drop в списке каналов)
+  switchUserToChannel(userId, targetChannelId) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error('Not connected to voice server'));
+        return;
+      }
+      if (!userId || !targetChannelId) {
+        reject(new Error('userId and targetChannelId are required'));
+        return;
+      }
+
+      this.socket.emit('switchUserToChannel', { userId, targetChannelId }, (response) => {
+        if (response && response.error) {
+          reject(new Error(response.error));
+          return;
+        }
+        resolve(response || { success: true });
+      });
+    });
+  }
 }
 
 export const voiceChannelService = new VoiceChannelService();
