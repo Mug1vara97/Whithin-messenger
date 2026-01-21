@@ -118,14 +118,16 @@ class VoiceCallApi {
     this.roomId = null;
   }
 
-  async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true) {
+  async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
     return new Promise((resolve, reject) => {
       this.socket.emit('join', {
         roomId,
         name,
         userId,
         initialMuted,
-        initialAudioEnabled
+        initialAudioEnabled,
+        avatar,
+        avatarColor
       }, async (response) => {
         if (response && response.error) {
           reject(new Error(response.error));

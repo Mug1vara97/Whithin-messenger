@@ -1158,7 +1158,29 @@ export const useCallStore = create(
         
         try {
           console.log('Joining room:', roomId);
-          const response = await voiceCallApi.joinRoom(roomId, state.currentUserName, state.currentUserId);
+          
+          // Получаем профиль пользователя для передачи аватара
+          let userAvatar = null;
+          let userAvatarColor = '#5865f2';
+          try {
+            const profile = await userApi.getProfile(state.currentUserId);
+            if (profile) {
+              userAvatar = profile.avatar || null;
+              userAvatarColor = profile.avatarColor || '#5865f2';
+            }
+          } catch (err) {
+            console.warn('Failed to load profile for joinRoom:', err);
+          }
+          
+          const response = await voiceCallApi.joinRoom(
+            roomId, 
+            state.currentUserName, 
+            state.currentUserId, 
+            state.isMuted, 
+            !state.isGlobalAudioMuted,
+            userAvatar,
+            userAvatarColor
+          );
           
           // LiveKit doesn't need routerRtpCapabilities or device initialization
           // Audio/video tracks are managed automatically by LiveKit
