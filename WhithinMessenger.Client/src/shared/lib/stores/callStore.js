@@ -197,8 +197,9 @@ export const useCallStore = create(
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
           const currentParticipants = newMap.get(channelId) || [];
-          // Проверяем, нет ли уже такого участника
-          if (!currentParticipants.some(p => p.userId === participant.userId)) {
+          // Проверяем, нет ли уже такого участника (проверяем и odUserId и userId)
+          const participantId = participant.odUserId || participant.userId;
+          if (!currentParticipants.some(p => (p.odUserId === participantId) || (p.userId === participantId))) {
             newMap.set(channelId, [...currentParticipants, participant]);
           }
           return { voiceChannelParticipants: newMap };

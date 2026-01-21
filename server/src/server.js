@@ -469,8 +469,22 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик для получения информации о участниках голосовых каналов
-    socket.on('getVoiceChannelParticipants', () => {
+    socket.on('getVoiceChannelParticipants', (data) => {
         try {
+            const requestedChannelId = data?.channelId;
+            
+            // Если запрошен конкретный канал - отправляем только его
+            if (requestedChannelId) {
+                const participants = getChannelParticipants(requestedChannelId);
+                socket.emit('voiceChannelParticipantsUpdate', {
+                    channelId: requestedChannelId,
+                    participants: participants
+                });
+                return;
+            }
+            
+            // Иначе отправляем информацию о всех каналах
+            
             // Очищаем пустые комнаты
             const emptyRooms = [];
             for (const [roomId, room] of rooms.entries()) {

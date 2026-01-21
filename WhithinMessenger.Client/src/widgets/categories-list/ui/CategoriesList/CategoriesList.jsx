@@ -29,52 +29,60 @@ const CategoriesList = ({
   }, [categories]);
 
   // Подключаемся к voice-server для получения участников голосовых каналов
-  // Используем serverId как стабильную зависимость
-  const voiceServiceInitializedRef = useRef(false);
+  const voiceServiceConnectedRef = useRef(false);
+  const subscribedChannelsRef = useRef(new Set());
   
+  // Подключаемся к voice-server при монтировании
   useEffect(() => {
-    // Подключаемся только один раз при монтировании
-    if (voiceServiceInitializedRef.current) return;
+    if (!voiceServiceConnectedRef.current) {
+      voiceChannelService.connect();
+      voiceServiceConnectedRef.current = true;
+    }
     
-    // Проверяем есть ли голосовые каналы
-    const hasVoiceChannels = localCategories.some(category => {
-      const chats = category.chats || category.Chats || [];
-      return chats.some(chat => 
-        chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4
-      );
-    });
+    return () => {
+      // При размонтировании отписываемся от всех каналов
+      subscribedChannelsRef.current.forEach(channelId => {
+        voiceChannelService.unsubscribeFromChannel(channelId);
+      });
+      subscribedChannelsRef.current.clear();
+    };
+  }, []);
+  
+  // Подписываемся на голосовые каналы при изменении категорий
+  useEffect(() => {
+    if (!localCategories || localCategories.length === 0) return;
     
-    if (!hasVoiceChannels) return;
-    
-    voiceServiceInitializedRef.current = true;
-    voiceChannelService.connect();
-    
-    // Подписываемся на все голосовые каналы
+    // Собираем все голосовые каналы
+    const voiceChannelIds = new Set();
     localCategories.forEach(category => {
       const chats = category.chats || category.Chats || [];
       chats.forEach(chat => {
         const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
         if (isVoice) {
           const channelId = chat.chatId || chat.ChatId;
-          voiceChannelService.subscribeToChannel(channelId);
+          if (channelId) {
+            voiceChannelIds.add(channelId);
+          }
         }
       });
     });
     
-    return () => {
-      // Отписываемся при размонтировании
-      localCategories.forEach(category => {
-        const chats = category.chats || category.Chats || [];
-        chats.forEach(chat => {
-          const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
-          if (isVoice) {
-            const channelId = chat.chatId || chat.ChatId;
-            voiceChannelService.unsubscribeFromChannel(channelId);
-          }
-        });
-      });
-    };
-  }, []); // Пустой массив зависимостей - запускаем только при монтировании
+    // Подписываемся на новые каналы
+    voiceChannelIds.forEach(channelId => {
+      if (!subscribedChannelsRef.current.has(channelId)) {
+        voiceChannelService.subscribeToChannel(channelId);
+        subscribedChannelsRef.current.add(channelId);
+      }
+    });
+    
+    // Отписываемся от каналов которые больше не существуют
+    subscribedChannelsRef.current.forEach(channelId => {
+      if (!voiceChannelIds.has(channelId)) {
+        voiceChannelService.unsubscribeFromChannel(channelId);
+        subscribedChannelsRef.current.delete(channelId);
+      }
+    });
+  }, [localCategories]);
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);

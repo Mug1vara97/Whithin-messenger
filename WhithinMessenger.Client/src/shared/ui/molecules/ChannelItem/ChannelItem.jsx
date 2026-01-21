@@ -1,10 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
 import { useCallStore } from '../../../lib/stores/callStore';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import './ChannelItem.css';
+
+// Функция глубокого сравнения участников
+const areParticipantsEqual = (a, b) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const pA = a[i];
+    const pB = b[i];
+    if (!pB) return false;
+    if (pA.odUserId !== pB.odUserId || 
+        pA.userId !== pB.userId ||
+        pA.isMuted !== pB.isMuted || 
+        pA.isSpeaking !== pB.isSpeaking) {
+      return false;
+    }
+  }
+  return true;
+};
 
 const ChannelItem = ({ 
   channel,
@@ -22,29 +39,62 @@ const ChannelItem = ({
 
   const channelId = channel.chatId || channel.ChatId;
 
-  // Для голосовых каналов получаем данные из store
-  // Используем getState() вместо подписки чтобы избежать бесконечных ререндеров
-  const getVoiceParticipants = () => {
+  // Локальное состояние для участников голосового канала
+  const [voiceParticipants, setVoiceParticipants] = useState([]);
+  const [speakingStates, setSpeakingStates] = useState(null);
+  const prevParticipantsRef = useRef([]);
+  
+  // Функция получения участников из store
+  const getParticipantsFromStore = useCallback(() => {
     if (!isVoiceChannel) return [];
     
     const state = useCallStore.getState();
     const currentRoomId = state.currentRoomId;
     const isCurrentChannel = currentRoomId === channelId;
     
-    // Получаем участников из voiceChannelParticipants или из participants
     const fromMap = state.voiceChannelParticipants?.get?.(channelId);
     if (fromMap && fromMap.length > 0) {
       return fromMap;
     }
     return isCurrentChannel ? state.participants : [];
-  };
+  }, [isVoiceChannel, channelId]);
+
+  // Подписка на изменения store для голосовых каналов
+  useEffect(() => {
+    if (!isVoiceChannel) return;
+    
+    // Инициализируем начальное значение
+    const initialParticipants = getParticipantsFromStore();
+    setVoiceParticipants(initialParticipants);
+    prevParticipantsRef.current = initialParticipants;
+    setSpeakingStates(useCallStore.getState().participantSpeakingStates);
+    
+    // Подписываемся на изменения store
+    const unsubscribe = useCallStore.subscribe((state) => {
+      // Получаем новых участников
+      const newParticipants = state.voiceChannelParticipants?.get?.(channelId) || [];
+      const currentRoomId = state.currentRoomId;
+      const isCurrentChannel = currentRoomId === channelId;
+      
+      // Если нет участников из Map, используем participants текущего канала
+      const participantsToUse = newParticipants.length > 0 
+        ? newParticipants 
+        : (isCurrentChannel ? state.participants : []);
+      
+      // Сравниваем с предыдущими участниками
+      if (!areParticipantsEqual(participantsToUse, prevParticipantsRef.current)) {
+        prevParticipantsRef.current = participantsToUse;
+        setVoiceParticipants([...participantsToUse]);
+      }
+      
+      // Обновляем speaking states
+      setSpeakingStates(state.participantSpeakingStates);
+    });
+    
+    return () => unsubscribe();
+  }, [isVoiceChannel, channelId, getParticipantsFromStore]);
   
-  // Подписываемся только на currentRoomId для минимальных обновлений
-  const currentRoomId = useCallStore(state => state.currentRoomId);
-  
-  // Получаем участников через getState() - без подписки на изменения
-  const voiceParticipants = getVoiceParticipants();
-  const participantSpeakingStates = useCallStore.getState().participantSpeakingStates;
+  const participantSpeakingStates = speakingStates;
 
   const handleClick = () => {
     if (onClick) {
