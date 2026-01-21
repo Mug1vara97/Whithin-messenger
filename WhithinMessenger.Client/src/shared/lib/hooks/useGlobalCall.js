@@ -21,6 +21,15 @@ export const useGlobalCall = (userId = null, userName = null) => {
     }
 
     try {
+      // Проверяем, есть ли активный звонок в другом канале
+      if (callContext.isConnected && callContext.currentRoomId && callContext.currentRoomId !== roomId) {
+        console.log(`useGlobalCall: Active call in different channel (${callContext.currentRoomId}), ending it first before joining ${roomId}`);
+        // Сначала отключаемся от текущего канала
+        await callContext.endCall();
+        // Ждем немного, чтобы соединение полностью закрылось
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       // Инициализируем звонок если еще не подключены
       if (!callContext.isConnected) {
         await callContext.initializeCall(user.id || user.userId, user.username || user.name);

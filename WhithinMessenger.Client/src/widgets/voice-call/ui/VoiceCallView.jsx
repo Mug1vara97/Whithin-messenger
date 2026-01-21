@@ -159,6 +159,7 @@ const VoiceCallView = ({
         return;
       }
       
+      // Если активен звонок в другом канале, startCall сам отключится от него
       console.log('VoiceCallView: Starting voice call');
       startCall(channelId, channelName).catch((err) => {
         console.error('Call start error:', err);
