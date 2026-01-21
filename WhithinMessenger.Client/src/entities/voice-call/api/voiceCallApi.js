@@ -84,6 +84,36 @@ class VoiceCallApi {
       this.isConnected = false;
     });
 
+    // Обработчик переключения в другой канал (от сервера)
+    this.socket.on('switchToChannel', async ({ channelId, sourceChannelId }) => {
+      console.log('switchToChannel: Received switch command to channel', channelId, 'from', sourceChannelId);
+      
+      // Если мы находимся в исходном канале, переключаемся
+      if (this.roomId === sourceChannelId && this.room) {
+        try {
+          // Используем callStore для правильного переключения
+          const { useCallStore } = await import('../../../shared/lib/stores/callStore');
+          const callStore = useCallStore.getState();
+          
+          // Выходим из текущей комнаты через callStore
+          await callStore.leaveRoom();
+          
+          // Присоединяемся к новому каналу через callStore
+          await callStore.joinRoom(channelId);
+          
+          console.log('switchToChannel: Successfully switched to channel', channelId);
+        } catch (error) {
+          console.error('switchToChannel: Failed to switch channel:', error);
+        }
+      } else {
+        console.log('switchToChannel: Not in source channel or no active room, skipping switch', {
+          currentRoomId: this.roomId,
+          sourceChannelId,
+          hasRoom: !!this.room
+        });
+      }
+    });
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Connection timeout'));

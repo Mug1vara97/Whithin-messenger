@@ -732,6 +732,22 @@ io.on('connection', async (socket) => {
             return;
         }
         
+        // Находим socket пользователя ДО удаления peer (чтобы не потерять ссылку)
+        const userSocket = Array.from(io.sockets.sockets.values()).find(s => s.id === peerToMove.id);
+        
+        // Сохраняем данные peer перед удалением
+        const peerData = {
+            id: peerToMove.id,
+            userId: peerToMove.userId,
+            name: peerToMove.name,
+            muted: peerToMove.muted,
+            audioEnabled: peerToMove.audioEnabled,
+            speaking: peerToMove.speaking,
+            avatar: peerToMove.avatar,
+            avatarColor: peerToMove.avatarColor,
+            roomId: targetChannelId
+        };
+        
         // Удаляем пользователя из исходного канала
         sourceRoom.peers.delete(peerToMove.id);
         peers.delete(peerToMove.id);
@@ -771,19 +787,23 @@ io.on('connection', async (socket) => {
         
         const targetRoomFinal = rooms.get(targetChannelId);
         
-        // Обновляем peer для нового канала
-        peerToMove.roomId = targetChannelId;
-        peerToMove.id = peerToMove.id; // Сохраняем socket.id
-        targetRoomFinal.peers.set(peerToMove.id, peerToMove);
-        peers.set(peerToMove.id, peerToMove);
+        // Восстанавливаем peer для нового канала
+        targetRoomFinal.peers.set(peerData.id, peerData);
+        peers.set(peerData.id, peerData);
         
-        // Обновляем socket.data
-        const userSocket = Array.from(io.sockets.sockets.values()).find(s => {
-            const p = peers.get(s.id);
-            return p && p.userId === userId;
-        });
         if (userSocket) {
+            // Обновляем socket.data
             userSocket.data.roomId = targetChannelId;
+            
+            // Отправляем событие пользователю для переключения в новый канал
+            // Клиент обработает это событие и переключится через LiveKit
+            userSocket.emit('switchToChannel', {
+                channelId: targetChannelId,
+                sourceChannelId: sourceChannelId
+            });
+            console.log(`Sent switchToChannel event to user ${userId} for channel ${targetChannelId}`);
+        } else {
+            console.warn(`Socket not found for user ${userId} (socketId: ${peerData.id}), cannot send switch command`);
         }
         
         // Обновляем состояние пользователя
