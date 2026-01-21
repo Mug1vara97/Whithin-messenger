@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
@@ -28,7 +28,7 @@ const CategoriesList = ({
     setLocalCategories(categories);
   }, [categories]);
 
-  // Получаем список голосовых каналов и подключаемся к voice-server для получения участников
+  // Получаем список голосовых каналов
   const voiceChannelIds = useMemo(() => {
     const ids = [];
     localCategories.forEach(category => {
@@ -43,12 +43,30 @@ const CategoriesList = ({
     return ids;
   }, [localCategories]);
 
+  // Храним предыдущие ID для сравнения
+  const prevVoiceChannelIdsRef = useRef([]);
+  const isConnectedRef = useRef(false);
+
   // Подключаемся к voice-server и запрашиваем участников голосовых каналов
   useEffect(() => {
     if (voiceChannelIds.length === 0) return;
 
-    // Подключаемся к voice-server
-    voiceChannelService.connect();
+    // Сравниваем с предыдущими ID чтобы избежать лишних вызовов
+    const prevIds = prevVoiceChannelIdsRef.current;
+    const idsChanged = voiceChannelIds.length !== prevIds.length || 
+      voiceChannelIds.some((id, i) => id !== prevIds[i]);
+
+    if (!idsChanged && isConnectedRef.current) {
+      return; // Ничего не изменилось
+    }
+
+    prevVoiceChannelIdsRef.current = [...voiceChannelIds];
+
+    // Подключаемся к voice-server только один раз
+    if (!isConnectedRef.current) {
+      voiceChannelService.connect();
+      isConnectedRef.current = true;
+    }
 
     // Запрашиваем участников для всех голосовых каналов
     voiceChannelIds.forEach(channelId => {
@@ -61,7 +79,7 @@ const CategoriesList = ({
         voiceChannelService.unsubscribeFromChannel(channelId);
       });
     };
-  }, [voiceChannelIds]);
+  }, [voiceChannelIds.join(',')]);
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);

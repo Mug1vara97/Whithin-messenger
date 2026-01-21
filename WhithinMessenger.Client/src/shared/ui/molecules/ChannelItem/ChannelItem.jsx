@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
@@ -20,23 +20,30 @@ const ChannelItem = ({
                         channel.TypeId === 4 ||
                         channel.typeId === "44444444-4444-4444-4444-444444444444";
 
-  // Получаем участников голосового канала из callStore
-  const { currentRoomId, participants, voiceChannelParticipants, participantSpeakingStates } = useCallStore(state => ({
-    currentRoomId: state.currentRoomId,
-    participants: state.participants,
-    voiceChannelParticipants: state.voiceChannelParticipants,
-    participantSpeakingStates: state.participantSpeakingStates
-  }));
-
   const channelId = channel.chatId || channel.ChatId;
+
+  // Получаем только нужные данные из callStore - подписываемся только если это голосовой канал
+  const currentRoomId = useCallStore(state => isVoiceChannel ? state.currentRoomId : null);
+  const participants = useCallStore(state => isVoiceChannel ? state.participants : []);
+  const channelParticipantsFromMap = useCallStore(state => 
+    isVoiceChannel ? (state.voiceChannelParticipants?.get?.(channelId) || []) : []
+  );
+  const participantSpeakingStates = useCallStore(state => 
+    isVoiceChannel ? state.participantSpeakingStates : null
+  );
+
   const isCurrentVoiceChannel = isVoiceChannel && currentRoomId === channelId;
   
   // Используем участников из voiceChannelParticipants (для всех каналов) 
   // или из participants (для текущего канала, если voiceChannelParticipants пуст)
-  const channelParticipantsFromMap = voiceChannelParticipants?.get?.(channelId) || [];
-  const voiceParticipants = channelParticipantsFromMap.length > 0 
-    ? channelParticipantsFromMap 
-    : (isCurrentVoiceChannel ? participants : []);
+  const voiceParticipants = useMemo(() => {
+    if (!isVoiceChannel) return [];
+    
+    if (channelParticipantsFromMap.length > 0) {
+      return channelParticipantsFromMap;
+    }
+    return isCurrentVoiceChannel ? participants : [];
+  }, [isVoiceChannel, channelParticipantsFromMap, isCurrentVoiceChannel, participants]);
 
   const handleClick = () => {
     if (onClick) {

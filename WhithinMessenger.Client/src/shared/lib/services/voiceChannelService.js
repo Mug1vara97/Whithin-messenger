@@ -10,6 +10,7 @@ class VoiceChannelService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.subscribedChannels = new Set();
+    this.requestedChannels = new Set(); // Каналы для которых уже запрошены участники
   }
 
   connect() {
@@ -34,6 +35,9 @@ class VoiceChannelService {
       console.log('[VoiceChannelService] Connected to voice server');
       this.isConnected = true;
       this.reconnectAttempts = 0;
+      
+      // Очищаем requestedChannels при переподключении чтобы запросить заново
+      this.requestedChannels.clear();
       
       // Запрашиваем участников для всех подписанных каналов
       this.subscribedChannels.forEach(channelId => {
@@ -85,7 +89,17 @@ class VoiceChannelService {
         avatarColor: p.avatarColor || '#5865f2'
       }));
       
-      useCallStore.getState().setVoiceChannelParticipants(channelId, formattedParticipants);
+      // Проверяем, изменились ли данные перед обновлением
+      const currentParticipants = useCallStore.getState().voiceChannelParticipants?.get?.(channelId) || [];
+      const hasChanged = formattedParticipants.length !== currentParticipants.length ||
+        formattedParticipants.some((p, i) => {
+          const curr = currentParticipants[i];
+          return !curr || p.odUserId !== curr.odUserId || p.isMuted !== curr.isMuted || p.isSpeaking !== curr.isSpeaking;
+        });
+      
+      if (hasChanged) {
+        useCallStore.getState().setVoiceChannelParticipants(channelId, formattedParticipants);
+      }
     });
 
     this.socket.on('voiceChannelParticipantStateChanged', (data) => {
@@ -106,6 +120,7 @@ class VoiceChannelService {
       this.socket = null;
       this.isConnected = false;
       this.subscribedChannels.clear();
+      this.requestedChannels.clear();
     }
   }
 
@@ -113,9 +128,15 @@ class VoiceChannelService {
   subscribeToChannel(channelId) {
     if (!channelId) return;
     
+    // Уже подписаны на этот канал
+    if (this.subscribedChannels.has(channelId)) {
+      return;
+    }
+    
     this.subscribedChannels.add(channelId);
     
-    if (this.isConnected) {
+    // Запрашиваем участников только если ещё не запрашивали
+    if (this.isConnected && !this.requestedChannels.has(channelId)) {
       this.requestChannelParticipants(channelId);
     }
   }
@@ -132,7 +153,13 @@ class VoiceChannelService {
       return;
     }
 
+    // Не запрашиваем повторно
+    if (this.requestedChannels.has(channelId)) {
+      return;
+    }
+
     console.log('[VoiceChannelService] Requesting participants for channel:', channelId);
+    this.requestedChannels.add(channelId);
     this.socket.emit('getVoiceChannelParticipants', { channelId });
   }
 
