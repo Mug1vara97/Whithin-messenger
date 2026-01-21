@@ -6,6 +6,7 @@ using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Infrastructure.Database;
 using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
+using WhithinMessenger.Application.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -61,10 +62,12 @@ public class UserController : ControllerBase
         try
         {
             var currentUserId = (Guid)HttpContext.Items["UserId"]!;
-            var query = new SearchUsersQuery(currentUserId, name);
-            var result = await _mediator.Send(query);
+            var userRepository = HttpContext.RequestServices.GetRequiredService<IUserRepositoryExtensions>();
             
-            return Ok(result.Users);
+            // Для добавления в друзья показываем всех пользователей
+            var users = await userRepository.SearchAllUsersAsync(currentUserId, name ?? string.Empty);
+            
+            return Ok(users);
         }
         catch (Exception ex)
         {

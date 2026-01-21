@@ -97,7 +97,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
                     <div key={user.userId} className="add-friend-modal__user">
                       <UserAvatar
                         username={user.username}
-                        avatar={user.avatarUrl}
+                        avatarUrl={user.avatarUrl}
                         avatarColor={user.avatarColor}
                         size="medium"
                       />
