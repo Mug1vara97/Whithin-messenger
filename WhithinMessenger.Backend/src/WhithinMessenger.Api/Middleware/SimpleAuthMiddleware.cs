@@ -23,10 +23,56 @@ public class SimpleAuthMiddleware
         if (context.Request.Path.StartsWithSegments("/chatlisthub") || 
             context.Request.Path.StartsWithSegments("/groupchathub") ||
             context.Request.Path.StartsWithSegments("/serverhub") ||
-            context.Request.Path.StartsWithSegments("/serverlisthub"))
+            context.Request.Path.StartsWithSegments("/serverlisthub") ||
+            context.Request.Path.StartsWithSegments("/notificationhub"))
         {
             _logger.LogInformation($"SimpleAuthMiddleware: SignalR request, skipping auth for {context.Request.Path}");
             
+            // Для SignalR хабов используем JWT токен из query string если есть
+            var accessToken = context.Request.Query["access_token"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                try
+                {
+                    var parts = accessToken.Split('.');
+                    if (parts.Length == 3)
+                    {
+                        var payload = parts[1];
+                        var padding = (4 - payload.Length % 4) % 4;
+                        var paddedPayload = payload + new string('=', padding);
+                        var decodedPayload = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(paddedPayload));
+                        var payloadObj = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(decodedPayload);
+                        
+                        if (payloadObj.TryGetValue("UserId", out var userIdObj) && userIdObj != null)
+                        {
+                            var userIdString = userIdObj.ToString();
+                            if (Guid.TryParse(userIdString, out var signalRUserId))
+                            {
+                                _logger.LogInformation($"SimpleAuthMiddleware: Found userId from JWT token in query: {signalRUserId}");
+                                context.Items["UserId"] = signalRUserId;
+                                
+                                var claims = new List<Claim>
+                                {
+                                    new Claim("UserId", signalRUserId.ToString()),
+                                    new Claim(ClaimTypes.NameIdentifier, signalRUserId.ToString())
+                                };
+                                
+                                var identity = new ClaimsIdentity(claims, "JWT");
+                                context.User = new ClaimsPrincipal(identity);
+                                
+                                await _next(context);
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"SimpleAuthMiddleware: Error decoding JWT token from query string");
+                }
+            }
+            
+            // Fallback: используем userId из query string если JWT не найден
             var userIdFromQuery = context.Request.Query["userId"].FirstOrDefault();
             if (!string.IsNullOrEmpty(userIdFromQuery) && Guid.TryParse(userIdFromQuery, out var signalRUserId))
             {
