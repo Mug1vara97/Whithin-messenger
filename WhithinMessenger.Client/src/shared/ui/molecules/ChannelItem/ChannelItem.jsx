@@ -204,7 +204,8 @@ const ChannelItem = ({
                       return (
                         <Draggable
                           key={odUserId || participant.peerId}
-                          draggableId={`participant-${odUserId}-${channelId}`}
+                          // Важно: UUID содержит '-', поэтому используем безопасный разделитель
+                          draggableId={`voice-participant__${odUserId}__from__${channelId}`}
                           index={participantIndex}
                           isDragDisabled={false}
                         >

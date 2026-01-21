@@ -3,7 +3,19 @@ import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
+import { voiceCallApi } from '../../../../entities/voice-call/api/voiceCallApi';
 import './CategoriesList.css';
+
+const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
+const isVoiceChannelChat = (chat) => {
+  const t = chat?.chatType ?? chat?.ChatType;
+  const typeId = chat?.typeId ?? chat?.TypeId;
+  return (
+    t === 4 || t === '4' ||
+    typeId === 4 || typeId === '4' ||
+    typeId === VOICE_TYPE_GUID
+  );
+};
 
 const CategoriesList = ({ 
   categories = [],
@@ -57,7 +69,7 @@ const CategoriesList = ({
     localCategories.forEach(category => {
       const chats = category.chats || category.Chats || [];
       chats.forEach(chat => {
-        const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
+        const isVoice = isVoiceChannelChat(chat);
         if (isVoice) {
           const channelId = chat.chatId || chat.ChatId;
           if (channelId) {
@@ -313,30 +325,23 @@ const CategoriesList = ({
       else if (type === 'VOICE_PARTICIPANT') {
         console.log('Moving voice participant');
         
-        // Извлекаем userId и channelId из draggableId
-        // Формат: participant-{userId}-{sourceChannelId}
-        const participantMatch = result.draggableId.match(/^participant-(.+?)-(.+)$/);
-        if (!participantMatch) {
+        // Извлекаем userId и sourceChannelId из draggableId
+        // Формат: voice-participant__{userId}__from__{sourceChannelId}
+        const prefix = 'voice-participant__';
+        const mid = '__from__';
+        if (!result.draggableId.startsWith(prefix) || !result.draggableId.includes(mid)) {
           console.error('Invalid participant draggableId format:', result.draggableId);
           return;
         }
-        
-        const [, userId, sourceChannelId] = participantMatch;
-        const targetChannelId = destination.droppableId.replace('voice-channel-', '');
-        
-        // Проверяем, что это действительно голосовой канал
-        const targetChannel = localCategories
-          .flatMap(cat => cat.chats || cat.Chats || [])
-          .find(chat => {
-            const chatId = chat.chatId || chat.ChatId;
-            return chatId === targetChannelId && 
-                   (chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4);
-          });
-        
-        if (!targetChannel) {
-          console.error('Target channel is not a voice channel or not found');
+
+        const withoutPrefix = result.draggableId.slice(prefix.length);
+        const [userId, sourceChannelId] = withoutPrefix.split(mid);
+        if (!userId || !sourceChannelId) {
+          console.error('Invalid participant draggableId parts:', { userId, sourceChannelId, draggableId: result.draggableId });
           return;
         }
+
+        const targetChannelId = destination.droppableId.replace('voice-channel-', '');
         
         // Если перетаскиваем в тот же канал, ничего не делаем
         if (sourceChannelId === targetChannelId) {
@@ -348,7 +353,6 @@ const CategoriesList = ({
         
         // Вызываем API для переключения пользователя в другой канал
         try {
-          const { voiceCallApi } = await import('../../../../entities/voice-call/api/voiceCallApi');
           await voiceCallApi.switchUserToChannel(userId, targetChannelId);
           console.log('Participant moved successfully');
         } catch (error) {
