@@ -239,9 +239,10 @@ const HomePage = () => {
             console.log('HomePage: Setting selectedChat to new channel:', channelData);
             setSelectedChat(channelData);
             
-            // Обновляем URL, если нужно
+            // Обновляем URL без перезагрузки страницы (используем replace: true для сохранения состояния)
             if (serverId) {
-              navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+              // Используем window.history для обновления URL без размонтирования компонентов
+              window.history.replaceState(null, '', `/server/${serverId}/${newChannelId}`);
             }
           } else {
             // Если канал не найден в данных сервера, создаем базовый объект
@@ -260,7 +261,8 @@ const HomePage = () => {
             });
             
             if (serverId) {
-              navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+              // Используем window.history для обновления URL без размонтирования компонентов
+              window.history.replaceState(null, '', `/server/${serverId}/${newChannelId}`);
             }
           }
         } else {
@@ -280,7 +282,8 @@ const HomePage = () => {
           });
           
           if (serverId) {
-            navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+            // Используем window.history для обновления URL без размонтирования компонентов
+            window.history.replaceState(null, '', `/server/${serverId}/${newChannelId}`);
           }
         }
       }
