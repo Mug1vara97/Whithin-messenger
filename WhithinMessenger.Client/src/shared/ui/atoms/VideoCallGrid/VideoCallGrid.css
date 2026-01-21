@@ -437,18 +437,18 @@
   }
 }
 
-/* 3 users - все блоки одинакового размера */
+/* 3 users - 2 сверху, 1 снизу по центру, все блоки одинакового размера */
 .video-grid[data-user-count="3"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1000px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="3"] .video-tile {
-  width: calc(33.333% - 5.33px);
+  width: calc(50% - 4px);
   max-width: 350px;
 }
 
@@ -457,14 +457,6 @@
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
     max-width: none;
-  }
-}
-
-/* 3 users - средний контейнер (3 в ряд) */
-@container call-container (min-width: 500px) {
-  .video-grid[data-user-count="3"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 350px;
   }
 }
 
