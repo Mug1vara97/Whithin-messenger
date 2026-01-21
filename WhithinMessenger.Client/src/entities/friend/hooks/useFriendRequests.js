@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { friendApi } from '../api';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { useAuth } from '../../../shared/lib/hooks/useAuth';
 
 export const useFriendRequests = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { getConnection } = useConnectionContext();
+  const { user } = useAuth();
+  const connectionRef = useRef(null);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -51,6 +56,49 @@ export const useFriendRequests = () => {
       console.error('Error sending friend request:', err);
     }
   }, [fetchFriendRequests]);
+
+  // Подписка на SignalR события запросов в друзья
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let mounted = true;
+
+    const setupRealtime = async () => {
+      try {
+        const connection = await getConnection('notificationhub', user.id);
+        if (!mounted) return;
+        
+        connectionRef.current = connection;
+
+        // FriendRequestReceived - когда получен новый запрос в друзья
+        connection.on('FriendRequestReceived', (data) => {
+          console.log('FriendRequestReceived event:', data);
+          // Обновляем список запросов
+          fetchFriendRequests();
+        });
+
+        // FriendRequestDeclined - когда наш запрос отклонен
+        connection.on('FriendRequestDeclined', (data) => {
+          console.log('FriendRequestDeclined event:', data);
+          setSentRequests(prev => prev.filter(req => req.id !== data.requestId));
+        });
+
+        console.log('Friend requests realtime subscriptions set up');
+      } catch (err) {
+        console.error('Error setting up friend requests realtime:', err);
+      }
+    };
+
+    setupRealtime();
+
+    return () => {
+      mounted = false;
+      if (connectionRef.current) {
+        connectionRef.current.off('FriendRequestReceived');
+        connectionRef.current.off('FriendRequestDeclined');
+      }
+    };
+  }, [user?.id, getConnection, fetchFriendRequests]);
 
   useEffect(() => {
     fetchFriendRequests();
