@@ -212,9 +212,77 @@ const HomePage = () => {
           username: newChannelName
         }));
       } else if (selectedChat && (selectedChat.chatId || selectedChat.chat_id) === sourceChannelId) {
-        // Если переключились из канала, который сейчас открыт, нужно обновить на новый канал
-        // Но это может быть не нужно, если пользователь не хочет автоматически переключать интерфейс
-        console.log('HomePage: User switched from current channel, but not updating selectedChat automatically');
+        // Если переключились из канала, который сейчас открыт, обновляем selectedChat на новый канал
+        console.log('HomePage: User switched from current channel, updating selectedChat to new channel:', newChannelId);
+        
+        // Получаем данные нового канала из serverData
+        const currentServerData = serverDataFromPanel || serverData;
+        if (currentServerData) {
+          const allChannels = currentServerData.categories?.flatMap(category => category.chats || category.Chats || []) || [];
+          const foundChannel = allChannels.find(chat => 
+            (chat.chatId || chat.ChatId || chat.chat_id) === newChannelId
+          );
+          
+          if (foundChannel) {
+            const channelData = {
+              ...foundChannel,
+              chatId: foundChannel.chatId || foundChannel.ChatId || foundChannel.chat_id,
+              groupName: foundChannel.name || foundChannel.Name || foundChannel.groupName || newChannelName,
+              name: foundChannel.name || foundChannel.Name || newChannelName,
+              Name: foundChannel.name || foundChannel.Name || newChannelName,
+              username: foundChannel.name || foundChannel.Name || foundChannel.username || newChannelName,
+              chatType: foundChannel.typeId || foundChannel.chatType,
+              chatTypeId: foundChannel.typeId || foundChannel.chatType,
+              isGroupChat: false,
+              isServerChat: true
+            };
+            console.log('HomePage: Setting selectedChat to new channel:', channelData);
+            setSelectedChat(channelData);
+            
+            // Обновляем URL, если нужно
+            if (serverId) {
+              navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+            }
+          } else {
+            // Если канал не найден в данных сервера, создаем базовый объект
+            console.log('HomePage: Channel not found in server data, creating basic channel object');
+            setSelectedChat({
+              chatId: newChannelId,
+              chat_id: newChannelId,
+              groupName: newChannelName,
+              name: newChannelName,
+              Name: newChannelName,
+              username: newChannelName,
+              chatType: '44444444-4444-4444-4444-444444444444',
+              chatTypeId: '44444444-4444-4444-4444-444444444444',
+              isGroupChat: false,
+              isServerChat: true
+            });
+            
+            if (serverId) {
+              navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+            }
+          }
+        } else {
+          // Если нет данных сервера, создаем базовый объект
+          console.log('HomePage: No server data available, creating basic channel object');
+          setSelectedChat({
+            chatId: newChannelId,
+            chat_id: newChannelId,
+            groupName: newChannelName,
+            name: newChannelName,
+            Name: newChannelName,
+            username: newChannelName,
+            chatType: '44444444-4444-4444-4444-444444444444',
+            chatTypeId: '44444444-4444-4444-4444-444444444444',
+            isGroupChat: false,
+            isServerChat: true
+          });
+          
+          if (serverId) {
+            navigate(`/server/${serverId}/${newChannelId}`, { replace: true });
+          }
+        }
       }
     };
     
@@ -222,7 +290,7 @@ const HomePage = () => {
     return () => {
       window.removeEventListener('voiceChannelSwitched', handleVoiceChannelSwitched);
     };
-  }, [selectedChat]);
+  }, [selectedChat, serverData, serverDataFromPanel, serverId, navigate]);
 
   useEffect(() => {
     if (chatId && chats && chats.length > 0) {
