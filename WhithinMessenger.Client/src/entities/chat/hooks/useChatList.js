@@ -97,7 +97,12 @@ export const useChatList = (userId, onChatCreated = null) => {
 
     const handleSearchResults = (results) => {
       console.log('Received search results:', results);
-      setSearchResults(results);
+      // Фильтруем: только друзья или пользователи с существующими чатами
+      const filteredResults = Array.isArray(results) 
+        ? results.filter(user => user.isFriend === true || user.hasExistingChat === true)
+        : [];
+      console.log('Filtered search results (friends or existing chats):', filteredResults);
+      setSearchResults(filteredResults);
     };
 
 

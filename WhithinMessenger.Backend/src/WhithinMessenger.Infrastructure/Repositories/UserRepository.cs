@@ -58,8 +58,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
+            // Фильтруем: только друзья или пользователи с существующими чатами
+            var allowedUserIds = friendIds.Union(existingChatUserIds).ToHashSet();
+
             var users = await _context.Users
                 .Where(u => u.Id != currentUserId)
+                .Where(u => allowedUserIds.Contains(u.Id)) // Только друзья или пользователи с чатами
                 .Where(u =>
                     u.UserName.ToLower().Contains(normalizedName) ||
                     u.UserName.ToLower().Replace(" ", "").Contains(normalizedName.Replace(" ", "")) ||
@@ -78,6 +82,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     FriendshipStatus = friendshipStatusMap.ContainsKey(u.Id) ? friendshipStatusMap[u.Id] : null
                 })
                 .OrderByDescending(u => u.HasExistingChat)
+                .ThenByDescending(u => u.IsFriend)
                 .ThenBy(u => u.Username)
                 .Take(50)
                 .ToListAsync(cancellationToken);
@@ -162,15 +167,19 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
 
             Console.WriteLine($"GetUsersWithExistingChatsAsync: Found {existingChatUserIds.Count} user IDs with existing chats");
+            Console.WriteLine($"GetUsersWithExistingChatsAsync: Found {friendIds.Count} friends");
 
-            if (!existingChatUserIds.Any())
+            // Объединяем: друзья ИЛИ пользователи с существующими чатами
+            var allowedUserIds = friendIds.Union(existingChatUserIds).ToHashSet();
+
+            if (!allowedUserIds.Any())
             {
-                Console.WriteLine("GetUsersWithExistingChatsAsync: No users with existing chats found");
+                Console.WriteLine("GetUsersWithExistingChatsAsync: No friends or users with existing chats found");
                 return new List<UserSearchInfo>();
             }
 
             var users = await _context.Users
-                .Where(u => existingChatUserIds.Contains(u.Id))
+                .Where(u => allowedUserIds.Contains(u.Id))
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
@@ -179,11 +188,13 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
                     LastSeen = u.LastSeen,
-                    HasExistingChat = true,
+                    HasExistingChat = existingChatUserIds.Contains(u.Id),
                     IsFriend = friendIds.Contains(u.Id),
                     FriendshipStatus = friendshipStatusMap.ContainsKey(u.Id) ? friendshipStatusMap[u.Id] : null
                 })
-                .OrderBy(u => u.Username)
+                .OrderByDescending(u => u.HasExistingChat)
+                .ThenByDescending(u => u.IsFriend)
+                .ThenBy(u => u.Username)
                 .ToListAsync(cancellationToken);
 
             return users;
