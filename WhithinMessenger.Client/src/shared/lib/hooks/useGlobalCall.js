@@ -25,14 +25,41 @@ export const useGlobalCall = (userId = null, userName = null) => {
       if (callContext.isConnected && callContext.currentRoomId && callContext.currentRoomId !== roomId) {
         console.log(`useGlobalCall: Active call in different channel (${callContext.currentRoomId}), ending it first before joining ${roomId}`);
         // Сначала отключаемся от текущего канала
+        const previousRoomId = callContext.currentRoomId;
         await callContext.endCall();
-        // Ждем немного, чтобы соединение полностью закрылось
-        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Ждем, пока соединение полностью закроется (максимум 3 секунды)
+        let waitCount = 0;
+        const maxWait = 30; // 30 * 100ms = 3 секунды
+        while (callContext.isConnected && waitCount < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+        }
+        
+        if (callContext.isConnected) {
+          console.warn('useGlobalCall: Connection still active after endCall, waiting additional time');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        console.log(`useGlobalCall: Disconnected from previous room (${previousRoomId}), ready to join new room (${roomId})`);
       }
 
       // Инициализируем звонок если еще не подключены
       if (!callContext.isConnected) {
+        console.log('useGlobalCall: Initializing call connection');
         await callContext.initializeCall(user.id || user.userId, user.username || user.name);
+        
+        // Ждем, пока соединение установится
+        let waitCount = 0;
+        const maxWait = 50; // 50 * 100ms = 5 секунд
+        while (!callContext.isConnected && waitCount < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+        }
+        
+        if (!callContext.isConnected) {
+          throw new Error('Failed to establish connection to voice server');
+        }
       }
 
       // Присоединяемся к комнате
