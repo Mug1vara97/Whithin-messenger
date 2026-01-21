@@ -1316,8 +1316,10 @@ export const useCallStore = create(
             console.log('📤 Initial audio state sent to server:', !currentState.isGlobalAudioMuted);
           }
           
-          // Используем переданное название канала или пытаемся получить из текущего звонка
-          const finalChannelName = channelName || state.currentCall?.channelName || roomId;
+          // Используем переданное название канала, иначе используем roomId
+          // НЕ используем старое название из currentCall, чтобы избежать проблем при переключении
+          const finalChannelName = channelName || roomId;
+          console.log('joinRoom: Setting currentCall with channelName:', finalChannelName, 'for roomId:', roomId);
           set({ 
             currentRoomId: roomId, 
             isInCall: true, 

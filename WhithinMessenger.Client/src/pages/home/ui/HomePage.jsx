@@ -198,16 +198,23 @@ const HomePage = () => {
   // Слушаем событие переключения канала для обновления интерфейса
   useEffect(() => {
     const handleVoiceChannelSwitched = (event) => {
-      const { channelId: newChannelId, channelName: newChannelName } = event.detail;
+      const { channelId: newChannelId, channelName: newChannelName, sourceChannelId } = event.detail;
+      console.log('HomePage: voiceChannelSwitched event received:', { newChannelId, newChannelName, sourceChannelId, currentSelectedChat: selectedChat });
       
       // Если переключились в канал, который сейчас открыт, обновляем selectedChat
       if (selectedChat && (selectedChat.chatId || selectedChat.chat_id) === newChannelId) {
+        console.log('HomePage: Updating selectedChat with new channel name:', newChannelName);
         setSelectedChat(prev => ({
           ...prev,
           groupName: newChannelName,
           name: newChannelName,
-          Name: newChannelName
+          Name: newChannelName,
+          username: newChannelName
         }));
+      } else if (selectedChat && (selectedChat.chatId || selectedChat.chat_id) === sourceChannelId) {
+        // Если переключились из канала, который сейчас открыт, нужно обновить на новый канал
+        // Но это может быть не нужно, если пользователь не хочет автоматически переключать интерфейс
+        console.log('HomePage: User switched from current channel, but not updating selectedChat automatically');
       }
     };
     
