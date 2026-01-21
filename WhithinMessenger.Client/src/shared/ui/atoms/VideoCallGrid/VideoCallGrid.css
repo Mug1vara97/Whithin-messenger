@@ -443,20 +443,18 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 900px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="3"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 350px;
+  flex-shrink: 0;
 }
 
 /* 3 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -466,20 +464,18 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1000px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="4"] .video-tile {
   width: calc(50% - 4px);
-  max-width: 400px;
+  flex-shrink: 0;
 }
 
 /* 4 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="4"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -489,21 +485,18 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  padding: 0 20px;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="5"] .video-tile {
   width: calc(33.333% - 5.33px);
-  max-width: 350px;
+  flex-shrink: 0;
 }
 
 /* 5 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="5"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -511,42 +504,27 @@
 @container call-container (min-width: 500px) and (max-width: 800px) {
   .video-grid[data-user-count="5"] .video-tile {
     width: calc(50% - 4px);
-    max-width: none;
   }
 }
 
-/* 5 users - широкий контейнер (3-2 layout, все одинаковые) */
-@container call-container (min-width: 800px) {
-  .video-grid[data-user-count="5"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="5"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 350px;
-  }
-}
-
-/* 6 users - все блоки одинакового размера */
+/* 6 users - 3x2, все блоки одинакового размера */
 .video-grid[data-user-count="6"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="6"] .video-tile {
   width: calc(33.333% - 5.33px);
-  max-width: 350px;
+  flex-shrink: 0;
 }
 
 /* 6 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -554,19 +532,6 @@
 @container call-container (min-width: 500px) and (max-width: 750px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: calc(50% - 4px);
-    max-width: none;
-  }
-}
-
-/* 6 users - широкий контейнер (3 колонки) */
-@container call-container (min-width: 750px) {
-  .video-grid[data-user-count="6"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="6"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 350px;
   }
 }
 
@@ -576,20 +541,18 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="7"] .video-tile {
   width: calc(33.333% - 5.33px);
-  max-width: 350px;
+  flex-shrink: 0;
 }
 
 /* 7 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="7"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -597,42 +560,27 @@
 @container call-container (min-width: 500px) and (max-width: 800px) {
   .video-grid[data-user-count="7"] .video-tile {
     width: calc(50% - 4px);
-    max-width: none;
   }
 }
 
-/* 7 users - широкий контейнер (3 колонки) */
-@container call-container (min-width: 800px) {
-  .video-grid[data-user-count="7"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="7"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 350px;
-  }
-}
-
-/* 8 users - все блоки одинакового размера */
+/* 8 users - 4x2, все блоки одинакового размера */
 .video-grid[data-user-count="8"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="8"] .video-tile {
   width: calc(25% - 6px);
-  max-width: 300px;
+  flex-shrink: 0;
 }
 
 /* 8 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="8"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
@@ -640,19 +588,6 @@
 @container call-container (min-width: 500px) and (max-width: 800px) {
   .video-grid[data-user-count="8"] .video-tile {
     width: calc(50% - 4px);
-    max-width: none;
-  }
-}
-
-/* 8 users - широкий контейнер (4 колонки) */
-@container call-container (min-width: 800px) {
-  .video-grid[data-user-count="8"] {
-    max-width: 1400px;
-  }
-
-  .video-grid[data-user-count="8"] .video-tile {
-    width: calc(25% - 6px);
-    max-width: 300px;
   }
 }
 
@@ -662,36 +597,25 @@
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  max-width: 1400px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="9"] .video-tile {
   width: calc(33.333% - 5.33px);
-  max-width: 320px;
+  flex-shrink: 0;
 }
 
-/* 9 users - очень узкий контейнер (1 колонка) */
+/* 9 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="9"] .video-tile {
     width: 100%;
-    max-width: none;
   }
 }
 
-/* 9 users - узкий контейнер (2 колонки) */
+/* 9 users - средний контейнер (2 колонки) */
 @container call-container (min-width: 500px) and (max-width: 700px) {
   .video-grid[data-user-count="9"] .video-tile {
     width: calc(50% - 4px);
-    max-width: none;
-  }
-}
-
-/* 9 users - широкий контейнер (3 колонки) */
-@container call-container (min-width: 700px) {
-  .video-grid[data-user-count="9"] .video-tile {
-    width: calc(33.333% - 5.33px);
-    max-width: 320px;
   }
 }
 
