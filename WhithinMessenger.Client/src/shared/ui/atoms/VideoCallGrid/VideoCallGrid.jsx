@@ -115,7 +115,10 @@ const VideoCallGrid = ({
   remoteScreenShares = new Map(),
   forceGridMode = false,
   hideBottomUsers = false,
-  enableAutoFocus = true // Новый пропс для управления автофокусом
+  enableAutoFocus = true, // Новый пропс для управления автофокусом
+  testMode = false, // Режим тестирования с кнопками добавления/удаления пользователей
+  onAddTestParticipant, // Callback для добавления тестового участника
+  onRemoveTestParticipant // Callback для удаления тестового участника
 }) => {
   const bottomGridRef = useRef(null);
 
@@ -618,6 +621,27 @@ const VideoCallGrid = ({
   // Обычный режим (сетка)
   return (
     <div className={`video-call-container ${className}`}>
+      {/* Тестовые кнопки для добавления/удаления участников */}
+      {testMode && (
+        <div className="test-controls">
+          <button 
+            className="test-btn test-btn-add"
+            onClick={onAddTestParticipant}
+            title="Добавить тестового участника"
+          >
+            + Добавить участника ({extendedParticipants.length})
+          </button>
+          <button 
+            className="test-btn test-btn-remove"
+            onClick={onRemoveTestParticipant}
+            disabled={extendedParticipants.length <= 1}
+            title="Удалить последнего участника"
+          >
+            − Удалить участника
+          </button>
+        </div>
+      )}
+
       <div className="video-grid-wrapper">
         {totalPages > 1 && currentPage > 0 && (
           <button 

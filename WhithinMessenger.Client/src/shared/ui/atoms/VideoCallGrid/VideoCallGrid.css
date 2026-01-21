@@ -437,80 +437,93 @@
   }
 }
 
-/* 3 users - 2 top, 1 centered bottom */
+/* 3 users - все блоки одинакового размера */
 .video-grid[data-user-count="3"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="3"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-.video-grid[data-user-count="3"] .video-tile:nth-child(3) {
-  width: 50%;
+  width: calc(33.333% - 5.33px);
+  max-width: 350px;
 }
 
 /* 3 users - узкий контейнер (1 колонка) */
-@container call-container (max-width: 600px) {
+@container call-container (max-width: 500px) {
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
-  }
-  
-  .video-grid[data-user-count="3"] .video-tile:nth-child(3) {
-    width: 100%;
+    max-width: none;
   }
 }
 
-/* 4 users - 2x2 grid */
+/* 3 users - средний контейнер (3 в ряд) */
+@container call-container (min-width: 500px) {
+  .video-grid[data-user-count="3"] .video-tile {
+    width: calc(33.333% - 5.33px);
+    max-width: 350px;
+  }
+}
+
+/* 4 users - 2x2 grid, все блоки одинакового размера */
 .video-grid[data-user-count="4"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="4"] .video-tile {
   width: calc(50% - 4px);
+  max-width: 400px;
 }
 
 /* 4 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="4"] .video-tile {
     width: 100%;
+    max-width: none;
   }
 }
 
-/* 5 users - 2-2-1 layout by default */
+/* 5 users - 3-2 layout, все блоки одинакового размера */
 .video-grid[data-user-count="5"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
   padding: 0 20px;
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
 .video-grid[data-user-count="5"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-.video-grid[data-user-count="5"] .video-tile:nth-child(5) {
-  width: 50%;
+  width: calc(33.333% - 5.33px);
+  max-width: 350px;
 }
 
 /* 5 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="5"] .video-tile {
     width: 100%;
-  }
-  
-  .video-grid[data-user-count="5"] .video-tile:nth-child(5) {
-    width: 100%;
+    max-width: none;
   }
 }
 
-/* 5 users - 3-2 layout for wide containers */
+/* 5 users - средний контейнер (2 колонки) */
+@container call-container (min-width: 500px) and (max-width: 800px) {
+  .video-grid[data-user-count="5"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 5 users - широкий контейнер (3-2 layout, все одинаковые) */
 @container call-container (min-width: 800px) {
   .video-grid[data-user-count="5"] {
     max-width: 1400px;
@@ -518,151 +531,175 @@
 
   .video-grid[data-user-count="5"] .video-tile {
     width: calc(33.333% - 5.33px);
-  }
-
-  .video-grid[data-user-count="5"] .video-tile:nth-child(4),
-  .video-grid[data-user-count="5"] .video-tile:nth-child(5) {
-    width: calc(50% - 4px);
+    max-width: 350px;
   }
 }
 
-/* 6 users - 2x3 grid by default */
+/* 6 users - все блоки одинакового размера */
 .video-grid[data-user-count="6"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="6"] .video-tile {
-  width: calc(50% - 4px);
+  width: calc(33.333% - 5.33px);
+  max-width: 350px;
 }
 
 /* 6 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="6"] .video-tile {
     width: 100%;
+    max-width: none;
   }
 }
 
-/* 6 users - 3x2 grid for wide containers */
+/* 6 users - средний контейнер (2 колонки) */
+@container call-container (min-width: 500px) and (max-width: 750px) {
+  .video-grid[data-user-count="6"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 6 users - широкий контейнер (3 колонки) */
 @container call-container (min-width: 750px) {
+  .video-grid[data-user-count="6"] {
+    max-width: 1400px;
+  }
+
   .video-grid[data-user-count="6"] .video-tile {
     width: calc(33.333% - 5.33px);
+    max-width: 350px;
   }
 }
 
-/* 7 users */
+/* 7 users - 3-3-1 layout, все блоки одинакового размера */
 .video-grid[data-user-count="7"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="7"] .video-tile {
-  width: calc(50% - 4px);
-}
-
-.video-grid[data-user-count="7"] .video-tile:nth-child(7) {
-  width: 50%;
+  width: calc(33.333% - 5.33px);
+  max-width: 350px;
 }
 
 /* 7 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="7"] .video-tile {
     width: 100%;
-  }
-  
-  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
-    width: 100%;
+    max-width: none;
   }
 }
 
-/* 7 users - 3 колонки для широких контейнеров */
-@container call-container (min-width: 750px) {
+/* 7 users - средний контейнер (2 колонки) */
+@container call-container (min-width: 500px) and (max-width: 800px) {
+  .video-grid[data-user-count="7"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 7 users - широкий контейнер (3 колонки) */
+@container call-container (min-width: 800px) {
   .video-grid[data-user-count="7"] {
     max-width: 1400px;
   }
 
   .video-grid[data-user-count="7"] .video-tile {
     width: calc(33.333% - 5.33px);
-  }
-
-  .video-grid[data-user-count="7"] .video-tile:nth-child(7) {
-    width: calc(33.333% - 5.33px);
+    max-width: 350px;
   }
 }
 
-/* 8 users */
+/* 8 users - все блоки одинакового размера */
 .video-grid[data-user-count="8"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="8"] .video-tile {
-  width: calc(50% - 4px);
+  width: calc(25% - 6px);
+  max-width: 300px;
 }
 
 /* 8 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="8"] .video-tile {
     width: 100%;
+    max-width: none;
   }
 }
 
-/* 8 users - 3 колонки для широких контейнеров */
-@container call-container (min-width: 750px) {
+/* 8 users - средний контейнер (2 колонки) */
+@container call-container (min-width: 500px) and (max-width: 800px) {
+  .video-grid[data-user-count="8"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 8 users - широкий контейнер (4 колонки) */
+@container call-container (min-width: 800px) {
   .video-grid[data-user-count="8"] {
     max-width: 1400px;
   }
 
   .video-grid[data-user-count="8"] .video-tile {
-    width: calc(33.333% - 5.33px);
-  }
-
-  .video-grid[data-user-count="8"] .video-tile:nth-child(7),
-  .video-grid[data-user-count="8"] .video-tile:nth-child(8) {
-    width: calc(50% - 4px);
+    width: calc(25% - 6px);
+    max-width: 300px;
   }
 }
 
-/* 8 users - 4 колонки для очень широких контейнеров */
-@container call-container (min-width: 1100px) {
-  .video-grid[data-user-count="8"] .video-tile {
-    width: calc(25% - 6px);
-  }
-
-  .video-grid[data-user-count="8"] .video-tile:nth-child(7),
-  .video-grid[data-user-count="8"] .video-tile:nth-child(8) {
-    width: calc(25% - 6px);
-  }
-}
-
-/* 9 users - 3x3 grid */
+/* 9 users - 3x3 grid, все блоки одинакового размера */
 .video-grid[data-user-count="9"] {
   flex-direction: row;
   flex-wrap: wrap;
   align-content: center;
+  justify-content: center;
   max-width: 1400px;
+  margin: 0 auto;
 }
 
 .video-grid[data-user-count="9"] .video-tile {
   width: calc(33.333% - 5.33px);
-}
-
-/* 9 users - узкий контейнер (2 колонки) */
-@container call-container (max-width: 600px) {
-  .video-grid[data-user-count="9"] .video-tile {
-    width: calc(50% - 4px);
-  }
+  max-width: 320px;
 }
 
 /* 9 users - очень узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="9"] .video-tile {
     width: 100%;
+    max-width: none;
+  }
+}
+
+/* 9 users - узкий контейнер (2 колонки) */
+@container call-container (min-width: 500px) and (max-width: 700px) {
+  .video-grid[data-user-count="9"] .video-tile {
+    width: calc(50% - 4px);
+    max-width: none;
+  }
+}
+
+/* 9 users - широкий контейнер (3 колонки) */
+@container call-container (min-width: 700px) {
+  .video-grid[data-user-count="9"] .video-tile {
+    width: calc(33.333% - 5.33px);
+    max-width: 320px;
   }
 }
 
@@ -1089,4 +1126,59 @@
     width: 100% !important;
     max-width: 100% !important;
   }
+}
+
+/* ===== ТЕСТОВЫЕ КОНТРОЛЫ ===== */
+.test-controls {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.test-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.test-btn-add {
+  background: #3ba55d;
+  color: white;
+}
+
+.test-btn-add:hover {
+  background: #2d8049;
+  transform: scale(1.02);
+}
+
+.test-btn-remove {
+  background: #ed4245;
+  color: white;
+}
+
+.test-btn-remove:hover:not(:disabled) {
+  background: #c73e3e;
+  transform: scale(1.02);
+}
+
+.test-btn:disabled {
+  background: #555;
+  color: #888;
+  cursor: not-allowed;
+  transform: none;
 }

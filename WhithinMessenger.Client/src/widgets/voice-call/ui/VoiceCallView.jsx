@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
 import { createParticipant } from '../../../entities/video-call/model/types';
@@ -100,8 +100,46 @@ const VoiceCallView = ({
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [showMusicBotPanel, setShowMusicBotPanel] = useState(false);
   
+  // Тестовый режим для проверки сетки
+  const [testMode, setTestMode] = useState(false);
+  const [testParticipants, setTestParticipants] = useState([]);
+  
   // Хук для управления ботом
   const { isBotInRoom, isLoading: isBotLoading, addBot, error: botError } = useMusicBot(channelId);
+
+  // Генератор случайных имён для тестовых участников
+  const testNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Edward', 'Fiona', 'George', 'Helen', 'Ivan', 'Julia'];
+  
+  // Добавить тестового участника
+  const handleAddTestParticipant = useCallback(() => {
+    const id = `test-${Date.now()}`;
+    const name = testNames[testParticipants.length % testNames.length] + ` ${testParticipants.length + 1}`;
+    const newParticipant = createParticipant(id, name, null, 'online', 'participant');
+    newParticipant.isMuted = Math.random() > 0.5;
+    newParticipant.isAudioEnabled = true;
+    newParticipant.isSpeaking = false;
+    newParticipant.isVideoEnabled = false;
+    newParticipant.avatarColor = ['#5865f2', '#3ba55d', '#faa81a', '#ed4245', '#eb459e'][Math.floor(Math.random() * 5)];
+    setTestParticipants(prev => [...prev, newParticipant]);
+  }, [testParticipants.length]);
+  
+  // Удалить последнего тестового участника
+  const handleRemoveTestParticipant = useCallback(() => {
+    setTestParticipants(prev => prev.slice(0, -1));
+  }, []);
+  
+  // Переключение тестового режима (Ctrl+Shift+T)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        setTestMode(prev => !prev);
+        console.log('Test mode toggled:', !testMode);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [testMode]);
 
   // Логирование состояния демонстрации экрана
   // console.log('VoiceCallView screen share state:', { 
@@ -228,6 +266,11 @@ const VoiceCallView = ({
       videoParticipantsList.push(videoParticipant);
     });
     
+    // Добавляем тестовых участников в тестовом режиме
+    if (testMode && testParticipants.length > 0) {
+      videoParticipantsList.push(...testParticipants);
+    }
+    
     console.log('Video participants updated:', videoParticipantsList);
     return videoParticipantsList;
   }, [
@@ -244,6 +287,8 @@ const VoiceCallView = ({
     participantGlobalAudioStates,
     participantVideoStates,
     participantSpeakingStates,
+    testMode,
+    testParticipants,
     currentUserProfile
   ]);
 
@@ -355,6 +400,9 @@ const VoiceCallView = ({
                       remoteScreenShares={remoteScreenShares}
                       onStopScreenShare={toggleScreenShare}
                       enableAutoFocus={false} // Отключаем автофокус для серверных звонков
+                      testMode={testMode}
+                      onAddTestParticipant={handleAddTestParticipant}
+                      onRemoveTestParticipant={handleRemoveTestParticipant}
                     />
                   </div>
                 )}
