@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Close, Search, PersonAdd } from '@mui/icons-material';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import tokenManager from '../../../lib/services/tokenManager';
 import './AddMemberModal.css';
 
 const AddMemberModal = ({ isOpen, onClose, serverId, onMemberAdded, connection }) => {
@@ -22,16 +23,22 @@ const AddMemberModal = ({ isOpen, onClose, serverId, onMemberAdded, connection }
     setError('');
 
     try {
+      const token = tokenManager.getToken();
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
       // Загружаем друзей и участников сервера параллельно
       const [friendsResponse, membersResponse] = await Promise.all([
         fetch(`${BASE_URL}/api/friends`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           credentials: 'include',
         }),
         fetch(`${BASE_URL}/api/server/${serverId}/members`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           credentials: 'include',
         })
       ]);
