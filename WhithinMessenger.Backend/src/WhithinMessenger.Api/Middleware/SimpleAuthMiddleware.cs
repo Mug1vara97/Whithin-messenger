@@ -74,15 +74,15 @@ public class SimpleAuthMiddleware
             
             // Fallback: используем userId из query string если JWT не найден
             var userIdFromQuery = context.Request.Query["userId"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(userIdFromQuery) && Guid.TryParse(userIdFromQuery, out var signalRUserId))
+            if (!string.IsNullOrEmpty(userIdFromQuery) && Guid.TryParse(userIdFromQuery, out var fallbackUserId))
             {
-                _logger.LogInformation($"SimpleAuthMiddleware: Found userId in SignalR query: {signalRUserId}");
-                context.Items["UserId"] = signalRUserId;
+                _logger.LogInformation($"SimpleAuthMiddleware: Found userId in SignalR query: {fallbackUserId}");
+                context.Items["UserId"] = fallbackUserId;
                 
                 var claims = new List<Claim>
                 {
-                    new Claim("UserId", signalRUserId.ToString()),
-                    new Claim(ClaimTypes.NameIdentifier, signalRUserId.ToString())
+                    new Claim("UserId", fallbackUserId.ToString()),
+                    new Claim(ClaimTypes.NameIdentifier, fallbackUserId.ToString())
                 };
                 
                 var identity = new ClaimsIdentity(claims, "SimpleAuth");
