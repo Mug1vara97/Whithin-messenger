@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
+import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
 import './CategoriesList.css';
 
 const CategoriesList = ({ 
@@ -26,6 +27,41 @@ const CategoriesList = ({
   useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
+
+  // Получаем список голосовых каналов и подключаемся к voice-server для получения участников
+  const voiceChannelIds = useMemo(() => {
+    const ids = [];
+    localCategories.forEach(category => {
+      const chats = category.chats || category.Chats || [];
+      chats.forEach(chat => {
+        const isVoice = chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4;
+        if (isVoice) {
+          ids.push(chat.chatId || chat.ChatId);
+        }
+      });
+    });
+    return ids;
+  }, [localCategories]);
+
+  // Подключаемся к voice-server и запрашиваем участников голосовых каналов
+  useEffect(() => {
+    if (voiceChannelIds.length === 0) return;
+
+    // Подключаемся к voice-server
+    voiceChannelService.connect();
+
+    // Запрашиваем участников для всех голосовых каналов
+    voiceChannelIds.forEach(channelId => {
+      voiceChannelService.subscribeToChannel(channelId);
+    });
+
+    return () => {
+      // Отписываемся от каналов при размонтировании
+      voiceChannelIds.forEach(channelId => {
+        voiceChannelService.unsubscribeFromChannel(channelId);
+      });
+    };
+  }, [voiceChannelIds]);
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);

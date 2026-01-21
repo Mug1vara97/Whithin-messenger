@@ -368,6 +368,18 @@ io.on('connection', async (socket) => {
                 userId: peer.userId
             });
 
+            // Отправляем глобальное событие о присоединении к голосовому каналу
+            // (для всех клиентов, даже тех кто не в звонке)
+            io.emit('userJoinedVoiceChannel', {
+                channelId: roomId,
+                userId: peer.userId,
+                userName: peer.name,
+                isMuted: peer.muted
+            });
+
+            // Также отправляем обновленный список участников канала
+            scheduleChannelUpdate(roomId, 100);
+
             console.log(`Peer ${name} (${socket.id}) joined room ${roomId}`);
             console.log('Existing peers:', existingPeers);
 

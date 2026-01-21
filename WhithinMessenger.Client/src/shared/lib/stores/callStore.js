@@ -70,6 +70,10 @@ export const useCallStore = create(
       peerIdToUserIdMap: new Map(),
       processedProducers: new Set(),
       
+      // Участники всех голосовых каналов (для отображения в списке каналов)
+      // Map: channelId -> [{ userId, userName, avatar, avatarColor, isMuted }]
+      voiceChannelParticipants: new Map(),
+      
       // Отдельные состояния для оптимизации (избегаем перерендера демонстрации экрана)
       participantMuteStates: new Map(), // userId -> isMuted
       participantAudioStates: new Map(), // userId -> isAudioEnabled
@@ -173,6 +177,65 @@ export const useCallStore = create(
           const newSpeakingStates = new Map(state.participantSpeakingStates);
           newSpeakingStates.set(userId, false);
           return { participantSpeakingStates: newSpeakingStates };
+        });
+      },
+      
+      // Управление участниками голосовых каналов (для отображения в списке каналов)
+      setVoiceChannelParticipants: (channelId, participants) => {
+        set((state) => {
+          const newMap = new Map(state.voiceChannelParticipants);
+          if (participants && participants.length > 0) {
+            newMap.set(channelId, participants);
+          } else {
+            newMap.delete(channelId);
+          }
+          return { voiceChannelParticipants: newMap };
+        });
+      },
+      
+      addVoiceChannelParticipant: (channelId, participant) => {
+        set((state) => {
+          const newMap = new Map(state.voiceChannelParticipants);
+          const currentParticipants = newMap.get(channelId) || [];
+          // Проверяем, нет ли уже такого участника
+          if (!currentParticipants.some(p => p.userId === participant.userId)) {
+            newMap.set(channelId, [...currentParticipants, participant]);
+          }
+          return { voiceChannelParticipants: newMap };
+        });
+      },
+      
+      removeVoiceChannelParticipant: (channelId, odUserId) => {
+        set((state) => {
+          const newMap = new Map(state.voiceChannelParticipants);
+          const currentParticipants = newMap.get(channelId) || [];
+          const filteredParticipants = currentParticipants.filter(p => p.odUserId !== odUserId && p.userId !== odUserId);
+          if (filteredParticipants.length > 0) {
+            newMap.set(channelId, filteredParticipants);
+          } else {
+            newMap.delete(channelId);
+          }
+          return { voiceChannelParticipants: newMap };
+        });
+      },
+      
+      updateVoiceChannelParticipant: (channelId, odUserId, updates) => {
+        set((state) => {
+          const newMap = new Map(state.voiceChannelParticipants);
+          const currentParticipants = newMap.get(channelId) || [];
+          const updatedParticipants = currentParticipants.map(p => 
+            (p.odUserId === odUserId || p.userId === odUserId) ? { ...p, ...updates } : p
+          );
+          newMap.set(channelId, updatedParticipants);
+          return { voiceChannelParticipants: newMap };
+        });
+      },
+      
+      clearVoiceChannelParticipants: (channelId) => {
+        set((state) => {
+          const newMap = new Map(state.voiceChannelParticipants);
+          newMap.delete(channelId);
+          return { voiceChannelParticipants: newMap };
         });
       },
       
@@ -434,6 +497,19 @@ export const useCallStore = create(
               }]
             }));
 
+            // Добавляем участника в voiceChannelParticipants
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId) {
+              get().addVoiceChannelParticipant(currentRoomId, {
+                odUserId: peerData.userId,
+                userName: peerData.name || peerData.userName,
+                isMuted: peerData.isMuted || false,
+                avatar: profileData?.avatar || null,
+                avatarColor: profileData?.avatarColor || '#5865f2'
+              });
+              console.log('📢 Added peer to voice channel participants:', peerData.userId);
+            }
+
             // Воспроизводим звук подключения пользователя
             audioNotificationManager.playUserJoinedSound().catch(error => {
               console.warn('Failed to play user joined sound:', error);
@@ -498,6 +574,13 @@ export const useCallStore = create(
                   participants: state.participants.filter(p => p.userId !== userId)
                 };
               });
+              
+              // Удаляем участника из voiceChannelParticipants
+              const currentRoomId = get().currentRoomId;
+              if (currentRoomId) {
+                get().removeVoiceChannelParticipant(currentRoomId, userId);
+                console.log('📢 Removed peer from voice channel participants:', userId);
+              }
             }
 
             // Воспроизводим звук отключения пользователя
@@ -523,6 +606,12 @@ export const useCallStore = create(
                 p.userId === userId ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking } : p
               )
             }));
+            
+            // Обновляем voiceChannelParticipants
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId) {
+              get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: mutedState });
+            }
           });
 
           voiceCallApi.on('peerAudioStateChanged', (data) => {
@@ -1167,6 +1256,42 @@ export const useCallStore = create(
           }
           
           set({ currentRoomId: roomId, isInCall: true, currentCall: { channelId: roomId, channelName: roomId } });
+          
+          // Обновляем voiceChannelParticipants для отображения в списке каналов
+          const afterJoinState = get();
+          const currentUserData = {
+            odUserId: afterJoinState.currentUserId,
+            userName: afterJoinState.currentUserName,
+            isMuted: afterJoinState.isMuted,
+            avatar: null,
+            avatarColor: '#5865f2'
+          };
+          
+          // Загружаем профиль текущего пользователя
+          try {
+            const profile = await userApi.getProfile(afterJoinState.currentUserId);
+            if (profile) {
+              currentUserData.avatar = profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null;
+              currentUserData.avatarColor = profile.avatarColor || '#5865f2';
+            }
+          } catch (e) {
+            console.warn('Failed to load current user profile for voice channel:', e);
+          }
+          
+          // Формируем список участников канала
+          const channelParticipants = [
+            currentUserData,
+            ...afterJoinState.participants.map(p => ({
+              odUserId: p.userId,
+              userName: p.name || p.userName,
+              isMuted: p.isMuted,
+              avatar: p.avatar,
+              avatarColor: p.avatarColor || '#5865f2'
+            }))
+          ];
+          
+          get().setVoiceChannelParticipants(roomId, channelParticipants);
+          console.log('📢 Voice channel participants updated:', channelParticipants);
           
           // Воспроизводим звук подключения для самого пользователя
           audioNotificationManager.playUserJoinedSound().catch(error => {
@@ -2029,6 +2154,12 @@ export const useCallStore = create(
       endCall: async () => {
         try {
           const state = get();
+          
+          // Очищаем voiceChannelParticipants для текущего канала
+          if (state.currentRoomId) {
+            get().clearVoiceChannelParticipants(state.currentRoomId);
+            console.log('📢 Cleared voice channel participants for:', state.currentRoomId);
+          }
           
           // Очищаем обработчики событий
           voiceCallApi.off('peerJoined');
