@@ -137,6 +137,27 @@ class VoiceCallApi {
     // Сокет остается подключенным для быстрого переподключения
   }
 
+  // Переключение пользователя в другой голосовой канал
+  async switchUserToChannel(userId, targetChannelId) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.socket.connected) {
+        reject(new Error('Not connected to voice server'));
+        return;
+      }
+
+      console.log('switchUserToChannel: Switching user', userId, 'to channel', targetChannelId);
+      
+      this.socket.emit('switchUserToChannel', { userId, targetChannelId }, (response) => {
+        if (response && response.error) {
+          reject(new Error(response.error));
+          return;
+        }
+        console.log('switchUserToChannel: Success', response);
+        resolve(response);
+      });
+    });
+  }
+
   async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
     return new Promise((resolve, reject) => {
       // Если уже есть активная комната, выходим из неё перед присоединением к новой

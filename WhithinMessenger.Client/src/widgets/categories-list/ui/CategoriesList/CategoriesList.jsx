@@ -310,6 +310,52 @@ const CategoriesList = ({
         
         console.log('MoveChat completed successfully');
       }
+      else if (type === 'VOICE_PARTICIPANT') {
+        console.log('Moving voice participant');
+        
+        // Извлекаем userId и channelId из draggableId
+        // Формат: participant-{userId}-{sourceChannelId}
+        const participantMatch = result.draggableId.match(/^participant-(.+?)-(.+)$/);
+        if (!participantMatch) {
+          console.error('Invalid participant draggableId format:', result.draggableId);
+          return;
+        }
+        
+        const [, userId, sourceChannelId] = participantMatch;
+        const targetChannelId = destination.droppableId.replace('voice-channel-', '');
+        
+        // Проверяем, что это действительно голосовой канал
+        const targetChannel = localCategories
+          .flatMap(cat => cat.chats || cat.Chats || [])
+          .find(chat => {
+            const chatId = chat.chatId || chat.ChatId;
+            return chatId === targetChannelId && 
+                   (chat.chatType === 4 || chat.typeId === 4 || chat.TypeId === 4);
+          });
+        
+        if (!targetChannel) {
+          console.error('Target channel is not a voice channel or not found');
+          return;
+        }
+        
+        // Если перетаскиваем в тот же канал, ничего не делаем
+        if (sourceChannelId === targetChannelId) {
+          console.log('Participant already in target channel');
+          return;
+        }
+        
+        console.log('Moving participant:', { userId, sourceChannelId, targetChannelId });
+        
+        // Вызываем API для переключения пользователя в другой канал
+        try {
+          const { voiceCallApi } = await import('../../../../entities/voice-call/api/voiceCallApi');
+          await voiceCallApi.switchUserToChannel(userId, targetChannelId);
+          console.log('Participant moved successfully');
+        } catch (error) {
+          console.error('Failed to move participant:', error);
+          alert(`Ошибка переключения пользователя: ${error.message}`);
+        }
+      }
     } catch (error) {
       console.error('Move operation failed:', error);
       alert(`Ошибка перемещения: ${error.message}`);

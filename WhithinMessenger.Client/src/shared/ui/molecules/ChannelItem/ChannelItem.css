@@ -148,6 +148,14 @@
   margin-left: 28px;
   margin-top: 2px;
   padding-bottom: 4px;
+  min-height: 20px;
+  transition: background-color 0.2s ease;
+}
+
+.voice-channel-participants.dragging-over {
+  background-color: rgba(88, 101, 242, 0.1);
+  border-radius: 4px;
+  padding: 4px;
 }
 
 .voice-participant {
@@ -155,8 +163,20 @@
   align-items: center;
   padding: 4px 8px;
   border-radius: 4px;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.2s ease, box-shadow 0.2s ease;
   gap: 8px;
+  cursor: grab;
+  user-select: none;
+}
+
+.voice-participant:active {
+  cursor: grabbing;
+}
+
+.voice-participant.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .voice-participant:hover {
@@ -244,4 +264,12 @@
 .voice-participant.deafened .voice-participant-name {
   color: var(--text-muted);
   opacity: 0.7;
+}
+
+.voice-channel-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  margin-left: 28px;
+  font-style: italic;
 }

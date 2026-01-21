@@ -692,6 +692,124 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Обработчик переключения пользователя в другой канал
+    socket.on('switchUserToChannel', ({ userId, targetChannelId }, callback) => {
+        console.log('switchUserToChannel: Switching user', userId, 'to channel', targetChannelId);
+        
+        if (!userId || !targetChannelId) {
+            if (callback) callback({ error: 'userId and targetChannelId are required' });
+            return;
+        }
+        
+        // Находим текущий канал пользователя
+        const userState = getUserVoiceState(userId);
+        const sourceChannelId = userState.channelId;
+        
+        if (!sourceChannelId) {
+            console.log(`User ${userId} is not in any channel`);
+            if (callback) callback({ error: 'User is not in any channel' });
+            return;
+        }
+        
+        if (sourceChannelId === targetChannelId) {
+            console.log(`User ${userId} is already in channel ${targetChannelId}`);
+            if (callback) callback({ success: true, message: 'User already in target channel' });
+            return;
+        }
+        
+        // Находим peer пользователя в исходном канале
+        const sourceRoom = rooms.get(sourceChannelId);
+        if (!sourceRoom) {
+            console.log(`Source room ${sourceChannelId} not found`);
+            if (callback) callback({ error: 'Source room not found' });
+            return;
+        }
+        
+        const peerToMove = Array.from(sourceRoom.peers.values()).find(p => p.userId === userId);
+        if (!peerToMove) {
+            console.log(`Peer for user ${userId} not found in room ${sourceChannelId}`);
+            if (callback) callback({ error: 'User not found in source room' });
+            return;
+        }
+        
+        // Удаляем пользователя из исходного канала
+        sourceRoom.peers.delete(peerToMove.id);
+        peers.delete(peerToMove.id);
+        
+        // Обновляем состояние пользователя
+        updateUserVoiceState(userId, { channelId: null });
+        
+        // Уведомляем о выходе из исходного канала
+        io.emit('userLeftVoiceChannel', {
+            channelId: sourceChannelId,
+            userId: userId
+        });
+        
+        // Если исходная комната стала пустой, удаляем её
+        if (sourceRoom.peers.size === 0) {
+            rooms.delete(sourceChannelId);
+            io.emit('voiceChannelParticipantsUpdate', {
+                channelId: sourceChannelId,
+                participants: []
+            });
+        } else {
+            scheduleChannelUpdate(sourceChannelId, 100);
+        }
+        
+        // Добавляем пользователя в новый канал
+        const targetRoom = rooms.get(targetChannelId);
+        if (!targetRoom) {
+            // Создаем новую комнату если её нет
+            const newRoom = {
+                id: targetChannelId,
+                peers: new Map(),
+                createdAt: Date.now()
+            };
+            rooms.set(targetChannelId, newRoom);
+            console.log(`Created new room ${targetChannelId}`);
+        }
+        
+        const targetRoomFinal = rooms.get(targetChannelId);
+        
+        // Обновляем peer для нового канала
+        peerToMove.roomId = targetChannelId;
+        peerToMove.id = peerToMove.id; // Сохраняем socket.id
+        targetRoomFinal.peers.set(peerToMove.id, peerToMove);
+        peers.set(peerToMove.id, peerToMove);
+        
+        // Обновляем socket.data
+        const userSocket = Array.from(io.sockets.sockets.values()).find(s => {
+            const p = peers.get(s.id);
+            return p && p.userId === userId;
+        });
+        if (userSocket) {
+            userSocket.data.roomId = targetChannelId;
+        }
+        
+        // Обновляем состояние пользователя
+        updateUserVoiceState(userId, { 
+            channelId: targetChannelId,
+            userName: peerToMove.name
+        });
+        
+        // Уведомляем о присоединении к новому каналу
+        io.emit('userJoinedVoiceChannel', {
+            channelId: targetChannelId,
+            userId: userId,
+            userName: peerToMove.name,
+            isMuted: peerToMove.muted || false,
+            isAudioDisabled: userState.isAudioDisabled || false,
+            avatar: peerToMove.avatar || null,
+            avatarColor: peerToMove.avatarColor || '#5865f2'
+        });
+        
+        scheduleChannelUpdate(targetChannelId, 100);
+        
+        console.log(`User ${userId} switched from ${sourceChannelId} to ${targetChannelId}`);
+        
+        if (callback) callback({ success: true, sourceChannelId, targetChannelId });
+    });
+
     // Обработчик выхода из комнаты (без отключения сокета)
     socket.on('leave', ({ roomId }) => {
         console.log('Client leaving room:', socket.id, roomId);

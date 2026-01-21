@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Draggable } from '@hello-pangea/dnd';
+import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { FaCog } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -33,7 +33,8 @@ const ChannelItem = ({
   onClick,
   onContextMenu,
   onSettings,
-  isDragDisabled = false
+  isDragDisabled = false,
+  onParticipantDrop = null
 }) => {
   const isVoiceChannel = channel.chatType === 4 || 
                         channel.typeId === 4 || 
@@ -183,59 +184,88 @@ const ChannelItem = ({
           </div>
           
           {/* Участники голосового канала */}
-          {isVoiceChannel && voiceParticipants.length > 0 && (
-            <div className="voice-channel-participants">
-              {voiceParticipants.map((participant) => {
-                const odUserId = participant.odUserId || participant.userId;
-                const isSpeaking = participant.isSpeaking || participantSpeakingStates?.get?.(odUserId) || false;
-                const isDeafened = participant.isDeafened || participant.isAudioDisabled || participant.isGlobalAudioMuted;
-                return (
-                  <div 
-                    key={odUserId || participant.peerId} 
-                    className={`voice-participant ${isSpeaking ? 'speaking' : ''} ${participant.isMuted ? 'muted' : ''} ${isDeafened ? 'deafened' : ''}`}
-                  >
-                    <div className="voice-participant-avatar">
-                      {participant.avatar ? (
-                        <img 
-                          src={getAvatarUrl(participant.avatar)} 
-                          alt={participant.userName}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <span 
-                        className="voice-participant-initials"
-                        style={{ 
-                          display: participant.avatar ? 'none' : 'flex',
-                          backgroundColor: participant.avatarColor || '#5865f2'
-                        }}
-                      >
-                        {getInitials(participant.userName)}
-                      </span>
-                    </div>
-                    <span className="voice-participant-name">
-                      {participant.userName}
-                    </span>
-                    <div className="voice-participant-status-icons">
-                      {participant.isMuted && (
-                        <span className="voice-participant-muted-icon" title="Микрофон выключен">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
-                          </svg>
-                        </span>
-                      )}
-                      {isDeafened && (
-                        <span className="voice-participant-deafened-icon" title="Звук выключен">
-                          <HeadsetOffIcon sx={{ fontSize: 14, width: 14, height: 14 }} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          {isVoiceChannel && (
+            <Droppable 
+              droppableId={`voice-channel-${channelId}`}
+              type="VOICE_PARTICIPANT"
+              isDropDisabled={!isVoiceChannel}
+            >
+              {(provided, snapshot) => (
+                <div 
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`voice-channel-participants ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                >
+                  {voiceParticipants.length > 0 ? (
+                    voiceParticipants.map((participant, participantIndex) => {
+                      const odUserId = participant.odUserId || participant.userId;
+                      const isSpeaking = participant.isSpeaking || participantSpeakingStates?.get?.(odUserId) || false;
+                      const isDeafened = participant.isDeafened || participant.isAudioDisabled || participant.isGlobalAudioMuted;
+                      return (
+                        <Draggable
+                          key={odUserId || participant.peerId}
+                          draggableId={`participant-${odUserId}-${channelId}`}
+                          index={participantIndex}
+                          isDragDisabled={false}
+                        >
+                          {(provided, snapshot) => (
+                            <div 
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className={`voice-participant ${isSpeaking ? 'speaking' : ''} ${participant.isMuted ? 'muted' : ''} ${isDeafened ? 'deafened' : ''} ${snapshot.isDragging ? 'dragging' : ''}`}
+                              style={provided.draggableProps.style}
+                            >
+                              <div className="voice-participant-avatar">
+                                {participant.avatar ? (
+                                  <img 
+                                    src={getAvatarUrl(participant.avatar)} 
+                                    alt={participant.userName}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <span 
+                                  className="voice-participant-initials"
+                                  style={{ 
+                                    display: participant.avatar ? 'none' : 'flex',
+                                    backgroundColor: participant.avatarColor || '#5865f2'
+                                  }}
+                                >
+                                  {getInitials(participant.userName)}
+                                </span>
+                              </div>
+                              <span className="voice-participant-name">
+                                {participant.userName}
+                              </span>
+                              <div className="voice-participant-status-icons">
+                                {participant.isMuted && (
+                                  <span className="voice-participant-muted-icon" title="Микрофон выключен">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+                                    </svg>
+                                  </span>
+                                )}
+                                {isDeafened && (
+                                  <span className="voice-participant-deafened-icon" title="Звук выключен">
+                                    <HeadsetOffIcon sx={{ fontSize: 14, width: 14, height: 14 }} />
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })
+                  ) : (
+                    <div className="voice-channel-empty">Нет участников</div>
+                  )}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           )}
         </div>
       )}
