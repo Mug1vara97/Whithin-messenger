@@ -12,6 +12,22 @@
   box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
 }
 
+/* Для карточки файла (документ/архив) — без светлой обёртки */
+.media-file:has(.media-file-card) {
+  padding: 0;
+  margin: 4px 0;
+  background: transparent;
+  border: none;
+}
+
+.media-file:has(.media-file-card):hover {
+  box-shadow: none;
+}
+
+.media-file:has(.media-file-card) .media-content {
+  margin-top: 0;
+}
+
 .media-file-header {
   display: flex;
   align-items: center;
@@ -261,7 +277,7 @@
   max-width: 400px;
 }
 
-/* Другие файлы (документы, архивы) */
+/* Другие файлы (документы, архивы) — карточка в стиле Discord */
 .media-file-container {
   display: flex;
   align-items: center;
@@ -307,6 +323,62 @@
 .media-file-size {
   font-size: 12px;
   color: #666;
+}
+
+/* Карточка файла (документ/архив) — тёмный стиль как на референсе */
+.media-file-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #36393f;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+  max-width: 420px;
+}
+
+.media-file-card:hover {
+  background: #3c3f44;
+}
+
+.media-file-card__icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #c5c8e3;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.media-file-card__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.media-file-card__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #5865f2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-file-card:hover .media-file-card__name {
+  text-decoration: underline;
+}
+
+.media-file-card__size {
+  font-size: 12px;
+  color: #8e9297;
 }
 
 /* Адаптивность */

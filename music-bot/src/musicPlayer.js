@@ -1,5 +1,6 @@
 const { AudioSource, AudioFrame, LocalAudioTrack, TrackPublishOptions, TrackSource } = require('@livekit/rtc-node');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
+const yandexProvider = require('./yandexMusicProvider');
 
 class MusicPlayer {
   constructor(room) {
@@ -85,41 +86,21 @@ class MusicPlayer {
       }
 
       // Don't unpublish track - keep it published and just change the audio source
-      // The track should remain published throughout playback
-
-      // Determine source type and get audio stream
-      // Use yt-dlp for all sources (YouTube, Spotify, SoundCloud, etc.)
-      console.log(`[MusicPlayer] Attempting to get stream via yt-dlp for: ${url}`);
-      
-      // Normalize YouTube URL - remove playlist parameter and use standard format
-      let normalizedUrl = url;
-      const youtubeIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|music\.youtube\.com\/watch\?v=)([^&]+)/);
-      if (youtubeIdMatch) {
-        const videoId = youtubeIdMatch[1];
-        normalizedUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        console.log(`[MusicPlayer] Normalized YouTube URL: ${normalizedUrl}`);
-      }
-      
-      // Get stream URL from yt-dlp first, then pass it to ffmpeg
-      // This is more reliable than piping stdout
-      const { execSync } = require('child_process');
+      // Use Yandex Music provider: ссылка или поисковый запрос
+      console.log(`[MusicPlayer] Resolving via Yandex Music: ${url}`);
       let streamUrl;
+      let resolvedTitle;
       try {
-        console.log('[MusicPlayer] Getting stream URL from yt-dlp...');
-        const urlOutput = execSync(`yt-dlp -f "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]" --get-url --no-playlist --no-warnings --quiet --no-check-certificates "${normalizedUrl}"`, {
-          encoding: 'utf8',
-          timeout: 30000, // 30 second timeout
-          maxBuffer: 1024 * 1024 // 1MB buffer
-        });
-        streamUrl = urlOutput.trim().split('\n')[0]; // Get first URL (in case multiple)
-        console.log(`[MusicPlayer] Got stream URL: ${streamUrl.substring(0, 100)}...`);
+        const resolved = await yandexProvider.resolveToStreamUrl(url);
+        streamUrl = resolved.streamUrl;
+        resolvedTitle = resolved.title || null;
+        console.log(`[MusicPlayer] Got stream URL from Yandex Music${resolvedTitle ? `: ${resolvedTitle}` : ''}`);
       } catch (urlError) {
-        console.error('[MusicPlayer] Error getting stream URL from yt-dlp:', urlError.message);
-        throw new Error(`Failed to get stream URL: ${urlError.message}`);
+        console.error('[MusicPlayer] Error resolving Yandex Music:', urlError.message);
+        throw new Error(urlError.message || 'Не удалось получить поток из Яндекс.Музыки');
       }
-      
       if (!streamUrl || !streamUrl.startsWith('http')) {
-        throw new Error('Invalid stream URL received from yt-dlp');
+        throw new Error('Некорректная ссылка на поток от Яндекс.Музыки');
       }
       
       // Create ffmpeg process to download and convert audio to raw PCM format

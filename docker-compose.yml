@@ -130,6 +130,8 @@ services:
       - BOT_USER_ID=music-bot-001
       - BOT_USER_NAME=Music Bot
       - BOT_PORT=3001
+      - YANDEX_MUSIC_TOKEN=${YANDEX_MUSIC_TOKEN:-}
+      - YANDEX_MUSIC_UID=${YANDEX_MUSIC_UID:-0}
       - NODE_TLS_REJECT_UNAUTHORIZED=0
     extra_hosts:
       - "host.docker.internal:host-gateway"

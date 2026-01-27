@@ -152,7 +152,7 @@ const MusicBotControls = ({ roomId, className = '' }) => {
             <TextField
               fullWidth
               size="small"
-              placeholder="URL трека (YouTube, Spotify и т.д.)"
+              placeholder="Ссылка Яндекс.Музыки или поиск (название, исполнитель)"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyPress={(e) => {

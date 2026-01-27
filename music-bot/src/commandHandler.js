@@ -13,39 +13,39 @@ class CommandHandler {
         case 'play':
         case 'p':
           if (args.length === 0) {
-            this.sendMessage('Error: Please provide a URL or search query');
+            this.sendMessage('Укажите ссылку Яндекс.Музыки или поисковый запрос (например: !play группа — песня)');
             return;
           }
           const url = args.join(' ');
           try {
             await this.player.addToQueue(url);
-            this.sendMessage(`Added to queue: ${url}`);
+            this.sendMessage(`Добавлено в очередь: ${url}`);
           } catch (error) {
             console.error('[CommandHandler] Error adding to queue:', error);
-            this.sendMessage(`❌ Error adding to queue: ${error.message || 'Unknown error'}`);
+            this.sendMessage(`❌ ${error.message || 'Ошибка при добавлении в очередь'}`);
           }
           break;
           
         case 'pause':
           await this.player.pause();
-          this.sendMessage('Music paused');
+          this.sendMessage('Пауза');
           break;
           
         case 'resume':
         case 'unpause':
           await this.player.resume();
-          this.sendMessage('Music resumed');
+          this.sendMessage('Продолжаем');
           break;
           
         case 'stop':
           await this.player.stop();
-          this.sendMessage('Music stopped');
+          this.sendMessage('Остановлено');
           break;
           
         case 'skip':
         case 'next':
           await this.player.skip();
-          this.sendMessage('Skipped to next track');
+          this.sendMessage('Следующий трек');
           break;
           
         case 'queue':
@@ -56,22 +56,22 @@ class CommandHandler {
           
         case 'clear':
           this.player.clearQueue();
-          this.sendMessage('Queue cleared');
+          this.sendMessage('Очередь очищена');
           break;
           
         case 'volume':
         case 'vol':
           if (args.length === 0) {
-            this.sendMessage(`Current volume: ${Math.round(this.player.volume * 100)}%`);
+            this.sendMessage(`Громкость: ${Math.round(this.player.volume * 100)}%`);
             return;
           }
           const volume = parseFloat(args[0]);
           if (isNaN(volume) || volume < 0 || volume > 100) {
-            this.sendMessage('Error: Volume must be between 0 and 100');
+            this.sendMessage('Громкость от 0 до 100');
             return;
           }
           this.player.setVolume(volume / 100);
-          this.sendMessage(`Volume set to: ${volume}%`);
+          this.sendMessage(`Громкость: ${volume}%`);
           break;
           
         case 'help':
@@ -79,7 +79,7 @@ class CommandHandler {
           break;
           
         default:
-          this.sendMessage(`Unknown command: ${command}. Use !help for available commands.`);
+          this.sendMessage(`Неизвестная команда. !help — подсказка.`);
       }
     } catch (error) {
       console.error('Error handling command:', error);
@@ -89,10 +89,10 @@ class CommandHandler {
 
   getQueueInfo() {
     if (this.player.queue.length === 0) {
-      return 'Queue is empty';
+      return 'Очередь пуста';
     }
     
-    let info = `Queue (${this.player.queue.length} items):\n`;
+    let info = `Очередь (${this.player.queue.length}):\n`;
     this.player.queue.forEach((url, index) => {
       const marker = index === this.player.currentIndex ? '> ' : '  ';
       info += `${marker}${index + 1}. ${url}\n`;
@@ -102,16 +102,16 @@ class CommandHandler {
   }
 
   getHelpMessage() {
-    return `Music Bot Commands:
-!play <url> - Add music to queue
-!pause - Pause playback
-!resume - Resume playback
-!stop - Stop playback
-!skip - Skip to next track
-!queue - Show current queue
-!clear - Clear queue
-!volume <0-100> - Set volume
-!help - Show this help`;
+    return `Музыкальный бот (Яндекс.Музыка):
+!play <ссылка или запрос> — добавить трек (ссылка music.yandex.ru или поиск)
+!pause — пауза
+!resume — продолжить
+!stop — остановить
+!skip — следующий трек
+!queue — очередь
+!clear — очистить очередь
+!volume <0-100> — громкость
+!help — эта подсказка`;
   }
 
   sendMessage(message) {

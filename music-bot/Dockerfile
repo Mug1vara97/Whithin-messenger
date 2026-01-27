@@ -8,12 +8,9 @@ RUN npm install --omit=dev
 # ЭТАП 2: Финальный образ
 FROM node:18-bullseye-slim
 
-# Устанавливаем FFmpeg и yt-dlp (необходимы для обработки аудио)
+# FFmpeg — для декодирования аудио из Яндекс.Музыки
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    python3 \
-    python3-pip \
-    && pip3 install --no-cache-dir yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -132,7 +132,7 @@ const MediaFile = ({ mediaFile }) => {
       return <AudioMessage mediaFile={mediaFile} />;
     }
 
-    // Для документов, архивов и других файлов — показываем ссылку на скачивание
+    // Для документов, архивов и других файлов — карточка-ссылка в стиле Discord
     const fileUrl = `${BASE_URL}/${mediaFile.filePath}`;
     const isArchive = /\.(zip|rar|7z|tar|gz)$/i.test(mediaFile.originalFileName || '');
     const FileIcon = isArchive ? FolderZipIcon : InsertDriveFileIcon;
@@ -142,14 +142,14 @@ const MediaFile = ({ mediaFile }) => {
         download={mediaFile.originalFileName || undefined}
         target="_blank"
         rel="noopener noreferrer"
-        className="media-file-container media-file-download-link"
+        className="media-file-card"
       >
-        <div className="media-file-icon">
-          <FileIcon sx={{ fontSize: 40, color: 'inherit' }} />
+        <div className="media-file-card__icon">
+          <FileIcon sx={{ fontSize: 40 }} />
         </div>
-        <div className="media-file-info">
-          <div className="media-file-name">{mediaFile.originalFileName}</div>
-          <div className="media-file-size">{formatFileSize(mediaFile.fileSize)}</div>
+        <div className="media-file-card__info">
+          <span className="media-file-card__name">{mediaFile.originalFileName}</span>
+          <span className="media-file-card__size">{formatFileSize(mediaFile.fileSize)}</span>
         </div>
       </a>
     );
