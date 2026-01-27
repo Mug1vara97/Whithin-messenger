@@ -261,6 +261,25 @@
   max-width: 100%;
 }
 
+.media-video-container--player {
+  position: relative;
+  max-width: 640px;
+}
+
+.media-video-container--player .media-skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.media-video-container--player .whithin-video-player.media-loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .media-video {
   max-width: 100%;
   max-height: 300px;

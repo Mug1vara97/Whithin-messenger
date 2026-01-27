@@ -21,7 +21,7 @@ const options = {
 const server = https.createServer(options, app);
 const io = new Server(server, {
     cors: {
-        origin: ["https://whithin.ru", "http://voice-server:3000", "http://music-bot:3001"],
+        origin: ["https://whithin.ru", "http://voice-server:3000"],
         methods: ["GET", "POST"],
         credentials: true
     },
@@ -959,87 +959,6 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // Music Bot handlers
-    socket.on('registerBot', ({ botId, botName }) => {
-        console.log(`Music bot registered: ${botId} (${botName})`);
-        socket.data.isBot = true;
-        socket.data.botId = botId;
-        socket.data.botName = botName;
-    });
-
-    socket.on('botJoinedRoom', ({ roomId, botId }) => {
-        console.log(`Music bot ${botId} joined room: ${roomId}`);
-        // Notify all clients in the room that bot joined
-        socket.to(roomId).emit('botJoined', { roomId, botId });
-    });
-
-    socket.on('botLeftRoom', ({ roomId, botId }) => {
-        console.log(`Music bot ${botId} left room: ${roomId}`);
-        // Notify all clients in the room that bot left
-        socket.to(roomId).emit('botLeft', { roomId, botId });
-    });
-
-    socket.on('botMessage', ({ roomId, message, botId }) => {
-        console.log(`Music bot ${botId} message in room ${roomId}: ${message}`);
-        // Broadcast bot message to all clients in the room
-        io.to(roomId).emit('botMessage', { roomId, message, botId });
-    });
-
-    // Handle bot join/leave room requests from clients
-    socket.on('botJoinRoom', ({ roomId }, callback) => {
-        if (!roomId) {
-            if (callback) callback({ error: 'Room ID is required' });
-            return;
-        }
-        
-        console.log(`Client ${socket.id} requested bot to join room: ${roomId}`);
-        
-        // Forward request to bot (bot should be listening to this event)
-        // For now, we'll just acknowledge the request
-        // The actual bot connection is handled by the bot itself via Socket.IO
-        if (callback) {
-            callback({ success: true, roomId });
-        }
-        
-        // Emit event that bot should listen to
-        // Отправляем событие всем подключенным клиентам (включая бота)
-        console.log(`[Server] Broadcasting botJoinRoom event to all clients:`, { roomId, channelId: roomId });
-        io.emit('botJoinRoom', { roomId, channelId: roomId });
-    });
-
-    socket.on('botLeaveRoom', ({ roomId }, callback) => {
-        if (!roomId) {
-            if (callback) callback({ error: 'Room ID is required' });
-            return;
-        }
-        
-        console.log(`Client ${socket.id} requested bot to leave room: ${roomId}`);
-        
-        // Forward request to bot
-        if (callback) {
-            callback({ success: true, roomId });
-        }
-        
-        // Emit event that bot should listen to
-        io.emit('botLeaveRoom', { roomId, channelId: roomId });
-    });
-
-    socket.on('botCommand', ({ roomId, command, args, userId }, callback) => {
-        if (!roomId || !command) {
-            if (callback) callback({ error: 'Room ID and command are required' });
-            return;
-        }
-        
-        console.log(`Client ${socket.id} sent bot command in room ${roomId}: ${command}`, args);
-        
-        // Forward command to bot
-        if (callback) {
-            callback({ success: true });
-        }
-        
-        // Emit event that bot should listen to
-        io.emit('botCommand', { roomId, command, args, userId: userId || socket.id });
-    });
 });
 
 // Health check endpoint

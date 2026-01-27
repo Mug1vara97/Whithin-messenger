@@ -513,15 +513,6 @@
   }
 
   /* Music Bot Container */
-  .music-bot-container {
-    padding: 8px 16px;
-    background: rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    position: relative;
-    z-index: 100;
-    pointer-events: auto;
-  }
-  
   /* Bottom Controls */
   .bottom-controls {
     position: absolute;

@@ -15,11 +15,8 @@ import ChatIcon from '@mui/icons-material/Chat';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
-import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import { MusicBotControls } from '../../../shared/ui/molecules';
-import { useMusicBot } from '../../../entities/music-bot';
 import './VoiceCallView.css';
 
 // Определяет, является ли banner путём к изображению или цветом
@@ -98,14 +95,10 @@ const VoiceCallView = ({
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
-  const [showMusicBotPanel, setShowMusicBotPanel] = useState(false);
   
   // Тестовый режим для проверки сетки
   const [testMode, setTestMode] = useState(false);
   const [testParticipants, setTestParticipants] = useState([]);
-  
-  // Хук для управления ботом
-  const { isBotInRoom, isLoading: isBotLoading, addBot, error: botError } = useMusicBot(channelId);
 
   // Генератор случайных имён для тестовых участников
   const testNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Edward', 'Fiona', 'George', 'Helen', 'Ivan', 'Julia'];
@@ -430,39 +423,6 @@ const VoiceCallView = ({
                       </div>
                     </div>
                     <div className="toolbar">
-                      {!isBotInRoom && (
-                        <button 
-                          className="toolbar-button" 
-                          type="button" 
-                          aria-label="Добавить музыкального бота"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            console.log('[VoiceCallView] Adding bot to room:', channelId);
-                            try {
-                              await addBot();
-                              setShowMusicBotPanel(true);
-                            } catch (err) {
-                              console.error('Failed to add bot:', err);
-                            }
-                          }}
-                          disabled={isBotLoading}
-                          title="Добавить музыкального бота"
-                        >
-                          <MusicNoteIcon sx={{ fontSize: 24 }} />
-                        </button>
-                      )}
-                      {isBotInRoom && (
-                        <button 
-                          className="toolbar-button" 
-                          type="button" 
-                          aria-label="Показать панель музыкального бота"
-                          onClick={() => setShowMusicBotPanel(!showMusicBotPanel)}
-                          title="Показать панель музыкального бота"
-                        >
-                          <MusicNoteIcon sx={{ fontSize: 24 }} />
-                        </button>
-                      )}
                       <button 
                         className="toolbar-button" 
                         type="button" 
@@ -475,13 +435,6 @@ const VoiceCallView = ({
                   </div>
                 </div>
               </div>
-
-              {/* Music Bot Controls */}
-              {showMusicBotPanel && (
-                <div className="music-bot-container">
-                  <MusicBotControls roomId={channelId} />
-                </div>
-              )}
 
               {/* Bottom Controls */}
               <div className="bottom-controls">

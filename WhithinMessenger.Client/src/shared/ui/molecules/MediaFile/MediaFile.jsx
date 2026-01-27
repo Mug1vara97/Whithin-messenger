@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
+import VideoPlayer from './VideoPlayer';
 import ImageIcon from '@mui/icons-material/Image';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -14,6 +15,14 @@ const MediaFile = ({ mediaFile }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    if (mediaFile?.contentType?.startsWith('video/')) {
+      setVideoError(false);
+      setVideoLoading(true);
+    }
+  }, [mediaFile?.filePath]);
 
   const renderMediaContent = () => {
     if (mediaFile.contentType.startsWith('image/')) {
@@ -50,9 +59,8 @@ const MediaFile = ({ mediaFile }) => {
 
     if (mediaFile.contentType.startsWith('video/')) {
       const videoUrl = `${BASE_URL}/${mediaFile.filePath}`;
-      const [videoError, setVideoError] = useState(false);
-      
-      // Если ошибка воспроизведения - показываем fallback с кнопкой скачивания
+
+      // Если ошибка воспроизведения — fallback с кнопкой скачивания
       if (videoError) {
         return (
           <div className="media-video-container">
@@ -88,8 +96,8 @@ const MediaFile = ({ mediaFile }) => {
                   fontWeight: '500',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#4752c4'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#5865f2'}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; }}
+                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#5865f2'; }}
               >
                 <DownloadIcon sx={{ fontSize: 18 }} />
                 Скачать видео
@@ -98,32 +106,24 @@ const MediaFile = ({ mediaFile }) => {
           </div>
         );
       }
-      
+
       return (
-        <div className="media-video-container">
+        <div className="media-video-container media-video-container--player">
           {videoLoading && (
             <div className="media-skeleton media-skeleton-video">
-              <div className="skeleton-shimmer"></div>
+              <div className="skeleton-shimmer" />
               <div className="skeleton-icon"><VideocamIcon sx={{ fontSize: 40 }} /></div>
             </div>
           )}
-          <video
+          <VideoPlayer
             src={videoUrl}
-            controls
-            className={`media-video ${videoLoading ? 'media-loading' : ''}`}
-            preload="metadata"
-            onLoadedData={() => {
-              console.log('✅ MediaFile - видео загружено');
-              setVideoLoading(false);
-            }}
-            onError={(e) => {
-              console.error('❌ MediaFile - ошибка загрузки видео:', e);
+            onLoad={() => setVideoLoading(false)}
+            onError={() => {
               setVideoLoading(false);
               setVideoError(true);
             }}
-          >
-            Ваш браузер не поддерживает видео.
-          </video>
+            className={videoLoading ? 'media-loading' : ''}
+          />
         </div>
       );
     }

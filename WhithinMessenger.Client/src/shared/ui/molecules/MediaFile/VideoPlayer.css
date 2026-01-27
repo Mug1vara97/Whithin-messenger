@@ -1,0 +1,218 @@
+/* Видеоплеер в стиле Whithin — тёмная тема, кастомные контролы */
+.whithin-video-player {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 360px;
+  background: #1e1e1e;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+}
+
+.whithin-video-player__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+/* Центральная кнопка Play до первого воспроизведения */
+.whithin-video-player__center-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+  z-index: 2;
+}
+
+.whithin-video-player__center-play:hover {
+  background: rgba(88, 101, 242, 0.9);
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+.whithin-video-player__center-play:active {
+  transform: translate(-50%, -50%) scale(0.98);
+}
+
+/* Оверлей контролов */
+.whithin-video-player__controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 12px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  color: #dcddde;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.whithin-video-player__controls.visible {
+  opacity: 1;
+}
+
+/* Полоса прогресса */
+.whithin-video-player__progress-wrap {
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.whithin-video-player__progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #5865f2;
+  border-radius: 3px;
+  pointer-events: none;
+  transition: width 0.05s linear;
+}
+
+.whithin-video-player__progress {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+}
+
+.whithin-video-player__progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(0,0,0,0.5);
+  margin-top: -4px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.whithin-video-player__progress::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.whithin-video-player__progress::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(0,0,0,0.5);
+  border: none;
+  cursor: pointer;
+}
+
+/* Нижняя панель с кнопками */
+.whithin-video-player__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.whithin-video-player__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #dcddde;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.whithin-video-player__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.whithin-video-player__time {
+  font-size: 12px;
+  color: #b9bbbe;
+  min-width: 90px;
+  margin-right: 4px;
+}
+
+.whithin-video-player__volume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.whithin-video-player__volume-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 72px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.whithin-video-player__volume-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dcddde;
+  cursor: pointer;
+}
+
+.whithin-video-player__volume-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dcddde;
+  border: none;
+  cursor: pointer;
+}
+
+/* В полноэкранном режиме — увеличить область плеера */
+.whithin-video-player:fullscreen,
+.whithin-video-player:-webkit-full-screen,
+.whithin-video-player:-moz-full-screen {
+  max-width: none;
+  max-height: none;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+
+.whithin-video-player:fullscreen .whithin-video-player__video,
+.whithin-video-player:-webkit-full-screen .whithin-video-player__video,
+.whithin-video-player:-moz-full-screen .whithin-video-player__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

@@ -5,6 +5,8 @@ import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
@@ -215,6 +217,16 @@ const VideoCallGrid = ({
   const [bottomPage, setBottomPage] = useState(0);
   const [visibleBottomUsers] = useState(6);
   const [lastVideoParticipants, setLastVideoParticipants] = useState(new Set());
+  const [fullscreenScreenShareId, setFullscreenScreenShareId] = useState(null);
+
+  // Сброс состояния полноэкранного режима при выходе
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setFullscreenScreenShareId(null);
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
@@ -478,11 +490,22 @@ const VideoCallGrid = ({
                 <div className="screen-share-status">
                   <span className="status-indicator screen-share-indicator"></span>
                   <span className="status-text">Демонстрация экрана</span>
-                  {/* Показываем индикатор звука для демонстрации экрана */}
                   <div className="screen-share-audio-indicator">
                     <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16, color: '#5865f2' }} />
                   </div>
-                  {/* Кнопка закрытия убрана по требованию пользователя */}
+                  <button
+                    type="button"
+                    className="screen-share-fullscreen-btn"
+                    onClick={handleScreenShareFullscreen}
+                    title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                    aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                  >
+                    {fullscreenScreenShareId === participant.id ? (
+                      <FullscreenExitIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                    ) : (
+                      <FullscreenIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                    )}
+                  </button>
                 </div>
               ) : (
                 <>

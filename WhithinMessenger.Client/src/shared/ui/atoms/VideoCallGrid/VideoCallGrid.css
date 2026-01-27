@@ -994,6 +994,59 @@
   transform: scale(0.95);
 }
 
+/* Кнопка полноэкранного режима для демонстрации экрана */
+.screen-share-fullscreen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 8px;
+  padding: 0;
+  background: rgba(88, 101, 242, 0.25);
+  color: #b9bbbe;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.screen-share-fullscreen-btn:hover {
+  background: rgba(88, 101, 242, 0.5);
+  color: #fff;
+}
+
+.screen-share-fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+/* Плитка демонстрации экрана в полноэкранном режиме */
+.video-tile.screen-share-tile:fullscreen,
+.video-tile.screen-share-tile:-webkit-full-screen,
+.video-tile.screen-share-tile:-moz-full-screen {
+  max-width: none;
+  max-height: none;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: #000;
+}
+
+.video-tile.screen-share-tile:fullscreen .tile-content,
+.video-tile.screen-share-tile:-webkit-full-screen .tile-content,
+.video-tile.screen-share-tile:-moz-full-screen .tile-content {
+  width: 100%;
+  height: 100%;
+}
+
+.video-tile.screen-share-tile:fullscreen .tile-video,
+.video-tile.screen-share-tile:-webkit-full-screen .tile-video,
+.video-tile.screen-share-tile:-moz-full-screen .tile-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* ===== АДАПТИВНЫЕ СТИЛИ (Container Queries) ===== */
 
 /* Адаптивные размеры для маленьких контейнеров по ширине */
