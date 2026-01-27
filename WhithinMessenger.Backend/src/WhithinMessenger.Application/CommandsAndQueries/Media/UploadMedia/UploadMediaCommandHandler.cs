@@ -32,15 +32,6 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     {
         try
         {
-            if (request.File.Length > 50 * 1024 * 1024)
-            {
-                return new UploadMediaResult
-                {
-                    Success = false,
-                    ErrorMessage = "Файл слишком большой. Максимальный размер: 50MB"
-                };
-            }
-
             var contentType = request.File.ContentType;
             var folderPath = _fileService.GetMediaFolderPath(contentType);
 

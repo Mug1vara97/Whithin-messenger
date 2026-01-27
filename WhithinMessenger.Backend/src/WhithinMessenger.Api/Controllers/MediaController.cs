@@ -32,6 +32,8 @@ public class MediaController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = 10737418240)] // 10 GB для загрузки файлов
     public async Task<IActionResult> UploadMedia(
         [FromForm] Guid chatId,
         [FromForm] IFormFile file,

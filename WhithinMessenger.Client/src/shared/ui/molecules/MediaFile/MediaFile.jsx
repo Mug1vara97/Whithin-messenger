@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
+import ImageIcon from '@mui/icons-material/Image';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import DownloadIcon from '@mui/icons-material/Download';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import './MediaFile.css';
 
 const MediaFile = ({ mediaFile }) => {
@@ -20,7 +25,7 @@ const MediaFile = ({ mediaFile }) => {
           {imageLoading && (
             <div className="media-skeleton">
               <div className="skeleton-shimmer"></div>
-              <div className="skeleton-icon">🖼️</div>
+              <div className="skeleton-icon"><ImageIcon sx={{ fontSize: 40 }} /></div>
             </div>
           )}
           <img
@@ -58,7 +63,9 @@ const MediaFile = ({ mediaFile }) => {
               borderRadius: '8px',
               border: '1px solid #40444b'
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎥</div>
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+                <VideocamIcon sx={{ fontSize: 48, color: '#72767d' }} />
+              </div>
               <p style={{ color: '#dcddde', marginBottom: '8px', fontSize: '14px' }}>
                 Видео не может быть воспроизведено в браузере
               </p>
@@ -69,7 +76,9 @@ const MediaFile = ({ mediaFile }) => {
                 href={videoUrl}
                 download={mediaFile.originalFileName || 'video.mp4'}
                 style={{
-                  display: 'inline-block',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   padding: '10px 20px',
                   backgroundColor: '#5865f2',
                   color: 'white',
@@ -82,7 +91,8 @@ const MediaFile = ({ mediaFile }) => {
                 onMouseOver={(e) => e.target.style.backgroundColor = '#4752c4'}
                 onMouseOut={(e) => e.target.style.backgroundColor = '#5865f2'}
               >
-                📥 Скачать видео
+                <DownloadIcon sx={{ fontSize: 18 }} />
+                Скачать видео
               </a>
             </div>
           </div>
@@ -94,7 +104,7 @@ const MediaFile = ({ mediaFile }) => {
           {videoLoading && (
             <div className="media-skeleton media-skeleton-video">
               <div className="skeleton-shimmer"></div>
-              <div className="skeleton-icon">🎥</div>
+              <div className="skeleton-icon"><VideocamIcon sx={{ fontSize: 40 }} /></div>
             </div>
           )}
           <video
@@ -122,17 +132,26 @@ const MediaFile = ({ mediaFile }) => {
       return <AudioMessage mediaFile={mediaFile} />;
     }
 
-    // Для других типов файлов
+    // Для документов, архивов и других файлов — показываем ссылку на скачивание
+    const fileUrl = `${BASE_URL}/${mediaFile.filePath}`;
+    const isArchive = /\.(zip|rar|7z|tar|gz)$/i.test(mediaFile.originalFileName || '');
+    const FileIcon = isArchive ? FolderZipIcon : InsertDriveFileIcon;
     return (
-      <div className="media-file-container">
+      <a
+        href={fileUrl}
+        download={mediaFile.originalFileName || undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="media-file-container media-file-download-link"
+      >
         <div className="media-file-icon">
-          📄
+          <FileIcon sx={{ fontSize: 40, color: 'inherit' }} />
         </div>
         <div className="media-file-info">
           <div className="media-file-name">{mediaFile.originalFileName}</div>
           <div className="media-file-size">{formatFileSize(mediaFile.fileSize)}</div>
         </div>
-      </div>
+      </a>
     );
   };
 

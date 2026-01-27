@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { BASE_URL } from '../constants/apiEndpoints';
+import tokenManager from '../services/tokenManager';
 
 export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -94,6 +95,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       // Отправляем запрос
       xhr.open('POST', `${BASE_URL}/api/media/upload`);
       xhr.withCredentials = true;
+      const token = tokenManager.getToken();
+      if (token && tokenManager.isTokenValid()) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
       xhr.send(formData);
 
       // Ждем результата

@@ -17,7 +17,7 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, Mic, Stop, AttachFile } from '@mui/icons-material';
+import { Call, Mic, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
 import { musicBotApi } from '../../../entities/music-bot';
 import './ChatRoom.css';
 
@@ -897,9 +897,10 @@ const ChatRoom = ({
               <strong className="message-username">{username}</strong>
               <div className="uploading-file-container">
                 <div className="uploading-file-info">
-                  <div className="uploading-file-icon">
-                    {uploadingFile.type.startsWith('image/') ? '🖼️' : 
-                     uploadingFile.type.startsWith('video/') ? '🎥' : '📄'}
+                  <div className="uploading-file-icon uploading-file-icon-mui">
+                    {uploadingFile.type.startsWith('image/') ? <ImageIcon sx={{ fontSize: 32 }} /> : 
+                     uploadingFile.type.startsWith('video/') ? <Videocam sx={{ fontSize: 32 }} /> : 
+                     /\.(zip|rar|7z|tar|gz)$/i.test(uploadingFile.name) ? <FolderZip sx={{ fontSize: 32 }} /> : <InsertDriveFile sx={{ fontSize: 32 }} />}
                   </div>
                   <div className="uploading-file-details">
                     <div className="uploading-file-name">{uploadingFile.name}</div>
@@ -1038,8 +1039,16 @@ const ChatRoom = ({
               type="file"
               ref={fileInputRef}
               style={{ display: 'none' }}
-              onChange={(e) => handleSendMedia(e.target.files[0])}
-              accept="image/*, video/*, audio/*"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (files?.length) {
+                  for (let i = 0; i < files.length; i++) {
+                    await handleSendMedia(files[i]);
+                  }
+                }
+                e.target.value = '';
+              }}
+              multiple
             />
             <button
               type="button"
