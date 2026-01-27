@@ -49,10 +49,10 @@ const getRoomOptions = () => {
       frameRate: 30
     },
     publishDefaults: {
-      videoCodec: 'vp9',
+      videoCodec: 'vp8',
       videoEncoding: VideoPresets.h1080.encoding,
       simulcast: true,
-      videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
+      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
     }
   };
 };
@@ -582,9 +582,7 @@ class VoiceCallApi {
     }
     
     if (enabled) {
-      // Включаем камеру с настройками качества
-      // VideoCaptureOptions: разрешение и частота кадров для захвата
-      // TrackPublishOptions: кодек, битрейт, simulcast для публикации
+      // Камера: 1080p/30fps, VP8 (меньше нагрузка на CPU чем VP9 — без лагов), simulcast [h360, h720]
       await this.room.localParticipant.setCameraEnabled(
         true,
         {
@@ -592,10 +590,10 @@ class VoiceCallApi {
           frameRate: 30
         },
         {
-          videoCodec: 'vp9',
+          videoCodec: 'vp8',
           videoEncoding: VideoPresets.h1080.encoding,
           simulcast: true,
-          videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
+          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
         }
       );
     } else {
@@ -610,7 +608,7 @@ class VoiceCallApi {
     }
     
     if (enabled) {
-      // Включаем демонстрацию экрана с настройками качества
+      // Демонстрация экрана: 1080p, VP9/SVC, стабильное качество (порядок слоёв от низкого к высокому)
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
@@ -621,7 +619,7 @@ class VoiceCallApi {
           videoCodec: 'vp9',
           videoEncoding: VideoPresets.h1080.encoding,
           simulcast: true,
-          videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
+          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
         }
       );
     } else {
