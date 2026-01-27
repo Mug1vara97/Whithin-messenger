@@ -324,6 +324,19 @@ const VideoCallGrid = ({
     goToBottomPage(Math.min(totalBottomPages - 1, bottomPage + 1));
   };
 
+  const handleScreenShareFullscreen = useCallback((participantId, e) => {
+    e?.stopPropagation?.();
+    const tile = e?.target?.closest?.('.video-tile');
+    if (!tile) return;
+    if (fullscreenScreenShareId === participantId) {
+      document.exitFullscreen?.();
+      setFullscreenScreenShareId(null);
+    } else {
+      tile.requestFullscreen?.();
+      setFullscreenScreenShareId(participantId);
+    }
+  }, [fullscreenScreenShareId]);
+
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
@@ -363,7 +376,7 @@ const VideoCallGrid = ({
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
         onClick={() => handleParticipantClick(participant)}
       >
         <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
@@ -496,7 +509,7 @@ const VideoCallGrid = ({
                   <button
                     type="button"
                     className="screen-share-fullscreen-btn"
-                    onClick={handleScreenShareFullscreen}
+                    onClick={(e) => handleScreenShareFullscreen(participant.id, e)}
                     title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
                     aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
                   >

@@ -45,14 +45,14 @@ const getRoomOptions = () => {
       channelCount: 1
     },
     videoCaptureDefaults: {
-      resolution: VideoPresets.h720.resolution,
+      resolution: VideoPresets.h1080.resolution,
       frameRate: 30
     },
     publishDefaults: {
       videoCodec: 'vp9',
-      videoEncoding: VideoPresets.h720.encoding,
+      videoEncoding: VideoPresets.h1080.encoding,
       simulcast: true,
-      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h180]
+      videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
     }
   };
 };
@@ -588,14 +588,14 @@ class VoiceCallApi {
       await this.room.localParticipant.setCameraEnabled(
         true,
         {
-          resolution: VideoPresets.h720.resolution,
+          resolution: VideoPresets.h1080.resolution,
           frameRate: 30
         },
         {
           videoCodec: 'vp9',
-          videoEncoding: VideoPresets.h720.encoding,
+          videoEncoding: VideoPresets.h1080.encoding,
           simulcast: true,
-          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h180]
+          videoSimulcastLayers: [VideoPresets.h720, VideoPresets.h360]
         }
       );
     } else {
