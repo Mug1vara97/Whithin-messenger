@@ -1,7 +1,9 @@
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Attributes;
+using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
 using WhithinMessenger.Domain.Interfaces;
@@ -16,12 +18,14 @@ public class ServerController : ControllerBase
     private readonly IServerRepository _serverRepository;
     private readonly IMediator _mediator;
     private readonly IWebHostEnvironment _environment;
+    private readonly IHubContext<ServerHub> _serverHub;
 
-    public ServerController(IServerRepository serverRepository, IMediator mediator, IWebHostEnvironment environment)
+    public ServerController(IServerRepository serverRepository, IMediator mediator, IWebHostEnvironment environment, IHubContext<ServerHub> serverHub)
     {
         _serverRepository = serverRepository;
         _mediator = mediator;
         _environment = environment;
+        _serverHub = serverHub;
     }
 
     [HttpGet("servers")]
@@ -462,6 +466,7 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
+            await _serverHub.Clients.User(body.UserId.ToString()).SendAsync("ChannelMemberAdded", serverId, channelId);
             return Ok(new { message = "Участник добавлен в канал" });
         }
         catch (Exception ex)
@@ -486,6 +491,7 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
+            await _serverHub.Clients.User(memberUserId.ToString()).SendAsync("ChannelMemberRemoved", serverId, channelId);
             return Ok(new { message = "Участник удалён из канала" });
         }
         catch (Exception ex)

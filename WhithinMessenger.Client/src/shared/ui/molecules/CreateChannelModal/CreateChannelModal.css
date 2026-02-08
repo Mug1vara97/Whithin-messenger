@@ -21,6 +21,7 @@
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   animation: modalSlideIn 0.2s ease-out;
+  pointer-events: auto;
 }
 
 @keyframes modalSlideIn {
@@ -117,6 +118,8 @@
   background-color: var(--surface, #2f3136);
   border: 1px solid var(--border, #4f545c);
   border-radius: 4px;
+  position: relative;
+  z-index: 1;
 }
 
 .member-option {
@@ -213,10 +216,17 @@
   line-height: 1.4;
 }
 
+.channel-name-group {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
 .input-container {
   position: relative;
   display: flex;
   align-items: center;
+  pointer-events: auto;
 }
 
 .input-prefix {

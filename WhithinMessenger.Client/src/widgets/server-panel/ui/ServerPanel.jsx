@@ -345,11 +345,20 @@ const ServerPanel = ({
 
     console.log('ServerPanel: Registering SignalR handlers, serverConnection:', serverConnection);
     console.log('ServerPanel: Registering ChatCreated handler:', handleChatCreated);
+    const handleChannelMemberAdded = (srvId, channelId) => {
+      if (selectedServer?.serverId === srvId) fetchServerData();
+    };
+    const handleChannelMemberRemoved = (srvId, channelId) => {
+      if (selectedServer?.serverId === srvId) fetchServerData();
+    };
+
     serverConnection.on("ChatCreated", handleChatCreated);
     serverConnection.on("ChatDeleted", handleChatDeleted);
     serverConnection.on("ChatUpdated", handleChatUpdated);
     serverConnection.on("CategoryCreated", handleCategoryCreated);
     serverConnection.on("CategoryDeleted", handleCategoryDeleted);
+    serverConnection.on("ChannelMemberAdded", handleChannelMemberAdded);
+    serverConnection.on("ChannelMemberRemoved", handleChannelMemberRemoved);
 
     return () => {
       serverConnection.off("ChatCreated", handleChatCreated);
@@ -357,8 +366,10 @@ const ServerPanel = ({
       serverConnection.off("ChatUpdated", handleChatUpdated);
       serverConnection.off("CategoryCreated", handleCategoryCreated);
       serverConnection.off("CategoryDeleted", handleCategoryDeleted);
+      serverConnection.off("ChannelMemberAdded", handleChannelMemberAdded);
+      serverConnection.off("ChannelMemberRemoved", handleChannelMemberRemoved);
     };
-  }, [serverConnection, onServerDataUpdated, user]);
+  }, [serverConnection, onServerDataUpdated, user, selectedServer?.serverId, fetchServerData]);
 
 
   // Получаем баннер из данных сервера (используем server или selectedServer)

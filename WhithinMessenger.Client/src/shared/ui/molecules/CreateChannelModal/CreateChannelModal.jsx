@@ -213,6 +213,25 @@ const CreateChannelModal = ({
               </div>
             </div>
 
+            <div className="form-group channel-name-group">
+              <label htmlFor="channelName">Название канала</label>
+              <div className="input-container">
+                <span className="input-prefix">
+                  {channelType === 3 ? '#' : '🔊'}
+                </span>
+                <input
+                  id="channelName"
+                  type="text"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder={channelType === 3 ? 'новый-канал' : 'Новый канал'}
+                  className={errors.name ? 'error' : ''}
+                  autoComplete="off"
+                />
+              </div>
+              {errors.name && <div className="error-message">{errors.name}</div>}
+            </div>
+
             <div className="form-group">
               <label className="private-channel-label">
                 <input
@@ -251,25 +270,6 @@ const CreateChannelModal = ({
                 )}
               </div>
             )}
-
-            <div className="form-group">
-              <label htmlFor="channelName">Название канала</label>
-              <div className="input-container">
-                <span className="input-prefix">
-                  {channelType === 3 ? '#' : '🔊'}
-                </span>
-                <input
-                  id="channelName"
-                  type="text"
-                  value={channelName}
-                  onChange={(e) => setChannelName(e.target.value)}
-                  placeholder={channelType === 3 ? 'новый-канал' : 'Новый канал'}
-                  className={errors.name ? 'error' : ''}
-                  autoFocus
-                />
-              </div>
-              {errors.name && <div className="error-message">{errors.name}</div>}
-            </div>
 
             {errors.submit && (
               <div className="error-message submit-error">{errors.submit}</div>
