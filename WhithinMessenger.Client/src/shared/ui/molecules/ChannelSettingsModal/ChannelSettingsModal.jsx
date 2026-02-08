@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaTimes, FaLock, FaUserMinus } from 'react-icons/fa';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import tokenManager from '../../../lib/services/tokenManager';
 import './ChannelSettingsModal.css';
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = tokenManager.getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

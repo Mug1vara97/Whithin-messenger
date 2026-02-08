@@ -119,7 +119,13 @@ const CategoriesList = ({
 
     const handleChatCreated = (newChat, categoryId) => {
       console.log('CategoriesList: ChatCreated event received:', { newChat, categoryId });
-      
+      const isPrivate = newChat.isPrivate === true || newChat.IsPrivate === true;
+      if (isPrivate) {
+        const memberIds = (newChat.members || newChat.Members || []).map(m => m.userId ?? m.UserId ?? m.user_id).filter(Boolean);
+        const hasAccess = userId && memberIds.some(id => String(id) === String(userId));
+        if (!hasAccess) return;
+      }
+
       const updatedCategories = localCategories.map(cat => {
         if ((cat.categoryId || cat.CategoryId) === categoryId) {
           return {
@@ -173,7 +179,7 @@ const CategoriesList = ({
       connection.off("CategoryCreated", handleCategoryCreated);
       connection.off("CategoryDeleted", handleCategoryDeleted);
     };
-  }, [connection?.state, onCategoriesReordered, onChatsReordered]);
+  }, [connection?.state, onCategoriesReordered, onChatsReordered, userId]);
 
   const handleChatClick = (channel) => {
     if (onChatClick) {

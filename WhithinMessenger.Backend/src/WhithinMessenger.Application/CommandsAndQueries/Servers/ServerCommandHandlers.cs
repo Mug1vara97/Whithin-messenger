@@ -160,7 +160,12 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 members = memberUserIds.Select(uid => new { userId = uid }).ToList()
             };
 
-            return new CreateChatResult { Success = true, Chat = result };
+            return new CreateChatResult
+            {
+                Success = true,
+                Chat = result,
+                NotifyUserIds = request.IsPrivate ? memberUserIds : null
+            };
         }
         catch (Exception ex)
         {

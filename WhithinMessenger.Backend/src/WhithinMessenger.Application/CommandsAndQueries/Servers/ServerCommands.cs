@@ -53,6 +53,8 @@ public class CreateChatResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public object? Chat { get; set; }
+    /// <summary>Для приватного канала — кому отправить ChatCreated (только эти пользователи). Иначе null — рассылать всей группе сервера.</summary>
+    public List<Guid>? NotifyUserIds { get; set; }
 }
 
 public class UpdateChatNameCommand : IRequest<UpdateChatNameResult>

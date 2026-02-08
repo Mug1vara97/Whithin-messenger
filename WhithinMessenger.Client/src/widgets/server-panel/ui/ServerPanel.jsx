@@ -153,12 +153,9 @@ const ServerPanel = ({
 
     const handleChatCreated = (newChat, categoryId) => {
       console.log('ServerPanel: ChatCreated event received in useEffect:', { newChat, categoryId });
-      console.log('ServerPanel: onServerDataUpdated available:', !!onServerDataUpdated);
       setServer(prev => {
         if (!prev) return prev;
-        
-        const updatedCategories = [...(prev.categories || [])];
-        
+
         const processedChat = {
           ...newChat,
           chatId: newChat.chatId || newChat.ChatId,
@@ -170,6 +167,17 @@ const ServerPanel = ({
           allowedRoleIds: newChat.allowedRoleIds || newChat.AllowedRoleIds,
           members: newChat.members || newChat.Members || []
         };
+
+        const isPrivate = processedChat.isPrivate === true;
+        if (isPrivate) {
+          const memberIds = (processedChat.members || []).map(m => m.userId ?? m.UserId ?? m.user_id).filter(Boolean);
+          const myId = user?.id ?? user?.userId;
+          const isOwner = prev.ownerId === myId || prev.OwnerId === myId;
+          const hasAccess = isOwner || (myId && memberIds.some(id => String(id) === String(myId)));
+          if (!hasAccess) return prev;
+        }
+
+        const updatedCategories = [...(prev.categories || [])];
         
         if (categoryId === null) {
           const existingNullCategory = updatedCategories.find(cat => {
@@ -350,7 +358,7 @@ const ServerPanel = ({
       serverConnection.off("CategoryCreated", handleCategoryCreated);
       serverConnection.off("CategoryDeleted", handleCategoryDeleted);
     };
-  }, [serverConnection, onServerDataUpdated]); // Возвращаем onServerDataUpdated
+  }, [serverConnection, onServerDataUpdated, user]);
 
 
   // Получаем баннер из данных сервера (используем server или selectedServer)
@@ -1020,6 +1028,7 @@ const ServerPanel = ({
         categoryId={selectedCategoryForChannel?.categoryId || selectedCategoryForChannel?.CategoryId || null}
         categoryName={selectedCategoryForChannel?.categoryName || selectedCategoryForChannel?.CategoryName}
         serverId={currentServer?.serverId ?? selectedServer?.serverId}
+        serverConnection={serverConnection}
       />
 
       <ChannelSettingsModal

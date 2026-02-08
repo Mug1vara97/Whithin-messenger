@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FaTimes, FaHashtag, FaVolumeUp, FaLock } from 'react-icons/fa';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
+import tokenManager from '../../../lib/services/tokenManager';
 import './CreateChannelModal.css';
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = tokenManager.getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -15,43 +16,62 @@ const CreateChannelModal = ({
   onSubmit, 
   categoryId,
   categoryName,
-  serverId 
+  serverId,
+  serverConnection 
 }) => {
   const { user } = useAuthContext();
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState(3); // 3 - текстовый, 4 - голосовой
-  // Приватный канал: определяется флагом при создании (чекбокс) и на бэкенде в Chat.IsPrivate;
-  // в списке каналов — по полю channel.isPrivate из ответа GET /api/Server/{serverId}
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [serverMembers, setServerMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const membersHandlerRef = useRef(null);
 
-  // Список участников сервера для выбора доступа к приватному каналу (API: GET /api/server/{serverId}/members)
+  // Список участников: как в настройках сервера — через SignalR GetServerMembers; иначе REST с токеном
   const fetchServerMembers = useCallback(async () => {
     if (!serverId) return;
     setMembersLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/server/${serverId}/members`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Бэкенд возвращает массив; на случай обёртки — поддерживаем и { members: [...] }
-        const list = Array.isArray(data) ? data : (data?.members ?? []);
-        setServerMembers(Array.isArray(list) ? list : []);
+      if (serverConnection?.state === 'Connected') {
+        const handler = (loadedMembers) => {
+          setServerMembers(Array.isArray(loadedMembers) ? loadedMembers : []);
+          setMembersLoading(false);
+          serverConnection.off('ServerMembersLoaded', handler);
+        };
+        membersHandlerRef.current = handler;
+        serverConnection.on('ServerMembersLoaded', handler);
+        await serverConnection.invoke('GetServerMembers', serverId);
+        setTimeout(() => {
+          setMembersLoading(prev => {
+            if (prev) serverConnection.off('ServerMembersLoaded', membersHandlerRef.current);
+            return false;
+          });
+        }, 10000);
       } else {
-        setServerMembers([]);
+        const res = await fetch(`${BASE_URL}/api/server/${serverId}/members`, {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data?.members ?? []);
+          setServerMembers(Array.isArray(list) ? list : []);
+        } else {
+          setServerMembers([]);
+        }
+        setMembersLoading(false);
       }
     } catch {
       setServerMembers([]);
-    } finally {
       setMembersLoading(false);
+      if (serverConnection && membersHandlerRef.current) {
+        serverConnection.off('ServerMembersLoaded', membersHandlerRef.current);
+      }
     }
-  }, [serverId]);
+  }, [serverId, serverConnection]);
 
   useEffect(() => {
     if (isOpen) {

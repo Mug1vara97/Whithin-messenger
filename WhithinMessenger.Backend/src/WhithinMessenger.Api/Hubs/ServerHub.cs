@@ -220,7 +220,15 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ChatCreated", result.Chat, categoryId);
+                if (result.NotifyUserIds != null && result.NotifyUserIds.Count > 0)
+                {
+                    var userIdStrings = result.NotifyUserIds.Select(id => id.ToString()).ToList();
+                    await Clients.Users(userIdStrings).SendAsync("ChatCreated", result.Chat, categoryId);
+                }
+                else
+                {
+                    await Clients.Group(serverId.ToString()).SendAsync("ChatCreated", result.Chat, categoryId);
+                }
             }
             else
             {
