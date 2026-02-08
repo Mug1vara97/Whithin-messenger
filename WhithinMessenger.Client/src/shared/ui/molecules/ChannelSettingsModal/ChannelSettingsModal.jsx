@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaTimes, FaLock, FaUserMinus } from 'react-icons/fa';
-import { BASE_URL } from '../../../../lib/constants/apiEndpoints';
+import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import './ChannelSettingsModal.css';
 
 const getAuthHeaders = () => {
