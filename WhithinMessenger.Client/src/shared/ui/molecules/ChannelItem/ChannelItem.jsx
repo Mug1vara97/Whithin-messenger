@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
-import { FaCog } from 'react-icons/fa';
+import { FaCog, FaLock } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import { useCallStore } from '../../../lib/stores/callStore';
@@ -40,6 +40,8 @@ const ChannelItem = ({
                         channel.typeId === 4 || 
                         channel.TypeId === 4 ||
                         channel.typeId === "44444444-4444-4444-4444-444444444444";
+  // Приватный канал: поле приходит с бэкенда в ответе GET сервера (Chat.IsPrivate)
+  const isPrivate = channel.isPrivate === true || channel.IsPrivate === true;
 
   const channelId = channel.chatId || channel.ChatId;
 
@@ -171,6 +173,7 @@ const ChannelItem = ({
             </span>
             <span className="channel-name">
               {getChannelName()}
+              {isPrivate && <FaLock className="private-channel-icon" title="Приватный канал" />}
             </span>
             <div className="channel-settings">
               <button

@@ -20,6 +20,8 @@ const CreateChannelModal = ({
   const { user } = useAuthContext();
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState(3); // 3 - текстовый, 4 - голосовой
+  // Приватный канал: определяется флагом при создании (чекбокс) и на бэкенде в Chat.IsPrivate;
+  // в списке каналов — по полю channel.isPrivate из ответа GET /api/Server/{serverId}
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [serverMembers, setServerMembers] = useState([]);
@@ -27,6 +29,7 @@ const CreateChannelModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Список участников сервера для выбора доступа к приватному каналу (API: GET /api/server/{serverId}/members)
   const fetchServerMembers = useCallback(async () => {
     if (!serverId) return;
     setMembersLoading(true);
@@ -37,7 +40,9 @@ const CreateChannelModal = ({
       });
       if (res.ok) {
         const data = await res.json();
-        setServerMembers(Array.isArray(data) ? data : []);
+        // Бэкенд возвращает массив; на случай обёртки — поддерживаем и { members: [...] }
+        const list = Array.isArray(data) ? data : (data?.members ?? []);
+        setServerMembers(Array.isArray(list) ? list : []);
       } else {
         setServerMembers([]);
       }
@@ -196,7 +201,7 @@ const CreateChannelModal = ({
                   onChange={(e) => setIsPrivate(e.target.checked)}
                 />
                 <FaLock className="private-icon" />
-                Приватный канал — видят только добавленные участники
+                Приватный канал — видят только те, кого вы добавите в список ниже
               </label>
             </div>
 
