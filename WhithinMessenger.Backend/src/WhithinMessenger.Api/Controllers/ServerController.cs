@@ -445,9 +445,62 @@ public class ServerController : ControllerBase
             return StatusCode(500, new { error = "Произошла ошибка при добавлении участника: " + ex.Message });
         }
     }
+
+    [HttpPost("{serverId}/channels/{channelId}/members")]
+    public async Task<IActionResult> AddMemberToChannel(Guid serverId, Guid channelId, [FromBody] AddMemberToChannelRequest body)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var command = new AddMemberToChannelCommand(serverId, channelId, body.UserId, userId);
+            var result = await _mediator.Send(command);
+            if (!result.Success)
+            {
+                if (result.ErrorMessage?.Contains("не найден") == true)
+                    return NotFound(new { error = result.ErrorMessage });
+                if (result.ErrorMessage?.Contains("Нет прав") == true || result.ErrorMessage?.Contains("не являетесь") == true)
+                    return Forbid(result.ErrorMessage);
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+            return Ok(new { message = "Участник добавлен в канал" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка: " + ex.Message });
+        }
+    }
+
+    [HttpDelete("{serverId}/channels/{channelId}/members/{memberUserId}")]
+    public async Task<IActionResult> RemoveMemberFromChannel(Guid serverId, Guid channelId, Guid memberUserId)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var command = new RemoveMemberFromChannelCommand(serverId, channelId, memberUserId, userId);
+            var result = await _mediator.Send(command);
+            if (!result.Success)
+            {
+                if (result.ErrorMessage?.Contains("не найден") == true)
+                    return NotFound(new { error = result.ErrorMessage });
+                if (result.ErrorMessage?.Contains("Нет прав") == true || result.ErrorMessage?.Contains("не являетесь") == true)
+                    return Forbid(result.ErrorMessage);
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+            return Ok(new { message = "Участник удалён из канала" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка: " + ex.Message });
+        }
+    }
 }
 
 public class AddMemberRequest
+{
+    public Guid UserId { get; set; }
+}
+
+public class AddMemberToChannelRequest
 {
     public Guid UserId { get; set; }
 }

@@ -44,11 +44,22 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
 {
     private readonly IChatRepository _chatRepository;
     private readonly ICategoryRepository _categoryRepository;
+    private readonly IChatMemberRepository _chatMemberRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IServerRepository _serverRepository;
 
-    public CreateChatCommandHandler(IChatRepository chatRepository, ICategoryRepository categoryRepository)
+    public CreateChatCommandHandler(
+        IChatRepository chatRepository,
+        ICategoryRepository categoryRepository,
+        IChatMemberRepository chatMemberRepository,
+        IUserRepository userRepository,
+        IServerRepository serverRepository)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
+        _chatMemberRepository = chatMemberRepository;
+        _userRepository = userRepository;
+        _serverRepository = serverRepository;
     }
 
     public async Task<CreateChatResult> Handle(CreateChatCommand request, CancellationToken cancellationToken)
@@ -73,7 +84,6 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 _ => Guid.Parse("33333333-3333-3333-3333-333333333333")  // По умолчанию TextChannel
             };
 
-            // Получаем максимальный ChatOrder для данной категории
             var existingChats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var maxOrder = existingChats
                 .Where(c => c.CategoryId == request.CategoryId)
@@ -89,11 +99,53 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 CategoryId = request.CategoryId,
                 TypeId = typeId,
                 CreatedAt = DateTime.UtcNow,
-                IsPrivate = false,
+                IsPrivate = request.IsPrivate,
                 ChatOrder = maxOrder + 1
             };
 
             await _chatRepository.CreateAsync(chat, cancellationToken);
+
+            var memberUserIds = new List<Guid> { request.UserId };
+            if (request.IsPrivate && request.MemberIds != null)
+            {
+                var isServerMember = await _serverRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken);
+                if (!isServerMember)
+                {
+                    await _chatRepository.DeleteAsync(chat.Id, cancellationToken);
+                    return new CreateChatResult { Success = false, ErrorMessage = "Вы не являетесь участником сервера" };
+                }
+                foreach (var uid in request.MemberIds)
+                {
+                    if (uid == request.UserId) continue;
+                    var onServer = await _serverRepository.IsUserMemberAsync(request.ServerId, uid, cancellationToken);
+                    if (onServer && !memberUserIds.Contains(uid))
+                        memberUserIds.Add(uid);
+                }
+            }
+
+            if (request.IsPrivate && memberUserIds.Count > 0)
+            {
+                var membersToAdd = new List<Member>();
+                var chatLoaded = await _chatRepository.GetByIdAsync(chat.Id, cancellationToken);
+                if (chatLoaded == null) chatLoaded = chat;
+
+                foreach (var uid in memberUserIds)
+                {
+                    var appUser = await _userRepository.GetByIdAsync(uid, cancellationToken);
+                    if (appUser == null) continue;
+                    membersToAdd.Add(new Member
+                    {
+                        Id = Guid.NewGuid(),
+                        ChatId = chat.Id,
+                        UserId = uid,
+                        JoinedAt = DateTimeOffset.UtcNow,
+                        Chat = chatLoaded,
+                        User = appUser
+                    });
+                }
+                if (membersToAdd.Count > 0)
+                    await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
+            }
 
             var result = new
             {
@@ -105,7 +157,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 createdAt = chat.CreatedAt,
                 isPrivate = chat.IsPrivate,
                 chatOrder = chat.ChatOrder,
-                members = new List<object>()
+                members = memberUserIds.Select(uid => new { userId = uid }).ToList()
             };
 
             return new CreateChatResult { Success = true, Chat = result };
@@ -521,6 +573,160 @@ public class GetAuditLogQueryHandler : IRequestHandler<GetAuditLogQuery, GetAudi
         catch (Exception ex)
         {
             return Task.FromResult(new GetAuditLogResult { Success = false, ErrorMessage = ex.Message });
+        }
+    }
+}
+
+public class AddMemberToChannelCommandHandler : IRequestHandler<AddMemberToChannelCommand, AddMemberToChannelResult>
+{
+    private readonly IChatRepository _chatRepository;
+    private readonly IChatMemberRepository _chatMemberRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IServerRepository _serverRepository;
+
+    public AddMemberToChannelCommandHandler(
+        IChatRepository chatRepository,
+        IChatMemberRepository chatMemberRepository,
+        IUserRepository userRepository,
+        IServerRepository serverRepository)
+    {
+        _chatRepository = chatRepository;
+        _chatMemberRepository = chatMemberRepository;
+        _userRepository = userRepository;
+        _serverRepository = serverRepository;
+    }
+
+    public async Task<AddMemberToChannelResult> Handle(AddMemberToChannelCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat == null || chat.ServerId != request.ServerId)
+            {
+                return new AddMemberToChannelResult { Success = false, ErrorMessage = "Канал не найден" };
+            }
+            if (!chat.IsPrivate)
+            {
+                return new AddMemberToChannelResult { Success = false, ErrorMessage = "Канал не является приватным" };
+            }
+
+            var currentUserIsMember = await _serverRepository.IsUserMemberAsync(request.ServerId, request.CurrentUserId, cancellationToken);
+            if (!currentUserIsMember)
+            {
+                return new AddMemberToChannelResult { Success = false, ErrorMessage = "Вы не являетесь участником сервера" };
+            }
+            var currentUserInChannel = await _chatMemberRepository.IsMemberAsync(request.ChatId, request.CurrentUserId, cancellationToken);
+            if (!currentUserInChannel)
+            {
+                var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+                if (server == null || server.OwnerId != request.CurrentUserId)
+                {
+                    return new AddMemberToChannelResult { Success = false, ErrorMessage = "Нет прав для добавления в этот канал" };
+                }
+            }
+
+            var userToAddIsOnServer = await _serverRepository.IsUserMemberAsync(request.ServerId, request.UserIdToAdd, cancellationToken);
+            if (!userToAddIsOnServer)
+            {
+                return new AddMemberToChannelResult { Success = false, ErrorMessage = "Пользователь не является участником сервера" };
+            }
+            var alreadyInChannel = await _chatMemberRepository.IsMemberAsync(request.ChatId, request.UserIdToAdd, cancellationToken);
+            if (alreadyInChannel)
+            {
+                return new AddMemberToChannelResult { Success = true };
+            }
+
+            var appUser = await _userRepository.GetByIdAsync(request.UserIdToAdd, cancellationToken);
+            if (appUser == null)
+            {
+                return new AddMemberToChannelResult { Success = false, ErrorMessage = "Пользователь не найден" };
+            }
+
+            await _chatMemberRepository.CreateAsync(new Member
+            {
+                Id = Guid.NewGuid(),
+                ChatId = request.ChatId,
+                UserId = request.UserIdToAdd,
+                JoinedAt = DateTimeOffset.UtcNow,
+                Chat = chat,
+                User = appUser
+            }, cancellationToken);
+
+            return new AddMemberToChannelResult { Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new AddMemberToChannelResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
+}
+
+public class RemoveMemberFromChannelCommandHandler : IRequestHandler<RemoveMemberFromChannelCommand, RemoveMemberFromChannelResult>
+{
+    private readonly IChatRepository _chatRepository;
+    private readonly IChatMemberRepository _chatMemberRepository;
+    private readonly IServerRepository _serverRepository;
+
+    public RemoveMemberFromChannelCommandHandler(
+        IChatRepository chatRepository,
+        IChatMemberRepository chatMemberRepository,
+        IServerRepository serverRepository)
+    {
+        _chatRepository = chatRepository;
+        _chatMemberRepository = chatMemberRepository;
+        _serverRepository = serverRepository;
+    }
+
+    public async Task<RemoveMemberFromChannelResult> Handle(RemoveMemberFromChannelCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat == null || chat.ServerId != request.ServerId)
+            {
+                return new RemoveMemberFromChannelResult { Success = false, ErrorMessage = "Канал не найден" };
+            }
+            if (!chat.IsPrivate)
+            {
+                return new RemoveMemberFromChannelResult { Success = false, ErrorMessage = "Канал не является приватным" };
+            }
+
+            var currentUserIsMember = await _serverRepository.IsUserMemberAsync(request.ServerId, request.CurrentUserId, cancellationToken);
+            if (!currentUserIsMember)
+            {
+                return new RemoveMemberFromChannelResult { Success = false, ErrorMessage = "Вы не являетесь участником сервера" };
+            }
+
+            if (request.UserIdToRemove == request.CurrentUserId)
+            {
+                var channelMembers = await _chatMemberRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
+                var member = channelMembers.FirstOrDefault(m => m.UserId == request.CurrentUserId);
+                if (member != null)
+                {
+                    await _chatMemberRepository.DeleteAsync(member.Id, cancellationToken);
+                }
+                return new RemoveMemberFromChannelResult { Success = true };
+            }
+
+            var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+            var currentUserInChannel = await _chatMemberRepository.IsMemberAsync(request.ChatId, request.CurrentUserId, cancellationToken);
+            if (server?.OwnerId != request.CurrentUserId && !currentUserInChannel)
+            {
+                return new RemoveMemberFromChannelResult { Success = false, ErrorMessage = "Нет прав для удаления из канала" };
+            }
+
+            var channelMembersToRemove = await _chatMemberRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
+            var toRemove = channelMembersToRemove.FirstOrDefault(m => m.UserId == request.UserIdToRemove);
+            if (toRemove == null)
+            {
+                return new RemoveMemberFromChannelResult { Success = true };
+            }
+            await _chatMemberRepository.DeleteAsync(toRemove.Id, cancellationToken);
+            return new RemoveMemberFromChannelResult { Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new RemoveMemberFromChannelResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }

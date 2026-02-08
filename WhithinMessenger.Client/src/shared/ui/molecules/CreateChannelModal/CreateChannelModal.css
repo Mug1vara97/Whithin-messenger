@@ -91,6 +91,61 @@
   letter-spacing: 0.02em;
 }
 
+.private-channel-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-transform: none !important;
+  font-weight: 500 !important;
+  color: var(--text, #ffffff) !important;
+}
+
+.private-channel-label input[type="checkbox"] {
+  margin: 0;
+}
+
+.private-icon {
+  color: var(--text-muted, #8e9297);
+  font-size: 14px;
+}
+
+.member-picker .member-list {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: var(--surface, #2f3136);
+  border: 1px solid var(--border, #4f545c);
+  border-radius: 4px;
+}
+
+.member-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text, #ffffff);
+  text-transform: none;
+  font-weight: 400;
+}
+
+.member-option input[type="checkbox"] {
+  margin: 0;
+}
+
+.member-name {
+  flex: 1;
+}
+
+.members-loading,
+.no-members {
+  padding: 12px;
+  color: var(--text-muted, #8e9297);
+  font-size: 13px;
+}
+
 .category-display {
   padding: 8px 12px;
   background-color: var(--surface, #2f3136);

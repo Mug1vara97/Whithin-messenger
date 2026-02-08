@@ -204,7 +204,7 @@ public class ServerHub : Hub
         }
     }
 
-    public async Task CreateChat(Guid serverId, Guid? categoryId, string chatName, int chatType)
+    public async Task CreateChat(Guid serverId, Guid? categoryId, string chatName, int chatType, bool isPrivate = false, List<Guid>? memberIds = null)
     {
         try
         {
@@ -215,7 +215,7 @@ public class ServerHub : Hub
                 return;
             }
 
-            var command = new CreateChatCommand(serverId, categoryId, chatName, chatType, userId.Value);
+            var command = new CreateChatCommand(serverId, categoryId, chatName, chatType, userId.Value, isPrivate, memberIds);
             var result = await _mediator.Send(command);
 
             if (result.Success)

@@ -50,7 +50,7 @@ const ServerPanel = ({
   const isConnectingRef = useRef(false);
 
   const fetchServerData = useCallback(async () => {
-    if (!selectedServer?.serverId) return;
+    if (!selectedServer?.serverId) return null;
     
     try {
       const response = await fetch(`${BASE_URL}/api/server/${selectedServer.serverId}`, {
@@ -65,13 +65,61 @@ const ServerPanel = ({
         const serverData = await response.json();
         console.log('ServerPanel: Received server data:', serverData);
         setServer(serverData);
+        return serverData;
       } else {
         console.error('ServerPanel: Failed to fetch server data, status:', response.status);
+        return null;
       }
     } catch (error) {
       console.error('Error fetching server data:', error);
+      return null;
     }
   }, [selectedServer?.serverId]);
+
+  const findChannelInServer = useCallback((serverData, chatId) => {
+    if (!serverData?.categories) return null;
+    for (const cat of serverData.categories) {
+      const chats = cat.chats || cat.Chats || [];
+      const ch = chats.find(c => (c.chatId ?? c.ChatId) === chatId);
+      if (ch) return ch;
+    }
+    return null;
+  }, []);
+
+  const handleAddMemberToChannel = useCallback(async (serverId, channelId, userId) => {
+    const res = await fetch(`${BASE_URL}/api/server/${serverId}/channels/${channelId}/members`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ userId })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Не удалось добавить участника');
+    }
+    const serverData = await fetchServerData();
+    if (channelId && serverData) {
+      const updated = findChannelInServer(serverData, channelId);
+      if (updated) setSelectedChannelForSettings(updated);
+    }
+  }, [fetchServerData, findChannelInServer]);
+
+  const handleRemoveMemberFromChannel = useCallback(async (serverId, channelId, memberUserId) => {
+    const res = await fetch(`${BASE_URL}/api/server/${serverId}/channels/${channelId}/members/${memberUserId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Не удалось убрать участника');
+    }
+    const serverData = await fetchServerData();
+    if (channelId && serverData) {
+      const updated = findChannelInServer(serverData, channelId);
+      if (updated) setSelectedChannelForSettings(updated);
+    }
+  }, [fetchServerData, findChannelInServer]);
 
   const createCategory = useCallback(async (categoryData) => {
     if (!selectedServer?.serverId) return;
@@ -533,11 +581,15 @@ const ServerPanel = ({
         chatTypeType: typeof chatType
       });
       
+      const isPrivate = Boolean(channelData.isPrivate);
+      const memberIds = Array.isArray(channelData.memberIds) ? channelData.memberIds : [];
       await serverConnection.invoke("CreateChat", 
         serverId,
         categoryId,
         chatName,
-        chatType
+        chatType,
+        isPrivate,
+        memberIds.length > 0 ? memberIds : null
       );
 
       console.log('Канал создан успешно');
@@ -967,14 +1019,19 @@ const ServerPanel = ({
         onSubmit={handleCreateChannel}
         categoryId={selectedCategoryForChannel?.categoryId || selectedCategoryForChannel?.CategoryId || null}
         categoryName={selectedCategoryForChannel?.categoryName || selectedCategoryForChannel?.CategoryName}
+        serverId={currentServer?.serverId ?? selectedServer?.serverId}
       />
 
       <ChannelSettingsModal
         isOpen={showChannelSettingsModal}
         onClose={handleCloseChannelSettingsModal}
         channel={selectedChannelForSettings}
+        serverId={currentServer?.serverId ?? selectedServer?.serverId}
         onUpdateChannel={handleUpdateChannel}
         onDeleteChannel={handleDeleteChannel}
+        onAddMemberToChannel={handleAddMemberToChannel}
+        onRemoveMemberFromChannel={handleRemoveMemberFromChannel}
+        currentUserId={user?.id}
       />
 
       <CreateCategoryModal

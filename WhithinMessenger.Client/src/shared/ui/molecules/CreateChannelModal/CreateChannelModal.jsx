@@ -1,26 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { FaTimes, FaHashtag, FaVolumeUp } from 'react-icons/fa';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FaTimes, FaHashtag, FaVolumeUp, FaLock } from 'react-icons/fa';
+import { BASE_URL } from '../../../../lib/constants/apiEndpoints';
+import { useAuthContext } from '../../../../lib/contexts/AuthContext';
 import './CreateChannelModal.css';
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const CreateChannelModal = ({ 
   isOpen, 
   onClose, 
   onSubmit, 
   categoryId,
-  categoryName 
+  categoryName,
+  serverId 
 }) => {
+  const { user } = useAuthContext();
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState(3); // 3 - текстовый, 4 - голосовой
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [serverMembers, setServerMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const fetchServerMembers = useCallback(async () => {
+    if (!serverId) return;
+    setMembersLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/server/${serverId}/members`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setServerMembers(Array.isArray(data) ? data : []);
+      } else {
+        setServerMembers([]);
+      }
+    } catch {
+      setServerMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [serverId]);
 
   useEffect(() => {
     if (isOpen) {
       setChannelName('');
       setChannelType(3);
+      setIsPrivate(false);
+      setSelectedMemberIds([]);
       setErrors({});
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && isPrivate && serverId) {
+      fetchServerMembers();
+    } else if (!isPrivate) {
+      setServerMembers([]);
+      setSelectedMemberIds([]);
+    }
+  }, [isOpen, isPrivate, serverId, fetchServerMembers]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -39,6 +84,12 @@ const CreateChannelModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  const toggleMember = (userId) => {
+    setSelectedMemberIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -53,7 +104,9 @@ const CreateChannelModal = ({
       await onSubmit({
         name: channelName.trim(),
         type: channelType,
-        categoryId: categoryId || null
+        categoryId: categoryId || null,
+        isPrivate: isPrivate,
+        memberIds: isPrivate ? selectedMemberIds : []
       });
       
     } catch (error) {
@@ -134,6 +187,45 @@ const CreateChannelModal = ({
                 </label>
               </div>
             </div>
+
+            <div className="form-group">
+              <label className="private-channel-label">
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) => setIsPrivate(e.target.checked)}
+                />
+                <FaLock className="private-icon" />
+                Приватный канал — видят только добавленные участники
+              </label>
+            </div>
+
+            {isPrivate && serverId && (
+              <div className="form-group member-picker">
+                <label>Кто имеет доступ</label>
+                {membersLoading ? (
+                  <div className="members-loading">Загрузка участников...</div>
+                ) : (
+                  <div className="member-list">
+                    {serverMembers
+                      .filter(m => (m.userId ?? m.user_id) !== user?.id)
+                      .map(m => (
+                        <label key={m.userId || m.user_id} className="member-option">
+                          <input
+                            type="checkbox"
+                            checked={selectedMemberIds.includes(m.userId ?? m.user_id)}
+                            onChange={() => toggleMember(m.userId ?? m.user_id)}
+                          />
+                          <span className="member-name">{m.username ?? m.userName ?? m.user_name ?? 'Участник'}</span>
+                        </label>
+                      ))}
+                    {serverMembers.length === 0 && !membersLoading && (
+                      <div className="no-members">Загрузите участников сервера или добавьте себя позже.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="form-group">
               <label htmlFor="channelName">Название канала</label>

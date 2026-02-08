@@ -31,14 +31,20 @@ public class CreateChatCommand : IRequest<CreateChatResult>
     public string ChatName { get; set; }
     public int ChatType { get; set; }
     public Guid UserId { get; set; }
+    /// <summary>Приватный канал — видят только добавленные участники.</summary>
+    public bool IsPrivate { get; set; }
+    /// <summary>Идентификаторы пользователей с доступом (только для приватного канала). Создатель добавляется автоматически.</summary>
+    public List<Guid>? MemberIds { get; set; }
 
-    public CreateChatCommand(Guid serverId, Guid? categoryId, string chatName, int chatType, Guid userId)
+    public CreateChatCommand(Guid serverId, Guid? categoryId, string chatName, int chatType, Guid userId, bool isPrivate = false, List<Guid>? memberIds = null)
     {
         ServerId = serverId;
         CategoryId = categoryId;
         ChatName = chatName;
         ChatType = chatType;
         UserId = userId;
+        IsPrivate = isPrivate;
+        MemberIds = memberIds ?? new List<Guid>();
     }
 }
 
@@ -347,4 +353,50 @@ public class GetAuditLogResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public object? AuditLogs { get; set; }
+}
+
+/// <summary>Добавить участника в приватный канал сервера.</summary>
+public class AddMemberToChannelCommand : IRequest<AddMemberToChannelResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid ChatId { get; set; }
+    public Guid UserIdToAdd { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public AddMemberToChannelCommand(Guid serverId, Guid chatId, Guid userIdToAdd, Guid currentUserId)
+    {
+        ServerId = serverId;
+        ChatId = chatId;
+        UserIdToAdd = userIdToAdd;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class AddMemberToChannelResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>Убрать участника из приватного канала.</summary>
+public class RemoveMemberFromChannelCommand : IRequest<RemoveMemberFromChannelResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid ChatId { get; set; }
+    public Guid UserIdToRemove { get; set; }
+    public Guid CurrentUserId { get; set; }
+
+    public RemoveMemberFromChannelCommand(Guid serverId, Guid chatId, Guid userIdToRemove, Guid currentUserId)
+    {
+        ServerId = serverId;
+        ChatId = chatId;
+        UserIdToRemove = userIdToRemove;
+        CurrentUserId = currentUserId;
+    }
+}
+
+public class RemoveMemberFromChannelResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
 }
