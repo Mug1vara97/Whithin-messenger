@@ -11,6 +11,7 @@ import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import HeadsetIcon from '@mui/icons-material/Headset';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import styles from './ChatVoiceCall.module.css';
