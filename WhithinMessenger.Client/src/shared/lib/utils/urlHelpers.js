@@ -1,4 +1,5 @@
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
+import tokenManager from '../services/tokenManager';
 
 const URL_PATTERN = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
 
@@ -58,6 +59,8 @@ export const splitTextWithLinks = (text) => {
     return [];
   }
 
+  URL_PATTERN.lastIndex = 0;
+
   const parts = [];
   let lastIndex = 0;
   let match;
@@ -85,4 +88,37 @@ export const splitTextWithLinks = (text) => {
   }
 
   return parts;
+};
+
+export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
+  const url = buildMediaUrl(rawUrl);
+  if (!url) {
+    throw new Error('Invalid file URL');
+  }
+
+  const headers = {};
+  const token = tokenManager.getToken();
+  if (token && tokenManager.isTokenValid()) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'include',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName || 'download';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
 };

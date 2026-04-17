@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import VideoPlayer from './VideoPlayer';
@@ -23,6 +23,18 @@ const MediaFile = ({ mediaFile }) => {
       setVideoLoading(true);
     }
   }, [mediaFile?.filePath]);
+
+  const handleDownload = async (e, url, fileName) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      await downloadMediaFile(url, fileName);
+    } catch (downloadError) {
+      console.error('❌ MediaFile - ошибка скачивания файла:', downloadError);
+      setError('Ошибка скачивания файла');
+    }
+  };
 
   const renderMediaContent = () => {
     if (mediaFile.contentType.startsWith('image/')) {
@@ -83,8 +95,6 @@ const MediaFile = ({ mediaFile }) => {
               <a
                 href={videoUrl}
                 download={mediaFile.originalFileName || 'video.mp4'}
-                target="_blank"
-                rel="noopener noreferrer"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -100,10 +110,7 @@ const MediaFile = ({ mediaFile }) => {
                 }}
                 onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; }}
                 onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#5865f2'; }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  openExternalUrl(videoUrl);
-                }}
+                onClick={(e) => handleDownload(e, videoUrl, mediaFile.originalFileName || 'video.mp4')}
               >
                 <DownloadIcon sx={{ fontSize: 18 }} />
                 Скачать видео
@@ -146,13 +153,8 @@ const MediaFile = ({ mediaFile }) => {
       <a
         href={fileUrl}
         download={mediaFile.originalFileName || undefined}
-        target="_blank"
-        rel="noopener noreferrer"
         className="media-file-card"
-        onClick={(e) => {
-          e.preventDefault();
-          openExternalUrl(fileUrl);
-        }}
+        onClick={(e) => handleDownload(e, fileUrl, mediaFile.originalFileName || 'download')}
       >
         <div className="media-file-card__icon">
           <FileIcon sx={{ fontSize: 40 }} />
