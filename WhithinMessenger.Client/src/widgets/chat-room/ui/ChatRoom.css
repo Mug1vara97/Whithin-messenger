@@ -411,6 +411,27 @@
   font-size: 14px;
   line-height: 1.4;
   color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-link {
+  color: #66b3ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.message-link:hover {
+  color: #9bd0ff;
+}
+
+.my-message .message-link {
+  color: #ffffff;
+}
+
+.my-message .message-link:hover {
+  color: #e6eeff;
 }
 
 .message.highlighted {

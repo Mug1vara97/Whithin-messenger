@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { openExternalUrl, splitTextWithLinks } from '../../../shared/lib/utils/urlHelpers';
 import { 
   useChat, 
   useMessageSearch, 
@@ -100,6 +101,39 @@ const ChatRoom = ({
   const [chatUserProfile, setChatUserProfile] = useState(null);
 
   const inputRef = useRef(null);
+
+  const renderTextWithLinks = useCallback((text, keyPrefix) => {
+    const parts = splitTextWithLinks(text);
+
+    if (!parts.length) {
+      return text;
+    }
+
+    return parts.map((part, index) => {
+      if (part.type === 'link') {
+        return (
+          <a
+            key={`${keyPrefix}-link-${index}`}
+            href={part.href}
+            className="message-link"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openExternalUrl(part.href);
+            }}
+          >
+            {part.value}
+          </a>
+        );
+      }
+
+      return (
+        <React.Fragment key={`${keyPrefix}-text-${index}`}>
+          {part.value}
+        </React.Fragment>
+      );
+    });
+  }, []);
 
   const loadChatInfo = useCallback(() => {
     if (!chatId || !connection) return;
@@ -725,14 +759,14 @@ const ChatRoom = ({
                     </div>
                     {msg.content && (
                       <div className="message-text">
-                        {msg.content}
+                        {renderTextWithLinks(msg.content, `${msg.messageId}-forwarded-content`)}
                       </div>
                     )}
                   </>
                 )}
                 {!msg.forwardedMessage && (
                   <div className="message-text">
-                    {msg.content}
+                    {renderTextWithLinks(msg.content, `${msg.messageId}-content`)}
                   </div>
                 )}
                 
