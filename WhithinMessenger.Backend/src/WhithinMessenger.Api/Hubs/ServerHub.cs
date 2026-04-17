@@ -175,6 +175,35 @@ public class ServerHub : Hub
         }
     }
 
+    public async Task UpdateCategory(Guid serverId, Guid categoryId, string categoryName)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var command = new UpdateCategoryCommand(serverId, categoryId, categoryName, userId.Value);
+            var result = await _mediator.Send(command);
+
+            if (result.Success)
+            {
+                await Clients.Group(serverId.ToString()).SendAsync("CategoryUpdated", result.Category);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении категории: {ex.Message}");
+        }
+    }
+
     public async Task MoveChat(Guid serverId, Guid chatId, Guid? sourceCategoryId, Guid? targetCategoryId, int newPosition)
     {
         try

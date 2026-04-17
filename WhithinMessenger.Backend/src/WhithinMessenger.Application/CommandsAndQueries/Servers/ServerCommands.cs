@@ -23,6 +23,29 @@ public class DeleteCategoryResult
     public string? ErrorMessage { get; set; }
 }
 
+public class UpdateCategoryCommand : IRequest<UpdateCategoryResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid CategoryId { get; set; }
+    public string CategoryName { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateCategoryCommand(Guid serverId, Guid categoryId, string categoryName, Guid userId)
+    {
+        ServerId = serverId;
+        CategoryId = categoryId;
+        CategoryName = categoryName;
+        UserId = userId;
+    }
+}
+
+public class UpdateCategoryResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Category { get; set; }
+}
+
 
 public class CreateChatCommand : IRequest<CreateChatResult>
 {

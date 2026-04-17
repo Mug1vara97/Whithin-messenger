@@ -39,6 +39,67 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
     }
 }
 
+public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryCommand, UpdateCategoryResult>
+{
+    private readonly ICategoryRepository _categoryRepository;
+
+    public UpdateCategoryCommandHandler(ICategoryRepository categoryRepository)
+    {
+        _categoryRepository = categoryRepository;
+    }
+
+    public async Task<UpdateCategoryResult> Handle(UpdateCategoryCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var category = await _categoryRepository.GetByIdAsync(request.CategoryId, cancellationToken);
+            if (category == null)
+            {
+                return new UpdateCategoryResult { Success = false, ErrorMessage = "Категория не найдена" };
+            }
+
+            if (category.ServerId != request.ServerId)
+            {
+                return new UpdateCategoryResult { Success = false, ErrorMessage = "Категория не принадлежит указанному серверу" };
+            }
+
+            var categoryName = request.CategoryName?.Trim();
+            if (string.IsNullOrWhiteSpace(categoryName))
+            {
+                return new UpdateCategoryResult { Success = false, ErrorMessage = "Название категории не может быть пустым" };
+            }
+
+            var duplicate = await _categoryRepository.ExistsAsync(request.ServerId, categoryName, cancellationToken);
+            if (duplicate && !string.Equals(category.CategoryName, categoryName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new UpdateCategoryResult { Success = false, ErrorMessage = "Категория с таким названием уже существует" };
+            }
+
+            category.CategoryName = categoryName;
+            var updatedCategory = await _categoryRepository.UpdateAsync(category, cancellationToken);
+
+            return new UpdateCategoryResult
+            {
+                Success = true,
+                Category = new
+                {
+                    categoryId = updatedCategory.Id,
+                    categoryName = updatedCategory.CategoryName,
+                    serverId = updatedCategory.ServerId,
+                    categoryOrder = updatedCategory.CategoryOrder,
+                    isPrivate = updatedCategory.IsPrivate,
+                    allowedRoleIds = updatedCategory.AllowedRoleIds,
+                    allowedUserIds = updatedCategory.AllowedUserIds
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new UpdateCategoryResult { Success = false, ErrorMessage = $"Ошибка при обновлении категории: {ex.Message}" };
+        }
+    }
+}
+
 
 public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, CreateChatResult>
 {

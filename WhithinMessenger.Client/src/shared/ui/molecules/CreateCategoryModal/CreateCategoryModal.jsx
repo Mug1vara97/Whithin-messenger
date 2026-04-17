@@ -4,7 +4,11 @@ import './CreateCategoryModal.css';
 const CreateCategoryModal = ({
   isOpen,
   onClose,
-  onSubmit
+  onSubmit,
+  initialName = '',
+  title = 'Создать категорию',
+  submitButtonText = 'Создать категорию',
+  submitLoadingText = 'Сохранение...'
 }) => {
   const [categoryName, setCategoryName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -12,10 +16,10 @@ const CreateCategoryModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setCategoryName('');
+      setCategoryName(initialName || '');
       setErrors({});
     }
-  }, [isOpen]);
+  }, [isOpen, initialName]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -50,7 +54,7 @@ const CreateCategoryModal = ({
       setCategoryName('');
       onClose();
     } catch (error) {
-      setErrors({ submit: error.message || 'Ошибка при создании категории' });
+      setErrors({ submit: error.message || 'Ошибка при сохранении категории' });
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +72,7 @@ const CreateCategoryModal = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Создать категорию</h2>
+          <h2>{title}</h2>
           <button className="close-button" onClick={onClose}>&times;</button>
         </div>
         
@@ -106,7 +110,7 @@ const CreateCategoryModal = ({
               className="create-button"
               disabled={isLoading}
             >
-              {isLoading ? 'Создание...' : 'Создать категорию'}
+              {isLoading ? submitLoadingText : submitButtonText}
             </button>
           </div>
         </form>

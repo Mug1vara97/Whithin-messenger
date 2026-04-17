@@ -39,6 +39,8 @@ const ServerPanel = ({
   const [showChannelSettingsModal, setShowChannelSettingsModal] = useState(false);
   const [selectedChannelForSettings, setSelectedChannelForSettings] = useState(null);
   const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, type: null, data: null });
   const [serverConnection, setServerConnection] = useState(null);
@@ -343,6 +345,35 @@ const ServerPanel = ({
       });
     };
 
+    const handleCategoryUpdated = (updatedCategory) => {
+      console.log('ServerPanel: CategoryUpdated event received:', updatedCategory);
+      setServer(prev => {
+        if (!prev) return prev;
+
+        const updatedCategories = (prev.categories || []).map(cat => {
+          const catId = cat.categoryId || cat.CategoryId;
+          const updatedId = updatedCategory.categoryId || updatedCategory.CategoryId;
+          if (catId !== updatedId) {
+            return cat;
+          }
+
+          return {
+            ...cat,
+            categoryName: updatedCategory.categoryName || updatedCategory.CategoryName,
+            CategoryName: updatedCategory.categoryName || updatedCategory.CategoryName
+          };
+        });
+
+        const updatedServer = { ...prev, categories: updatedCategories };
+
+        if (onServerDataUpdated) {
+          onServerDataUpdated(updatedServer);
+        }
+
+        return updatedServer;
+      });
+    };
+
     console.log('ServerPanel: Registering SignalR handlers, serverConnection:', serverConnection);
     console.log('ServerPanel: Registering ChatCreated handler:', handleChatCreated);
     const handleChannelMemberAdded = (srvId, channelId) => {
@@ -357,6 +388,7 @@ const ServerPanel = ({
     serverConnection.on("ChatUpdated", handleChatUpdated);
     serverConnection.on("CategoryCreated", handleCategoryCreated);
     serverConnection.on("CategoryDeleted", handleCategoryDeleted);
+    serverConnection.on("CategoryUpdated", handleCategoryUpdated);
     serverConnection.on("ChannelMemberAdded", handleChannelMemberAdded);
     serverConnection.on("ChannelMemberRemoved", handleChannelMemberRemoved);
 
@@ -366,6 +398,7 @@ const ServerPanel = ({
       serverConnection.off("ChatUpdated", handleChatUpdated);
       serverConnection.off("CategoryCreated", handleCategoryCreated);
       serverConnection.off("CategoryDeleted", handleCategoryDeleted);
+      serverConnection.off("CategoryUpdated", handleCategoryUpdated);
       serverConnection.off("ChannelMemberAdded", handleChannelMemberAdded);
       serverConnection.off("ChannelMemberRemoved", handleChannelMemberRemoved);
     };
@@ -728,9 +761,25 @@ const ServerPanel = ({
   }, []);
 
   const handleEditCategory = useCallback((category) => {
-    console.log('Редактирование категории:', category);
-    alert('Редактирование категорий пока не реализовано');
+    setSelectedCategoryForEdit(category);
+    setShowEditCategoryModal(true);
   }, []);
+
+  const handleUpdateCategorySubmit = useCallback(async (categoryData) => {
+    if (!serverConnection || serverConnection.state !== 'Connected') {
+      throw new Error('Нет соединения с сервером');
+    }
+
+    const categoryId = selectedCategoryForEdit?.categoryId || selectedCategoryForEdit?.CategoryId;
+    if (!categoryId) {
+      throw new Error('ID категории не найден');
+    }
+
+    const serverId = selectedServer?.serverId || currentServer?.serverId;
+    await serverConnection.invoke("UpdateCategory", serverId, categoryId, categoryData.categoryName);
+    setShowEditCategoryModal(false);
+    setSelectedCategoryForEdit(null);
+  }, [serverConnection, selectedCategoryForEdit, selectedServer?.serverId, currentServer?.serverId]);
 
   const handleDeleteCategory = useCallback(async (category) => {
     if (window.confirm(`Вы уверены, что хотите удалить категорию "${category.CategoryName || category.categoryName}"? Все каналы внутри также будут удалены.`)) {
@@ -1058,6 +1107,19 @@ const ServerPanel = ({
         isOpen={showCreateCategoryModal}
         onClose={() => setShowCreateCategoryModal(false)}
         onSubmit={handleCreateCategorySubmit}
+      />
+
+      <CreateCategoryModal
+        isOpen={showEditCategoryModal}
+        onClose={() => {
+          setShowEditCategoryModal(false);
+          setSelectedCategoryForEdit(null);
+        }}
+        onSubmit={handleUpdateCategorySubmit}
+        initialName={selectedCategoryForEdit?.categoryName || selectedCategoryForEdit?.CategoryName || ''}
+        title="Настройки категории"
+        submitButtonText="Сохранить"
+        submitLoadingText="Сохранение..."
       />
 
       <ContextMenu
