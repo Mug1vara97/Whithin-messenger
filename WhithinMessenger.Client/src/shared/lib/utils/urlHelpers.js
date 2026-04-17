@@ -45,10 +45,22 @@ export const openExternalUrl = (rawUrl) => {
   }
 
   const electronBridge = window?.electronAPI || window?.electron;
-
   if (electronBridge?.openExternal) {
     electronBridge.openExternal(url);
     return;
+  }
+
+  // Fallback для Electron с nodeIntegration/preload bridge
+  try {
+    if (typeof window?.require === 'function') {
+      const electron = window.require('electron');
+      if (electron?.shell?.openExternal) {
+        electron.shell.openExternal(url);
+        return;
+      }
+    }
+  } catch {
+    // Игнорируем и используем браузерный fallback ниже
   }
 
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -127,12 +139,16 @@ export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
 
   let blob;
   try {
-    blob = await tryDownload(directUrl);
+    if (fallbackApiUrl) {
+      blob = await tryDownload(fallbackApiUrl);
+    } else {
+      blob = await tryDownload(directUrl);
+    }
   } catch (primaryError) {
     if (!fallbackApiUrl) {
       throw primaryError;
     }
-    blob = await tryDownload(fallbackApiUrl);
+    blob = await tryDownload(directUrl);
   }
 
   const objectUrl = window.URL.createObjectURL(blob);

@@ -87,6 +87,15 @@
   color: #9bd0ff;
 }
 
+.message-item.own .message-link {
+  color: #ffffff;
+  text-decoration-color: rgba(255, 255, 255, 0.9);
+}
+
+.message-item.own .message-link:hover {
+  color: #e6eeff;
+}
+
 .message-content {
   display: flex;
   flex-direction: column;
