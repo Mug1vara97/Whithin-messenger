@@ -268,15 +268,27 @@ public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, GetRolesResul
         _roleRepository = roleRepository;
     }
 
-    public Task<GetRolesResult> Handle(GetRolesQuery request, CancellationToken cancellationToken)
+    public async Task<GetRolesResult> Handle(GetRolesQuery request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new GetRolesResult { Success = true, Roles = new List<object>() });
+            var roles = await _roleRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
+
+            var mappedRoles = roles.Select(role => new
+            {
+                roleId = role.Id,
+                serverId = role.ServerId,
+                roleName = role.RoleName,
+                color = role.Color,
+                permissions = role.Permissions,
+                createdAt = role.CreatedAt
+            }).ToList();
+
+            return new GetRolesResult { Success = true, Roles = mappedRoles };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new GetRolesResult { Success = false, ErrorMessage = ex.Message });
+            return new GetRolesResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -290,15 +302,49 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
         _roleRepository = roleRepository;
     }
 
-    public Task<CreateRoleResult> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
+    public async Task<CreateRoleResult> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new CreateRoleResult { Success = true, Role = new { } });
+            var roleName = request.RoleName?.Trim();
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                return new CreateRoleResult { Success = false, ErrorMessage = "Название роли не может быть пустым" };
+            }
+
+            var exists = await _roleRepository.ExistsAsync(request.ServerId, roleName, cancellationToken);
+            if (exists)
+            {
+                return new CreateRoleResult { Success = false, ErrorMessage = "Роль с таким названием уже существует" };
+            }
+
+            var createdRole = await _roleRepository.CreateAsync(new ServerRole
+            {
+                Id = Guid.NewGuid(),
+                ServerId = request.ServerId,
+                RoleName = roleName,
+                Color = request.Color,
+                Permissions = request.Permissions ?? "{}",
+                CreatedAt = DateTimeOffset.UtcNow
+            }, cancellationToken);
+
+            return new CreateRoleResult
+            {
+                Success = true,
+                Role = new
+                {
+                    roleId = createdRole.Id,
+                    serverId = createdRole.ServerId,
+                    roleName = createdRole.RoleName,
+                    color = createdRole.Color,
+                    permissions = createdRole.Permissions,
+                    createdAt = createdRole.CreatedAt
+                }
+            };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new CreateRoleResult { Success = false, ErrorMessage = ex.Message });
+            return new CreateRoleResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -312,15 +358,46 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
         _roleRepository = roleRepository;
     }
 
-    public Task<UpdateRoleResult> Handle(UpdateRoleCommand request, CancellationToken cancellationToken)
+    public async Task<UpdateRoleResult> Handle(UpdateRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new UpdateRoleResult { Success = true, Role = new { }, ServerId = Guid.NewGuid() });
+            var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+            if (existingRole == null)
+            {
+                return new UpdateRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            var roleName = request.RoleName?.Trim();
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                return new UpdateRoleResult { Success = false, ErrorMessage = "Название роли не может быть пустым" };
+            }
+
+            existingRole.RoleName = roleName;
+            existingRole.Color = request.Color;
+            existingRole.Permissions = request.Permissions ?? "{}";
+
+            var updatedRole = await _roleRepository.UpdateAsync(existingRole, cancellationToken);
+
+            return new UpdateRoleResult
+            {
+                Success = true,
+                ServerId = updatedRole.ServerId,
+                Role = new
+                {
+                    roleId = updatedRole.Id,
+                    serverId = updatedRole.ServerId,
+                    roleName = updatedRole.RoleName,
+                    color = updatedRole.Color,
+                    permissions = updatedRole.Permissions,
+                    createdAt = updatedRole.CreatedAt
+                }
+            };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new UpdateRoleResult { Success = false, ErrorMessage = ex.Message });
+            return new UpdateRoleResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -334,15 +411,23 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
         _roleRepository = roleRepository;
     }
 
-    public Task<DeleteRoleResult> Handle(DeleteRoleCommand request, CancellationToken cancellationToken)
+    public async Task<DeleteRoleResult> Handle(DeleteRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new DeleteRoleResult { Success = true, ServerId = Guid.NewGuid() });
+            var existingRole = await _roleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+            if (existingRole == null)
+            {
+                return new DeleteRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            await _roleRepository.DeleteAsync(request.RoleId, cancellationToken);
+
+            return new DeleteRoleResult { Success = true, ServerId = existingRole.ServerId };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new DeleteRoleResult { Success = false, ErrorMessage = ex.Message });
+            return new DeleteRoleResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }

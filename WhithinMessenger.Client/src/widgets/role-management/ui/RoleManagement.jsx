@@ -30,7 +30,7 @@ const RoleManagement = ({ connection, serverId, userId, userPermissions, isServe
   const filteredRoles = useMemo(() => {
     if (!searchQuery.trim()) return roles;
     return roles.filter(role => 
-      role.roleName.toLowerCase().includes(searchQuery.toLowerCase())
+      (role.roleName || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [roles, searchQuery]);
 

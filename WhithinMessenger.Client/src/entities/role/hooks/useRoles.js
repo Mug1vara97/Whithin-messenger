@@ -110,6 +110,10 @@ export const useRoles = (connection, serverId, userId) => {
 
     const handleRoleCreated = (newRole) => {
       console.log('useRoles: Получено событие RoleCreated:', newRole);
+      if (!newRole?.roleId || typeof newRole?.roleName !== 'string') {
+        console.warn('useRoles: Пропускаем некорректное событие RoleCreated');
+        return;
+      }
       setRoles(prev => {
         const exists = prev.some(role => role.roleId === newRole.roleId);
         if (exists) {
