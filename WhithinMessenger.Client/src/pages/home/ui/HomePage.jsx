@@ -456,9 +456,16 @@ const HomePage = () => {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {/* Check if it's a voice channel */}
                   {(selectedChat.chatType === 4 || 
-                    selectedChat.typeId === 4 || 
+                    selectedChat.chatType === '4' ||
+                    selectedChat.chatTypeId === 4 ||
+                    selectedChat.chatTypeId === '4' ||
+                    selectedChat.chatTypeId === "44444444-4444-4444-4444-444444444444" ||
+                    selectedChat.typeId === 4 ||
+                    selectedChat.typeId === '4' ||
                     selectedChat.TypeId === 4 ||
-                    selectedChat.typeId === "44444444-4444-4444-4444-444444444444") ? (
+                    selectedChat.TypeId === '4' ||
+                    selectedChat.typeId === "44444444-4444-4444-4444-444444444444" ||
+                    selectedChat.TypeId === "44444444-4444-4444-4444-444444444444") ? (
                     console.log('HomePage: Rendering VoiceCallView with user:', user, 'selectedChat:', selectedChat),
                     <VoiceCallView
                       channelId={selectedChat.chatId || selectedChat.chat_id}

@@ -6,13 +6,19 @@ import voiceChannelService from '../../../../shared/lib/services/voiceChannelSer
 import './CategoriesList.css';
 
 const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
+const getChannelTypeValue = (channel) =>
+  channel?.chatType ??
+  channel?.ChatType ??
+  channel?.chatTypeId ??
+  channel?.typeId ??
+  channel?.TypeId;
+
 const isVoiceChannelChat = (chat) => {
-  const t = chat?.chatType ?? chat?.ChatType;
-  const typeId = chat?.typeId ?? chat?.TypeId;
+  const typeValue = getChannelTypeValue(chat);
   return (
-    t === 4 || t === '4' ||
-    typeId === 4 || typeId === '4' ||
-    typeId === VOICE_TYPE_GUID
+    typeValue === 4 ||
+    typeValue === '4' ||
+    typeValue === VOICE_TYPE_GUID
   );
 };
 
@@ -183,7 +189,12 @@ const CategoriesList = ({
 
   const handleChatClick = (channel) => {
     if (onChatClick) {
-      onChatClick(channel.chatId || channel.ChatId, channel.name || channel.Name || channel.groupName, channel.chatType || channel.typeId);
+      const channelType = getChannelTypeValue(channel);
+      onChatClick(
+        channel.chatId || channel.ChatId,
+        channel.name || channel.Name || channel.groupName,
+        channelType
+      );
     }
   };
 
