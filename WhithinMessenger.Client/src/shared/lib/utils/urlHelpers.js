@@ -108,7 +108,7 @@ export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
     .replace(/^\/+/, '');
 
   const fallbackApiUrl = cleanedPath
-    ? `${BASE_URL}/api/media/download/${encodeURIComponent(cleanedPath)}`
+    ? `${BASE_URL}/api/media/download?filePath=${encodeURIComponent(cleanedPath)}`
     : '';
 
   const tryDownload = async (url) => {

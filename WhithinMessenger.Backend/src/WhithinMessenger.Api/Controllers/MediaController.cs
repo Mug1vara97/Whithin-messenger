@@ -179,19 +179,25 @@ public class MediaController : ControllerBase
         }
     }
 
-    [HttpGet("download/{filePath}")]
-    public async Task<IActionResult> DownloadFile(string filePath)
+    [HttpGet("download")]
+    public async Task<IActionResult> DownloadFile([FromQuery] string filePath)
     {
         try
         {
-            var fileData = await _fileService.GetFileAsync(filePath);
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return BadRequest("Путь к файлу не указан");
+            }
+
+            var normalizedFilePath = filePath.Trim().TrimStart('/');
+            var fileData = await _fileService.GetFileAsync(normalizedFilePath);
             if (fileData == null)
             {
                 return NotFound("Файл не найден");
             }
 
-            var contentType = await _fileService.GetContentTypeAsync(filePath);
-            var fileName = Path.GetFileName(filePath);
+            var contentType = await _fileService.GetContentTypeAsync(normalizedFilePath);
+            var fileName = Path.GetFileName(normalizedFilePath);
 
             return File(fileData, contentType, fileName);
         }
