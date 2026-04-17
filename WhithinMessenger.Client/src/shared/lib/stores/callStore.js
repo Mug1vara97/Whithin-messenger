@@ -112,6 +112,12 @@ export const useCallStore = create(
           return false;
         }
       })(),
+      devicesPreinitialized: false,
+      mediaDeviceInfo: {
+        hasMicrophone: false,
+        hasAudioOutput: false,
+        microphonePermission: 'unknown'
+      },
       isNoiseSuppressed: false,
       noiseSuppressionMode: 'rnnoise',
       userVolumes: new Map(),
@@ -155,6 +161,61 @@ export const useCallStore = create(
       clearError: () => set({ error: null }),
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
+
+      // Ленивая прединициализация устройств при старте приложения:
+      // определяем наличие микрофона/наушников и статус разрешений,
+      // но не начинаем захват аудио без явной необходимости.
+      preinitializeAudioDevices: async (requestMicrophoneAccess = false) => {
+        try {
+          if (!navigator?.mediaDevices?.enumerateDevices) {
+            set({
+              devicesPreinitialized: true,
+              mediaDeviceInfo: {
+                hasMicrophone: false,
+                hasAudioOutput: false,
+                microphonePermission: 'unsupported'
+              }
+            });
+            return;
+          }
+
+          let microphonePermission = 'unknown';
+          if (navigator.permissions?.query) {
+            try {
+              const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+              microphonePermission = permissionStatus.state || 'unknown';
+            } catch {
+              microphonePermission = 'unknown';
+            }
+          }
+
+          if (requestMicrophoneAccess && microphonePermission !== 'granted') {
+            try {
+              const prewarmStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              prewarmStream.getTracks().forEach(track => track.stop());
+              microphonePermission = 'granted';
+            } catch {
+              // Пользователь мог отклонить доступ — просто фиксируем текущее состояние ниже
+            }
+          }
+
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+          const hasAudioOutput = devices.some(device => device.kind === 'audiooutput');
+
+          set({
+            devicesPreinitialized: true,
+            mediaDeviceInfo: {
+              hasMicrophone,
+              hasAudioOutput,
+              microphonePermission
+            }
+          });
+        } catch (error) {
+          console.warn('Failed to preinitialize audio devices:', error);
+          set({ devicesPreinitialized: true });
+        }
+      },
       
       // Voice Activity Detection (VAD) функции
       updateSpeakingState: (userId, isSpeaking) => {

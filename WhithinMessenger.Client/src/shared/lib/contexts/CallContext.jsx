@@ -40,6 +40,8 @@ export const CallProvider = ({ children }) => {
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
   const isVideoEnabled = useCallStore(state => state.isVideoEnabled);
   const cameraStream = useCallStore(state => state.cameraStream);
+  const devicesPreinitialized = useCallStore(state => state.devicesPreinitialized);
+  const mediaDeviceInfo = useCallStore(state => state.mediaDeviceInfo);
   
   // Получаем отдельные состояния участников через селекторы для реактивности
   const participantMuteStates = useCallStore(state => state.participantMuteStates);
@@ -91,7 +93,18 @@ export const CallProvider = ({ children }) => {
 
   // Очистка при размонтировании провайдера
   useEffect(() => {
+    // Прединициализация списка аудиоустройств при запуске приложения
+    // без захвата микрофона (только проверка доступности/permissions).
+    callStore.preinitializeAudioDevices(false);
+
+    const handleDeviceChange = () => {
+      callStore.preinitializeAudioDevices(false);
+    };
+
+    navigator?.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
+
     return () => {
+      navigator?.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange);
       // Не очищаем соединение здесь, так как оно должно жить глобально
       // Очистка происходит только при явном завершении звонка
     };
@@ -122,6 +135,8 @@ export const CallProvider = ({ children }) => {
     remoteScreenShares,
     isVideoEnabled,
     cameraStream,
+    devicesPreinitialized,
+    mediaDeviceInfo,
     
     // Отдельные состояния участников для оптимизации рендеринга
     participantMuteStates,
@@ -151,6 +166,7 @@ export const CallProvider = ({ children }) => {
     startVideo: callStore.startVideo,
     stopVideo: callStore.stopVideo,
     toggleVideo: callStore.toggleVideo,
+    preinitializeAudioDevices: callStore.preinitializeAudioDevices,
     
     // Прямой доступ к store для расширенного использования
     store: callStore
@@ -178,6 +194,8 @@ export const CallProvider = ({ children }) => {
     remoteScreenShares,
     isVideoEnabled,
     cameraStream,
+    devicesPreinitialized,
+    mediaDeviceInfo,
     participantMuteStates,
     participantAudioStates,
     participantGlobalAudioStates,
