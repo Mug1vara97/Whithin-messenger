@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AddUserModal from '../AddUserModal/AddUserModal';
 import ChatAvatarUpload from '../ChatAvatarUpload/ChatAvatarUpload';
@@ -157,7 +158,7 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
           >
             {type === 'image' ? (
               <img
-                src={`${BASE_URL}/${file.filePath}`}
+                src={buildMediaUrl(file.filePath)}
                 alt={file.originalFileName}
                 className="chat-info-media-image"
               />
@@ -460,13 +461,13 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
             <div className="chat-info-media-modal-content">
               {selectedMedia.contentType.startsWith('video/') ? (
                 <video 
-                  src={`${BASE_URL}/${selectedMedia.filePath}`} 
+                  src={buildMediaUrl(selectedMedia.filePath)}
                   controls 
                   className="chat-info-media-preview-video"
                 />
               ) : selectedMedia.contentType.startsWith('audio/') ? (
                 <audio 
-                  src={`${BASE_URL}/${selectedMedia.filePath}`} 
+                  src={buildMediaUrl(selectedMedia.filePath)}
                   controls 
                   className="chat-info-media-preview-audio"
                 />
@@ -476,10 +477,14 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                   <h4 className="chat-info-file-name">{selectedMedia.originalFileName}</h4>
                   <p className="chat-info-file-size">{formatFileSize(selectedMedia.fileSize)}</p>
                   <a 
-                    href={`${BASE_URL}/${selectedMedia.filePath}`}
+                    href={buildMediaUrl(selectedMedia.filePath)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="chat-info-download-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(buildMediaUrl(selectedMedia.filePath));
+                    }}
                   >
                     Скачать файл
                   </a>

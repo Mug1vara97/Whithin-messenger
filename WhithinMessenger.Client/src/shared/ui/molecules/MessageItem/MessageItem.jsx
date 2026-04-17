@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { UserAvatar } from '../../atoms';
 import MediaFile from '../MediaFile/MediaFile';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
+import { openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import './MessageItem.css';
 
 const MessageItem = ({ 
@@ -93,11 +94,40 @@ const MessageItem = ({
       console.log('❌ MessageItem - в сообщении нет медиафайлов для отображения');
     }
     
+    const messageParts = splitTextWithLinks(message.content);
+
     return (
       <div className="message-content">
         {message.content && (
           <div className="message-text">
-            {message.content}
+            {messageParts.length > 0 ? (
+              messageParts.map((part, index) => {
+                if (part.type === 'link') {
+                  return (
+                    <a
+                      key={`${message.messageId}-link-${index}`}
+                      href={part.href}
+                      className="message-link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openExternalUrl(part.href);
+                      }}
+                    >
+                      {part.value}
+                    </a>
+                  );
+                }
+
+                return (
+                  <React.Fragment key={`${message.messageId}-text-${index}`}>
+                    {part.value}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              message.content
+            )}
           </div>
         )}
         {message.mediaFiles && message.mediaFiles.length > 0 && (

@@ -19,6 +19,17 @@
   font-size: 13px;
   line-height: 1.4;
   word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.replied-link {
+  color: #66b3ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.replied-link:hover {
+  color: #9bd0ff;
 }
 
 /* Специальные стили для аудио в ответах */

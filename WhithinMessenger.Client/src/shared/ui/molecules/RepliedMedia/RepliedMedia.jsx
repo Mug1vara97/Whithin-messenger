@@ -1,5 +1,5 @@
 import React from 'react';
-import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import './RepliedMedia.css';
 
@@ -15,7 +15,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     if (mediaFile.contentType.startsWith('image/')) {
       return (
         <img 
-          src={`${BASE_URL}/${mediaFile.filePath}`} 
+          src={buildMediaUrl(mediaFile.filePath)}
           alt="Replied image" 
           className="replied-image"
         />
@@ -25,7 +25,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     if (mediaFile.contentType.startsWith('video/')) {
       return (
         <video 
-          src={`${BASE_URL}/${mediaFile.filePath}`} 
+          src={buildMediaUrl(mediaFile.filePath)}
           controls 
           className="replied-video"
         />
@@ -41,7 +41,7 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     
     if (isMediaPath) {
       console.log('🎵 RepliedMedia - это медиафайл:', content);
-      const src = `${BASE_URL}/${content}`;
+      const src = buildMediaUrl(content);
       const extension = content.split('.').pop().toLowerCase();
       
       switch (extension) {
@@ -72,14 +72,52 @@ const RepliedMedia = ({ content, mediaFiles }) => {
           };
           return <AudioMessage mediaFile={audioMediaFile} />;
         default:
-          return <a href={src} target="_blank" rel="noopener noreferrer">Download file</a>;
+          return (
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="replied-link"
+              onClick={(e) => {
+                e.preventDefault();
+                openExternalUrl(src);
+              }}
+            >
+              Download file
+            </a>
+          );
       }
     }
   }
 
   // Если это обычный текст
   console.log('🎵 RepliedMedia - отображаем как текст:', content);
-  return <span className="replied-text">{content}</span>;
+  const textParts = splitTextWithLinks(content);
+
+  return (
+    <span className="replied-text">
+      {textParts.length > 0 ? textParts.map((part, index) => {
+        if (part.type === 'link') {
+          return (
+            <a
+              key={`reply-link-${index}`}
+              href={part.href}
+              className="replied-link"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalUrl(part.href);
+              }}
+            >
+              {part.value}
+            </a>
+          );
+        }
+
+        return <React.Fragment key={`reply-text-${index}`}>{part.value}</React.Fragment>;
+      }) : content}
+    </span>
+  );
 };
 
 export default RepliedMedia;

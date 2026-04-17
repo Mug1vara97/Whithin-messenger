@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import VideoPlayer from './VideoPlayer';
@@ -26,7 +26,7 @@ const MediaFile = ({ mediaFile }) => {
 
   const renderMediaContent = () => {
     if (mediaFile.contentType.startsWith('image/')) {
-      const imageUrl = `${BASE_URL}/${mediaFile.filePath}`;
+      const imageUrl = buildMediaUrl(mediaFile.filePath);
       
       
       return (
@@ -58,7 +58,7 @@ const MediaFile = ({ mediaFile }) => {
     }
 
     if (mediaFile.contentType.startsWith('video/')) {
-      const videoUrl = `${BASE_URL}/${mediaFile.filePath}`;
+      const videoUrl = buildMediaUrl(mediaFile.filePath);
 
       // Если ошибка воспроизведения — fallback с кнопкой скачивания
       if (videoError) {
@@ -83,6 +83,8 @@ const MediaFile = ({ mediaFile }) => {
               <a
                 href={videoUrl}
                 download={mediaFile.originalFileName || 'video.mp4'}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -98,6 +100,10 @@ const MediaFile = ({ mediaFile }) => {
                 }}
                 onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; }}
                 onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#5865f2'; }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openExternalUrl(videoUrl);
+                }}
               >
                 <DownloadIcon sx={{ fontSize: 18 }} />
                 Скачать видео
@@ -133,7 +139,7 @@ const MediaFile = ({ mediaFile }) => {
     }
 
     // Для документов, архивов и других файлов — карточка-ссылка в стиле Discord
-    const fileUrl = `${BASE_URL}/${mediaFile.filePath}`;
+    const fileUrl = buildMediaUrl(mediaFile.filePath);
     const isArchive = /\.(zip|rar|7z|tar|gz)$/i.test(mediaFile.originalFileName || '');
     const FileIcon = isArchive ? FolderZipIcon : InsertDriveFileIcon;
     return (
@@ -143,6 +149,10 @@ const MediaFile = ({ mediaFile }) => {
         target="_blank"
         rel="noopener noreferrer"
         className="media-file-card"
+        onClick={(e) => {
+          e.preventDefault();
+          openExternalUrl(fileUrl);
+        }}
       >
         <div className="media-file-card__icon">
           <FileIcon sx={{ fontSize: 40 }} />
