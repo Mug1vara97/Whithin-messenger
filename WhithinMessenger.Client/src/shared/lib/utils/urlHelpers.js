@@ -1,4 +1,4 @@
-import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
+import { BASE_URL, MEDIA_BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
 
 const URL_PATTERN = /((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
@@ -91,8 +91,8 @@ export const splitTextWithLinks = (text) => {
 };
 
 export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
-  const url = buildMediaUrl(rawUrl);
-  if (!url) {
+  const directUrl = buildMediaUrl(rawUrl);
+  if (!directUrl) {
     throw new Error('Invalid file URL');
   }
 
@@ -102,17 +102,39 @@ export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    method: 'GET',
-    credentials: 'include',
-    headers,
-  });
+  const normalizedPath = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  const cleanedPath = normalizedPath
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .replace(/^\/+/, '');
 
-  if (!response.ok) {
-    throw new Error(`Download failed with status ${response.status}`);
+  const fallbackApiUrl = cleanedPath
+    ? `${BASE_URL}/api/media/download/${encodeURIComponent(cleanedPath)}`
+    : '';
+
+  const tryDownload = async (url) => {
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed with status ${response.status}`);
+    }
+
+    return response.blob();
+  };
+
+  let blob;
+  try {
+    blob = await tryDownload(directUrl);
+  } catch (primaryError) {
+    if (!fallbackApiUrl) {
+      throw primaryError;
+    }
+    blob = await tryDownload(fallbackApiUrl);
   }
 
-  const blob = await response.blob();
   const objectUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = objectUrl;
