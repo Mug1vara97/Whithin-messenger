@@ -39,7 +39,7 @@ export const useRoles = (connection, serverId, userId) => {
     try {
       console.log('useRoles: Создаем роль с данными:', roleData);
       setError(null);
-      await roleApi.createRole(connection, serverId, roleData, userId);
+      await roleApi.createRole(connection, serverId, roleData);
       console.log('useRoles: Роль успешно создана');
     } catch (err) {
       console.error('Error creating role:', err);
@@ -53,7 +53,7 @@ export const useRoles = (connection, serverId, userId) => {
 
     try {
       setError(null);
-      await roleApi.updateRole(connection, roleId, roleData, userId);
+      await roleApi.updateRole(connection, roleId, roleData);
     } catch (err) {
       console.error('Error updating role:', err);
       setError(err.message);
@@ -66,7 +66,7 @@ export const useRoles = (connection, serverId, userId) => {
 
     try {
       setError(null);
-      await roleApi.deleteRole(connection, roleId, userId);
+      await roleApi.deleteRole(connection, roleId);
     } catch (err) {
       console.error('Error deleting role:', err);
       setError(err.message);
@@ -79,7 +79,7 @@ export const useRoles = (connection, serverId, userId) => {
 
     try {
       setError(null);
-      await roleApi.assignRole(connection, targetUserId, roleId, userId);
+      await roleApi.assignRole(connection, targetUserId, roleId);
     } catch (err) {
       console.error('Error assigning role:', err);
       setError(err.message);
@@ -92,7 +92,7 @@ export const useRoles = (connection, serverId, userId) => {
 
     try {
       setError(null);
-      await roleApi.removeRole(connection, targetUserId, roleId, userId);
+      await roleApi.removeRole(connection, targetUserId, roleId);
     } catch (err) {
       console.error('Error removing role:', err);
       setError(err.message);

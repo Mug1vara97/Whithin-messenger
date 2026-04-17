@@ -5,24 +5,36 @@ export const roleApi = {
     return connection.invoke("GetRoles", serverId);
   },
 
-  createRole: (connection, serverId, roleData, userId) => {
-    return connection.invoke("CreateRole", serverId, roleData, userId);
+  createRole: (connection, serverId, roleData) => {
+    return connection.invoke(
+      "CreateRole",
+      serverId,
+      roleData.roleName,
+      roleData.color,
+      roleData.permissions
+    );
   },
 
-  updateRole: (connection, roleId, roleData, userId) => {
-    return connection.invoke("UpdateRole", roleId, roleData, userId);
+  updateRole: (connection, roleId, roleData) => {
+    return connection.invoke(
+      "UpdateRole",
+      roleId,
+      roleData.roleName,
+      roleData.color,
+      roleData.permissions
+    );
   },
 
-  deleteRole: (connection, roleId, userId) => {
-    return connection.invoke("DeleteRole", roleId, userId);
+  deleteRole: (connection, roleId) => {
+    return connection.invoke("DeleteRole", roleId);
   },
 
-  assignRole: (connection, targetUserId, roleId, currentUserId) => {
-    return connection.invoke("AssignRole", targetUserId, roleId, currentUserId);
+  assignRole: (connection, targetUserId, roleId) => {
+    return connection.invoke("AssignRole", targetUserId, roleId);
   },
 
-  removeRole: (connection, targetUserId, roleId, currentUserId) => {
-    return connection.invoke("RemoveRole", targetUserId, roleId, currentUserId);
+  removeRole: (connection, targetUserId, roleId) => {
+    return connection.invoke("RemoveRole", targetUserId, roleId);
   },
 
   getUserRoles: (connection, userId, serverId) => {
