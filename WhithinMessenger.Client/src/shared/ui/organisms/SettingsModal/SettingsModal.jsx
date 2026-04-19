@@ -11,6 +11,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [hotkeys, setHotkeys] = useState(() => hotkeyStorage.getHotkeys());
   const [editingHotkey, setEditingHotkey] = useState(null);
   const [tempKey, setTempKey] = useState('');
+  const [soundNotificationsEnabled, setSoundNotificationsEnabled] = useState(() => {
+    const saved = localStorage.getItem('soundNotificationsEnabled');
+    return saved == null ? true : JSON.parse(saved);
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -32,8 +36,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }));
   }, [noiseSuppression]);
 
+  useEffect(() => {
+    localStorage.setItem('soundNotificationsEnabled', JSON.stringify(soundNotificationsEnabled));
+    window.dispatchEvent(
+      new CustomEvent('notificationSettingsChanged', {
+        detail: { soundNotificationsEnabled },
+      })
+    );
+  }, [soundNotificationsEnabled]);
+
   const handleNoiseSuppressionToggle = () => {
     setNoiseSuppression(!noiseSuppression);
+  };
+
+  const handleSoundNotificationsToggle = () => {
+    setSoundNotificationsEnabled((prev) => !prev);
   };
 
   const handleHotkeyEdit = (action) => {
@@ -157,7 +174,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
             <h3>Уведомления</h3>
             <div className="setting-item">
               <label className="setting-label">
-                <input type="checkbox" defaultChecked />
+                <input
+                  type="checkbox"
+                  checked={soundNotificationsEnabled}
+                  onChange={handleSoundNotificationsToggle}
+                />
                 <span className="setting-text">Звуковые уведомления</span>
               </label>
             </div>

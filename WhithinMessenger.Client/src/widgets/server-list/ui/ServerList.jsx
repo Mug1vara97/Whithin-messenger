@@ -9,7 +9,14 @@ import compassIcon from '../../../assets/magnifying-glass.png';
 import { Settings } from '@mui/icons-material';
 import styles from './ServerList.module.css';
 
-const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, onSettingsClick, onNotificationsClick }) => {
+const ServerList = ({
+  onServerSelected,
+  onDiscoverClick,
+  onCreateServerClick,
+  onSettingsClick,
+  onNotificationsClick,
+  unreadNotificationsCount = 0
+}) => {
   const { logout } = useAuthContext();
   const [isDragging, setIsDragging] = useState(false);
   
@@ -205,6 +212,11 @@ const ServerList = ({ onServerSelected, onDiscoverClick, onCreateServerClick, on
                   >
                     <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                   </svg>
+                  {unreadNotificationsCount > 0 && (
+                    <span className={styles['notification-badge']}>
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                    </span>
+                  )}
                 </button>
               </li>
               <li className={styles['server-item']}>
@@ -324,6 +336,7 @@ export default memo(ServerList, (prevProps, nextProps) => {
     prevProps.userId === nextProps.userId &&
     prevProps.selectedServerId === nextProps.selectedServerId &&
     prevProps.onServerSelected === nextProps.onServerSelected &&
-    prevProps.onDiscoverClick === nextProps.onDiscoverClick
+    prevProps.onDiscoverClick === nextProps.onDiscoverClick &&
+    prevProps.unreadNotificationsCount === nextProps.unreadNotificationsCount
   );
 });

@@ -381,37 +381,13 @@ public class GroupChatHub : Hub
                     // Отправляем ChatUpdated событие для обновления списка чатов
                     await _chatListHubContext.Clients.All.SendAsync("chatupdated", parsedChatId, message, DateTimeOffset.UtcNow);
 
-                    // Создаем уведомления для участников чата
-                    try
-                    {
-                        var chat = await _chatRepository.GetByIdAsync(parsedChatId);
-                        if (chat != null)
-                        {
-                            var chatMembers = await _chatRepository.GetChatMembersAsync(parsedChatId);
-                            var notificationMembers = chatMembers.Where(m => m != userId.Value).ToList();
-                            
-                            var isGroupChat = chat.Type?.TypeName == "Group";
-                            var notificationType = isGroupChat ? "group_message" : "direct_message";
-                            var chatName = chat.Name ?? username;
-                            var notificationContent = isGroupChat
-                                ? $"{username} в {chatName}: {message}"
-                                : $"{username}: {message}";
-
-                            foreach (var memberId in notificationMembers)
-                            {
-                                await _notificationService.CreateNotificationAsync(
-                                    memberId,
-                                    parsedChatId,
-                                    result.MessageId,
-                                    notificationType,
-                                    notificationContent);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error creating notifications for message");
-                    }
+                    await CreateNotificationsForChatMessage(
+                        parsedChatId,
+                        userId.Value,
+                        username,
+                        result.MessageId,
+                        message
+                    );
                 }
                 else
                 {
@@ -614,6 +590,14 @@ public class GroupChatHub : Hub
 
                     // Отправляем ChatUpdated событие для обновления списка чатов
                     await _chatListHubContext.Clients.All.SendAsync("chatupdated", parsedChatId, mediaUrl, DateTimeOffset.UtcNow);
+
+                    await CreateNotificationsForChatMessage(
+                        parsedChatId,
+                        userId.Value,
+                        username,
+                        result.MessageId,
+                        "Отправил медиафайл"
+                    );
                 }
                 else
                 {
@@ -756,6 +740,50 @@ public class GroupChatHub : Hub
             string[] colors = { "#5865F2", "#EB459E", "#ED4245", "#FEE75C", "#57F287", "#FAA61A" };
             int index = Math.Abs(userId.GetHashCode()) % colors.Length;
             return colors[index];
+        }
+
+        private async Task CreateNotificationsForChatMessage(
+            Guid chatId,
+            Guid senderId,
+            string senderUsername,
+            Guid? messageId,
+            string previewText
+        )
+        {
+            try
+            {
+                var chat = await _chatRepository.GetByIdAsync(chatId);
+                if (chat == null) return;
+
+                var chatMembers = await _chatRepository.GetChatMembersAsync(chatId);
+                var notificationMembers = chatMembers.Where(m => m != senderId).ToList();
+                if (!notificationMembers.Any()) return;
+
+                var isGroupChat = chat.Type?.TypeName == "Group";
+                var notificationType = isGroupChat ? "group_message" : "direct_message";
+                var chatName = string.IsNullOrWhiteSpace(chat.Name) ? senderUsername : chat.Name;
+                var cleanPreview = string.IsNullOrWhiteSpace(previewText) ? "Новое сообщение" : previewText;
+                var truncatedPreview = cleanPreview.Length > 140 ? cleanPreview[..140] : cleanPreview;
+                var notificationContent = isGroupChat
+                    ? $"{senderUsername} в {chatName}: {truncatedPreview}"
+                    : $"{senderUsername}: {truncatedPreview}";
+
+                foreach (var memberId in notificationMembers)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        memberId,
+                        chatId,
+                        messageId,
+                        notificationType,
+                        notificationContent,
+                        chat.ServerId
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating notifications for chat message");
+            }
         }
 
         public async Task DeleteChat(Guid chatId)

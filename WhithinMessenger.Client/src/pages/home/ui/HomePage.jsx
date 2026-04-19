@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChatList } from '../../../widgets/chat-list';
 import { ServerList } from '../../../widgets/server-list';
@@ -9,6 +9,7 @@ import { FriendsPanel } from '../../../widgets/friends-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
 import { useServer } from '../../../entities/server/hooks';
 import { useChatList } from '../../../entities/chat';
+import { useNotifications } from '../../../entities/notification';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { SettingsModal } from '../../../shared/ui/organisms';
@@ -37,6 +38,18 @@ const HomePage = () => {
     navigate(`/channels/@me/${chatId}`);
   });
   const { createServer, servers, createConnection } = useServerContext();
+  const {
+    notifications,
+    unreadCount,
+    unreadCountByChat,
+    loading: notificationsLoading,
+    markAsRead,
+    markChatAsRead,
+    deleteNotification,
+    refreshNotifications,
+    refreshUnreadCount
+  } = useNotifications();
+  const lastAutoReadRef = useRef({ chatId: null, at: 0 });
 
   // Состояние для активного звонка в чате
   const [activeChatCall, setActiveChatCall] = useState(null);
@@ -389,6 +402,88 @@ const HomePage = () => {
     setShowNotificationsModal(false);
   }, []);
 
+  const handleOpenNotification = useCallback(async (notification) => {
+    const notificationId = notification.id || notification.Id;
+    const targetChatId = notification.chatId || notification.ChatId;
+    const targetServerId = notification.serverId || notification.ServerId;
+    const isRead = notification.isRead ?? notification.IsRead;
+    if (!isRead && notificationId) {
+      await markAsRead(notificationId);
+    }
+    setShowNotificationsModal(false);
+    if (targetChatId) {
+      if (targetServerId) {
+        navigate(`/server/${targetServerId}/channel/${targetChatId}`);
+      } else {
+        navigate(`/channels/@me/${targetChatId}`);
+      }
+    }
+  }, [markAsRead, navigate]);
+
+  const handleDeleteNotification = useCallback(async (e, notification) => {
+    e.stopPropagation();
+    const notificationId = notification.id || notification.Id;
+    if (!notificationId) return;
+    await deleteNotification(notificationId);
+  }, [deleteNotification]);
+
+  const markCurrentChatNotificationsAsRead = useCallback(async () => {
+    const currentChatId = selectedChat?.chatId || selectedChat?.chat_id;
+    if (!currentChatId) return;
+    if (document.visibilityState !== 'visible') return;
+    if (showFriends || showDiscovery || showNotificationsModal) return;
+
+    const unreadInCurrentChat = unreadCountByChat[currentChatId] || 0;
+    if (unreadInCurrentChat <= 0) return;
+
+    const now = Date.now();
+    if (
+      lastAutoReadRef.current.chatId === currentChatId &&
+      now - lastAutoReadRef.current.at < 1200
+    ) {
+      return;
+    }
+
+    lastAutoReadRef.current = { chatId: currentChatId, at: now };
+
+    try {
+      await markChatAsRead(currentChatId);
+    } catch (err) {
+      console.error('Failed to auto-mark chat notifications as read', err);
+    }
+  }, [
+    selectedChat,
+    showFriends,
+    showDiscovery,
+    showNotificationsModal,
+    unreadCountByChat,
+    markChatAsRead
+  ]);
+
+  useEffect(() => {
+    markCurrentChatNotificationsAsRead();
+  }, [markCurrentChatNotificationsAsRead]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        markCurrentChatNotificationsAsRead();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [markCurrentChatNotificationsAsRead]);
+
+  useEffect(() => {
+    if (showNotificationsModal) {
+      refreshNotifications();
+      refreshUnreadCount();
+    }
+  }, [showNotificationsModal, refreshNotifications, refreshUnreadCount]);
+
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -419,6 +514,7 @@ const HomePage = () => {
             onCreateServerClick={handleCreateServerClick}
             onSettingsClick={handleSettingsClick}
             onNotificationsClick={handleNotificationsClick}
+            unreadNotificationsCount={unreadCount}
             userId={user?.id}
           />
           <div className="content-area">
@@ -428,12 +524,14 @@ const HomePage = () => {
                 onChatSelected={handleChatSelected}
                 selectedChat={selectedChat}
                 onServerDataUpdated={handleServerDataUpdated}
+                unreadCountByChat={unreadCountByChat}
               />
             ) : (
               <ChatList 
                 onChatSelected={handleChatSelected}
                 onFriendsSelected={handleFriendsSelected}
                 selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
+                unreadCountByChat={unreadCountByChat}
               />
             )}
             <div className="main-area">
@@ -561,7 +659,53 @@ const HomePage = () => {
               </button>
             </div>
             <div className="notifications-content">
-              <p>Нет новых уведомлений</p>
+              {notificationsLoading ? (
+                <p>Загрузка уведомлений...</p>
+              ) : notifications.length === 0 ? (
+                <p>Нет новых уведомлений</p>
+              ) : (
+                <div className="notifications-list">
+                  {notifications.map((notification) => {
+                    const id = notification.id || notification.Id;
+                    const type = notification.type || notification.Type;
+                    const content = notification.content || notification.Content;
+                    const isRead = notification.isRead ?? notification.IsRead;
+                    const createdAt = notification.createdAt || notification.CreatedAt;
+                    const createdAtLabel = createdAt
+                      ? new Date(createdAt).toLocaleString('ru-RU', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit'
+                        })
+                      : '';
+                    return (
+                      <button
+                        key={id}
+                        className={`notification-item ${isRead ? 'read' : 'unread'}`}
+                        onClick={() => handleOpenNotification(notification)}
+                      >
+                        <div className="notification-item-main">
+                          <div className="notification-item-header">
+                            <span className="notification-item-type">
+                              {type === 'group_message' ? 'Группа' : 'Личное сообщение'}
+                            </span>
+                            <span className="notification-item-time">{createdAtLabel}</span>
+                          </div>
+                          <p className="notification-item-text">{content}</p>
+                        </div>
+                        <span
+                          className="notification-delete"
+                          title="Удалить уведомление"
+                          onClick={(e) => handleDeleteNotification(e, notification)}
+                        >
+                          ×
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -7,7 +7,7 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import './ChatList.css';
 
-const ChatList = ({ onChatSelected, onFriendsSelected }) => {
+const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} }) => {
   const { user } = useAuthContext();
   const location = useLocation();
   const [selectedChat, setSelectedChat] = useState(null);
@@ -98,7 +98,9 @@ const ChatList = ({ onChatSelected, onFriendsSelected }) => {
         </div>
         <ul className="chat-list">
           {chats && chats.length > 0 ? (
-            chats.map((chat, index) => (
+            chats.map((chat, index) => {
+              const unreadForChat = unreadCountByChat[chat.chatId] || unreadCountByChat[chat.chat_id] || 0;
+              return (
               <li
                 key={`${chat.chatId}-${chat.lastMessageTime}-${index}`}
                 className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''}`}
@@ -130,8 +132,14 @@ const ChatList = ({ onChatSelected, onFriendsSelected }) => {
                   </div>
                   {chat.isGroupChat && <div className="group-indicator">(Group)</div>}
                 </div>
+                {unreadForChat > 0 && (
+                  <div className="chat-unread-badge">
+                    {unreadForChat > 99 ? '99+' : unreadForChat}
+                  </div>
+                )}
               </li>
-            ))
+              );
+            })
           ) : (
             <div className="no-chats">
               <p>Нет чатов</p>

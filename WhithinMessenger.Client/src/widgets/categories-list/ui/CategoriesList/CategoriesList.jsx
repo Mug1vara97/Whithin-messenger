@@ -25,6 +25,7 @@ const isVoiceChannelChat = (chat) => {
 const CategoriesList = ({ 
   categories = [],
   selectedChat,
+  unreadCountByChat = {},
   onChatClick,
   onAddChannel,
   onChannelContextMenu,
@@ -423,11 +424,15 @@ const CategoriesList = ({
                   {...provided.droppableProps}
                   className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
                 >
-                  {uncategorizedChannels.map((channel, index) => (
+                  {uncategorizedChannels.map((channel, index) => {
+                    const channelId = channel.chatId || channel.ChatId;
+                    const unreadCount = unreadCountByChat[channelId] || 0;
+                    return (
                     <ChannelItem
                       key={channel.chatId || channel.ChatId}
                       channel={channel}
                       index={index}
+                      unreadCount={unreadCount}
                       isActive={isChannelActive(channel)}
                       onClick={handleChatClick}
                       onContextMenu={(e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })}
@@ -436,7 +441,8 @@ const CategoriesList = ({
                       userId={userId}
                       userName={userName}
                     />
-                  ))}
+                    );
+                  })}
                   {provided.placeholder}
                 </div>
               )}
@@ -453,11 +459,15 @@ const CategoriesList = ({
                 onCategoryContextMenu={handleCategoryContextMenu}
                 isDragDisabled={false}
               >
-                {category.chats?.map((channel, channelIndex) => (
+                {category.chats?.map((channel, channelIndex) => {
+                  const channelId = channel.chatId || channel.ChatId;
+                  const unreadCount = unreadCountByChat[channelId] || 0;
+                  return (
                   <ChannelItem
                     key={channel.chatId || channel.ChatId}
                     channel={channel}
                     index={channelIndex}
+                    unreadCount={unreadCount}
                     isActive={isChannelActive(channel)}
                     onClick={handleChatClick}
                     onContextMenu={(e) => handleChannelContextMenu(e, channel, category)}
@@ -466,7 +476,8 @@ const CategoriesList = ({
                     userId={userId}
                     userName={userName}
                   />
-                )) || (
+                  );
+                }) || (
                   <div className="no-channels">
                     <p>Нет каналов в этой категории</p>
                   </div>

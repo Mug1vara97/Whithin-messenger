@@ -108,19 +108,22 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly IUserRepository _userRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
 
     public CreateChatCommandHandler(
         IChatRepository chatRepository,
         ICategoryRepository categoryRepository,
         IChatMemberRepository chatMemberRepository,
         IUserRepository userRepository,
-        IServerRepository serverRepository)
+        IServerRepository serverRepository,
+        IServerMemberRepository serverMemberRepository)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
         _chatMemberRepository = chatMemberRepository;
         _userRepository = userRepository;
         _serverRepository = serverRepository;
+        _serverMemberRepository = serverMemberRepository;
     }
 
     public async Task<CreateChatResult> Handle(CreateChatCommand request, CancellationToken cancellationToken)
@@ -206,6 +209,40 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 }
                 if (membersToAdd.Count > 0)
                     await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
+            }
+            else if (!request.IsPrivate)
+            {
+                // Public channels must include all current server members.
+                var serverMembers = await _serverMemberRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
+                var uniqueUserIds = serverMembers
+                    .Select(sm => sm.UserId)
+                    .Distinct()
+                    .ToList();
+
+                var membersToAdd = new List<Member>();
+                var chatLoaded = await _chatRepository.GetByIdAsync(chat.Id, cancellationToken);
+                if (chatLoaded == null) chatLoaded = chat;
+
+                foreach (var uid in uniqueUserIds)
+                {
+                    var appUser = await _userRepository.GetByIdAsync(uid, cancellationToken);
+                    if (appUser == null) continue;
+
+                    membersToAdd.Add(new Member
+                    {
+                        Id = Guid.NewGuid(),
+                        ChatId = chat.Id,
+                        UserId = uid,
+                        JoinedAt = DateTimeOffset.UtcNow,
+                        Chat = chatLoaded,
+                        User = appUser
+                    });
+                }
+
+                if (membersToAdd.Count > 0)
+                {
+                    await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
+                }
             }
 
             var result = new

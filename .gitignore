@@ -213,3 +213,7 @@ coverage/
 !**/backups/.gitkeep
 !**/ssl/.gitkeep
 
+## Android
+
+Whithin-android/
+

@@ -18,6 +18,7 @@ public class NotificationDto
 {
     public Guid Id { get; init; }
     public Guid ChatId { get; init; }
+    public Guid? ServerId { get; init; }
     public Guid? MessageId { get; init; }
     public string Type { get; init; } = string.Empty;
     public string Content { get; init; } = string.Empty;

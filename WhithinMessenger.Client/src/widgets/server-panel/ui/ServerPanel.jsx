@@ -27,7 +27,8 @@ const ServerPanel = ({
   selectedServer, 
   onChatSelected, 
   selectedChat,
-  onServerDataUpdated
+  onServerDataUpdated,
+  unreadCountByChat = {}
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
@@ -1065,6 +1066,7 @@ const ServerPanel = ({
         <CategoriesList
           categories={memoizedCategories}
           selectedChat={selectedChat}
+          unreadCountByChat={unreadCountByChat}
           onChatClick={handleChatClick}
           onAddChannel={handleAddChannel}
           onChannelContextMenu={(e, channel, category) => handleContextMenu(e, 'channel', { channel, category })}

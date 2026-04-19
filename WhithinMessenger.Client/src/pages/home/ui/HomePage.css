@@ -194,6 +194,90 @@
   color: var(--text-secondary, #8e9297);
 }
 
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.notification-item {
+  width: 100%;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.notification-item:hover {
+  border-color: var(--primary, #5865f2);
+  transform: translateY(-1px);
+}
+
+.notification-item.unread {
+  border-color: #5865f2;
+  background: rgba(88, 101, 242, 0.12);
+}
+
+.notification-item.read {
+  opacity: 0.85;
+}
+
+.notification-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.notification-item-type {
+  font-size: 12px;
+  color: var(--primary, #5865f2);
+  font-weight: 600;
+}
+
+.notification-item-time {
+  font-size: 12px;
+  color: var(--text-secondary, #8e9297);
+}
+
+.notification-item-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text, #dcddde);
+  word-break: break-word;
+}
+
+.notification-delete {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #8e9297);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.notification-delete:hover {
+  background: rgba(240, 71, 71, 0.18);
+  color: #f04747;
+}
+
 /* Стили для голосового канала */
 .voice-channel-container {
   display: flex;

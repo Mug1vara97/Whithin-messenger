@@ -13,6 +13,21 @@ export const useChat = (chatId, username, userId) => {
   const messagesEndRef = useRef(null);
   const currentChatIdRef = useRef(null);
 
+  const normalizeMessage = useCallback((msg) => {
+    if (!msg) return null;
+    return {
+      messageId: msg.messageId ?? msg.MessageId ?? msg.id ?? msg.Id,
+      senderUsername: msg.senderUsername ?? msg.SenderUsername ?? msg.username ?? msg.UserName ?? '',
+      content: msg.content ?? msg.Content ?? '',
+      avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
+      avatarColor: msg.avatarColor ?? msg.AvatarColor ?? null,
+      repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
+      forwardedMessage: msg.forwardedMessage ?? msg.ForwardedMessage ?? null,
+      createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
+      mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? []
+    };
+  }, []);
+
   useEffect(() => {
     const connect = async () => {
       if (!chatId || !userId) return;
@@ -37,21 +52,11 @@ export const useChat = (chatId, username, userId) => {
         setIsConnected(true);
 
         newConnection.on('ReceiveMessages', (messages) => {
-          const processedMessages = messages.map((msg) => {
-            
-            return {
-              messageId: msg.messageId,
-              senderUsername: msg.senderUsername,
-              content: msg.content,
-              avatarUrl: msg.avatarUrl,
-              avatarColor: msg.avatarColor,
-              repliedMessage: msg.repliedMessage || null,
-              forwardedMessage: msg.forwardedMessage || null,
-              createdAt: msg.createdAt,
-              mediaFiles: msg.mediaFiles || []
-            };
-          });
-          
+          const source = Array.isArray(messages) ? messages : [];
+          const processedMessages = source
+            .map(normalizeMessage)
+            .filter(Boolean);
+
           setMessages(processedMessages);
         });
 
@@ -116,18 +121,9 @@ export const useChat = (chatId, username, userId) => {
   useEffect(() => {
     if (connection) {
       const receiveMessageHandler = async (messageData) => {
-        const newMessage = {
-          messageId: messageData.messageId,
-          senderUsername: messageData.username,
-          content: messageData.content,
-          createdAt: new Date().toISOString(),
-          avatarUrl: messageData.avatarUrl,
-          avatarColor: messageData.avatarColor,
-          repliedMessage: messageData.repliedMessage || null,
-          forwardedMessage: messageData.forwardedMessage || null,
-          mediaFiles: messageData.mediaFiles || []
-        };
-        
+        const newMessage = normalizeMessage(messageData);
+        if (!newMessage) return;
+
         setMessages(prev => [...prev, newMessage]);
       };
 
@@ -156,7 +152,7 @@ export const useChat = (chatId, username, userId) => {
         connection.off('Error');
       };
     }
-  }, [connection]);
+  }, [connection, normalizeMessage]);
 
   useEffect(() => {
     if (messages.length > 0) {

@@ -88,6 +88,29 @@
   height: 20px;
 }
 
+.notification-button {
+  position: relative;
+  overflow: visible;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ed4245;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #1e1f22;
+}
+
 .create-button {
   background-color: var(--background, #2f3136);
   color: var(--success, #43b581);

@@ -18,7 +18,14 @@ public class NotificationService : INotificationService
         _notificationHub = notificationHub;
     }
 
-    public async Task CreateNotificationAsync(Guid userId, Guid chatId, Guid? messageId, string type, string content, CancellationToken cancellationToken = default)
+    public async Task CreateNotificationAsync(
+        Guid userId,
+        Guid chatId,
+        Guid? messageId,
+        string type,
+        string content,
+        Guid? serverId = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -40,6 +47,7 @@ public class NotificationService : INotificationService
             {
                 notificationId = notification.Id,
                 chatId = notification.ChatId,
+                serverId = serverId,
                 messageId = notification.MessageId,
                 type = notification.Type,
                 content = notification.Content,

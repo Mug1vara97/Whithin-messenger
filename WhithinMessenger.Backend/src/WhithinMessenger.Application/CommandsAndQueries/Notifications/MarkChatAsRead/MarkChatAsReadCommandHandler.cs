@@ -25,12 +25,17 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
     {
         try
         {
+            var unreadBefore = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationRepository.MarkChatAsReadAsync(request.ChatId, request.UserId, cancellationToken);
 
             var unreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync("UnreadCountChanged", unreadCount, cancellationToken);
 
-            return new MarkChatAsReadResult { Success = true };
+            return new MarkChatAsReadResult
+            {
+                Success = true,
+                MarkedCount = Math.Max(0, unreadBefore - unreadCount)
+            };
         }
         catch (Exception ex)
         {

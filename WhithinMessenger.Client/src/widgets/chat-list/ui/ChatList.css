@@ -215,6 +215,23 @@
   line-height: 1.2;
 }
 
+.chat-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: 999px;
+  background-color: #ed4245;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 /* Состояние "нет чатов" */
 .no-chats {
   padding: 20px;

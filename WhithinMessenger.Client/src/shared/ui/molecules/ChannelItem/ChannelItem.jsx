@@ -29,6 +29,7 @@ const areParticipantsEqual = (a, b) => {
 const ChannelItem = ({ 
   channel,
   index,
+  unreadCount = 0,
   isActive,
   onClick,
   onContextMenu,
@@ -175,6 +176,11 @@ const ChannelItem = ({
               {getChannelName()}
               {isPrivate && <FaLock className="private-channel-icon" title="Приватный канал" />}
             </span>
+            {unreadCount > 0 && !isActive && (
+              <span className="channel-unread-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
             <div className="channel-settings">
               <button
                 className="settings-button"

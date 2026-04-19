@@ -45,7 +45,7 @@ class AudioNotificationManager {
   async loadSounds() {
     try {
       // Загружаем звук подключения пользователя
-      const userJoinedResponse = await fetch('/user-joined.mp3');
+      const userJoinedResponse = await fetch('/patriot.mp3');
       if (userJoinedResponse.ok) {
         const userJoinedArrayBuffer = await userJoinedResponse.arrayBuffer();
         this.sounds.userJoined = await this.audioContext.decodeAudioData(userJoinedArrayBuffer);

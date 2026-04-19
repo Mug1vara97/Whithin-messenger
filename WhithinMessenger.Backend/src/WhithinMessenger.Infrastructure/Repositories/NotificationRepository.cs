@@ -44,6 +44,7 @@ public class NotificationRepository : INotificationRepository
             {
                 Id = n.Id,
                 ChatId = n.ChatId,
+                ServerId = n.Chat.ServerId,
                 MessageId = n.MessageId,
                 Type = n.Type,
                 Content = n.Content,
