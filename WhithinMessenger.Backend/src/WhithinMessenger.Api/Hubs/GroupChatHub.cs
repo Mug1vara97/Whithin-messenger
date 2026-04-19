@@ -28,6 +28,7 @@ public class GroupChatHub : Hub
     private readonly ILogger<GroupChatHub> _logger;
     private readonly INotificationService _notificationService;
     private readonly IChatRepository _chatRepository;
+    private readonly IMessageRepository _messageRepository;
 
     public GroupChatHub(
         IMediator mediator,
@@ -35,7 +36,8 @@ public class GroupChatHub : Hub
         IHttpContextAccessor httpContextAccessor,
         ILogger<GroupChatHub> logger,
         INotificationService notificationService,
-        IChatRepository chatRepository)
+        IChatRepository chatRepository,
+        IMessageRepository messageRepository)
     {
         _mediator = mediator;
         _chatListHubContext = chatListHubContext;
@@ -43,6 +45,7 @@ public class GroupChatHub : Hub
         _logger = logger;
         _notificationService = notificationService;
         _chatRepository = chatRepository;
+        _messageRepository = messageRepository;
     }
 
         public async Task JoinGroup(string chatId)
@@ -778,6 +781,10 @@ public class GroupChatHub : Hub
                         notificationContent,
                         chat.ServerId
                     );
+
+                    var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, memberId);
+                    await _chatListHubContext.Clients.Group($"user-{memberId}")
+                        .SendAsync("chatunreadupdated", chatId, unreadCount);
                 }
             }
             catch (Exception ex)

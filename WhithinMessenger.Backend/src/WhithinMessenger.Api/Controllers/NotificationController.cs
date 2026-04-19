@@ -1,11 +1,14 @@
 using MediatR;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Mvc;
+using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.DeleteNotification;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.GetNotifications;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.GetUnreadCount;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.MarkAsRead;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.MarkChatAsRead;
 using WhithinMessenger.Api.Attributes;
+using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -15,10 +18,17 @@ namespace WhithinMessenger.Api.Controllers;
 public class NotificationController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IMessageRepository _messageRepository;
+    private readonly IHubContext<ChatListHub> _chatListHub;
 
-    public NotificationController(IMediator mediator)
+    public NotificationController(
+        IMediator mediator,
+        IMessageRepository messageRepository,
+        IHubContext<ChatListHub> chatListHub)
     {
         _mediator = mediator;
+        _messageRepository = messageRepository;
+        _chatListHub = chatListHub;
     }
 
     [HttpGet]
@@ -90,6 +100,10 @@ public class NotificationController : ControllerBase
         {
             return BadRequest(new { error = result.ErrorMessage });
         }
+
+        var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, userId.Value);
+        await _chatListHub.Clients.Group($"user-{userId.Value}")
+            .SendAsync("chatunreadupdated", chatId, unreadCount);
 
         return Ok(new { message = $"Marked {result.MarkedCount} notifications as read" });
     }

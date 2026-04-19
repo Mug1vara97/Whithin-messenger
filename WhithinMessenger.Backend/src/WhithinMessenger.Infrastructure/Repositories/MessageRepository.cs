@@ -69,6 +69,42 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 await _context.SaveChangesAsync(cancellationToken);
             }
         }
+
+        public async Task<int> GetUnreadCountByChatAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Messages
+                .Where(m => m.ChatId == chatId && m.UserId != userId)
+                .Where(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
+                .CountAsync(cancellationToken);
+        }
+
+        public async Task MarkChatAsReadAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            var unreadMessageIds = await _context.Messages
+                .Where(m => m.ChatId == chatId && m.UserId != userId)
+                .Where(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
+                .Select(m => m.Id)
+                .ToListAsync(cancellationToken);
+
+            if (unreadMessageIds.Count == 0)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var readRows = unreadMessageIds.Select(messageId => new MessageRead
+            {
+                Id = Guid.NewGuid(),
+                MessageId = messageId,
+                UserId = userId,
+                ReadAt = now,
+                Message = null!,
+                User = null!
+            });
+
+            await _context.MessageReads.AddRangeAsync(readRows, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }
 

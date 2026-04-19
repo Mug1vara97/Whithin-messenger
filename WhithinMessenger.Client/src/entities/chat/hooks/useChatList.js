@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
 import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
@@ -11,6 +11,9 @@ export const useChatList = (userId, onChatCreated = null) => {
   const [isLoading] = useState(false);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const normalizeUnreadCount = useCallback((chat) => {
+    return chat?.unreadCount ?? chat?.UnreadCount ?? chat?.unread_count ?? 0;
+  }, []);
   const connectionRef = useRef(null);
 
 
@@ -174,6 +177,16 @@ export const useChatList = (userId, onChatCreated = null) => {
       });
     };
 
+    const handleChatUnreadUpdated = (chatId, unreadCount) => {
+      setChats(prevChats =>
+        prevChats.map(chat =>
+          chat.chatId === chatId
+            ? { ...chat, unreadCount }
+            : chat
+        )
+      );
+    };
+
     const handleError = (errorMessage) => {
       console.error('SignalR error:', errorMessage);
     };
@@ -184,6 +197,7 @@ export const useChatList = (userId, onChatCreated = null) => {
     connection.off("privatechatcreated", handlePrivateChatCreated);
     connection.off("chatdeleted", handleChatDeleted);
     connection.off("chatupdated", handleChatUpdated);
+    connection.off("chatunreadupdated", handleChatUnreadUpdated);
     connection.off("error", handleError);
 
     connection.on("receivechats", handleReceiveChats);
@@ -192,6 +206,7 @@ export const useChatList = (userId, onChatCreated = null) => {
     connection.on("privatechatcreated", handlePrivateChatCreated);
     connection.on("chatdeleted", handleChatDeleted);
     connection.on("chatupdated", handleChatUpdated);
+    connection.on("chatunreadupdated", handleChatUnreadUpdated);
     
     connection.on("error", handleError);
 
@@ -202,6 +217,7 @@ export const useChatList = (userId, onChatCreated = null) => {
       connection.off("privatechatcreated", handlePrivateChatCreated);
       connection.off("chatdeleted", handleChatDeleted);
       connection.off("chatupdated", handleChatUpdated);
+      connection.off("chatunreadupdated", handleChatUnreadUpdated);
       connection.off("error", handleError);
     };
   }, [connection, userId]);
@@ -260,8 +276,18 @@ export const useChatList = (userId, onChatCreated = null) => {
     throw new Error('Group chat creation not implemented yet');
   }, []);
 
+  const unreadCountByChat = useMemo(() => {
+    return chats.reduce((acc, chat) => {
+      const chatId = chat.chatId || chat.chat_id;
+      if (!chatId) return acc;
+      acc[chatId] = normalizeUnreadCount(chat);
+      return acc;
+    }, {});
+  }, [chats, normalizeUnreadCount]);
+
   return {
     chats,
+    unreadCountByChat,
     searchResults,
     isSearching,
     isLoading,

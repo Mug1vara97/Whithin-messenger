@@ -59,7 +59,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         .Where(m => m.ChatId == c.Id)
                         .OrderByDescending(m => m.CreatedAt)
                         .Select(m => m.CreatedAt)
-                        .FirstOrDefault()
+                        .FirstOrDefault(),
+                    UnreadCount = _context.Messages
+                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
+                        .Count(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
                 })
                 .ToListAsync(cancellationToken);
 
@@ -84,7 +87,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         .Where(m => m.ChatId == c.Id)
                         .OrderByDescending(m => m.CreatedAt)
                         .Select(m => m.CreatedAt)
-                        .FirstOrDefault()
+                        .FirstOrDefault(),
+                    UnreadCount = _context.Messages
+                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
+                        .Count(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
                 })
                 .ToListAsync(cancellationToken);
 

@@ -34,14 +34,13 @@ const HomePage = () => {
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
-  const { chats, createPrivateChat } = useChatList(user?.id || null, (chatId) => {
+  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat } = useChatList(user?.id || null, (chatId) => {
     navigate(`/channels/@me/${chatId}`);
   });
   const { createServer, servers, createConnection } = useServerContext();
   const {
     notifications,
     unreadCount,
-    unreadCountByChat,
     loading: notificationsLoading,
     markAsRead,
     markChatAsRead,
@@ -433,7 +432,7 @@ const HomePage = () => {
     if (document.visibilityState !== 'visible') return;
     if (showFriends || showDiscovery || showNotificationsModal) return;
 
-    const unreadInCurrentChat = unreadCountByChat[currentChatId] || 0;
+    const unreadInCurrentChat = messageUnreadCountByChat[currentChatId] || 0;
     if (unreadInCurrentChat <= 0) return;
 
     const now = Date.now();
@@ -456,7 +455,7 @@ const HomePage = () => {
     showFriends,
     showDiscovery,
     showNotificationsModal,
-    unreadCountByChat,
+    messageUnreadCountByChat,
     markChatAsRead
   ]);
 
@@ -524,14 +523,14 @@ const HomePage = () => {
                 onChatSelected={handleChatSelected}
                 selectedChat={selectedChat}
                 onServerDataUpdated={handleServerDataUpdated}
-                unreadCountByChat={unreadCountByChat}
+                unreadCountByChat={messageUnreadCountByChat}
               />
             ) : (
               <ChatList 
                 onChatSelected={handleChatSelected}
                 onFriendsSelected={handleFriendsSelected}
                 selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
-                unreadCountByChat={unreadCountByChat}
+                unreadCountByChat={messageUnreadCountByChat}
               />
             )}
             <div className="main-area">

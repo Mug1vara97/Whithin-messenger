@@ -32,6 +32,7 @@ namespace WhithinMessenger.Domain.Interfaces
         public bool IsGroupChat { get; init; }
         public string? LastMessage { get; init; }
         public DateTimeOffset LastMessageTime { get; init; }
+        public int UnreadCount { get; init; }
     }
 
     public interface ICreatePrivateChatResult
