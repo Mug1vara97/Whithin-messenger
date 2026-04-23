@@ -131,6 +131,7 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       isScreenShareTransitioning: false,
+      screenShareSessionId: 0,
       screenShareStream: null,
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
@@ -2396,6 +2397,7 @@ export const useCallStore = create(
             peerIdToUserIdMap: new Map(),
             remoteScreenShares: new Map(),
             isScreenShareTransitioning: false,
+            screenShareSessionId: 0,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2519,6 +2521,7 @@ export const useCallStore = create(
             audioContext: null,
             connecting: false,
             isScreenShareTransitioning: false,
+            screenShareSessionId: 0,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2541,6 +2544,8 @@ export const useCallStore = create(
         set({ isScreenShareTransitioning: true });
         try {
           const state = get();
+          const screenShareSessionId = Date.now();
+          set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
           if (state.isScreenSharing) {
@@ -2580,10 +2585,18 @@ export const useCallStore = create(
                 publication.track.on('ended', () => {
                   console.log('Screen sharing stopped by user');
                   const currentState = get();
-                  if (currentState.localScreenTrackId === localScreenTrackId) {
+                  // Guard by session id to ignore stale ended events from previous shares.
+                  if (
+                    currentState.screenShareSessionId === screenShareSessionId &&
+                    currentState.localScreenTrackId === localScreenTrackId
+                  ) {
                     get().stopScreenShare();
                   } else {
-                    console.log('Ignoring stale screen-share ended event:', localScreenTrackId);
+                    console.log('Ignoring stale screen-share ended event:', {
+                      localScreenTrackId,
+                      callbackSessionId: screenShareSessionId,
+                      currentSessionId: currentState.screenShareSessionId
+                    });
                   }
                 });
               }
@@ -2653,6 +2666,7 @@ export const useCallStore = create(
 
           // Очищаем состояние
           set({
+            screenShareSessionId: 0,
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
