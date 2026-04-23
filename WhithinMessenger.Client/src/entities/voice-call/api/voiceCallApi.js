@@ -320,8 +320,13 @@ class VoiceCallApi {
               console.log('🔍 Found existing remote participant:', participant.identity);
               // Check for existing subscribed tracks
               participant.trackPublications.forEach((publication) => {
-                if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
-                  console.log('🔍 Found existing subscribed audio track for participant:', participant.identity);
+                const hasActiveTrack = publication.isSubscribed &&
+                  publication.track &&
+                  publication.track.mediaStreamTrack &&
+                  publication.track.mediaStreamTrack.readyState !== 'ended';
+
+                if (hasActiveTrack) {
+                  console.log('🔍 Found existing subscribed track for participant:', participant.identity, publication.kind);
                   console.log('🔍 Track details:', {
                     trackSid: publication.trackSid,
                     hasTrack: !!publication.track,
@@ -474,8 +479,13 @@ class VoiceCallApi {
       
       // Check for existing tracks that are already subscribed
       participant.trackPublications.forEach((publication) => {
-        if (publication.kind === Track.Kind.Audio && publication.isSubscribed && publication.track) {
-          console.log('Found existing subscribed audio track for participant:', participant.identity);
+        const hasActiveTrack = publication.isSubscribed &&
+          publication.track &&
+          publication.track.mediaStreamTrack &&
+          publication.track.mediaStreamTrack.readyState !== 'ended';
+
+        if (hasActiveTrack) {
+          console.log('Found existing subscribed track for participant:', participant.identity, publication.kind);
           // Emit trackSubscribed event for existing tracks
           this.emit('trackSubscribed', {
             track: publication.track,
@@ -642,7 +652,14 @@ class VoiceCallApi {
 
   off(event, callback) {
     if (!this.eventHandlers.has(event)) return;
-    
+
+    // If callback is not provided, remove all handlers for event.
+    // callStore cleanup relies on this shorthand.
+    if (!callback) {
+      this.eventHandlers.set(event, []);
+      return;
+    }
+
     const handlers = this.eventHandlers.get(event);
     const index = handlers.indexOf(callback);
     if (index > -1) {

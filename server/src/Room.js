@@ -141,14 +141,6 @@ class Room {
             // Удаляем из screenProducers
             this.screenProducers.delete(producerId);
       
-            // Уведомляем всех пиров о закрытом producer
-            console.log('Broadcasting producerClosed event to all peers for screen sharing');
-            const eventData = {
-              producerId,
-              producerSocketId: producerData.peerId,
-              mediaType: 'screen'
-            };
-            this.io.to(this.id).emit('producerClosed', eventData);
           }
           
           // Закрываем producer если он все еще открыт
@@ -167,6 +159,7 @@ class Room {
           const finalEventData = {
             producerId,
             producerSocketId: producerData.peerId,
+            kind: producerData.producer.kind,
             mediaType: producerData.producer.appData?.mediaType
           };
           this.io.to(this.id).emit('producerClosed', finalEventData);

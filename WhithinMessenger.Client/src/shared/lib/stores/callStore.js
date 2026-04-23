@@ -131,11 +131,13 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       screenShareStream: null,
+      localScreenTrackPublishedHandler: null,
       remoteScreenShares: new Map(),
       
   // Состояние вебкамеры
   isVideoEnabled: false,
   cameraStream: null, // Отдельный поток для вебкамеры
+  localCameraTrackPublishedHandler: null,
   videoProducer: null, // Демонстрации экрана от других пользователей (producerId -> data)
       
       // WebRTC соединения (хранятся глобально)
@@ -485,6 +487,8 @@ export const useCallStore = create(
           voiceCallApi.off('peerLeft');
           voiceCallApi.off('peerMuteStateChanged');
           voiceCallApi.off('peerAudioStateChanged');
+          voiceCallApi.off('trackSubscribed');
+          voiceCallApi.off('peerVideoStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
@@ -751,6 +755,11 @@ export const useCallStore = create(
               console.error('callStore: Track has no mediaStreamTrack!', track);
               return;
             }
+
+            if (track.mediaStreamTrack.readyState === 'ended') {
+              console.log('🔊 callStore: Ignoring ended track in subscription handler:', track.sid);
+              return;
+            }
             
             const state = get();
             const targetUserId = userId || participant.identity;
@@ -772,6 +781,15 @@ export const useCallStore = create(
                 console.log('🖥️ callStore: Remote screen share detected for user:', targetUserId);
                 
                 const newRemoteScreenShares = new Map(state.remoteScreenShares);
+                // Keep only one active screen share stream per remote user.
+                for (const [key, value] of newRemoteScreenShares.entries()) {
+                  if (value.userId === targetUserId || value.socketId === participant.identity) {
+                    if (value.stream) {
+                      value.stream.getTracks().forEach(trackItem => trackItem.stop());
+                    }
+                    newRemoteScreenShares.delete(key);
+                  }
+                }
                 newRemoteScreenShares.set(track.sid, {
                   stream: videoStream,
                   producerId: track.sid,
@@ -1025,17 +1043,28 @@ export const useCallStore = create(
             }));
             
             // Проверяем, является ли это демонстрацией экрана
-            const screenShare = state.remoteScreenShares.get(producerId);
-            if (screenShare) {
-              console.log('Screen share producer closed:', producerId);
-              // Останавливаем поток
-              if (screenShare.stream) {
-                screenShare.stream.getTracks().forEach(track => track.stop());
-              }
-              // Удаляем из Map
+            if (mediaType === 'screen') {
               const newRemoteScreenShares = new Map(state.remoteScreenShares);
-              newRemoteScreenShares.delete(producerId);
-              set({ remoteScreenShares: newRemoteScreenShares });
+              let removedCount = 0;
+
+              for (const [screenShareId, screenShare] of newRemoteScreenShares.entries()) {
+                const matchesProducer = screenShareId === producerId;
+                const matchesSocket = producerSocketId &&
+                  (screenShare.socketId === producerSocketId || screenShare.userId === producerSocketId);
+
+                if (matchesProducer || matchesSocket) {
+                  if (screenShare.stream) {
+                    screenShare.stream.getTracks().forEach(track => track.stop());
+                  }
+                  newRemoteScreenShares.delete(screenShareId);
+                  removedCount += 1;
+                }
+              }
+
+              if (removedCount > 0) {
+                console.log('Screen share producer closed, removed shares:', removedCount);
+                set({ remoteScreenShares: newRemoteScreenShares });
+              }
             }
             
             // Проверяем, является ли это вебкамерой (video producer с mediaType camera)
@@ -2363,7 +2392,9 @@ export const useCallStore = create(
             audioElements: new Map(),
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
-            remoteScreenShares: new Map()
+            remoteScreenShares: new Map(),
+            localScreenTrackPublishedHandler: null,
+            localCameraTrackPublishedHandler: null
           });
           
           console.log('leaveRoom: Left room successfully, connection preserved');
@@ -2389,6 +2420,8 @@ export const useCallStore = create(
           voiceCallApi.off('peerLeft');
           voiceCallApi.off('peerMuteStateChanged');
           voiceCallApi.off('peerAudioStateChanged');
+          voiceCallApi.off('trackSubscribed');
+          voiceCallApi.off('peerVideoStateChanged');
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
@@ -2480,7 +2513,9 @@ export const useCallStore = create(
             localStream: null,
             noiseSuppressionManager: null,
             audioContext: null,
-            connecting: false
+            connecting: false,
+            localScreenTrackPublishedHandler: null,
+            localCameraTrackPublishedHandler: null
           });
           
           console.log('Call ended successfully');
@@ -2508,15 +2543,24 @@ export const useCallStore = create(
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
           if (room) {
+            if (state.localScreenTrackPublishedHandler) {
+              room.off(RoomEvent.LocalTrackPublished, state.localScreenTrackPublishedHandler);
+            }
+
             // Listen for local track published event to get the stream
             const handleLocalTrackPublished = (publication) => {
               // Check if it's a screen share track
               const isScreenShare = publication.source === 'screen_share' || 
                                    publication.source === 2; // Track.Source.ScreenShare = 2
               
-              if (isScreenShare && publication.track) {
+              const isActiveTrack = publication.track?.mediaStreamTrack?.readyState !== 'ended';
+
+              if (isScreenShare && publication.track && isActiveTrack) {
                 const stream = new MediaStream([publication.track.mediaStreamTrack]);
-                set({ screenShareStream: stream, isScreenSharing: true });
+                set({
+                  screenShareStream: stream,
+                  isScreenSharing: true
+                });
                 
                 // Handle track ended
                 publication.track.on('ended', () => {
@@ -2536,7 +2580,8 @@ export const useCallStore = create(
             });
             
             // Listen for new screen share tracks
-            room.on('LocalTrackPublished', handleLocalTrackPublished);
+            room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+            set({ localScreenTrackPublishedHandler: handleLocalTrackPublished });
           }
           
           set({ isScreenSharing: true });
@@ -2570,6 +2615,11 @@ export const useCallStore = create(
 
         try {
           const state = get();
+          const room = voiceCallApi.getRoom();
+
+          if (room && state.localScreenTrackPublishedHandler) {
+            room.off(RoomEvent.LocalTrackPublished, state.localScreenTrackPublishedHandler);
+          }
           
           // Use LiveKit API to stop screen share
           await voiceCallApi.setScreenShareEnabled(false);
@@ -2582,7 +2632,8 @@ export const useCallStore = create(
           // Очищаем состояние
           set({
             screenShareStream: null,
-            isScreenSharing: false
+            isScreenSharing: false,
+            localScreenTrackPublishedHandler: null
           });
 
           console.log('Screen sharing stopped successfully');
@@ -2638,13 +2689,19 @@ export const useCallStore = create(
           // Get the camera stream from LiveKit room
           const room = voiceCallApi.getRoom();
           if (room) {
+            if (state.localCameraTrackPublishedHandler) {
+              room.off(RoomEvent.LocalTrackPublished, state.localCameraTrackPublishedHandler);
+            }
+
             // Listen for local track published event to get the stream
             const handleLocalTrackPublished = (publication) => {
               // Check if it's a camera track
               const isCamera = publication.source === 'camera' || 
                               publication.source === 1; // Track.Source.Camera = 1
               
-              if (isCamera && publication.track) {
+              const isActiveTrack = publication.track?.mediaStreamTrack?.readyState !== 'ended';
+
+              if (isCamera && publication.track && isActiveTrack) {
                 const stream = new MediaStream([publication.track.mediaStreamTrack]);
                 set({ cameraStream: stream, isVideoEnabled: true });
                 
@@ -2674,6 +2731,7 @@ export const useCallStore = create(
             
             // Listen for new camera tracks
             room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+            set({ localCameraTrackPublishedHandler: handleLocalTrackPublished });
           }
           
           set({ isVideoEnabled: true });
@@ -2689,6 +2747,10 @@ export const useCallStore = create(
         console.log('🎥🎥🎥 STOP VIDEO START 🎥🎥🎥');
         try {
           const state = get();
+          const room = voiceCallApi.getRoom();
+          if (room && state.localCameraTrackPublishedHandler) {
+            room.off(RoomEvent.LocalTrackPublished, state.localCameraTrackPublishedHandler);
+          }
         console.log('🎥 Current state before stop:', {
           isVideoEnabled: state.isVideoEnabled,
           hasVideoProducer: !!state.videoProducer,
@@ -2760,7 +2822,8 @@ export const useCallStore = create(
             isVideoEnabled: false,
             videoProducer: null,
             cameraStream: null,
-            cameraAudioProducer: null
+            cameraAudioProducer: null,
+            localCameraTrackPublishedHandler: null
           });
           
           // Обновляем отдельное состояние веб-камеры для текущего пользователя
