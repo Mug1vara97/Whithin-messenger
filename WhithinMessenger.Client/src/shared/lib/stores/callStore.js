@@ -131,6 +131,7 @@ export const useCallStore = create(
       // Состояние демонстрации экрана
       isScreenSharing: false,
       screenShareStream: null,
+      localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
       remoteScreenShares: new Map(),
       
@@ -2393,6 +2394,7 @@ export const useCallStore = create(
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
             remoteScreenShares: new Map(),
+            localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
           });
@@ -2514,6 +2516,7 @@ export const useCallStore = create(
             noiseSuppressionManager: null,
             audioContext: null,
             connecting: false,
+            localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
           });
@@ -2556,16 +2559,23 @@ export const useCallStore = create(
               const isActiveTrack = publication.track?.mediaStreamTrack?.readyState !== 'ended';
 
               if (isScreenShare && publication.track && isActiveTrack) {
+                const localScreenTrackId = publication.track.mediaStreamTrack?.id || publication.track.sid;
                 const stream = new MediaStream([publication.track.mediaStreamTrack]);
                 set({
                   screenShareStream: stream,
-                  isScreenSharing: true
+                  isScreenSharing: true,
+                  localScreenTrackId
                 });
                 
                 // Handle track ended
                 publication.track.on('ended', () => {
                   console.log('Screen sharing stopped by user');
-                  get().stopScreenShare();
+                  const currentState = get();
+                  if (currentState.localScreenTrackId === localScreenTrackId) {
+                    get().stopScreenShare();
+                  } else {
+                    console.log('Ignoring stale screen-share ended event:', localScreenTrackId);
+                  }
                 });
               }
             };
@@ -2631,6 +2641,7 @@ export const useCallStore = create(
 
           // Очищаем состояние
           set({
+            localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
             localScreenTrackPublishedHandler: null

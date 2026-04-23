@@ -618,6 +618,19 @@ class VoiceCallApi {
     }
     
     if (enabled) {
+      // Defensive cleanup for stale publications before enabling a new share.
+      const hasActiveOrStaleScreenPublication = Array.from(
+        this.room.localParticipant.videoTrackPublications.values()
+      ).some((publication) => publication.source === Track.Source.ScreenShare);
+
+      if (hasActiveOrStaleScreenPublication) {
+        try {
+          await this.room.localParticipant.setScreenShareEnabled(false);
+        } catch (error) {
+          console.warn('Failed to disable previous screen share before re-enable:', error);
+        }
+      }
+
       // Демонстрация экрана: 1080p, VP9/SVC, стабильное качество (порядок слоёв от низкого к высокому)
       await this.room.localParticipant.setScreenShareEnabled(
         true,
