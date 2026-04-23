@@ -649,6 +649,11 @@ class VoiceCallApi {
         }
       }
 
+      // Give LiveKit a short settle window between unpublish/publish cycles.
+      // Without this, rapid restart may yield an already-ended incoming track
+      // on remote subscribers in some browser/runtime combinations.
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
       // Demonstration screen-share profile tuned for stability across restarts.
       // VP8 + no simulcast is less fragile than VP9/SVC in some desktop runtimes.
       await this.room.localParticipant.setScreenShareEnabled(

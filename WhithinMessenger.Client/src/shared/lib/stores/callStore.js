@@ -787,9 +787,6 @@ export const useCallStore = create(
                 // Keep only one active screen share stream per remote user.
                 for (const [key, value] of newRemoteScreenShares.entries()) {
                   if (value.userId === targetUserId || value.socketId === participant.identity) {
-                    if (value.stream) {
-                      value.stream.getTracks().forEach(trackItem => trackItem.stop());
-                    }
                     newRemoteScreenShares.delete(key);
                   }
                 }
@@ -1056,9 +1053,6 @@ export const useCallStore = create(
                   (screenShare.socketId === producerSocketId || screenShare.userId === producerSocketId);
 
                 if (matchesProducer || matchesSocket) {
-                  if (screenShare.stream) {
-                    screenShare.stream.getTracks().forEach(track => track.stop());
-                  }
                   newRemoteScreenShares.delete(screenShareId);
                   removedCount += 1;
                 }
