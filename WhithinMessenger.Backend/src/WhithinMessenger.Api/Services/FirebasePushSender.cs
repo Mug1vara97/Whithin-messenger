@@ -56,15 +56,11 @@ public class FirebasePushSender : IFirebasePushSender
                 message = new
                 {
                     token = deviceToken,
-                    notification = new
-                    {
-                        title,
-                        body = message
-                    },
                     data = new Dictionary<string, string>
                     {
                         ["chat_id"] = chatId.ToString(),
                         ["chat_title"] = title,
+                        ["title"] = title,
                         ["message"] = message
                     },
                     android = new
