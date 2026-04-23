@@ -130,6 +130,7 @@ export const useCallStore = create(
       
       // Состояние демонстрации экрана
       isScreenSharing: false,
+      isScreenShareTransitioning: false,
       screenShareStream: null,
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
@@ -2394,6 +2395,7 @@ export const useCallStore = create(
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
             remoteScreenShares: new Map(),
+            isScreenShareTransitioning: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2516,6 +2518,7 @@ export const useCallStore = create(
             noiseSuppressionManager: null,
             audioContext: null,
             connecting: false,
+            isScreenShareTransitioning: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2530,6 +2533,12 @@ export const useCallStore = create(
       
       // Демонстрация экрана
       startScreenShare: async () => {
+        if (get().isScreenShareTransitioning) {
+          console.log('Screen share transition already in progress, skipping start');
+          return;
+        }
+
+        set({ isScreenShareTransitioning: true });
         try {
           const state = get();
           
@@ -2617,10 +2626,18 @@ export const useCallStore = create(
           } else {
             console.log('Screen sharing cancelled by user');
           }
+        } finally {
+          set({ isScreenShareTransitioning: false });
         }
       },
 
       stopScreenShare: async () => {
+        if (get().isScreenShareTransitioning) {
+          console.log('Screen share transition already in progress, skipping stop');
+          return;
+        }
+
+        set({ isScreenShareTransitioning: true });
         console.log('Stopping screen sharing...');
 
         try {
@@ -2646,12 +2663,18 @@ export const useCallStore = create(
         } catch (error) {
           console.error('Error stopping screen share:', error);
           set({ error: 'Failed to stop screen sharing: ' + error.message });
+        } finally {
+          set({ isScreenShareTransitioning: false });
         }
       },
 
       toggleScreenShare: async () => {
         console.log('toggleScreenShare called');
         const state = get();
+        if (state.isScreenShareTransitioning) {
+          console.log('toggleScreenShare ignored: transition in progress');
+          return;
+        }
         console.log('Current state:', { isScreenSharing: state.isScreenSharing, sendTransport: !!state.sendTransport });
         if (state.isScreenSharing) {
           console.log('Stopping screen share...');

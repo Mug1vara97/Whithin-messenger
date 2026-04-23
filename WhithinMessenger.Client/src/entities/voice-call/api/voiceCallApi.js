@@ -631,7 +631,8 @@ class VoiceCallApi {
         }
       }
 
-      // Демонстрация экрана: 1080p, VP9/SVC, стабильное качество (порядок слоёв от низкого к высокому)
+      // Demonstration screen-share profile tuned for stability across restarts.
+      // VP8 + no simulcast is less fragile than VP9/SVC in some desktop runtimes.
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
@@ -639,10 +640,9 @@ class VoiceCallApi {
           frameRate: 30
         },
         {
-          videoCodec: 'vp9',
+          videoCodec: 'vp8',
           videoEncoding: VideoPresets.h1080.encoding,
-          simulcast: true,
-          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
+          simulcast: false
         }
       );
     } else {
