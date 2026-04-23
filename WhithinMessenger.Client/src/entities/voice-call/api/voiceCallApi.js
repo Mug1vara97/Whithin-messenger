@@ -647,6 +647,8 @@ class VoiceCallApi {
       );
     } else {
       await this.room.localParticipant.setScreenShareEnabled(false);
+      // Give LiveKit a brief moment to complete unpublish before next enable.
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
   }
 

@@ -2634,11 +2634,6 @@ export const useCallStore = create(
           // Use LiveKit API to stop screen share
           await voiceCallApi.setScreenShareEnabled(false);
 
-          // Останавливаем поток
-          if (state.screenShareStream) {
-            state.screenShareStream.getTracks().forEach(track => track.stop());
-          }
-
           // Очищаем состояние
           set({
             localScreenTrackId: null,
