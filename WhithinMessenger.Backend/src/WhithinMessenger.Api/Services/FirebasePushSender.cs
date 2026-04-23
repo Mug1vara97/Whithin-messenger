@@ -42,8 +42,8 @@ public class FirebasePushSender : IFirebasePushSender
         }
 
         var accessToken = await _credential.UnderlyingCredential.GetAccessTokenForRequestAsync(
-            requestUri: null,
-            cancellationToken: cancellationToken
+            null,
+            cancellationToken
         );
 
         var client = _httpClientFactory.CreateClient(nameof(FirebasePushSender));
