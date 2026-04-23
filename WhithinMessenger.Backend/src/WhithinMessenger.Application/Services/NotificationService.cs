@@ -9,13 +9,19 @@ public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly IHubContext<Hub> _notificationHub;
+    private readonly IUserPushTokenStore _userPushTokenStore;
+    private readonly IFirebasePushSender _firebasePushSender;
 
     public NotificationService(
         INotificationRepository notificationRepository,
-        IHubContext<Hub> notificationHub)
+        IHubContext<Hub> notificationHub,
+        IUserPushTokenStore userPushTokenStore,
+        IFirebasePushSender firebasePushSender)
     {
         _notificationRepository = notificationRepository;
         _notificationHub = notificationHub;
+        _userPushTokenStore = userPushTokenStore;
+        _firebasePushSender = firebasePushSender;
     }
 
     public async Task CreateNotificationAsync(
@@ -58,6 +64,14 @@ public class NotificationService : INotificationService
             var unreadCount = await GetUnreadCountForUserAsync(userId, cancellationToken);
             await _notificationHub.Clients.User(userId.ToString()).SendAsync("UnreadCountChanged", unreadCount, cancellationToken);
 
+            await SendPushToRegisteredDevicesAsync(
+                userId: userId,
+                chatId: chatId,
+                type: type,
+                content: content,
+                cancellationToken: cancellationToken
+            );
+
             Console.WriteLine($"Created notification for user {userId}: {content}");
         }
         catch (Exception ex)
@@ -69,6 +83,46 @@ public class NotificationService : INotificationService
     public async Task<int> GetUnreadCountForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _notificationRepository.GetUnreadCountAsync(userId, cancellationToken);
+    }
+
+    private async Task SendPushToRegisteredDevicesAsync(
+        Guid userId,
+        Guid chatId,
+        string type,
+        string content,
+        CancellationToken cancellationToken
+    )
+    {
+        var tokens = await _userPushTokenStore.GetTokensAsync(userId, cancellationToken);
+        if (tokens.Count == 0)
+        {
+            return;
+        }
+
+        var title = type switch
+        {
+            "direct_message" => "New message",
+            "group_message" => "New message in group",
+            _ => "Whithin"
+        };
+
+        foreach (var token in tokens)
+        {
+            try
+            {
+                await _firebasePushSender.SendChatNotificationAsync(
+                    deviceToken: token,
+                    chatId: chatId,
+                    title: title,
+                    message: content,
+                    cancellationToken: cancellationToken
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Push send failed for user {userId}: {ex.Message}");
+            }
+        }
     }
 }
 

@@ -20,15 +20,50 @@ public class NotificationController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IMessageRepository _messageRepository;
     private readonly IHubContext<ChatListHub> _chatListHub;
+    private readonly WhithinMessenger.Application.Services.IUserPushTokenStore _userPushTokenStore;
 
     public NotificationController(
         IMediator mediator,
         IMessageRepository messageRepository,
-        IHubContext<ChatListHub> chatListHub)
+        IHubContext<ChatListHub> chatListHub,
+        WhithinMessenger.Application.Services.IUserPushTokenStore userPushTokenStore)
     {
         _mediator = mediator;
         _messageRepository = messageRepository;
         _chatListHub = chatListHub;
+        _userPushTokenStore = userPushTokenStore;
+    }
+
+    [HttpPost("device-token")]
+    public async Task<IActionResult> RegisterDeviceToken([FromBody] RegisterDeviceTokenRequest request)
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { error = "Token is required" });
+        }
+
+        var deviceId = string.IsNullOrWhiteSpace(request.DeviceId) ? "android-default" : request.DeviceId.Trim();
+        await _userPushTokenStore.SaveTokenAsync(userId.Value, deviceId, request.Token.Trim());
+        return Ok(new { message = "Device token registered" });
+    }
+
+    [HttpDelete("device-token/{deviceId}")]
+    public async Task<IActionResult> RemoveDeviceToken(string deviceId)
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        await _userPushTokenStore.RemoveTokenAsync(userId.Value, deviceId);
+        return Ok(new { message = "Device token removed" });
     }
 
     [HttpGet]
@@ -137,6 +172,12 @@ public class NotificationController : ControllerBase
         }
         return null;
     }
+}
+
+public class RegisterDeviceTokenRequest
+{
+    public string Token { get; set; } = string.Empty;
+    public string? DeviceId { get; set; }
 }
 
 

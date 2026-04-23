@@ -43,6 +43,7 @@ services:
     volumes:
       - uploads_data:/app/wwwroot/uploads
       - ./ssl:/app/ssl
+      - /home/whithin-messenger/WhithinMessenger.Backend/src/WhithinMessenger.Api/whithin-db2f1-firebase-adminsdk-fbsvc-1d0a12ff4c.json:/app/secrets/firebase-service-account.json:ro
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development

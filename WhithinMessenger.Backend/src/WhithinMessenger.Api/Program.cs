@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Scalar.AspNetCore;
+using WhithinMessenger.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IFirebasePushSender, FirebasePushSender>();
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
 {
@@ -71,7 +74,14 @@ builder.Services.AddScoped<WhithinMessenger.Application.Services.INotificationSe
 {
     var notificationRepository = provider.GetRequiredService<WhithinMessenger.Domain.Interfaces.INotificationRepository>();
     var hubContext = provider.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>>();
-    return new WhithinMessenger.Application.Services.NotificationService(notificationRepository, hubContext);
+    var tokenStore = provider.GetRequiredService<IUserPushTokenStore>();
+    var firebasePushSender = provider.GetRequiredService<IFirebasePushSender>();
+    return new WhithinMessenger.Application.Services.NotificationService(
+        notificationRepository,
+        hubContext,
+        tokenStore,
+        firebasePushSender
+    );
 });
 
 // JWT Configuration - регистрируется в Infrastructure слое

@@ -362,3 +362,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Firebase service account credentials
+src/WhithinMessenger.Api/firebase-service-account.json
+src/WhithinMessenger.Api/whithin-db2f1-firebase-adminsdk-fbsvc-1d0a12ff4c.json
