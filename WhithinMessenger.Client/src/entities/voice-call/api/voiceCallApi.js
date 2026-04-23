@@ -68,6 +68,23 @@ class VoiceCallApi {
     this.eventHandlers = new Map();
   }
 
+  async waitForScreenShareCleared(timeoutMs = 3000) {
+    if (!this.room) return;
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const hasScreenSharePublication = Array.from(
+        this.room.localParticipant.videoTrackPublications.values()
+      ).some((publication) => publication.source === Track.Source.ScreenShare);
+
+      if (!hasScreenSharePublication) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
   async connect(userId, userName, serverUrl = VOICE_SERVER_URL) {
     if (this.socket && this.isConnected) {
       return this.socket;
@@ -626,6 +643,7 @@ class VoiceCallApi {
       if (hasActiveOrStaleScreenPublication) {
         try {
           await this.room.localParticipant.setScreenShareEnabled(false);
+          await this.waitForScreenShareCleared();
         } catch (error) {
           console.warn('Failed to disable previous screen share before re-enable:', error);
         }
@@ -647,8 +665,7 @@ class VoiceCallApi {
       );
     } else {
       await this.room.localParticipant.setScreenShareEnabled(false);
-      // Give LiveKit a brief moment to complete unpublish before next enable.
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await this.waitForScreenShareCleared();
     }
   }
 
