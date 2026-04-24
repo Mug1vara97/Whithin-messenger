@@ -1,6 +1,7 @@
 class TokenManager {
   constructor() {
     this.ACCESS_TOKEN_KEY = 'accessToken';
+    this.REFRESH_TOKEN_KEY = 'refreshToken';
     this.TOKEN_EXPIRY_KEY = 'accessTokenExpiry';
   }
 
@@ -13,10 +14,12 @@ class TokenManager {
       localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
       console.log('TokenManager: Token expires at:', new Date(expiryTime));
     } else {
-      // Если не передано время истечения, устанавливаем 24 часа по умолчанию
-      const defaultExpiry = Date.now() + (24 * 60 * 60 * 1000);
-      localStorage.setItem(this.TOKEN_EXPIRY_KEY, defaultExpiry.toString());
-      console.log('TokenManager: Token expires at (default 24h):', new Date(defaultExpiry));
+      const decoded = this.decodeToken();
+      const expFromJwt = decoded?.exp ? Number(decoded.exp) * 1000 : null;
+      const fallbackExpiry = Date.now() + (24 * 60 * 60 * 1000);
+      const finalExpiry = expFromJwt && !Number.isNaN(expFromJwt) ? expFromJwt : fallbackExpiry;
+      localStorage.setItem(this.TOKEN_EXPIRY_KEY, finalExpiry.toString());
+      console.log('TokenManager: Token expires at:', new Date(finalExpiry));
     }
   }
 
@@ -24,6 +27,15 @@ class TokenManager {
     const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
     console.log('TokenManager: Getting token:', token ? 'Token exists' : 'No token');
     return token;
+  }
+
+  setRefreshToken(token) {
+    if (!token) return;
+    localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
+  }
+
+  getRefreshToken() {
+    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
   }
 
   isTokenValid() {
@@ -35,9 +47,16 @@ class TokenManager {
   }
 
   isTokenExpired() {
-    const expiryTime = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
+    let expiryTime = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
     if (!expiryTime) {
-      return true;
+      const decoded = this.decodeToken();
+      const expFromJwt = decoded?.exp ? Number(decoded.exp) * 1000 : null;
+      if (expFromJwt && !Number.isNaN(expFromJwt)) {
+        expiryTime = expFromJwt.toString();
+        localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime);
+      } else {
+        return true;
+      }
     }
     const currentTime = Date.now();
     const expired = currentTime > parseInt(expiryTime, 10);
@@ -97,6 +116,7 @@ class TokenManager {
   clearTokens() {
     console.log('TokenManager: Clearing tokens.');
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
   }
 }

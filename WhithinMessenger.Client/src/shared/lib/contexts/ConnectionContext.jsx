@@ -64,14 +64,14 @@ export const ConnectionProvider = ({ children }) => {
       console.log(`ConnectionContext: Token for ${hubName}:`, token ? 'Token exists' : 'No token');
       console.log(`ConnectionContext: Token valid:`, isValid);
       
-      const url = token && isValid 
-        ? `${BASE_URL}/${hubName}?userId=${userId}&access_token=${token}`
-        : `${BASE_URL}/${hubName}?userId=${userId}`;
+      const url = `${BASE_URL}/${hubName}?userId=${userId}`;
       
       console.log(`ConnectionContext: SignalR URL:`, url);
 
       const connection = new HubConnectionBuilder()
-        .withUrl(url)
+        .withUrl(url, {
+          accessTokenFactory: () => tokenManager.getToken() || ''
+        })
         .withAutomaticReconnect()
         .build();
 

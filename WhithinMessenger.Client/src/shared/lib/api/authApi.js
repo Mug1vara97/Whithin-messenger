@@ -15,6 +15,10 @@ export const authApi = {
       } else {
         console.warn('No token in response:', response.data);
       }
+
+      if (response.data.refreshToken) {
+        tokenManager.setRefreshToken(response.data.refreshToken);
+      }
       
       return response.data;
     } catch (error) {
@@ -34,7 +38,8 @@ export const authApi = {
 
   async logout() {
     try {
-      await apiClient.post('/auth/logout');
+      const refreshToken = tokenManager.getRefreshToken();
+      await apiClient.post('/auth/logout', { refreshToken });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -55,5 +60,21 @@ export const authApi = {
       console.error('Error getting current user:', error);
       throw new Error('Failed to get user data');
     }
+  }
+  ,
+  async refreshToken() {
+    const refreshToken = tokenManager.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token');
+    }
+
+    const response = await apiClient.post('/auth/refresh', { refreshToken });
+    if (response.data?.token) {
+      tokenManager.setToken(response.data.token);
+    }
+    if (response.data?.refreshToken) {
+      tokenManager.setRefreshToken(response.data.refreshToken);
+    }
+    return response.data;
   }
 };

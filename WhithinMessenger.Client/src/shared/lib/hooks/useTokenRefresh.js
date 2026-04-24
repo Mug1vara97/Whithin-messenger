@@ -1,6 +1,5 @@
 import { useEffect, useCallback } from 'react';
 import tokenManager from '../services/tokenManager';
-import { authApi } from '../api/authApi';
 
 /**
  * Хук для автоматического обновления JWT токенов
@@ -10,18 +9,18 @@ export const useTokenRefresh = () => {
     // Проверяем, истекает ли токен в ближайшее время
     if (tokenManager.isTokenExpiringSoon() && !tokenManager.isTokenExpired()) {
       try {
-        console.log('Token is expiring soon, attempting to refresh...');
-        
-        // Здесь можно добавить логику обновления токена
-        // Пока что просто логируем
-        console.log('Token refresh not implemented yet');
-        
+        // Пока backend не выдает refresh endpoint, просто переустанавливаем
+        // срок из JWT exp, если он появился/обновился.
+        const decoded = tokenManager.decodeToken();
+        if (decoded?.exp) {
+          const jwtExpiry = Number(decoded.exp) * 1000;
+          if (!Number.isNaN(jwtExpiry)) {
+            localStorage.setItem('accessTokenExpiry', jwtExpiry.toString());
+          }
+        }
       } catch (error) {
         console.error('Failed to refresh token:', error);
-        // Если не удалось обновить токен, очищаем все
-        tokenManager.clearTokens();
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Временная ошибка не должна ронять пользовательскую сессию.
       }
     }
   }, []);

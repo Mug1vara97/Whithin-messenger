@@ -28,13 +28,15 @@ export const useAuth = () => {
           } else {
             console.log('useAuth: Cannot get user from token, making API request...');
             // Если не можем получить пользователя из токена, делаем запрос к серверу
-            const user = await authApi.getCurrentUser();
-            if (user) {
-              localStorage.setItem('user', JSON.stringify(user));
-              updateUser(user);
-            } else {
-              tokenManager.clearTokens();
-              localStorage.removeItem('user');
+            try {
+              const user = await authApi.getCurrentUser();
+              if (user) {
+                localStorage.setItem('user', JSON.stringify(user));
+                updateUser(user);
+              }
+            } catch (apiError) {
+              // Не очищаем сессию из-за временных проблем сети/бэкенда.
+              console.warn('useAuth: failed to fetch current user, keeping token session', apiError);
             }
           }
         } else {
@@ -44,9 +46,7 @@ export const useAuth = () => {
           localStorage.removeItem('user');
         }
       } catch (error) {
-        console.log('User not authenticated, continuing...');
-        tokenManager.clearTokens();
-        localStorage.removeItem('user');
+        console.warn('useAuth: auth initialization failed, keeping current session state', error);
       } finally {
         setIsAuthLoading(false);
       }

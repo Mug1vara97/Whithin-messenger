@@ -2,6 +2,8 @@ import axios from 'axios';
 import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
 
+let refreshPromise = null;
+
 const apiClient = axios.create({
   baseURL: BASE_URL ? BASE_URL + '/api' : '/api',
   timeout: 10000,
@@ -35,18 +37,55 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = (originalRequest?.url || '').toLowerCase();
+    const isRefreshRequest = requestUrl.includes('/auth/refresh');
     
     // Если получили 401 и это не повторный запрос
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry && !isRefreshRequest) {
       originalRequest._retry = true;
-      
-      // Очищаем токены и перенаправляем на логин
-      tokenManager.clearTokens();
-      localStorage.removeItem('user');
-      
-      // Перенаправляем на страницу логина только если мы не на ней уже
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const refreshToken = tokenManager.getRefreshToken();
+      if (!refreshToken) {
+        tokenManager.clearTokens();
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+
+      try {
+        if (!refreshPromise) {
+          refreshPromise = axios.post(
+            `${BASE_URL ? BASE_URL + '/api' : '/api'}/auth/refresh`,
+            { refreshToken },
+            { withCredentials: true }
+          ).finally(() => {
+            refreshPromise = null;
+          });
+        }
+
+        const refreshResponse = await refreshPromise;
+        const newAccessToken = refreshResponse?.data?.token;
+        const newRefreshToken = refreshResponse?.data?.refreshToken;
+        if (!newAccessToken) {
+          throw new Error('Refresh response does not contain access token');
+        }
+
+        tokenManager.setToken(newAccessToken);
+        if (newRefreshToken) {
+          tokenManager.setRefreshToken(newRefreshToken);
+        }
+
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        tokenManager.clearTokens();
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
       }
     }
     
