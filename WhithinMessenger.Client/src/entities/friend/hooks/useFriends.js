@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { friendApi } from '../api';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuth } from '../../../shared/lib/hooks/useAuth';
 import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
@@ -12,38 +11,53 @@ export const useFriends = () => {
   const { user } = useAuth();
   const connectionRef = useRef(null);
 
+  const getFriendConnection = useCallback(async () => {
+    if (!user?.id) {
+      throw new Error('Пользователь не авторизован');
+    }
+
+    if (connectionRef.current) {
+      return connectionRef.current;
+    }
+
+    const connection = await getConnection('friendhub', user.id);
+    connectionRef.current = connection;
+    return connection;
+  }, [getConnection, user?.id]);
+
   const fetchFriends = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const friendsData = await friendApi.getFriends();
-      
-      // Форматируем данные друзей: добавляем полный URL для аватаров
+      const connection = await getFriendConnection();
+      const friendsData = await connection.invoke('GetFriends');
+
       const formattedFriends = friendsData.map(friend => ({
         ...friend,
-        avatar: friend.avatar 
+        avatar: friend.avatar
           ? (friend.avatar.startsWith('http') ? friend.avatar : `${MEDIA_BASE_URL}${friend.avatar}`)
           : null
       }));
-      
+
       setFriends(formattedFriends);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка получения друзей');
       console.error('Error fetching friends:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getFriendConnection]);
 
   const removeFriend = useCallback(async (friendId) => {
     try {
-      await friendApi.removeFriend(friendId);
+      const connection = await getFriendConnection();
+      await connection.invoke('RemoveFriend', friendId);
       setFriends(prev => prev.filter(friend => friend.userId !== friendId));
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка удаления друга');
       console.error('Error removing friend:', err);
     }
-  }, []);
+  }, [getFriendConnection]);
 
   // Подписка на SignalR события друзей
   useEffect(() => {
@@ -53,28 +67,21 @@ export const useFriends = () => {
 
     const setupRealtime = async () => {
       try {
-        const connection = await getConnection('notificationhub', user.id);
+        const connection = await getFriendConnection();
         if (!mounted) return;
-        
-        connectionRef.current = connection;
 
-        // FriendAdded - когда кто-то принял наш запрос или мы приняли чужой
         connection.on('FriendAdded', (data) => {
           console.log('FriendAdded event:', data);
-          // Обновляем список друзей
           fetchFriends();
         });
 
-        // FriendRemoved - когда друг удален
         connection.on('FriendRemoved', (data) => {
           console.log('FriendRemoved event:', data);
           setFriends(prev => prev.filter(friend => friend.userId !== data.friendId));
         });
 
-        // FriendRequestAccepted - когда наш запрос принят
         connection.on('FriendRequestAccepted', (data) => {
           console.log('FriendRequestAccepted event:', data);
-          // Обновляем список друзей
           fetchFriends();
         });
 
@@ -94,7 +101,7 @@ export const useFriends = () => {
         connectionRef.current.off('FriendRequestAccepted');
       }
     };
-  }, [user?.id, getConnection, fetchFriends]);
+  }, [user?.id, getFriendConnection, fetchFriends]);
 
   useEffect(() => {
     fetchFriends();

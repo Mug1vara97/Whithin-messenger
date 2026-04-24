@@ -22,6 +22,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IFirebasePushSender, FirebasePushSender>();
+builder.Services.AddScoped<IFriendRealtimeNotifier, FriendRealtimeNotifier>();
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
 {
@@ -120,6 +121,7 @@ builder.Services.AddAuthentication(options =>
                  path.StartsWithSegments("/groupchathub") || 
                  path.StartsWithSegments("/serverhub") || 
                  path.StartsWithSegments("/serverlisthub") ||
+                 path.StartsWithSegments("/friendhub") ||
                  path.StartsWithSegments("/notificationhub")))
             {
                 context.Token = accessToken;
@@ -227,6 +229,11 @@ app.MapHub<ServerListHub>("/serverlisthub", options =>
 });
 
 app.MapHub<NotificationHub>("/notificationhub", options =>
+{
+    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+});
+
+app.MapHub<FriendHub>("/friendhub", options =>
 {
     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
 });

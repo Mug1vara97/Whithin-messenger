@@ -1,5 +1,5 @@
 using MediatR;
-using Microsoft.AspNetCore.SignalR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -9,16 +9,16 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
 {
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IHubContext<Hub> _hubContext;
+    private readonly IFriendRealtimeNotifier _friendRealtimeNotifier;
 
     public SendFriendRequestCommandHandler(
         IFriendshipRepository friendshipRepository, 
         IUserRepository userRepository,
-        IHubContext<Hub> hubContext)
+        IFriendRealtimeNotifier friendRealtimeNotifier)
     {
         _friendshipRepository = friendshipRepository;
         _userRepository = userRepository;
-        _hubContext = hubContext;
+        _friendRealtimeNotifier = friendRealtimeNotifier;
     }
 
     public async Task<SendFriendRequestResult> Handle(SendFriendRequestCommand request, CancellationToken cancellationToken)
@@ -64,16 +64,12 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
 
         await _friendshipRepository.CreateAsync(friendship, cancellationToken);
 
-        // Отправляем уведомление получателю через SignalR
-        await _hubContext.Clients.Group($"user-{request.AddresseeId}").SendAsync(
-            "FriendRequestReceived",
-            new
-            {
-                requestId = friendship.Id,
-                senderId = request.RequesterId,
-                senderUsername = requester.UserName
-            },
-            cancellationToken);
+        await _friendRealtimeNotifier.NotifyFriendRequestReceivedAsync(
+            addresseeId: request.AddresseeId,
+            requestId: friendship.Id,
+            senderId: request.RequesterId,
+            senderUsername: requester.UserName ?? string.Empty,
+            cancellationToken: cancellationToken);
 
         return new SendFriendRequestResult(true, FriendshipId: friendship.Id);
     }

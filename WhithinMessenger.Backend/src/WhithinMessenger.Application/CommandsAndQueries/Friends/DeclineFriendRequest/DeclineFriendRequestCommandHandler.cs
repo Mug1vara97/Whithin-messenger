@@ -1,5 +1,5 @@
 using MediatR;
-using Microsoft.AspNetCore.SignalR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -8,14 +8,14 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Friends.DeclineFriendR
 public class DeclineFriendRequestCommandHandler : IRequestHandler<DeclineFriendRequestCommand, DeclineFriendRequestResult>
 {
     private readonly IFriendshipRepository _friendshipRepository;
-    private readonly IHubContext<Hub> _hubContext;
+    private readonly IFriendRealtimeNotifier _friendRealtimeNotifier;
 
     public DeclineFriendRequestCommandHandler(
         IFriendshipRepository friendshipRepository,
-        IHubContext<Hub> hubContext)
+        IFriendRealtimeNotifier friendRealtimeNotifier)
     {
         _friendshipRepository = friendshipRepository;
-        _hubContext = hubContext;
+        _friendRealtimeNotifier = friendRealtimeNotifier;
     }
 
     public async Task<DeclineFriendRequestResult> Handle(DeclineFriendRequestCommand request, CancellationToken cancellationToken)
@@ -42,14 +42,10 @@ public class DeclineFriendRequestCommandHandler : IRequestHandler<DeclineFriendR
 
         await _friendshipRepository.UpdateAsync(friendship, cancellationToken);
 
-        // Уведомляем отправителя запроса
-        await _hubContext.Clients.Group($"user-{friendship.RequesterId}").SendAsync(
-            "FriendRequestDeclined",
-            new
-            {
-                requestId = request.FriendshipId
-            },
-            cancellationToken);
+        await _friendRealtimeNotifier.NotifyFriendRequestDeclinedAsync(
+            requesterId: friendship.RequesterId,
+            requestId: request.FriendshipId,
+            cancellationToken: cancellationToken);
 
         return new DeclineFriendRequestResult(true);
     }

@@ -41,6 +41,7 @@ export const HUB_ENDPOINTS = {
   GROUP_CHAT_HUB: '/groupchathub',
   STATUS_HUB: '/statushub',
   NOTIFICATION_HUB: '/notificationhub',
+  FRIEND_HUB: '/friendhub',
 };
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 

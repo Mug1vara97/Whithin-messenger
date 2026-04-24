@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { friendApi } from '../api';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuth } from '../../../shared/lib/hooks/useAuth';
 
@@ -12,50 +11,68 @@ export const useFriendRequests = () => {
   const { user } = useAuth();
   const connectionRef = useRef(null);
 
+  const getFriendConnection = useCallback(async () => {
+    if (!user?.id) {
+      throw new Error('Пользователь не авторизован');
+    }
+
+    if (connectionRef.current) {
+      return connectionRef.current;
+    }
+
+    const connection = await getConnection('friendhub', user.id);
+    connectionRef.current = connection;
+    return connection;
+  }, [getConnection, user?.id]);
+
   const fetchFriendRequests = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const requestsData = await friendApi.getFriendRequests();
+      const connection = await getFriendConnection();
+      const requestsData = await connection.invoke('GetFriendRequests');
       setPendingRequests(requestsData.pendingRequests || []);
       setSentRequests(requestsData.sentRequests || []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка получения запросов в друзья');
       console.error('Error fetching friend requests:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getFriendConnection]);
 
   const acceptRequest = useCallback(async (friendshipId) => {
     try {
-      await friendApi.acceptFriendRequest(friendshipId);
+      const connection = await getFriendConnection();
+      await connection.invoke('AcceptFriendRequest', friendshipId);
       setPendingRequests(prev => prev.filter(req => req.id !== friendshipId));
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка принятия запроса');
       console.error('Error accepting friend request:', err);
     }
-  }, []);
+  }, [getFriendConnection]);
 
   const declineRequest = useCallback(async (friendshipId) => {
     try {
-      await friendApi.declineFriendRequest(friendshipId);
+      const connection = await getFriendConnection();
+      await connection.invoke('DeclineFriendRequest', friendshipId);
       setPendingRequests(prev => prev.filter(req => req.id !== friendshipId));
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка отклонения запроса');
       console.error('Error declining friend request:', err);
     }
-  }, []);
+  }, [getFriendConnection]);
 
   const sendRequest = useCallback(async (targetUserId) => {
     try {
-      await friendApi.sendFriendRequest(targetUserId);
+      const connection = await getFriendConnection();
+      await connection.invoke('SendFriendRequest', targetUserId);
       await fetchFriendRequests();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Ошибка отправки запроса');
       console.error('Error sending friend request:', err);
     }
-  }, [fetchFriendRequests]);
+  }, [fetchFriendRequests, getFriendConnection]);
 
   // Подписка на SignalR события запросов в друзья
   useEffect(() => {
@@ -65,22 +82,25 @@ export const useFriendRequests = () => {
 
     const setupRealtime = async () => {
       try {
-        const connection = await getConnection('notificationhub', user.id);
+        const connection = await getFriendConnection();
         if (!mounted) return;
-        
-        connectionRef.current = connection;
 
-        // FriendRequestReceived - когда получен новый запрос в друзья
         connection.on('FriendRequestReceived', (data) => {
           console.log('FriendRequestReceived event:', data);
-          // Обновляем список запросов
           fetchFriendRequests();
         });
 
-        // FriendRequestDeclined - когда наш запрос отклонен
         connection.on('FriendRequestDeclined', (data) => {
           console.log('FriendRequestDeclined event:', data);
           setSentRequests(prev => prev.filter(req => req.id !== data.requestId));
+        });
+
+        connection.on('FriendRequestAccepted', () => {
+          fetchFriendRequests();
+        });
+
+        connection.on('FriendAdded', () => {
+          fetchFriendRequests();
         });
 
         console.log('Friend requests realtime subscriptions set up');
@@ -96,9 +116,11 @@ export const useFriendRequests = () => {
       if (connectionRef.current) {
         connectionRef.current.off('FriendRequestReceived');
         connectionRef.current.off('FriendRequestDeclined');
+        connectionRef.current.off('FriendRequestAccepted');
+        connectionRef.current.off('FriendAdded');
       }
     };
-  }, [user?.id, getConnection, fetchFriendRequests]);
+  }, [user?.id, getFriendConnection, fetchFriendRequests]);
 
   useEffect(() => {
     fetchFriendRequests();
