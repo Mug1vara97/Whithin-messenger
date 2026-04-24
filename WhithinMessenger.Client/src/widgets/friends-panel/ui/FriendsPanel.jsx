@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PersonAdd } from '@mui/icons-material';
 import { useFriends, useFriendRequests } from '../../../entities/friend';
-import { FriendItem } from '../../../shared/ui/molecules';
+import { FriendItem, FriendRequestItem } from '../../../shared/ui/molecules';
 import { AddFriendModal } from '../../../shared/ui/molecules';
 import './FriendsPanel.css';
 
@@ -14,6 +14,12 @@ const FriendsPanel = ({ onStartChat }) => {
   const onlineFriends = friends.filter(friend => friend.status === 'Online');
   const allFriends = friends;
   const blockedFriends = [];
+  const allPendingRequests = [...pendingRequests, ...sentRequests]
+    .map(request => ({
+      ...request,
+      isSent: sentRequests.some(sentRequest => sentRequest.id === request.id)
+    }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const getCurrentFriends = () => {
     switch (activeTab) {
@@ -22,7 +28,7 @@ const FriendsPanel = ({ onStartChat }) => {
       case 'all':
         return allFriends;
       case 'pending':
-        return pendingRequests;
+        return allPendingRequests;
       case 'blocked':
         return blockedFriends;
       default:
@@ -37,7 +43,7 @@ const FriendsPanel = ({ onStartChat }) => {
       case 'all':
         return `Все друзья — ${allFriends.length}`;
       case 'pending':
-        return `Ожидают — ${pendingRequests.length}`;
+        return `Ожидают — ${allPendingRequests.length}`;
       case 'blocked':
         return `Заблокированные — ${blockedFriends.length}`;
       default:
@@ -148,15 +154,22 @@ const FriendsPanel = ({ onStartChat }) => {
           ) : (
             <div className="friends-panel__list">
               {getCurrentFriends().map(item => (
-                <FriendItem
-                  key={item.userId || item.id}
-                  friend={item}
-                  onRemoveFriend={handleRemoveFriend}
-                  onStartChat={onStartChat}
-                  onAccept={activeTab === 'pending' ? handleAcceptRequest : undefined}
-                  onDecline={activeTab === 'pending' ? handleDeclineRequest : undefined}
-                  isRequest={activeTab === 'pending'}
-                />
+                activeTab === 'pending' ? (
+                  <FriendRequestItem
+                    key={item.id}
+                    request={item}
+                    isSent={item.isSent}
+                    onAccept={item.isSent ? undefined : handleAcceptRequest}
+                    onDecline={item.isSent ? undefined : handleDeclineRequest}
+                  />
+                ) : (
+                  <FriendItem
+                    key={item.userId || item.id}
+                    friend={item}
+                    onRemoveFriend={handleRemoveFriend}
+                    onStartChat={onStartChat}
+                  />
+                )
               ))}
             </div>
           )}
