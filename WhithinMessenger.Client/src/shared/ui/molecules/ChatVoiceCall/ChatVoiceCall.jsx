@@ -174,74 +174,78 @@ const ChatVoiceCall = ({
     return null;
   }
 
+  const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
+  const hasAnyVideo = isVideoEnabled || participants.some((participant) => participant.isVideoEnabled);
+  const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo;
+  const isOneToOneVoiceMode = !shouldShowVideoGrid && displayParticipants.length <= 2;
+
   return (
     <div className={styles.voiceCallContainer}>
       {/* Основная область участников */}
       <div className={styles.voiceCallWrapper}>
-        <div className={styles.participantsContainer}>
-          {(() => {
-            console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size, 'isVideoEnabled:', isVideoEnabled);
-            const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-            const hasAnyVideo = isVideoEnabled || participants.some(p => p.isVideoEnabled);
-            const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo;
-            return shouldShowVideoGrid ? (
-              /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
-              <div className={styles.screenShareContainer}>
-                <VideoCallGrid 
-                  participants={displayParticipants}
-                  onParticipantClick={(participant) => {
-                    console.log('Clicked participant:', participant);
-                  }}
-                  userVolumes={userVolumes}
-                  userMutedStates={userMutedStates}
-                  showVolumeSliders={showVolumeSliders}
-                  onToggleUserMute={toggleUserMute}
-                  onChangeUserVolume={changeUserVolume}
-                  onToggleVolumeSlider={toggleVolumeSlider}
-                  screenShareStream={screenShareStream}
-                  isScreenSharing={isScreenSharing}
-                  screenShareParticipant={isScreenSharing ? {
-                    id: userId,
-                    name: userName,
-                    isScreenSharing: true
-                  } : null}
-                  remoteScreenShares={remoteScreenShares}
-                  onStopScreenShare={handleScreenShare}
-                  forceGridMode={false}
-                  hideBottomUsers={true}
-                  isVideoEnabled={isVideoEnabled}
-                  videoStream={cameraStream}
-                  enableAutoFocus={false}
-                />
-              </div>
-            ) : (
-              /* Обычное отображение кружков пользователей */
-              displayParticipants.map((participant) => (
-                <div key={participant.id} className={styles.participantItem}>
-                  <div className={styles.participantAvatarContainer}>
-                    <div className={styles.participantAvatar}>
-                      <div className={styles.avatarCircle}>
-                        {(participant.name || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      {/* Индикаторы статуса */}
-                      <div className={styles.statusIndicators}>
-                        {participant.isMuted && (
-                          <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
-                            <MicOffIcon />
-                          </div>
-                        )}
-                        {participant.isGlobalAudioMuted && (
-                          <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
-                            <VolumeOffIcon />
-                          </div>
-                        )}
-                      </div>
+        <div className={`${styles.participantsContainer} ${isOneToOneVoiceMode ? styles.oneToOneParticipants : ''}`}>
+          {console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size, 'isVideoEnabled:', isVideoEnabled)}
+          {shouldShowVideoGrid ? (
+            /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
+            <div className={styles.screenShareContainer}>
+              <VideoCallGrid 
+                participants={displayParticipants}
+                onParticipantClick={(participant) => {
+                  console.log('Clicked participant:', participant);
+                }}
+                userVolumes={userVolumes}
+                userMutedStates={userMutedStates}
+                showVolumeSliders={showVolumeSliders}
+                onToggleUserMute={toggleUserMute}
+                onChangeUserVolume={changeUserVolume}
+                onToggleVolumeSlider={toggleVolumeSlider}
+                screenShareStream={screenShareStream}
+                isScreenSharing={isScreenSharing}
+                screenShareParticipant={isScreenSharing ? {
+                  id: userId,
+                  name: userName,
+                  isScreenSharing: true
+                } : null}
+                remoteScreenShares={remoteScreenShares}
+                onStopScreenShare={handleScreenShare}
+                forceGridMode={false}
+                hideBottomUsers={true}
+                isVideoEnabled={isVideoEnabled}
+                videoStream={cameraStream}
+                enableAutoFocus={false}
+              />
+            </div>
+          ) : (
+            /* Обычное отображение кружков пользователей */
+            displayParticipants.map((participant) => (
+              <div
+                key={participant.id}
+                className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''}`}
+              >
+                <div className={styles.participantAvatarContainer}>
+                  <div className={styles.participantAvatar}>
+                    <div className={styles.avatarCircle}>
+                      {(participant.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    {/* Индикаторы статуса */}
+                    <div className={styles.statusIndicators}>
+                      {participant.isMuted && (
+                        <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
+                          <MicOffIcon />
+                        </div>
+                      )}
+                      {participant.isGlobalAudioMuted && (
+                        <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
+                          <VolumeOffIcon />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))
-            );
-          })()}
+                <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
