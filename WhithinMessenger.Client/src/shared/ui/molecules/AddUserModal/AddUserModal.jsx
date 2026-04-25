@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, PersonAdd, Close } from '@mui/icons-material';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { getUserStatusColor, getUserStatusLabel } from '../../../lib/utils/userStatus';
 import './AddUserModal.css';
 
 const AddUserModal = ({ open, onClose, chatId, onUserAdded, connection }) => {
@@ -94,22 +95,6 @@ const AddUserModal = ({ open, onClose, chatId, onUserAdded, connection }) => {
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'online': return 'В сети';
-      case 'away': return 'Отошел';
-      default: return 'Не в сети';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'online': return '#43b581';
-      case 'away': return '#faa61a';
-      default: return '#72767d';
-    }
-  };
-
   if (!open) return null;
 
   return (
@@ -158,9 +143,9 @@ const AddUserModal = ({ open, onClose, chatId, onUserAdded, connection }) => {
                     <div className="add-user-status">
                       <div 
                         className="add-user-status-dot"
-                        style={{ backgroundColor: getStatusColor(user.userStatus) }}
+                        style={{ backgroundColor: getUserStatusColor(user.userStatus) }}
                       />
-                      <span className="add-user-status-text">{getStatusText(user.userStatus)}</span>
+                      <span className="add-user-status-text">{getUserStatusLabel(user.userStatus)}</span>
                     </div>
                   </div>
                   <button

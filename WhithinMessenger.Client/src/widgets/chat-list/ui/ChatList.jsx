@@ -1,17 +1,22 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { People } from '@mui/icons-material';
 import { SearchBar, UserAvatar, CreateGroupChatModal, UserPanel } from '../../../shared/ui';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { getUserStatusColor, getUserStatusLabel } from '../../../shared/lib/utils/userStatus';
 import './ChatList.css';
 
 const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} }) => {
   const { user } = useAuthContext();
+  const { getConnection } = useConnectionContext();
   const location = useLocation();
   const [selectedChat, setSelectedChat] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [statusOverrides, setStatusOverrides] = useState({});
+  const notificationConnectionRef = useRef(null);
   
   const {
     chats,
@@ -67,6 +72,59 @@ const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} })
     setShowModal(true);
   }, []);
 
+  useEffect(() => {
+    if (!user?.id || !getConnection) return undefined;
+    let mounted = true;
+
+    const setupPresenceRealtime = async () => {
+      try {
+        const notificationConnection = await getConnection('notificationhub', user.id);
+        if (!mounted) return;
+        notificationConnectionRef.current = notificationConnection;
+
+        const onUserStatusChanged = (payload) => {
+          const changedUserId = payload?.userId ?? payload?.UserId;
+          const changedStatus = payload?.status ?? payload?.Status;
+          if (!changedUserId || !changedStatus) return;
+
+          setStatusOverrides((prev) => ({
+            ...prev,
+            [String(changedUserId)]: changedStatus
+          }));
+        };
+
+        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
+      } catch (error) {
+        console.error('Failed to subscribe chat-list presence updates:', error);
+      }
+    };
+
+    setupPresenceRealtime();
+
+    return () => {
+      mounted = false;
+      if (notificationConnectionRef.current) {
+        notificationConnectionRef.current.off('UserStatusChanged');
+      }
+    };
+  }, [user?.id, getConnection]);
+
+  const getChatPresenceStatus = useCallback(
+    (chat) => {
+      if (chat.isGroupChat) {
+        return null;
+      }
+
+      const userIdKey = String(chat.userId ?? chat.UserId ?? '');
+      if (!userIdKey) {
+        return chat.userStatus ?? chat.UserStatus ?? null;
+      }
+
+      return statusOverrides[userIdKey] ?? chat.userStatus ?? chat.UserStatus ?? null;
+    },
+    [statusOverrides]
+  );
+
 
   const renderChatList = () => {
     return (
@@ -100,6 +158,7 @@ const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} })
           {chats && chats.length > 0 ? (
             chats.map((chat, index) => {
               const unreadForChat = unreadCountByChat[chat.chatId] || unreadCountByChat[chat.chat_id] || 0;
+              const chatPresenceStatus = getChatPresenceStatus(chat);
               return (
               <li
                 key={`${chat.chatId}-${chat.lastMessageTime}-${index}`}
@@ -124,7 +183,13 @@ const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} })
                       </span>
                     )}
                   </div>
-                  <div className="status-indicator"></div>
+                  {!chat.isGroupChat && (
+                    <div
+                      className="status-indicator"
+                      style={{ backgroundColor: getUserStatusColor(chatPresenceStatus) }}
+                      title={getUserStatusLabel(chatPresenceStatus)}
+                    />
+                  )}
                 </div>
                 <div className="chat-info">
                   <div className="chat-name">

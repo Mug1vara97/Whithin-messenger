@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
+import { getUserStatusLabel } from '../../../lib/utils/userStatus';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AddUserModal from '../AddUserModal/AddUserModal';
 import ChatAvatarUpload from '../ChatAvatarUpload/ChatAvatarUpload';
@@ -289,8 +290,7 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                           <div className="chat-info-participant-info">
                             <span className="chat-info-participant-name">{participant.username || 'Пользователь'}</span>
                             <span className="chat-info-participant-status">
-                              {participant.userStatus === 'online' ? 'В сети' : 
-                               participant.userStatus === 'away' ? 'Отошел' : 'Не в сети'}
+                              {getUserStatusLabel(participant.userStatus)}
                             </span>
                           </div>
                         </div>

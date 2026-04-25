@@ -1,10 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Headset, HeadsetOff, Settings as SettingsIcon } from '@mui/icons-material';
+import { userApi } from '../../../../entities/user/api';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useGlobalHotkeys } from '../../../lib/hooks/useGlobalHotkeys';
+import {
+    getUserStatusColor,
+    getUserStatusLabel,
+    getUserStatusOptions,
+    normalizeUserStatus,
+    PRESENCE_STATUS,
+    toBackendUserStatus
+} from '../../../lib/utils/userStatus';
 import { SettingsModal } from '../../organisms';
 import styles from './UserPanel.module.css';
+
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 const UserPanel = ({ 
     userId, 
@@ -26,6 +38,16 @@ const UserPanel = ({
     const [avatarInput, setAvatarInput] = useState('');
     const avatarFileInputRef = useRef(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState(PRESENCE_STATUS.ONLINE);
+    const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+    const [, setIsStatusUpdating] = useState(false);
+    const manualStatusRef = useRef(PRESENCE_STATUS.ONLINE);
+    const currentStatusRef = useRef(PRESENCE_STATUS.ONLINE);
+    const notificationConnectionRef = useRef(null);
+    const statusMenuRef = useRef(null);
+    const { getConnection } = useConnectionContext();
+
+    const getStorageKey = () => (userId ? `whithin:user-status:${userId}` : 'whithin:user-status');
 
     const fetchUserProfile = async () => {
         try {
@@ -144,6 +166,161 @@ const UserPanel = ({
         }
     }, [isOpen, userId]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const storageKey = getStorageKey();
+        const savedStatus = localStorage.getItem(storageKey);
+        if (savedStatus) {
+            const normalizedSavedStatus = normalizeUserStatus(savedStatus);
+            setCurrentStatus(normalizedSavedStatus);
+            manualStatusRef.current = normalizedSavedStatus;
+            currentStatusRef.current = normalizedSavedStatus;
+        } else {
+            setCurrentStatus(PRESENCE_STATUS.ONLINE);
+            manualStatusRef.current = PRESENCE_STATUS.ONLINE;
+            currentStatusRef.current = PRESENCE_STATUS.ONLINE;
+        }
+    }, [isOpen, userId]);
+
+    useEffect(() => {
+        if (!isStatusMenuOpen) return undefined;
+
+        const handleClickOutside = (event) => {
+            if (statusMenuRef.current && !statusMenuRef.current.contains(event.target)) {
+                setIsStatusMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isStatusMenuOpen]);
+
+    useEffect(() => {
+        if (!isStatusMenuOpen) return undefined;
+
+        const handleEscapeClose = (event) => {
+            if (event.key === 'Escape') {
+                setIsStatusMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('keydown', handleEscapeClose);
+        return () => document.removeEventListener('keydown', handleEscapeClose);
+    }, [isStatusMenuOpen]);
+
+    const applyStatus = async (statusValue, isManualChange = false) => {
+        const normalizedStatus = normalizeUserStatus(statusValue);
+        const storageKey = getStorageKey();
+
+        setCurrentStatus(normalizedStatus);
+        currentStatusRef.current = normalizedStatus;
+        localStorage.setItem(storageKey, normalizedStatus);
+
+        if (isManualChange) {
+            manualStatusRef.current = normalizedStatus;
+        }
+
+        if (!userId) return;
+
+        try {
+            setIsStatusUpdating(true);
+            await userApi.updateStatus(userId, toBackendUserStatus(normalizedStatus));
+        } catch (error) {
+            console.error('Error updating user status:', error);
+        } finally {
+            setIsStatusUpdating(false);
+        }
+    };
+
+    const handleStatusChange = async (statusValue) => {
+        setIsStatusMenuOpen(false);
+        await applyStatus(statusValue, true);
+    };
+
+    useEffect(() => {
+        if (!isOpen || !userId) return undefined;
+
+        let idleTimerId = null;
+
+        const resetIdleTimer = () => {
+            if (idleTimerId) {
+                window.clearTimeout(idleTimerId);
+            }
+
+            if (
+                manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
+                currentStatusRef.current === PRESENCE_STATUS.INACTIVE
+            ) {
+                applyStatus(PRESENCE_STATUS.ONLINE);
+            }
+
+            idleTimerId = window.setTimeout(() => {
+                if (
+                    manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
+                    currentStatusRef.current === PRESENCE_STATUS.ONLINE
+                ) {
+                    applyStatus(PRESENCE_STATUS.INACTIVE);
+                }
+            }, INACTIVITY_TIMEOUT_MS);
+        };
+
+        const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+        events.forEach((eventName) => {
+            window.addEventListener(eventName, resetIdleTimer, { passive: true });
+        });
+
+        resetIdleTimer();
+
+        return () => {
+            if (idleTimerId) {
+                window.clearTimeout(idleTimerId);
+            }
+            events.forEach((eventName) => {
+                window.removeEventListener(eventName, resetIdleTimer);
+            });
+        };
+    }, [isOpen, userId]);
+
+    useEffect(() => {
+        if (!isOpen || !userId || !getConnection) return undefined;
+
+        let mounted = true;
+
+        const setupRealtimeStatus = async () => {
+            try {
+                const notificationConnection = await getConnection('notificationhub', userId);
+                if (!mounted) return;
+                notificationConnectionRef.current = notificationConnection;
+
+                const onUserStatusChanged = (payload) => {
+                    const changedUserId = payload?.userId ?? payload?.UserId;
+                    if (String(changedUserId) !== String(userId)) {
+                        return;
+                    }
+
+                    const normalizedStatus = normalizeUserStatus(payload?.status ?? payload?.Status);
+                    setCurrentStatus(normalizedStatus);
+                    currentStatusRef.current = normalizedStatus;
+                    localStorage.setItem(getStorageKey(), normalizedStatus);
+                };
+
+                notificationConnection.on('UserStatusChanged', onUserStatusChanged);
+            } catch (error) {
+                console.error('Error setting up realtime status in user panel:', error);
+            }
+        };
+
+        setupRealtimeStatus();
+
+        return () => {
+            mounted = false;
+            if (notificationConnectionRef.current) {
+                notificationConnectionRef.current.off('UserStatusChanged');
+            }
+        };
+    }, [isOpen, userId, getConnection]);
+
     if (!isOpen) return null;
 
     return (
@@ -183,10 +360,50 @@ const UserPanel = ({
                                 username.charAt(0).toUpperCase()
                             )}
                         </div>
+                        <button
+                            className={styles['user-avatar-status-button']}
+                            onClick={() => setIsStatusMenuOpen((prev) => !prev)}
+                            title="Изменить статус"
+                            type="button"
+                        >
+                            <span
+                                className={styles['user-avatar-status']}
+                                style={{ backgroundColor: getUserStatusColor(currentStatus) }}
+                            />
+                        </button>
                     </div>
                     
                     <div className={styles['user-info']}>
                         <span className={styles.username}>{username}</span>
+                        <div className={styles['status-control']} ref={statusMenuRef}>
+                            <button
+                                className={styles['status-button']}
+                                onClick={() => setIsStatusMenuOpen((prev) => !prev)}
+                                title="Изменить статус"
+                                type="button"
+                            >
+                                <span className={styles['user-status-text']}>{getUserStatusLabel(currentStatus)}</span>
+                            </button>
+
+                            {isStatusMenuOpen && (
+                                <div className={styles['status-menu']}>
+                                    {getUserStatusOptions().map((statusOption) => (
+                                        <button
+                                            key={statusOption.value}
+                                            className={`${styles['status-menu-item']} ${currentStatus === statusOption.value ? styles['status-menu-item-active'] : ''}`}
+                                            onClick={() => handleStatusChange(statusOption.value)}
+                                            type="button"
+                                        >
+                                            <span
+                                                className={styles['status-dot']}
+                                                style={{ backgroundColor: statusOption.color }}
+                                            />
+                                            <span>{statusOption.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
                     <div className={styles['voice-controls']}>

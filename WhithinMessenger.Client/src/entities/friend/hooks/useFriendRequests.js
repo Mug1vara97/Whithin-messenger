@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { useAuth } from '../../../shared/lib/hooks/useAuth';
+import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 
 export const useFriendRequests = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -8,12 +8,12 @@ export const useFriendRequests = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { getConnection } = useConnectionContext();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const connectionRef = useRef(null);
 
   const getFriendConnection = useCallback(async () => {
     if (!user?.id) {
-      throw new Error('Пользователь не авторизован');
+      return null;
     }
 
     if (connectionRef.current) {
@@ -26,10 +26,17 @@ export const useFriendRequests = () => {
   }, [getConnection, user?.id]);
 
   const fetchFriendRequests = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       const connection = await getFriendConnection();
+      if (!connection) {
+        return;
+      }
       const requestsData = await connection.invoke('GetFriendRequests');
       setPendingRequests(requestsData.pendingRequests || []);
       setSentRequests(requestsData.sentRequests || []);
@@ -39,40 +46,61 @@ export const useFriendRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [getFriendConnection]);
+  }, [getFriendConnection, user?.id]);
 
   const acceptRequest = useCallback(async (friendshipId) => {
+    if (!user?.id) {
+      return;
+    }
+
     try {
       const connection = await getFriendConnection();
+      if (!connection) {
+        return;
+      }
       await connection.invoke('AcceptFriendRequest', friendshipId);
       setPendingRequests(prev => prev.filter(req => req.id !== friendshipId));
     } catch (err) {
       setError(err.message || 'Ошибка принятия запроса');
       console.error('Error accepting friend request:', err);
     }
-  }, [getFriendConnection]);
+  }, [getFriendConnection, user?.id]);
 
   const declineRequest = useCallback(async (friendshipId) => {
+    if (!user?.id) {
+      return;
+    }
+
     try {
       const connection = await getFriendConnection();
+      if (!connection) {
+        return;
+      }
       await connection.invoke('DeclineFriendRequest', friendshipId);
       setPendingRequests(prev => prev.filter(req => req.id !== friendshipId));
     } catch (err) {
       setError(err.message || 'Ошибка отклонения запроса');
       console.error('Error declining friend request:', err);
     }
-  }, [getFriendConnection]);
+  }, [getFriendConnection, user?.id]);
 
   const sendRequest = useCallback(async (targetUserId) => {
+    if (!user?.id) {
+      return;
+    }
+
     try {
       const connection = await getFriendConnection();
+      if (!connection) {
+        return;
+      }
       await connection.invoke('SendFriendRequest', targetUserId);
       await fetchFriendRequests();
     } catch (err) {
       setError(err.message || 'Ошибка отправки запроса');
       console.error('Error sending friend request:', err);
     }
-  }, [fetchFriendRequests, getFriendConnection]);
+  }, [fetchFriendRequests, getFriendConnection, user?.id]);
 
   // Подписка на SignalR события запросов в друзья
   useEffect(() => {
@@ -123,8 +151,9 @@ export const useFriendRequests = () => {
   }, [user?.id, getFriendConnection, fetchFriendRequests]);
 
   useEffect(() => {
+    if (!user?.id) return;
     fetchFriendRequests();
-  }, [fetchFriendRequests]);
+  }, [fetchFriendRequests, user?.id]);
 
   return {
     pendingRequests,

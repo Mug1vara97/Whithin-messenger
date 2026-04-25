@@ -3,6 +3,7 @@ import { PersonAdd } from '@mui/icons-material';
 import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { FriendItem, FriendRequestItem } from '../../../shared/ui/molecules';
 import { AddFriendModal } from '../../../shared/ui/molecules';
+import { normalizeUserStatus, PRESENCE_STATUS } from '../../../shared/lib/utils/userStatus';
 import './FriendsPanel.css';
 
 const FriendsPanel = ({ onStartChat }) => {
@@ -11,7 +12,9 @@ const FriendsPanel = ({ onStartChat }) => {
   const { friends, loading, error, removeFriend } = useFriends();
   const { pendingRequests, sentRequests, acceptRequest, declineRequest, sendRequest } = useFriendRequests();
 
-  const onlineFriends = friends.filter(friend => friend.status === 'Online');
+  const onlineFriends = friends.filter(
+    (friend) => normalizeUserStatus(friend.status) === PRESENCE_STATUS.ONLINE
+  );
   const allFriends = friends;
   const blockedFriends = [];
   const allPendingRequests = [...pendingRequests, ...sentRequests]

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Person, PersonOff, MoreVert, Check, Close } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
+import { getUserStatusColor, getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
 import './FriendItem.css';
 
 const FriendItem = ({ 
@@ -14,33 +15,6 @@ const FriendItem = ({
   isRequest = false
 }) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Online':
-        return '#4CAF50';
-      case 'Inactive':
-        return '#FF9800';
-      case 'DoNotDisturb':
-        return '#F44336';
-      case 'Offline':
-      default:
-        return '#9E9E9E';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'Online':
-        return 'В сети';
-      case 'Inactive':
-        return 'Неактивен';
-      case 'DoNotDisturb':
-        return 'Не беспокоить';
-      case 'Offline':
-      default:
-        return 'Не в сети';
-    }
-  };
 
   const formatLastSeen = (lastSeen) => {
     if (!lastSeen) return '';
@@ -70,7 +44,7 @@ const FriendItem = ({
         {!isRequest && (
           <div 
             className="friend-item__status-indicator"
-            style={{ backgroundColor: getStatusColor(friend.status) }}
+            style={{ backgroundColor: getUserStatusColor(friend.status) }}
           />
         )}
       </div>
@@ -81,9 +55,9 @@ const FriendItem = ({
         </div>
         {!isRequest && (
           <div className="friend-item__status">
-            {friend.status === 'Offline' && friend.lastSeen 
+            {normalizeUserStatus(friend.status) === PRESENCE_STATUS.OFFLINE && friend.lastSeen 
               ? `Был в сети ${formatLastSeen(friend.lastSeen)}`
-              : getStatusText(friend.status)
+              : getUserStatusLabel(friend.status)
             }
           </div>
         )}

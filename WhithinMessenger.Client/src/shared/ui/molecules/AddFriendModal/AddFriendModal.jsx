@@ -4,6 +4,7 @@ import { userApi } from '@/entities/user/api';
 import UserAvatar from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
 import { FormField } from '../../atoms/FormField';
+import { getUserStatusLabel } from '../../../lib/utils/userStatus';
 import './AddFriendModal.css';
 
 const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
@@ -108,7 +109,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
                            isPending ? 'Запрос отправлен' :
                            isBlocked ? 'Заблокирован' :
                            isDeclined ? 'Запрос отклонен' :
-                           user.userStatus}
+                           getUserStatusLabel(user.userStatus)}
                         </div>
                       </div>
                       {!isFriend && !isPending && !isBlocked && (

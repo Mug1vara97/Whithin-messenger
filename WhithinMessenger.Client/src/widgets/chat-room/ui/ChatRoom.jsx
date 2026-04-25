@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks } from '../../../shared/lib/utils/urlHelpers';
 import { 
@@ -33,6 +34,8 @@ const ChatRoom = ({
   onEndChatCall
 }) => {
   const { user } = useAuthContext();
+  const connectionContext = useConnectionContext();
+  const getConnection = connectionContext?.getConnection;
   const navigate = useNavigate();
   const username = user?.username;
   const userId = user?.id || user?.userId;
@@ -99,6 +102,7 @@ const ChatRoom = ({
   const [chatParticipants, setChatParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
+  const notificationConnectionRef = useRef(null);
 
   const inputRef = useRef(null);
 
@@ -291,6 +295,46 @@ const ChatRoom = ({
       });
     }
   }, [showChatInfo, chatId, connection]);
+
+  useEffect(() => {
+    if (!userId || !getConnection) return undefined;
+    let mounted = true;
+
+    const setupRealtimePresence = async () => {
+      try {
+        const notificationConnection = await getConnection('notificationhub', userId);
+        if (!mounted) return;
+        notificationConnectionRef.current = notificationConnection;
+
+        const onUserStatusChanged = (payload) => {
+          const changedUserId = payload?.userId ?? payload?.UserId;
+          const status = payload?.status ?? payload?.Status;
+          const lastSeen = payload?.lastSeen ?? payload?.LastSeen;
+
+          setChatParticipants((prev) =>
+            prev.map((participant) =>
+              String(participant.userId) === String(changedUserId)
+                ? { ...participant, userStatus: status ?? participant.userStatus, lastSeen: lastSeen ?? participant.lastSeen }
+                : participant
+            )
+          );
+        };
+
+        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
+      } catch (error) {
+        console.error('ChatRoom - failed to subscribe to presence updates:', error);
+      }
+    };
+
+    setupRealtimePresence();
+
+    return () => {
+      mounted = false;
+      if (notificationConnectionRef.current) {
+        notificationConnectionRef.current.off('UserStatusChanged');
+      }
+    };
+  }, [userId, getConnection]);
 
   useEffect(() => {
     setIsPrivateChat(chatTypeId === 1 || (!isGroupChat && !isServerChat));
