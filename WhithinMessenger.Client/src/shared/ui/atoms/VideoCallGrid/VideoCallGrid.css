@@ -13,104 +13,6 @@
   container-name: call-container;
 }
 
-.video-call-container.dm-audio-mode {
-  background: radial-gradient(circle at top, #2b2d31 0%, #1e1f22 55%, #111214 100%);
-}
-
-.dm-audio-stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 18px 16px 28px;
-}
-
-.dm-audio-users {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-}
-
-.dm-audio-avatar-wrap {
-  position: relative;
-  width: 104px;
-  height: 104px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.03);
-}
-
-.dm-audio-avatar-wrap.speaking {
-  animation: dm-avatar-speaking 1.7s ease-in-out infinite;
-}
-
-.dm-audio-avatar-image,
-.dm-audio-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 4px solid #2f3136;
-}
-
-.dm-audio-avatar-image {
-  object-fit: cover;
-}
-
-.dm-audio-avatar-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 38px;
-  font-weight: 700;
-}
-
-.dm-audio-muted-badge {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #ed4245;
-  border: 3px solid #111214;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-}
-
-.dm-audio-name {
-  margin-top: 10px;
-  color: #f2f3f5;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.dm-audio-status {
-  color: #b5bac1;
-  font-size: 15px;
-  font-weight: 500;
-  text-align: center;
-}
-
-@keyframes dm-avatar-speaking {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 10px rgba(35, 165, 90, 0.10);
-  }
-  50% {
-    transform: scale(1.03);
-    box-shadow: 0 0 0 14px rgba(35, 165, 90, 0.18);
-  }
-}
-
 .video-grid-wrapper {
   flex: 1;
   display: flex;
@@ -927,6 +829,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
+  border: 2px solid #5865f2; /* Синяя рамка для демонстрации экрана */
 }
 
 .screen-share-tile .tile-border {
@@ -935,6 +838,7 @@
   left: 0;
   right: 0;
   bottom: 0;
+  border: 2px solid #5865f2;
   border-radius: 8px;
   pointer-events: none;
   z-index: 1;
@@ -1157,19 +1061,6 @@
   
   .focused-view {
     padding: 10px !important;
-  }
-
-  .dm-audio-avatar-wrap {
-    width: 88px;
-    height: 88px;
-  }
-
-  .dm-audio-avatar-fallback {
-    font-size: 30px;
-  }
-
-  .dm-audio-name {
-    font-size: 20px;
   }
 }
 

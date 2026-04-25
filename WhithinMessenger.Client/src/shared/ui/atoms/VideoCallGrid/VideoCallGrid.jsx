@@ -230,20 +230,6 @@ const VideoCallGrid = ({
 
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
-  const hasAnyVideo = extendedParticipants.some((participant) =>
-    participant.isVideoEnabled && participant.videoStream && participant.videoStream.active
-  );
-  const hasAnyScreenShare = extendedParticipants.some((participant) => participant.isScreenShare);
-  const isOneToOneAudioCall = (
-    !forceGridMode &&
-    !isFocusedMode &&
-    extendedParticipants.length > 0 &&
-    extendedParticipants.length <= 2 &&
-    !hasAnyVideo &&
-    !hasAnyScreenShare
-  );
-  const remoteParticipant = extendedParticipants.find((participant) => !participant.isCurrentUser) || extendedParticipants[0];
-  const localParticipant = extendedParticipants.find((participant) => participant.isCurrentUser);
 
   // Вычисляемые значения
   const totalPages = Math.ceil(extendedParticipants.length / 6);
@@ -663,69 +649,6 @@ const VideoCallGrid = ({
               )}
             </div>
           )}
-        </div>
-      </div>
-    );
-  }
-
-  if (isOneToOneAudioCall) {
-    const remoteSlot = remoteParticipant || {
-      id: 'dm-remote-slot',
-      name: 'Собеседник',
-      avatar: null,
-      avatarColor: '#3a3d45',
-      isMuted: false,
-      isSpeaking: false
-    };
-    const localSlot = localParticipant || {
-      id: 'dm-local-slot',
-      name: 'Вы',
-      avatar: null,
-      avatarColor: '#5865f2',
-      isMuted: false,
-      isSpeaking: false
-    };
-    const dmParticipants = [remoteSlot, localSlot];
-    const callStateText = !remoteParticipant
-      ? 'Звоним...'
-      : remoteParticipant.isMuted
-        ? 'Микрофон выключен'
-        : 'В голосовом звонке';
-
-    return (
-      <div className={`video-call-container dm-audio-mode ${className}`}>
-        <div className="dm-audio-stage">
-          <div className="dm-audio-users">
-            {dmParticipants.map((participant) => (
-              <div
-                key={participant.id}
-                className={`dm-audio-avatar-wrap ${participant.isSpeaking ? 'speaking' : ''}`}
-              >
-                {participant.avatar ? (
-                  <img
-                    src={participant.avatar}
-                    alt={participant.name}
-                    className="dm-audio-avatar-image"
-                  />
-                ) : (
-                  <div
-                    className="dm-audio-avatar-fallback"
-                    style={{ backgroundColor: participant.avatarColor || getAvatarColor(participant.name || '?') }}
-                  >
-                    {getInitials(participant.name || '?')}
-                  </div>
-                )}
-                {participant.isMuted && (
-                  <span className="dm-audio-muted-badge">
-                    <MicOffIcon sx={{ fontSize: 16 }} />
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="dm-audio-name">{remoteParticipant?.name || 'Собеседник'}</div>
-          <div className="dm-audio-status">{callStateText}</div>
         </div>
       </div>
     );
