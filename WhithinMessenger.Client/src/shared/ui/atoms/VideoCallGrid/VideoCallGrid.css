@@ -829,7 +829,6 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
-  border: 2px solid #5865f2; /* Синяя рамка для демонстрации экрана */
 }
 
 .screen-share-tile .tile-border {
@@ -838,7 +837,6 @@
   left: 0;
   right: 0;
   bottom: 0;
-  border: 2px solid #5865f2;
   border-radius: 8px;
   pointer-events: none;
   z-index: 1;

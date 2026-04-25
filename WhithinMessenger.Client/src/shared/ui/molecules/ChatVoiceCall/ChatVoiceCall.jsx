@@ -135,6 +135,17 @@ const ChatVoiceCall = ({
     handleDisconnect();
   };
 
+  const isOneToOneCall = participants.length <= 1;
+  const remoteParticipant = participants[0] || null;
+  const partnerName = remoteParticipant?.name || chatName || 'Собеседник';
+  const partnerInitial = partnerName.charAt(0).toUpperCase() || 'U';
+  const ownInitial = (userName || 'You').charAt(0).toUpperCase();
+  const callStateText = !remoteParticipant
+    ? 'Звоним...'
+    : remoteParticipant.isMuted
+      ? 'Микрофон выключен'
+      : 'В голосовом звонке';
+
   // Создаем участников для отображения, как в VoiceCallView.jsx
   const currentUser = createParticipant(userId, userName || 'You', null, 'online', 'host');
   currentUser.isMuted = isMuted;
@@ -214,6 +225,22 @@ const ChatVoiceCall = ({
                   enableAutoFocus={false}
                 />
               </div>
+            ) : isOneToOneCall ? (
+              <div className={styles.dmCallStage}>
+                <div className={`${styles.dmAvatarWrap} ${remoteParticipant?.isSpeaking ? styles.dmAvatarSpeaking : ''}`}>
+                  <div className={styles.dmAvatarCircle}>{partnerInitial}</div>
+                  {remoteParticipant?.isMuted && (
+                    <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
+                      <MicOffIcon />
+                    </div>
+                  )}
+                </div>
+                <div className={styles.dmTitle}>{partnerName}</div>
+                <div className={styles.dmSubtitle}>{callStateText}</div>
+                <div className={styles.dmSelfBadge} title="Вы в звонке">
+                  {ownInitial}
+                </div>
+              </div>
             ) : (
               /* Обычное отображение кружков пользователей */
               displayParticipants.map((participant) => (
@@ -252,7 +279,7 @@ const ChatVoiceCall = ({
           <div className={styles.mainControls}>
             {/* Микрофон */}
             <button 
-              className={`${styles.controlBtn} ${styles.microphoneBtn} ${isMuted ? 'muted' : 'unmuted'}`}
+              className={`${styles.controlBtn} ${isMuted ? styles.controlBtnDanger : styles.controlBtnNeutral}`}
               onClick={handleToggleMute}
               title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
             >
@@ -261,33 +288,25 @@ const ChatVoiceCall = ({
 
             {/* Камера */}
             <button 
-              className={`${styles.controlBtn} ${styles.cameraBtn} ${isVideoEnabled ? 'active' : ''}`}
+              className={`${styles.controlBtn} ${isVideoEnabled ? styles.controlBtnActive : styles.controlBtnNeutral}`}
               onClick={handleToggleVideo}
               title={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
-              style={{ 
-                backgroundColor: isVideoEnabled ? '#5865f2' : '#40444b',
-                color: isVideoEnabled ? '#ffffff' : '#b9bbbe'
-              }}
             >
               {isVideoEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
             </button>
 
             {/* Демонстрация экрана */}
             <button 
-              className={`${styles.controlBtn} ${styles.screenShareBtn} ${isScreenSharing ? 'active' : ''}`}
+              className={`${styles.controlBtn} ${isScreenSharing ? styles.controlBtnActive : styles.controlBtnNeutral}`}
               onClick={handleScreenShare}
               title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Начать демонстрацию экрана'}
-              style={{ 
-                backgroundColor: isScreenSharing ? '#5865f2' : '#40444b',
-                color: isScreenSharing ? '#ffffff' : '#b9bbbe'
-              }}
             >
               {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
             </button>
 
             {/* Глобальный звук */}
             <button 
-              className={`${styles.controlBtn} ${styles.globalAudioBtn} ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
+              className={`${styles.controlBtn} ${isGlobalAudioMuted ? styles.controlBtnDanger : styles.controlBtnNeutral}`}
               onClick={toggleGlobalAudio}
               title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
             >

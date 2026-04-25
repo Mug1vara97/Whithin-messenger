@@ -3,7 +3,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: #18191c;
+  background: radial-gradient(circle at top, #2b2d31 0%, #1e1f22 45%, #111214 100%);
   display: flex;
   flex-direction: column;
   min-height: 230px;
@@ -61,6 +61,77 @@
   min-height: 0; /* Позволяет сжиматься */
 }
 
+.dmCallStage {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.dmAvatarWrap {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.03);
+}
+
+.dmAvatarSpeaking {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.dmAvatarCircle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #5865f2 0%, #4752c4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 68px;
+  font-weight: 700;
+  border: 4px solid #2f3136;
+}
+
+.dmTitle {
+  color: #f2f3f5;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  margin-top: 14px;
+}
+
+.dmSubtitle {
+  color: #b5bac1;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.dmSelfBadge {
+  position: absolute;
+  right: 34%;
+  bottom: 34px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #23a55a;
+  border: 3px solid #111214;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
 .participantItem {
   display: flex;
   flex-direction: column;
@@ -113,6 +184,23 @@
   font-size: 10px;
 }
 
+.dmAvatarWrap > .statusIndicator {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #111214;
+}
+
+.muteIndicator {
+  background: #ed4245;
+}
+
+.audioMutedIndicator {
+  background: #faa81a;
+}
+
 
 /* Bottom Controls */
 .bottomControls {
@@ -121,15 +209,15 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  background: rgba(24, 25, 28, 0.9);
+  background: rgba(17, 18, 20, 0.92);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: 999px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid #40444b;
+  border: 1px solid #2f3136;
 }
 
 .controlSection {
-  padding: 16px;
+  padding: 10px 14px;
 }
 
 .mainControls {
@@ -140,9 +228,9 @@
 }
 
 .controlBtn {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
   border: none;
   cursor: pointer;
   display: flex;
@@ -151,43 +239,36 @@
   transition: all 0.2s;
   font-size: 20px;
   position: relative;
-}
-
-.controlBtn.microphoneBtn.muted {
-  color: #f04747;
-}
-
-.controlBtn.microphoneBtn.unmuted {
-  background: #43b581;
-  color: #ffffff;
-}
-
-.controlBtn.cameraBtn {
-  background: #40444b;
-  color: #72767d;
-}
-
-.controlBtn.cameraBtn.disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.controlBtn.globalAudioBtn.muted {
-  color: #f04747;
-  color: #ffffff;
-}
-
-.controlBtn.globalAudioBtn.unmuted {
-  background: #40444b;
-  color: #b9bbbe;
+  color: #f2f3f5;
+  background: #404249;
+  border: 1px solid #4e5058;
 }
 
 .controlBtn.endCallBtn {
-  background: #f04747;
+  background: #da373c;
   color: #ffffff;
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid #f23f43;
+}
+
+.controlBtnNeutral {
+  background: #404249;
+  color: #f2f3f5;
+  border: 1px solid #4e5058;
+}
+
+.controlBtnActive {
+  background: #5865f2;
+  color: #ffffff;
+  border: 1px solid #6572ff;
+}
+
+.controlBtnDanger {
+  background: #da373c;
+  color: #ffffff;
+  border: 1px solid #f23f43;
 }
 
 .controlBtn:hover:not(.disabled) {
@@ -199,7 +280,7 @@
 }
 
 .controlBtn.endCallBtn:hover {
-  box-shadow: 0 6px 16px rgba(240, 71, 71, 0.4);
+  box-shadow: 0 6px 16px rgba(237, 66, 69, 0.4);
 }
 
 /* Error Banner */
@@ -236,14 +317,34 @@
   }
   
   .controlBtn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     font-size: 16px;
   }
   
   .controlBtn.endCallBtn {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .dmAvatarWrap {
+    width: 132px;
+    height: 132px;
+  }
+
+  .dmAvatarCircle {
+    font-size: 52px;
+  }
+
+  .dmTitle {
+    font-size: 24px;
+  }
+
+  .dmSelfBadge {
+    width: 34px;
+    height: 34px;
+    right: 28%;
+    bottom: 40px;
   }
 }
 
