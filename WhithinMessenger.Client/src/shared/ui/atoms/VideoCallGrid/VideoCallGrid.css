@@ -13,6 +13,114 @@
   container-name: call-container;
 }
 
+.video-call-container.dm-audio-mode {
+  background: radial-gradient(circle at top, #2b2d31 0%, #1e1f22 55%, #111214 100%);
+}
+
+.dm-audio-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 16px 28px;
+}
+
+.dm-audio-avatar-wrap {
+  position: relative;
+  width: 144px;
+  height: 144px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.03);
+}
+
+.dm-audio-avatar-wrap.speaking {
+  animation: dm-avatar-speaking 1.7s ease-in-out infinite;
+}
+
+.dm-audio-avatar-image,
+.dm-audio-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4px solid #2f3136;
+}
+
+.dm-audio-avatar-image {
+  object-fit: cover;
+}
+
+.dm-audio-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 52px;
+  font-weight: 700;
+}
+
+.dm-audio-muted-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ed4245;
+  border: 3px solid #111214;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.dm-audio-name {
+  margin-top: 14px;
+  color: #f2f3f5;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.dm-audio-status {
+  color: #b5bac1;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.dm-audio-self-pill {
+  position: absolute;
+  right: 36%;
+  bottom: 22px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #23a55a;
+  border: 3px solid #111214;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@keyframes dm-avatar-speaking {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(35, 165, 90, 0.10);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 14px rgba(35, 165, 90, 0.18);
+  }
+}
+
 .video-grid-wrapper {
   flex: 1;
   display: flex;
@@ -1059,6 +1167,23 @@
   
   .focused-view {
     padding: 10px !important;
+  }
+
+  .dm-audio-avatar-wrap {
+    width: 122px;
+    height: 122px;
+  }
+
+  .dm-audio-avatar-fallback {
+    font-size: 42px;
+  }
+
+  .dm-audio-name {
+    font-size: 22px;
+  }
+
+  .dm-audio-self-pill {
+    right: 29%;
   }
 }
 
