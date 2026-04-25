@@ -234,6 +234,15 @@ const VideoCallGrid = ({
   // Вычисляемые значения
   const totalPages = Math.ceil(extendedParticipants.length / 6);
   const totalBottomPages = Math.ceil(extendedParticipants.length / visibleBottomUsers);
+  const screenShareTilesCount = extendedParticipants.filter((participant) => participant.isScreenShare).length;
+  const regularTilesCount = extendedParticipants.length - screenShareTilesCount;
+  const isOneToOneScreenShareDuo = screenShareTilesCount === 1 && regularTilesCount === 1;
+  const isOneToOneScreenShareTrio = screenShareTilesCount === 1 && regularTilesCount === 2;
+  const gridLayoutClassName = isOneToOneScreenShareTrio
+    ? 'video-grid--screen-share-trio'
+    : isOneToOneScreenShareDuo
+      ? 'video-grid--screen-share-duo'
+      : '';
   
   // const currentParticipants = extendedParticipants.slice(currentPage * 6, (currentPage + 1) * 6);
 
@@ -691,7 +700,7 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={extendedParticipants.length}>
+        <div className={`video-grid ${gridLayoutClassName}`.trim()} data-user-count={extendedParticipants.length}>
           {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
 
           {extendedParticipants.map((participant) => renderParticipantTile(participant, false))}

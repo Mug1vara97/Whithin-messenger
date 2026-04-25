@@ -451,10 +451,75 @@
   flex-shrink: 0;
 }
 
+/* 1:1 + screen share (3 tiles): large screen on top, users below */
+.video-grid.video-grid--screen-share-trio {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-content: stretch;
+  justify-items: stretch;
+  height: 100%;
+  padding: 0 8px;
+}
+
+.video-grid.video-grid--screen-share-trio .video-tile {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+}
+
+.video-grid.video-grid--screen-share-trio .video-tile.screen-share-tile {
+  grid-column: 1 / -1;
+  min-height: clamp(220px, 62%, 520px);
+}
+
+.video-grid.video-grid--screen-share-trio .video-tile:not(.screen-share-tile) {
+  min-height: clamp(110px, 21%, 170px);
+}
+
+/* 1:1 + screen share (2 tiles): large screen + small side tile */
+.video-grid.video-grid--screen-share-duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 26%);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 8px;
+  align-content: stretch;
+  justify-items: stretch;
+  height: 100%;
+  padding: 0 8px;
+}
+
+.video-grid.video-grid--screen-share-duo .video-tile {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.video-grid.video-grid--screen-share-duo .video-tile.screen-share-tile {
+  min-height: clamp(240px, 100%, 640px);
+}
+
 /* 3 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
+  }
+
+  .video-grid.video-grid--screen-share-trio {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) repeat(2, auto);
+  }
+
+  .video-grid.video-grid--screen-share-trio .video-tile.screen-share-tile {
+    grid-column: 1;
+    min-height: clamp(190px, 56%, 420px);
+  }
+
+  .video-grid.video-grid--screen-share-duo {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 }
 
@@ -829,7 +894,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   aspect-ratio: 16 / 9;
-  border: 2px solid #5865f2; /* Синяя рамка для демонстрации экрана */
+  /*border: 2px solid #5865f2; Синяя рамка для демонстрации экрана */
 }
 
 .screen-share-tile .tile-border {
@@ -838,7 +903,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  border: 2px solid #5865f2;
+  /*border: 2px solid #5865f2;*/  
   border-radius: 8px;
   pointer-events: none;
   z-index: 1;
