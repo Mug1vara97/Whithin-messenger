@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { useCallStore } from '../../../shared/lib/stores/callStore';
+import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks } from '../../../shared/lib/utils/urlHelpers';
 import { 
@@ -100,6 +102,7 @@ const ChatRoom = ({
   const [otherUserInCall] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [chatParticipants, setChatParticipants] = useState([]);
+  const [existingCallParticipants, setExistingCallParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
   const notificationConnectionRef = useRef(null);
@@ -340,10 +343,50 @@ const ChatRoom = ({
     setIsPrivateChat(chatTypeId === 1 || (!isGroupChat && !isServerChat));
   }, [chatTypeId, isGroupChat, isServerChat]);
 
+  useEffect(() => {
+    if (!chatId || isServerChat) return undefined;
+
+    const readParticipantsFromStore = (state) => {
+      if (!state?.voiceChannelParticipants) return [];
+
+      const direct =
+        state.voiceChannelParticipants.get(chatId) ||
+        state.voiceChannelParticipants.get(String(chatId));
+      if (direct && Array.isArray(direct)) return direct;
+
+      for (const [channelKey, participants] of state.voiceChannelParticipants.entries()) {
+        if (String(channelKey) === String(chatId) && Array.isArray(participants)) {
+          return participants;
+        }
+      }
+
+      return [];
+    };
+
+    voiceChannelService.connect();
+    voiceChannelService.subscribeToChannel(String(chatId));
+    setExistingCallParticipants(readParticipantsFromStore(useCallStore.getState()));
+
+    const unsubscribe = useCallStore.subscribe((state) => {
+      setExistingCallParticipants(readParticipantsFromStore(state));
+    });
+
+    return () => {
+      unsubscribe();
+      voiceChannelService.unsubscribeFromChannel(String(chatId));
+    };
+  }, [chatId, isServerChat]);
+
   const isCallActiveInThisChat = (activePrivateCall && 
     String(activePrivateCall.chatId) === String(chatId) && 
     isPrivateChat) || (activeChatCall && 
     String(activeChatCall.chatId) === String(chatId));
+
+  const usersAlreadyInCall = existingCallParticipants.filter((participant) => {
+    const participantId = participant.odUserId || participant.userId;
+    return String(participantId) !== String(userId);
+  });
+  const hasJoinableCallInThisChat = !isCallActiveInThisChat && usersAlreadyInCall.length > 0;
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -735,6 +778,37 @@ const ChatRoom = ({
             }
           }}
         />
+      )}
+
+      {hasJoinableCallInThisChat && (
+        <div className="chat-call-join-card">
+          <div className="chat-call-join-left">
+            <div className="chat-call-join-avatars">
+              {usersAlreadyInCall.slice(0, 4).map((participant) => (
+                <UserAvatar
+                  key={participant.odUserId || participant.userId || participant.userName}
+                  username={participant.userName || 'U'}
+                  avatarUrl={participant.avatar}
+                  avatarColor={participant.avatarColor}
+                  size={28}
+                />
+              ))}
+            </div>
+            <div className="chat-call-join-text">
+              <strong>Звонок уже идёт</strong>
+              <span>
+                {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="chat-call-join-button"
+            onClick={handleCallWithoutNotification}
+          >
+            Присоединиться
+          </button>
+        </div>
       )}
 
       <div className="messages">

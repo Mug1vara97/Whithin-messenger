@@ -25,6 +25,86 @@
   min-height: 0;
 }
 
+.chat-call-join-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.22), rgba(35, 39, 76, 0.35));
+  border: 1px solid rgba(88, 101, 242, 0.45);
+  border-radius: 10px;
+}
+
+.chat-call-join-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chat-call-join-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.chat-call-join-avatars > * {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--background);
+  margin-left: -6px;
+}
+
+.chat-call-join-avatars > *:first-child {
+  margin-left: 0;
+}
+
+.chat-call-join-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.chat-call-join-text strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.chat-call-join-text span {
+  font-size: 12px;
+  color: var(--textSecondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.chat-call-join-button {
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.chat-call-join-button:hover {
+  background: #4b57d5;
+}
+
+.chat-call-join-button:active {
+  transform: scale(0.97);
+}
+
 .chat-room-error {
   display: flex;
   flex-direction: column;

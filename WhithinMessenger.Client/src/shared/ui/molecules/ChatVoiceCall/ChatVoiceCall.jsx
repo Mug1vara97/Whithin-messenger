@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { createParticipant } from '../../../../entities/video-call/model/types';
+import { userApi } from '../../../../entities/user/api/userApi';
+import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { VideoCallGrid } from '../../atoms';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
@@ -23,6 +25,28 @@ const ChatVoiceCall = ({
   userName,
   onClose
 }) => {
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+
+  const toMediaUrl = (value) => {
+    if (!value) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    return `${MEDIA_BASE_URL}${value}`;
+  };
+
+  const toBannerValue = (value) => {
+    if (!value) return null;
+    if (value.startsWith('#')) return value;
+    const lower = value.toLowerCase();
+    const looksLikeImage =
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('/uploads/') ||
+      value.startsWith('/api/') ||
+      value.startsWith('uploads/') ||
+      ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].some((ext) => lower.includes(ext));
+    return looksLikeImage ? toMediaUrl(value) : value;
+  };
+
   const {
     isConnected,
     isMuted,
@@ -50,6 +74,28 @@ const ChatVoiceCall = ({
     stopScreenShare,
     toggleVideo
   } = useGlobalCall(userId, userName);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadCurrentUserProfile = async () => {
+      if (!userId) return;
+      try {
+        const profile = await userApi.getProfile(userId);
+        if (!mounted || !profile) return;
+        setCurrentUserProfile({
+          avatar: toMediaUrl(profile.avatar),
+          avatarColor: profile.avatarColor || '#5865f2',
+          banner: toBannerValue(profile.banner)
+        });
+      } catch (error) {
+        console.warn('ChatVoiceCall: failed to load current user profile', error);
+      }
+    };
+    loadCurrentUserProfile();
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
 
   // Автоматически начинаем звонок при монтировании
   useEffect(() => {
@@ -144,6 +190,9 @@ const ChatVoiceCall = ({
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = cameraStream;
   currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
+  currentUser.avatar = currentUserProfile?.avatar || null;
+  currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
+  currentUser.banner = currentUserProfile?.banner || null;
   
   const displayParticipants = [currentUser];
   
@@ -161,6 +210,8 @@ const ChatVoiceCall = ({
     videoParticipant.isSpeaking = participant.isSpeaking || false;
     videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
     videoParticipant.videoStream = participant.videoStream || null;
+    videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
+    videoParticipant.banner = participant.banner || null;
     console.log('🎥 Creating display participant:', {
       id: videoParticipant.id,
       name: videoParticipant.name,
