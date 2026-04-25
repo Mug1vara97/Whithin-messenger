@@ -189,6 +189,7 @@ const ChatVoiceCall = ({
             /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
             <div className={styles.screenShareContainer}>
               <VideoCallGrid 
+                className="dm-grid-fit"
                 participants={displayParticipants}
                 onParticipantClick={(participant) => {
                   console.log('Clicked participant:', participant);
@@ -209,7 +210,7 @@ const ChatVoiceCall = ({
                 remoteScreenShares={remoteScreenShares}
                 onStopScreenShare={handleScreenShare}
                 forceGridMode={false}
-                hideBottomUsers={true}
+                hideBottomUsers={false}
                 isVideoEnabled={isVideoEnabled}
                 videoStream={cameraStream}
                 enableAutoFocus={false}

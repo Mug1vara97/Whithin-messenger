@@ -633,7 +633,9 @@ const VideoCallGrid = ({
 
               <div className="bottom-users-grid" ref={bottomGridRef}>
                 {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
-                {extendedParticipants.map((participant) => renderParticipantTile(participant, true))}
+                {extendedParticipants
+                  .filter((participant) => participant.id !== focusedParticipantId)
+                  .map((participant) => renderParticipantTile(participant, true))}
               </div>
 
               {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (

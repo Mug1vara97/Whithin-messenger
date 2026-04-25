@@ -447,9 +447,7 @@
 }
 
 .video-grid[data-user-count="3"] .video-tile {
-  height: calc((100% - 8px) / 2);
-  width: auto;
-  max-width: calc(50% - 4px);
+  width: min(calc(50% - 4px), calc(((100% - 8px) / 2) * 16 / 9));
   flex-shrink: 0;
 }
 
@@ -457,8 +455,6 @@
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="3"] .video-tile {
     width: 100%;
-    max-width: 100%;
-    height: auto;
   }
 }
 
@@ -472,15 +468,33 @@
 }
 
 .video-grid[data-user-count="4"] .video-tile {
-  height: calc((100% - 8px) / 2);
-  width: auto;
-  max-width: calc(50% - 4px);
+  width: min(calc(50% - 4px), calc(((100% - 8px) / 2) * 16 / 9));
   flex-shrink: 0;
 }
 
 /* 4 users - узкий контейнер (1 колонка) */
 @container call-container (max-width: 500px) {
   .video-grid[data-user-count="4"] .video-tile {
+    width: 100%;
+  }
+}
+
+/* DM/1:1 call fit mode: preserve tiles inside fixed-height container */
+.video-call-container.dm-grid-fit .video-grid[data-user-count="3"] .video-tile {
+  height: calc((100% - 8px) / 2);
+  width: auto;
+  max-width: calc(50% - 4px);
+}
+
+.video-call-container.dm-grid-fit .video-grid[data-user-count="4"] .video-tile {
+  height: calc((100% - 8px) / 2);
+  width: auto;
+  max-width: calc(50% - 4px);
+}
+
+@container call-container (max-width: 500px) {
+  .video-call-container.dm-grid-fit .video-grid[data-user-count="3"] .video-tile,
+  .video-call-container.dm-grid-fit .video-grid[data-user-count="4"] .video-tile {
     width: 100%;
     max-width: 100%;
     height: auto;
@@ -688,6 +702,44 @@
   max-height: 100%;
   min-height: 0; /* Позволяет сжиматься */
   height: 100%; /* Занимает всю доступную высоту */
+}
+
+/* DM focus layout: large centered share + compact participant strip */
+.video-call-container.dm-grid-fit.focused-mode .focused-view {
+  padding: 10px 14px 12px;
+  gap: 10px;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .focused-user-wrapper {
+  align-items: flex-start;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .focused-tile {
+  width: min(100%, 980px);
+  max-height: min(66vh, 360px);
+  margin: 0 auto;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .bottom-users-container {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+  gap: 8px;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .bottom-users-grid {
+  justify-content: center;
+  max-width: 100%;
+  gap: 8px;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .bottom-users-grid .small-tile {
+  width: min(320px, calc((100% - 8px) / 2));
+  min-width: 150px;
+  max-width: 380px;
 }
 
 .focused-user-wrapper {
