@@ -2,7 +2,7 @@
 .voiceCallContainer {
   position: relative;
   width: 100%;
-  height: 576px;
+  height: 50%;
   background:
     radial-gradient(120% 90% at 50% 0%, #23263a 0%, #1d1f2d 35%, #181a24 100%),
     #181a24;
@@ -67,8 +67,9 @@
 }
 
 .oneToOneParticipants {
-  align-items: flex-start;
-  padding-top: clamp(8px, 8vh, 72px);
+  align-items: center;
+  justify-content: center;
+  padding-top: 0;
 }
 
 .participantItem {

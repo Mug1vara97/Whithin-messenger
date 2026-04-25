@@ -210,7 +210,7 @@ const ChatVoiceCall = ({
                 remoteScreenShares={remoteScreenShares}
                 onStopScreenShare={handleScreenShare}
                 forceGridMode={false}
-                hideBottomUsers={false}
+                hideBottomUsers={displayParticipants.length <= 2}
                 isVideoEnabled={isVideoEnabled}
                 videoStream={cameraStream}
                 enableAutoFocus={false}
