@@ -810,12 +810,10 @@ const ChatRoom = ({
             </div>
             <div className="join-preview-status-row">
               <div className={`join-preview-status-pill ${primaryIsMuted ? 'off' : 'on'}`}>
-                {primaryIsMuted ? <MicOff style={{ fontSize: '16px' }} /> : <Mic style={{ fontSize: '16px' }} />}
-                <span>{primaryIsMuted ? 'Микрофон выкл.' : 'Микрофон вкл.'}</span>
+                {primaryIsMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
               </div>
               <div className={`join-preview-status-pill ${primaryIsDeafened ? 'off' : 'on'}`}>
-                {primaryIsDeafened ? <HeadsetOff style={{ fontSize: '16px' }} /> : <Headset style={{ fontSize: '16px' }} />}
-                <span>{primaryIsDeafened ? 'Наушники выкл.' : 'Наушники вкл.'}</span>
+                {primaryIsDeafened ? <HeadsetOff style={{ fontSize: '14px' }} /> : <Headset style={{ fontSize: '14px' }} />}
               </div>
             </div>
           </div>
