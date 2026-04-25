@@ -276,7 +276,10 @@ const ChatVoiceCall = ({
               >
                 <div className={styles.participantAvatarContainer}>
                   <div className={styles.participantAvatar}>
-                    <div className={styles.avatarCircle}>
+                    <div
+                      className={styles.avatarCircle}
+                      style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#5865f2' } : undefined}
+                    >
                       {participant.avatar ? (
                         <img
                           src={participant.avatar}

@@ -26,7 +26,8 @@
 }
 
 .chat-voice-call-join-preview {
-  flex: 0 0 50%;
+  flex: 0 0 auto;
+  height: 50%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -36,8 +37,29 @@
   border-bottom: 1px solid #40444b;
   background: #000000;
   min-height: 260px;
+  max-height: 80vh;
   position: relative;
   overflow: hidden;
+  resize: vertical;
+  cursor: ns-resize;
+}
+
+.chat-voice-call-join-preview::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, #707bf5 20%, #707bf5 80%, transparent 100%);
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.chat-voice-call-join-preview:hover::after {
+  opacity: 1;
 }
 
 .join-preview-center {
@@ -68,6 +90,36 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.join-preview-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.join-preview-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.join-preview-status-pill.on {
+  color: #f2f3f5;
+  background: rgba(49, 51, 56, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.join-preview-status-pill.off {
+  color: #ffffff;
+  background: rgba(237, 66, 69, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .join-preview-controls {

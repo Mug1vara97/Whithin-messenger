@@ -21,7 +21,7 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, Mic, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
+import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -388,6 +388,12 @@ const ChatRoom = ({
   });
   const hasJoinableCallInThisChat = !isCallActiveInThisChat && usersAlreadyInCall.length > 0;
   const primaryJoinParticipant = usersAlreadyInCall[0] || null;
+  const primaryIsMuted = !!primaryJoinParticipant?.isMuted;
+  const primaryIsDeafened = !!(
+    primaryJoinParticipant?.isGlobalAudioMuted ||
+    primaryJoinParticipant?.isAudioDisabled ||
+    primaryJoinParticipant?.isDeafened
+  );
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -795,6 +801,16 @@ const ChatRoom = ({
             <div className="join-preview-title">Звонок уже идёт</div>
             <div className="join-preview-subtitle">
               {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
+            </div>
+            <div className="join-preview-status-row">
+              <div className={`join-preview-status-pill ${primaryIsMuted ? 'off' : 'on'}`}>
+                {primaryIsMuted ? <MicOff style={{ fontSize: '16px' }} /> : <Mic style={{ fontSize: '16px' }} />}
+                <span>{primaryIsMuted ? 'Микрофон выкл.' : 'Микрофон вкл.'}</span>
+              </div>
+              <div className={`join-preview-status-pill ${primaryIsDeafened ? 'off' : 'on'}`}>
+                {primaryIsDeafened ? <HeadsetOff style={{ fontSize: '16px' }} /> : <Headset style={{ fontSize: '16px' }} />}
+                <span>{primaryIsDeafened ? 'Наушники выкл.' : 'Наушники вкл.'}</span>
+              </div>
             </div>
           </div>
           <div className="join-preview-controls">
