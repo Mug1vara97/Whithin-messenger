@@ -277,7 +277,15 @@ const ChatVoiceCall = ({
                 <div className={styles.participantAvatarContainer}>
                   <div className={styles.participantAvatar}>
                     <div className={styles.avatarCircle}>
-                      {(participant.name || 'U').charAt(0).toUpperCase()}
+                      {participant.avatar ? (
+                        <img
+                          src={participant.avatar}
+                          alt={participant.name || 'User'}
+                          className={styles.avatarImage}
+                        />
+                      ) : (
+                        (participant.name || 'U').charAt(0).toUpperCase()
+                      )}
                     </div>
                     {/* Индикаторы статуса */}
                     <div className={styles.statusIndicators}>

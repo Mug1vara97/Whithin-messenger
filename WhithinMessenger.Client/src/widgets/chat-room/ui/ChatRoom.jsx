@@ -387,6 +387,7 @@ const ChatRoom = ({
     return String(participantId) !== String(userId);
   });
   const hasJoinableCallInThisChat = !isCallActiveInThisChat && usersAlreadyInCall.length > 0;
+  const primaryJoinParticipant = usersAlreadyInCall[0] || null;
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -780,34 +781,35 @@ const ChatRoom = ({
         />
       )}
 
-      {hasJoinableCallInThisChat && (
-        <div className="chat-call-join-card">
-          <div className="chat-call-join-left">
-            <div className="chat-call-join-avatars">
-              {usersAlreadyInCall.slice(0, 4).map((participant) => (
-                <UserAvatar
-                  key={participant.odUserId || participant.userId || participant.userName}
-                  username={participant.userName || 'U'}
-                  avatarUrl={participant.avatar}
-                  avatarColor={participant.avatarColor}
-                  size={28}
-                />
-              ))}
+      {hasJoinableCallInThisChat && primaryJoinParticipant && (
+        <div className="chat-voice-call-join-preview">
+          <div className="join-preview-center">
+            <div className="join-preview-avatar-wrap">
+              <UserAvatar
+                username={primaryJoinParticipant.userName || 'U'}
+                avatarUrl={primaryJoinParticipant.avatar}
+                avatarColor={primaryJoinParticipant.avatarColor}
+                size={96}
+              />
             </div>
-            <div className="chat-call-join-text">
-              <strong>Звонок уже идёт</strong>
-              <span>
-                {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
-              </span>
+            <div className="join-preview-title">Звонок уже идёт</div>
+            <div className="join-preview-subtitle">
+              {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
             </div>
           </div>
-          <button
-            type="button"
-            className="chat-call-join-button"
-            onClick={handleCallWithoutNotification}
-          >
-            Присоединиться
-          </button>
+          <div className="join-preview-controls">
+            <button type="button" className="join-preview-btn disabled" title="Камера">
+              <Videocam style={{ fontSize: '20px' }} />
+            </button>
+            <button
+              type="button"
+              className="join-preview-btn join"
+              title="Присоединиться к звонку"
+              onClick={handleCallWithoutNotification}
+            >
+              <Call style={{ fontSize: '20px' }} />
+            </button>
+          </div>
         </div>
       )}
 
