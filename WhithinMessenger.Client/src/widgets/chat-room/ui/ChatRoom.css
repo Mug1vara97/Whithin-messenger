@@ -74,6 +74,38 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 68px;
+}
+
+.join-preview-avatar-wrap > * {
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
+  min-height: 68px;
+  border-radius: 50%;
+  border: 3px solid #000;
+  margin-left: -14px;
+}
+
+.join-preview-avatar-wrap > *:first-child {
+  margin-left: 0;
+}
+
+.join-preview-avatar-more {
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
+  min-height: 68px;
+  margin-left: -14px;
+  border-radius: 50%;
+  border: 3px solid #000;
+  background: #2f3136;
+  color: #f2f3f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .join-preview-title {

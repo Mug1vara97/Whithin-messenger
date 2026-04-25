@@ -13,7 +13,6 @@ import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import HeadsetIcon from '@mui/icons-material/Headset';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import styles from './ChatVoiceCall.module.css';
@@ -207,6 +206,7 @@ const ChatVoiceCall = ({
     );
     videoParticipant.isMuted = participant.isMuted || false;
     videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
+    videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
     videoParticipant.isSpeaking = participant.isSpeaking || false;
     videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
     videoParticipant.videoStream = participant.videoStream || null;
@@ -270,6 +270,9 @@ const ChatVoiceCall = ({
           ) : (
             /* Обычное отображение кружков пользователей */
             displayParticipants.map((participant) => (
+              (() => {
+                const participantIsDeafened = participant.isGlobalAudioMuted || participant.isAudioDisabled || participant.isDeafened;
+                return (
               <div
                 key={participant.id}
                 className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''}`}
@@ -290,23 +293,20 @@ const ChatVoiceCall = ({
                         (participant.name || 'U').charAt(0).toUpperCase()
                       )}
                     </div>
-                    {/* Индикаторы статуса */}
-                    <div className={styles.statusIndicators}>
-                      {participant.isMuted && (
-                        <div className={`${styles.statusIndicator} ${styles.muteIndicator}`}>
-                          <MicOffIcon />
-                        </div>
-                      )}
-                      {participant.isGlobalAudioMuted && (
-                        <div className={`${styles.statusIndicator} ${styles.audioMutedIndicator}`}>
-                          <VolumeOffIcon />
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
                 <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
+                <div className={styles.participantStatusRow}>
+                  <div className={`${styles.participantStatusPill} ${participant.isMuted ? styles.statusOff : styles.statusOn}`}>
+                    {participant.isMuted ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
+                  </div>
+                  <div className={`${styles.participantStatusPill} ${participantIsDeafened ? styles.statusOff : styles.statusOn}`}>
+                    {participantIsDeafened ? <HeadsetOffIcon sx={{ fontSize: 14 }} /> : <HeadsetIcon sx={{ fontSize: 14 }} />}
+                  </div>
+                </div>
               </div>
+                );
+              })()
             ))
           )}
         </div>

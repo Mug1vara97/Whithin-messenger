@@ -791,12 +791,18 @@ const ChatRoom = ({
         <div className="chat-voice-call-join-preview">
           <div className="join-preview-center">
             <div className="join-preview-avatar-wrap">
-              <UserAvatar
-                username={primaryJoinParticipant.userName || 'U'}
-                avatarUrl={primaryJoinParticipant.avatar}
-                avatarColor={primaryJoinParticipant.avatarColor}
-                size={96}
-              />
+              {usersAlreadyInCall.slice(0, 4).map((participant) => (
+                <UserAvatar
+                  key={participant.odUserId || participant.userId || participant.userName}
+                  username={participant.userName || 'U'}
+                  avatarUrl={participant.avatar}
+                  avatarColor={participant.avatarColor}
+                  size={68}
+                />
+              ))}
+              {usersAlreadyInCall.length > 4 && (
+                <div className="join-preview-avatar-more">+{usersAlreadyInCall.length - 4}</div>
+              )}
             </div>
             <div className="join-preview-title">Звонок уже идёт</div>
             <div className="join-preview-subtitle">
