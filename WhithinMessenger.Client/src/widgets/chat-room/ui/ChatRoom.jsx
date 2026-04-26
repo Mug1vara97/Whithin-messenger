@@ -389,12 +389,6 @@ const ChatRoom = ({
   });
   const hasJoinableCallInThisChat = !isCallActiveInThisChat && usersAlreadyInCall.length > 0;
   const primaryJoinParticipant = usersAlreadyInCall[0] || null;
-  const primaryIsMuted = !!primaryJoinParticipant?.isMuted;
-  const primaryIsDeafened = !!(
-    primaryJoinParticipant?.isGlobalAudioMuted ||
-    primaryJoinParticipant?.isAudioDisabled ||
-    primaryJoinParticipant?.isDeafened
-  );
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -799,14 +793,50 @@ const ChatRoom = ({
             <div className="join-preview-subtitle">
               {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
             </div>
-            <div className="join-preview-status-row">
-              <div className={`join-preview-status-pill ${primaryIsMuted ? 'off' : 'on'}`}>
-                {primaryIsMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
+            {isGroupChat && (
+              <div className="join-preview-status-list">
+                {usersAlreadyInCall.slice(0, 6).map((participant) => {
+                  const participantMuted = !!participant?.isMuted;
+                  const participantDeafened = !!(
+                    participant?.isGlobalAudioMuted ||
+                    participant?.isAudioDisabled ||
+                    participant?.isDeafened
+                  );
+
+                  return (
+                    <div
+                      className="join-preview-status-item"
+                      key={`${participant.odUserId || participant.userId || participant.userName}-status`}
+                    >
+                      <span className="join-preview-status-name">{participant.userName || 'User'}</span>
+                      <div className={`join-preview-status-pill ${participantMuted ? 'off' : 'on'}`}>
+                        {participantMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
+                      </div>
+                      <div className={`join-preview-status-pill ${participantDeafened ? 'off' : 'on'}`}>
+                        {participantDeafened ? <HeadsetOff style={{ fontSize: '14px' }} /> : <Headset style={{ fontSize: '14px' }} />}
+                      </div>
+                    </div>
+                  );
+                })}
+                {usersAlreadyInCall.length > 6 && (
+                  <div className="join-preview-status-more">+{usersAlreadyInCall.length - 6}</div>
+                )}
               </div>
-              <div className={`join-preview-status-pill ${primaryIsDeafened ? 'off' : 'on'}`}>
-                {primaryIsDeafened ? <HeadsetOff style={{ fontSize: '14px' }} /> : <Headset style={{ fontSize: '14px' }} />}
+            )}
+            {!isGroupChat && primaryJoinParticipant && (
+              <div className="join-preview-status-row">
+                <div className={`join-preview-status-pill ${primaryJoinParticipant?.isMuted ? 'off' : 'on'}`}>
+                  {primaryJoinParticipant?.isMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
+                </div>
+                <div className={`join-preview-status-pill ${
+                  (primaryJoinParticipant?.isGlobalAudioMuted || primaryJoinParticipant?.isAudioDisabled || primaryJoinParticipant?.isDeafened) ? 'off' : 'on'
+                }`}>
+                  {(primaryJoinParticipant?.isGlobalAudioMuted || primaryJoinParticipant?.isAudioDisabled || primaryJoinParticipant?.isDeafened)
+                    ? <HeadsetOff style={{ fontSize: '14px' }} />
+                    : <Headset style={{ fontSize: '14px' }} />}
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="join-preview-controls">
             <button type="button" className="join-preview-btn disabled" title="Камера">

@@ -16,6 +16,7 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { SettingsModal } from '../../../shared/ui/organisms';
 import { UserAvatar } from '../../../shared/ui';
 import { Call, CallEnd } from '@mui/icons-material';
+import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
@@ -63,6 +64,7 @@ const HomePage = () => {
   const joinedChatGroupsRef = useRef(new Set());
   const groupChatConnectionRef = useRef(null);
   const chatsRef = useRef([]);
+  const callerProfilesRef = useRef(new Map());
 
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
@@ -120,15 +122,48 @@ const HomePage = () => {
 
           const matchedChat = chatsRef.current.find((chat) => String(chat.chatId || chat.chat_id) === String(chatIdValue));
           const displayName = matchedChat?.groupName || matchedChat?.username || callerName || 'Неизвестный';
+          const callerKey = callerId ? String(callerId) : '';
+          const cachedCallerProfile = callerKey ? callerProfilesRef.current.get(callerKey) : null;
+
+          const fallbackAvatarUrl = matchedChat?.avatarUrl || matchedChat?.avatar || null;
+          const fallbackAvatarColor = matchedChat?.avatarColor || '#5865F2';
 
           setIncomingCall({
             chatId: String(chatIdValue),
-            callerId: callerId ? String(callerId) : null,
+            callerId: callerKey || null,
             callerName: callerName || displayName,
             chatName: displayName,
-            avatarUrl: matchedChat?.avatar || null,
-            avatarColor: matchedChat?.avatarColor || '#5865F2'
+            avatarUrl: cachedCallerProfile?.avatarUrl || fallbackAvatarUrl,
+            avatarColor: cachedCallerProfile?.avatarColor || fallbackAvatarColor
           });
+
+          if (callerKey && !cachedCallerProfile) {
+            fetch(`${BASE_URL}/api/profile/${callerKey}/profile`)
+              .then(async (response) => {
+                if (!response.ok) return null;
+                const profile = await response.json();
+                return {
+                  avatarUrl: profile?.avatar || null,
+                  avatarColor: profile?.avatarColor || fallbackAvatarColor
+                };
+              })
+              .then((profileData) => {
+                if (!profileData) return;
+
+                callerProfilesRef.current.set(callerKey, profileData);
+                setIncomingCall((prev) => {
+                  if (!prev || prev.callerId !== callerKey) return prev;
+                  return {
+                    ...prev,
+                    avatarUrl: profileData.avatarUrl || prev.avatarUrl,
+                    avatarColor: profileData.avatarColor || prev.avatarColor
+                  };
+                });
+              })
+              .catch((error) => {
+                console.warn('HomePage: failed to load caller avatar for incoming call:', error);
+              });
+          }
         };
 
         connection.on('IncomingCall', incomingCallHandler);
@@ -862,10 +897,6 @@ const HomePage = () => {
       {incomingCall && (
         <div className="global-incoming-call-overlay">
           <div className="global-incoming-call-card">
-            <div className="global-incoming-call-badge">
-              <span className="global-incoming-call-dot"></span>
-              Дозвон
-            </div>
             <div className="global-incoming-call-avatar-ring">
               <UserAvatar
                 username={incomingCall.callerName}
@@ -885,7 +916,6 @@ const HomePage = () => {
                 title="Отклонить"
               >
                 <CallEnd style={{ fontSize: '22px' }} />
-                <span>Отклонить</span>
               </button>
               <button
                 type="button"
@@ -894,7 +924,6 @@ const HomePage = () => {
                 title="Принять"
               >
                 <Call style={{ fontSize: '22px' }} />
-                <span>Принять</span>
               </button>
             </div>
           </div>

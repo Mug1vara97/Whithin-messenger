@@ -130,6 +130,39 @@
   gap: 8px;
 }
 
+.join-preview-status-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  width: min(100%, 430px);
+}
+
+.join-preview-status-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.join-preview-status-name {
+  color: #cfd4df;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.join-preview-status-more {
+  margin-top: 2px;
+  color: #99a1b0;
+  font-size: 12px;
+  text-align: center;
+}
+
 .join-preview-status-pill {
   display: flex;
   align-items: center;
