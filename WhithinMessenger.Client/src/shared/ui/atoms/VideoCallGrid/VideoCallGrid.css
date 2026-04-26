@@ -69,31 +69,16 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Режим только аватар (1:1 / голос): индикатор — кольцо вокруг круга, не вся плитка */
-.video-tile--avatar-only.speaking {
-  box-shadow: none !important;
-  animation: none !important;
-}
-
-.video-tile--avatar-only.speaking::before {
-  display: none !important;
-}
-
-.video-tile--avatar-only.speaking .tile-border {
-  border-color: transparent !important;
-  box-shadow: none !important;
-  animation: none !important;
-}
-
-/* Speaking — для видео/экрана: подсветка плитки */
-.video-tile.speaking:not(.video-tile--avatar-only) {
+/* Speaking animation - подсветка всей плитки (сетка / групповой звонок) */
+/* Используем inset box-shadow - он не обрезается overflow:hidden */
+.video-tile.speaking {
   z-index: 10;
   box-shadow: inset 0 0 0 3px #23a55a, inset 0 0 20px rgba(35, 165, 90, 0.6) !important;
   animation: speaking-tile-glow 1.2s ease-in-out infinite !important;
 }
 
-/* Зелёный оверлей — только не для режима «только аватар» */
-.video-tile.speaking:not(.video-tile--avatar-only)::before {
+/* Зелёный оверлей */
+.video-tile.speaking::before {
   content: '';
   position: absolute;
   top: 0;
@@ -107,51 +92,11 @@
   animation: speaking-overlay-pulse 1.2s ease-in-out infinite;
 }
 
-/* Рамка плитки при speaking — не для «только аватар» */
-.video-tile.speaking:not(.video-tile--avatar-only) .tile-border {
+/* Дополнительная рамка через tile-border */
+.video-tile.speaking .tile-border {
   border: 3px solid #23a55a !important;
   border-radius: 8px;
   box-shadow: inset 0 0 10px rgba(35, 165, 90, 0.4);
-}
-
-/* Кольцо вокруг круга аватара (локальный индикатор голоса) */
-.tile-avatar-voice-wrap {
-  position: relative;
-  z-index: 2;
-  border-radius: 50%;
-  line-height: 0;
-}
-
-.tile-avatar-voice-wrap::after {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-  box-sizing: border-box;
-}
-
-.tile-avatar-voice-wrap.is-speaking::after {
-  opacity: 1;
-  border-color: #23a55a;
-  box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 16px rgba(35, 165, 90, 0.45);
-  animation: voice-avatar-ring 1.2s ease-in-out infinite;
-}
-
-@keyframes voice-avatar-ring {
-  0%,
-  100% {
-    box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 12px rgba(35, 165, 90, 0.4);
-    border-color: #23a55a;
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(45, 199, 112, 0.45), 0 0 20px rgba(35, 165, 90, 0.55);
-    border-color: #2dc770;
-  }
 }
 
 @keyframes speaking-tile-glow {
@@ -855,18 +800,14 @@
 }
 
 /* Speaking animation for small tiles */
-.small-tile.speaking:not(.video-tile--avatar-only) .tile-border {
+.small-tile.speaking .tile-border {
   border-color: #23a55a;
   border-width: 2px;
   animation: speaking-glow-small 1.5s ease-in-out infinite;
 }
 
-.small-tile.speaking:not(.video-tile--avatar-only) {
+.small-tile.speaking {
   transform: scale(1.02);
-}
-
-.small-tile.video-tile--avatar-only.speaking {
-  transform: none;
 }
 
 @keyframes speaking-glow-small {

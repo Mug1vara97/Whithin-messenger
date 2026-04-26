@@ -391,7 +391,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: #43b581;
+  background: #00000000;
   border: none;
   color: #ffffff;
   cursor: pointer;
@@ -400,7 +400,7 @@
 }
 
 .voice-call-button:hover {
-  background: #3ca374;
+  background: var(--hover);
   transform: scale(1.05);
 }
 

@@ -135,8 +135,8 @@ const VideoCallGrid = ({
 
   const getAvatarColor = (name) => {
     const colors = [
-      '#4e5058', '#3ba55d', '#faa81a', '#ed4245', '#eb459e',
-      '#57f287', '#fee75c', '#f26522', '#00d9ff', '#5865f2', '#7289da'
+      '#5865f2', '#3ba55d', '#faa81a', '#ed4245', '#eb459e',
+      '#57f287', '#fee75c', '#f26522', '#00d9ff', '#7289da'
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -342,10 +342,6 @@ const VideoCallGrid = ({
     const isMuted = participant.isMuted || false;
     const isSpeaking = participant.isSpeaking || false;
     const isScreenShare = participant.isScreenShare || false;
-    const hasActiveVideo = Boolean(
-      participant.isVideoEnabled && participant.videoStream && participant.videoStream.active
-    );
-    const isAvatarOnlyTile = !isScreenShare && !hasActiveVideo;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
@@ -380,7 +376,7 @@ const VideoCallGrid = ({
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isAvatarOnlyTile ? 'video-tile--avatar-only' : ''} ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
         onClick={() => handleParticipantClick(participant)}
       >
         <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
@@ -417,36 +413,25 @@ const VideoCallGrid = ({
                     } : {})
                   }}>
                 {participant.avatar ? (
-                  <div
-                    className={`tile-avatar-voice-wrap ${
-                      isAvatarOnlyTile && isSpeaking ? 'is-speaking' : ''
-                    }`}
+                  <img
+                    src={participant.avatar}
+                    alt={participant.name}
+                    className="tile-avatar-bg"
                     style={{
                       position: 'absolute',
                       top: '50%',
                       left: '50%',
-                      transform: 'translate(-50%, -50%)'
+                      transform: 'translate(-50%, -50%)',
+                      width: isSmall ? '60px' : '100px',
+                      height: isSmall ? '60px' : '100px',
+                      borderRadius: '50%',
+                      border: '3px solid white',
+                      objectFit: 'cover'
                     }}
-                  >
-                    <img
-                      src={participant.avatar}
-                      alt={participant.name}
-                      className="tile-avatar-bg"
-                      style={{
-                        width: isSmall ? '60px' : '100px',
-                        height: isSmall ? '60px' : '100px',
-                        borderRadius: '50%',
-                        border: '2px solid rgba(255, 255, 255, 0.2)',
-                        objectFit: 'cover',
-                        display: 'block'
-                      }}
-                    />
-                  </div>
+                  />
                 ) : (
                   <div
-                    className={`avatar-placeholder tile-avatar-voice-wrap ${
-                      isAvatarOnlyTile && isSpeaking ? 'is-speaking' : ''
-                    }`}
+                    className="avatar-placeholder"
                     style={{
                       position: 'absolute',
                       top: '50%',
@@ -462,7 +447,7 @@ const VideoCallGrid = ({
                       fontSize: isSmall ? '24px' : '40px',
                       fontWeight: '600',
                       color: 'white',
-                      border: '2px solid rgba(0, 0, 0, 0.2)'
+                      border: '3px solid white'
                     }}
                   >
                     {getInitials(participant.name)}
@@ -481,57 +466,34 @@ const VideoCallGrid = ({
                   justifyContent: 'center'
                 }}
               >
-                <div
-                  className={`tile-avatar-voice-wrap ${
-                    isAvatarOnlyTile && isSpeaking ? 'is-speaking' : ''
-                  }`}
-                >
-                  <img
-                    src={participant.avatar}
-                    alt={participant.name}
-                    className="tile-avatar-bg"
-                    style={{
-                      width: isSmall ? '80px' : '120px',
-                      height: isSmall ? '80px' : '120px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid rgba(255, 255, 255, 0.15)',
-                      display: 'block'
-                    }}
-                  />
-                </div>
+                <img
+                  src={participant.avatar}
+                  alt={participant.name}
+                  className="tile-avatar-bg"
+                  style={{
+                    width: isSmall ? '80px' : '120px',
+                    height: isSmall ? '80px' : '120px',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
               </div>
             ) : (
               <div
+                className="avatar-placeholder"
                 style={{
+                  backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
                   width: '100%',
                   height: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  fontSize: isSmall ? '40px' : '80px',
+                  fontWeight: '600',
+                  color: 'white'
                 }}
               >
-                <div
-                  className={`avatar-placeholder tile-avatar-voice-wrap ${
-                    isAvatarOnlyTile && isSpeaking ? 'is-speaking' : ''
-                  }`}
-                  style={{
-                    backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
-                    width: isSmall ? '100px' : '120px',
-                    height: isSmall ? '100px' : '120px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: isSmall ? '32px' : '40px',
-                    fontWeight: '600',
-                    color: 'white',
-                    border: '2px solid rgba(0, 0, 0, 0.2)',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  {getInitials(participant.name)}
-                </div>
+                {getInitials(participant.name)}
               </div>
             )}
           </div>
