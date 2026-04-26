@@ -776,7 +776,7 @@ const ChatRoom = ({
         <div className="chat-voice-call-join-preview">
           <div className="join-preview-center">
             <div className="join-preview-title">Звонок уже идёт</div>
-            <div className="join-preview-users-grid">
+            <div className={`join-preview-users-grid ${usersAlreadyInCall.length === 1 ? 'single-user' : ''}`}>
               {usersAlreadyInCall.slice(0, 8).map((participant) => {
                 const participantMuted = !!participant?.isMuted;
                 const participantDeafened = !!(

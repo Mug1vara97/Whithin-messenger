@@ -127,6 +127,11 @@
   scrollbar-width: thin;
 }
 
+.join-preview-users-grid.single-user {
+  justify-content: center;
+  overflow-x: hidden;
+}
+
 .join-preview-user-item {
   display: flex;
   flex-direction: column;

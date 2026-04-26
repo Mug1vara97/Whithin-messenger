@@ -275,7 +275,7 @@ const HomePage = () => {
 
     const timeoutId = setTimeout(() => {
       setIncomingCall(null);
-    }, 30000);
+    }, 180000);
 
     return () => clearTimeout(timeoutId);
   }, [incomingCall]);
