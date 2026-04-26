@@ -9,4 +9,12 @@ public interface IFirebasePushSender
         string message,
         CancellationToken cancellationToken = default
     );
+
+    Task SendIncomingCallNotificationAsync(
+        string deviceToken,
+        Guid chatId,
+        Guid callerId,
+        string callerName,
+        CancellationToken cancellationToken = default
+    );
 }

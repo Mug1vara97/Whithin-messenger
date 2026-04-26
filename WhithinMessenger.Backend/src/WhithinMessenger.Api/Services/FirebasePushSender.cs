@@ -35,6 +35,50 @@ public class FirebasePushSender : IFirebasePushSender
         CancellationToken cancellationToken = default
     )
     {
+        await SendDataPushAsync(
+            deviceToken,
+            new Dictionary<string, string>
+            {
+                ["chat_id"] = chatId.ToString(),
+                ["chat_title"] = title,
+                ["title"] = title,
+                ["message"] = message,
+                ["type"] = "chat_message"
+            },
+            cancellationToken
+        );
+    }
+
+    public async Task SendIncomingCallNotificationAsync(
+        string deviceToken,
+        Guid chatId,
+        Guid callerId,
+        string callerName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await SendDataPushAsync(
+            deviceToken,
+            new Dictionary<string, string>
+            {
+                ["type"] = "incoming_call",
+                ["chat_id"] = chatId.ToString(),
+                ["room_id"] = chatId.ToString(),
+                ["caller_id"] = callerId.ToString(),
+                ["caller_name"] = callerName,
+                ["title"] = "Incoming call",
+                ["message"] = $"{callerName} is calling you"
+            },
+            cancellationToken
+        );
+    }
+
+    private async Task SendDataPushAsync(
+        string deviceToken,
+        Dictionary<string, string> data,
+        CancellationToken cancellationToken = default
+    )
+    {
         if (_credential == null || string.IsNullOrWhiteSpace(_projectId))
         {
             _logger.LogDebug("Firebase is not configured, push notification skipped");
@@ -56,13 +100,7 @@ public class FirebasePushSender : IFirebasePushSender
                 message = new
                 {
                     token = deviceToken,
-                    data = new Dictionary<string, string>
-                    {
-                        ["chat_id"] = chatId.ToString(),
-                        ["chat_title"] = title,
-                        ["title"] = title,
-                        ["message"] = message
-                    },
+                    data,
                     android = new
                     {
                         priority = "high"

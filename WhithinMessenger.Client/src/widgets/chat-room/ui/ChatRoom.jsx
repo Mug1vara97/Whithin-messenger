@@ -729,7 +729,7 @@ const ChatRoom = ({
         </div>
         <div className="header-actions">
 
-          {(isPrivateChat || isGroupChat) && !isCallActiveInThisChat && (
+          {(isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
             <button
               onClick={handleStartCall}
               className="voice-call-button"

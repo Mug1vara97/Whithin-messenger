@@ -85,6 +85,38 @@ public class NotificationService : INotificationService
         return await _notificationRepository.GetUnreadCountAsync(userId, cancellationToken);
     }
 
+    public async Task SendIncomingCallPushAsync(
+        Guid userId,
+        Guid chatId,
+        Guid callerId,
+        string callerName,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await _userPushTokenStore.GetTokensAsync(userId, cancellationToken);
+        if (tokens.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var token in tokens)
+        {
+            try
+            {
+                await _firebasePushSender.SendIncomingCallNotificationAsync(
+                    deviceToken: token,
+                    chatId: chatId,
+                    callerId: callerId,
+                    callerName: callerName,
+                    cancellationToken: cancellationToken
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Incoming-call push failed for user {userId}: {ex.Message}");
+            }
+        }
+    }
+
     private async Task SendPushToRegisteredDevicesAsync(
         Guid userId,
         Guid chatId,

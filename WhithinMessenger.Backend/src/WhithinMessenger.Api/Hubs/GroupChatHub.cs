@@ -17,6 +17,7 @@ using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Api.Hubs;
 using System.Security.Claims;
+using System.Linq;
 
 namespace WhithinMessenger.Api.Hubs
 {
@@ -644,6 +645,26 @@ public class GroupChatHub : Hub
         {
             await Clients.Group(chatId.ToString()).SendAsync("IncomingCall",
                 new { chatId, caller, callerId, roomId = chatId.ToString() });
+
+            // Also push to mobile devices so Android can show incoming call
+            // even when the app process is not active.
+            var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
+            foreach (var participantId in participantIds.Where(id => id != callerId))
+            {
+                try
+                {
+                    await _notificationService.SendIncomingCallPushAsync(
+                        userId: participantId,
+                        chatId: chatId,
+                        callerId: callerId,
+                        callerName: caller
+                    );
+                }
+                catch (Exception pushEx)
+                {
+                    _logger.LogWarning(pushEx, "Failed to send incoming-call push for chat {ChatId} to user {UserId}", chatId, participantId);
+                }
+            }
         }
         catch (Exception ex)
         {
