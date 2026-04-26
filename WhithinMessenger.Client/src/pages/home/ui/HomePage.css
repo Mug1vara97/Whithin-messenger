@@ -343,12 +343,12 @@
 
 .global-incoming-call-card {
   pointer-events: auto;
-  width: min(340px, calc(100vw - 32px));
+  width: min(320px, calc(100vw - 28px));
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #1f222b;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
-  padding: 20px 22px 24px;
+  padding: 16px 16px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -363,22 +363,16 @@
 }
 
 .global-incoming-call-avatar-ring {
-  width: 112px;
-  height: 112px;
-  min-width: 112px;
-  min-height: 112px;
-  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border: 3px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
-  padding: 5px;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .global-incoming-call-chat-name {
-  margin-top: 10px;
+  margin-top: 6px;
   color: #aeb6c6;
   font-size: 12px;
   max-width: 100%;
@@ -388,36 +382,36 @@
 }
 
 .global-incoming-call-user {
-  margin-top: 8px;
+  margin-top: 10px;
   color: #ffffff;
   font-weight: 700;
-  font-size: clamp(24px, 7vw, 34px);
-  line-height: 1;
+  font-size: clamp(18px, 5.2vw, 28px);
+  line-height: 1.1;
   text-align: center;
   word-break: break-word;
 }
 
 .global-incoming-call-text {
-  margin-top: 10px;
+  margin-top: 8px;
   color: #d0d4df;
-  font-size: clamp(18px, 6vw, 30px);
-  line-height: 1.05;
+  font-size: clamp(14px, 4.2vw, 20px);
+  line-height: 1.2;
   text-align: center;
 }
 
 .global-incoming-call-actions {
-  margin-top: 24px;
+  margin-top: 16px;
   width: 100%;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .global-incoming-call-button {
-  width: 82px;
-  height: 62px;
+  width: 72px;
+  height: 52px;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   color: #ffffff;
   cursor: pointer;
   display: inline-flex;

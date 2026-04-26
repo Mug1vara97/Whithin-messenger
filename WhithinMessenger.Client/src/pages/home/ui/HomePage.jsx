@@ -955,7 +955,6 @@ const HomePage = () => {
               />
             </div>
             <div className="global-incoming-call-user">{incomingCall.callerName}</div>
-            <div className="global-incoming-call-chat-name">{incomingCall.chatName}</div>
             <div className="global-incoming-call-text">Входящий звонок...</div>
             <div className="global-incoming-call-actions">
               <button
@@ -964,7 +963,7 @@ const HomePage = () => {
                 onClick={handleDeclineIncomingCall}
                 title="Отклонить"
               >
-                <CallEnd style={{ fontSize: '22px' }} />
+                <CallEnd style={{ fontSize: '20px' }} />
               </button>
               <button
                 type="button"
@@ -972,7 +971,7 @@ const HomePage = () => {
                 onClick={handleAcceptIncomingCall}
                 title="Принять"
               >
-                <Call style={{ fontSize: '22px' }} />
+                <Call style={{ fontSize: '20px' }} />
               </button>
             </div>
           </div>
