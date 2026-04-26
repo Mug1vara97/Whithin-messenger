@@ -21,7 +21,7 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, CallEnd, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
+import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -106,9 +106,7 @@ const ChatRoom = ({
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
   const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null);
   const notificationConnectionRef = useRef(null);
-  const ringtoneAudioRef = useRef(null);
 
   const inputRef = useRef(null);
 
@@ -408,14 +406,6 @@ const ChatRoom = ({
     loadChatParticipants();
   };
 
-  const stopIncomingCallRingtone = useCallback(() => {
-    if (!ringtoneAudioRef.current) return;
-
-    ringtoneAudioRef.current.pause();
-    ringtoneAudioRef.current.currentTime = 0;
-    ringtoneAudioRef.current = null;
-  }, []);
-
   const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -541,81 +531,6 @@ const ChatRoom = ({
     closeContextMenu();
     console.log('handleCallWithoutNotification: call started');
   };
-
-  const handleAcceptIncomingCall = () => {
-    setIncomingCall(null);
-    startChatCall();
-  };
-
-  const handleDeclineIncomingCall = () => {
-    setIncomingCall(null);
-  };
-
-  useEffect(() => {
-    if (!connection || !chatId) return undefined;
-
-    const handleIncomingCall = (payload) => {
-      const incomingChatId = payload?.chatId || payload?.ChatId;
-      const callerId = payload?.callerId || payload?.CallerId;
-      const caller = payload?.caller || payload?.Caller;
-      const roomId = payload?.roomId || payload?.RoomId;
-
-      if (String(incomingChatId) !== String(chatId)) return;
-      if (String(callerId) === String(userId)) return;
-      if (!isPrivateChat) return;
-
-      setIncomingCall({
-        chatId: incomingChatId,
-        roomId: roomId || String(incomingChatId),
-        caller: caller || groupName || 'Неизвестный',
-        callerId
-      });
-    };
-
-    connection.on('IncomingCall', handleIncomingCall);
-
-    return () => {
-      connection.off('IncomingCall', handleIncomingCall);
-    };
-  }, [chatId, connection, groupName, isPrivateChat, userId]);
-
-  useEffect(() => {
-    if (!incomingCall) {
-      stopIncomingCallRingtone();
-      return undefined;
-    }
-
-    const audio = new Audio('/patriot.mp3');
-    audio.loop = true;
-    audio.volume = 0.45;
-    ringtoneAudioRef.current = audio;
-
-    audio.play().catch((error) => {
-      console.warn('Failed to play incoming call ringtone:', error);
-    });
-
-    return () => {
-      stopIncomingCallRingtone();
-    };
-  }, [incomingCall, stopIncomingCallRingtone]);
-
-  useEffect(() => {
-    if (!incomingCall) return undefined;
-
-    const timeoutId = setTimeout(() => {
-      setIncomingCall(null);
-    }, 30000);
-
-    return () => clearTimeout(timeoutId);
-  }, [incomingCall]);
-
-  useEffect(() => {
-    if (isCallActiveInThisChat) {
-      setIncomingCall(null);
-    }
-  }, [isCallActiveInThisChat]);
-
-
 
   useEffect(() => {
     const handleGlobalPaste = async (e) => {
@@ -1253,41 +1168,6 @@ const ChatRoom = ({
         </div>
       )}
 
-      {incomingCall && (
-        <div className="incoming-call-overlay">
-          <div className="incoming-call-card">
-            <div className="incoming-call-avatar-ring">
-              <UserAvatar
-                username={incomingCall.caller}
-                avatarUrl={chatUserProfile?.avatar}
-                avatarColor={chatUserProfile?.avatarColor || '#5865F2'}
-                size={96}
-              />
-            </div>
-            <div className="incoming-call-user">{incomingCall.caller}</div>
-            <div className="incoming-call-text">Входящий звонок...</div>
-            <div className="incoming-call-actions">
-              <button
-                type="button"
-                className="incoming-call-button decline"
-                onClick={handleDeclineIncomingCall}
-                title="Отклонить"
-              >
-                <CallEnd style={{ fontSize: '22px' }} />
-              </button>
-              <button
-                type="button"
-                className="incoming-call-button accept"
-                onClick={handleAcceptIncomingCall}
-                title="Принять"
-              >
-                <Call style={{ fontSize: '22px' }} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
       <ChatInfoModal 
         open={showChatInfo}
         onClose={() => setShowChatInfo(false)}

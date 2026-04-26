@@ -12,7 +12,10 @@ import { useChatList } from '../../../entities/chat';
 import { useNotifications } from '../../../entities/notification';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { SettingsModal } from '../../../shared/ui/organisms';
+import { UserAvatar } from '../../../shared/ui';
+import { Call, CallEnd } from '@mui/icons-material';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
@@ -21,6 +24,8 @@ const HomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
+  const connectionContext = useConnectionContext();
+  const getConnection = connectionContext?.getConnection;
   
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -52,6 +57,12 @@ const HomePage = () => {
 
   // Состояние для активного звонка в чате
   const [activeChatCall, setActiveChatCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [groupChatConnection, setGroupChatConnection] = useState(null);
+  const ringtoneAudioRef = useRef(null);
+  const joinedChatGroupsRef = useRef(new Set());
+  const groupChatConnectionRef = useRef(null);
+  const chatsRef = useRef([]);
 
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
@@ -72,6 +83,144 @@ const HomePage = () => {
   const handleEndChatCall = useCallback(() => {
     console.log('HomePage: Ending chat call');
     setActiveChatCall(null);
+  }, []);
+
+  const stopIncomingCallRingtone = useCallback(() => {
+    if (!ringtoneAudioRef.current) return;
+
+    ringtoneAudioRef.current.pause();
+    ringtoneAudioRef.current.currentTime = 0;
+    ringtoneAudioRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    chatsRef.current = Array.isArray(chats) ? chats : [];
+  }, [chats]);
+
+  useEffect(() => {
+    if (!user?.id || !getConnection) return undefined;
+
+    let mounted = true;
+    let incomingCallHandler = null;
+
+    const setupIncomingCallListener = async () => {
+      try {
+        const connection = await getConnection('groupchathub', user.id);
+        if (!mounted) return;
+
+        setGroupChatConnection(connection);
+
+        incomingCallHandler = (payload) => {
+          const chatIdValue = payload?.chatId || payload?.ChatId;
+          const callerId = payload?.callerId || payload?.CallerId;
+          const callerName = payload?.caller || payload?.Caller;
+
+          if (!chatIdValue) return;
+          if (String(callerId) === String(user.id)) return;
+
+          const matchedChat = chatsRef.current.find((chat) => String(chat.chatId || chat.chat_id) === String(chatIdValue));
+          const displayName = matchedChat?.groupName || matchedChat?.username || callerName || 'Неизвестный';
+
+          setIncomingCall({
+            chatId: String(chatIdValue),
+            callerId: callerId ? String(callerId) : null,
+            callerName: callerName || displayName,
+            chatName: displayName,
+            avatarUrl: matchedChat?.avatar || null,
+            avatarColor: matchedChat?.avatarColor || '#5865F2'
+          });
+        };
+
+        connection.on('IncomingCall', incomingCallHandler);
+        groupChatConnectionRef.current = connection;
+      } catch (error) {
+        console.error('HomePage: failed to setup IncomingCall listener', error);
+      }
+    };
+
+    setupIncomingCallListener();
+
+    return () => {
+      mounted = false;
+      if (incomingCallHandler && groupChatConnectionRef.current) {
+        groupChatConnectionRef.current.off('IncomingCall', incomingCallHandler);
+      }
+    };
+  }, [getConnection, user?.id]);
+
+  useEffect(() => {
+    if (!groupChatConnection || groupChatConnection.state !== 'Connected' || !Array.isArray(chats)) return;
+
+    chats.forEach((chat) => {
+      const chatIdValue = String(chat.chatId || chat.chat_id || '');
+      if (!chatIdValue || joinedChatGroupsRef.current.has(chatIdValue)) return;
+
+      groupChatConnection
+        .invoke('JoinGroup', chatIdValue)
+        .then(() => {
+          joinedChatGroupsRef.current.add(chatIdValue);
+        })
+        .catch((error) => {
+          console.warn('HomePage: failed to join chat group for incoming calls:', chatIdValue, error);
+        });
+    });
+  }, [chats, groupChatConnection]);
+
+  useEffect(() => {
+    if (!incomingCall) {
+      stopIncomingCallRingtone();
+      return undefined;
+    }
+
+    const audio = new Audio('/den-den-mushi.mp3');
+    audio.loop = true;
+    audio.volume = 0.45;
+    ringtoneAudioRef.current = audio;
+
+    audio.play().catch((error) => {
+      console.warn('HomePage: failed to play incoming call ringtone:', error);
+    });
+
+    return () => {
+      stopIncomingCallRingtone();
+    };
+  }, [incomingCall, stopIncomingCallRingtone]);
+
+  useEffect(() => {
+    if (!incomingCall) return undefined;
+
+    const timeoutId = setTimeout(() => {
+      setIncomingCall(null);
+    }, 30000);
+
+    return () => clearTimeout(timeoutId);
+  }, [incomingCall]);
+
+  useEffect(() => {
+    if (activeChatCall) {
+      setIncomingCall(null);
+    }
+  }, [activeChatCall]);
+
+  const handleAcceptIncomingCall = useCallback(() => {
+    if (!incomingCall || !user?.id) return;
+
+    const callData = {
+      roomId: incomingCall.chatId,
+      roomName: `Звонок с ${incomingCall.chatName}`,
+      userName: user.username,
+      userId: user.id,
+      isPrivateCall: true,
+      chatId: incomingCall.chatId
+    };
+
+    handleJoinVoiceChannel(callData);
+    navigate(`/channels/@me/${incomingCall.chatId}`);
+    setIncomingCall(null);
+  }, [handleJoinVoiceChannel, incomingCall, navigate, user?.id, user?.username]);
+
+  const handleDeclineIncomingCall = useCallback(() => {
+    setIncomingCall(null);
   }, []);
 
   React.useEffect(() => {
@@ -705,6 +854,41 @@ const HomePage = () => {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {incomingCall && (
+        <div className="global-incoming-call-overlay">
+          <div className="global-incoming-call-card">
+            <div className="global-incoming-call-avatar-ring">
+              <UserAvatar
+                username={incomingCall.callerName}
+                avatarUrl={incomingCall.avatarUrl}
+                avatarColor={incomingCall.avatarColor}
+                size={96}
+              />
+            </div>
+            <div className="global-incoming-call-user">{incomingCall.callerName}</div>
+            <div className="global-incoming-call-text">Входящий звонок...</div>
+            <div className="global-incoming-call-actions">
+              <button
+                type="button"
+                className="global-incoming-call-button decline"
+                onClick={handleDeclineIncomingCall}
+                title="Отклонить"
+              >
+                <CallEnd style={{ fontSize: '22px' }} />
+              </button>
+              <button
+                type="button"
+                className="global-incoming-call-button accept"
+                onClick={handleAcceptIncomingCall}
+                title="Принять"
+              >
+                <Call style={{ fontSize: '22px' }} />
+              </button>
             </div>
           </div>
         </div>
