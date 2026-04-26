@@ -951,7 +951,7 @@ const HomePage = () => {
                 username={incomingCall.callerName}
                 avatarUrl={incomingCall.avatarUrl}
                 avatarColor={incomingCall.avatarColor}
-                size={96}
+                size={88}
               />
             </div>
             <div className="global-incoming-call-user">{incomingCall.callerName}</div>

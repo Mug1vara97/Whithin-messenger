@@ -775,48 +775,31 @@ const ChatRoom = ({
       {hasJoinableCallInThisChat && primaryJoinParticipant && (
         <div className="chat-voice-call-join-preview">
           <div className="join-preview-center">
-            <div className="join-preview-avatar-wrap">
-              {usersAlreadyInCall.slice(0, 4).map((participant) => (
-                <UserAvatar
-                  key={participant.odUserId || participant.userId || participant.userName}
-                  username={participant.userName || 'U'}
-                  avatarUrl={participant.avatar}
-                  avatarColor={participant.avatarColor}
-                  size={68}
-                />
-              ))}
-              {usersAlreadyInCall.length > 4 && (
-                <div className="join-preview-avatar-more">+{usersAlreadyInCall.length - 4}</div>
-              )}
-            </div>
             <div className="join-preview-title">Звонок уже идёт</div>
-            <div className="join-preview-subtitle">
-              {usersAlreadyInCall.map((participant) => participant.userName).join(', ')}
-            </div>
-            {isGroupChat && (
-              <div className="join-preview-status-list">
-                {usersAlreadyInCall.slice(0, 6).map((participant) => {
-                  const participantMuted = !!participant?.isMuted;
-                  const participantDeafened = !!(
-                    participant?.isGlobalAudioMuted ||
-                    participant?.isAudioDisabled ||
-                    participant?.isDeafened
-                  );
+            <div className="join-preview-users-grid">
+              {usersAlreadyInCall.slice(0, 8).map((participant) => {
+                const participantMuted = !!participant?.isMuted;
+                const participantDeafened = !!(
+                  participant?.isGlobalAudioMuted ||
+                  participant?.isAudioDisabled ||
+                  participant?.isDeafened
+                );
 
-                  return (
-                    <div
-                      className="join-preview-status-item"
-                      key={`${participant.odUserId || participant.userId || participant.userName}-status`}
-                    >
-                      <div className="join-preview-status-user">
-                        <UserAvatar
-                          username={participant.userName || 'U'}
-                          avatarUrl={participant.avatar}
-                          avatarColor={participant.avatarColor}
-                          size={28}
-                        />
-                        <span className="join-preview-status-name">{participant.userName || 'User'}</span>
-                      </div>
+                return (
+                  <div
+                    className="join-preview-user-item"
+                    key={participant.odUserId || participant.userId || participant.userName}
+                  >
+                    <div className={`join-preview-user-avatar ${participant?.isSpeaking ? 'speaking' : ''}`}>
+                      <UserAvatar
+                        username={participant.userName || 'U'}
+                        avatarUrl={participant.avatar}
+                        avatarColor={participant.avatarColor}
+                        size={74}
+                      />
+                    </div>
+                    <div className="join-preview-user-name">{participant.userName || 'User'}</div>
+                    <div className="join-preview-user-status-row">
                       <div className={`join-preview-status-pill ${participantMuted ? 'off' : 'on'}`}>
                         {participantMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
                       </div>
@@ -824,27 +807,13 @@ const ChatRoom = ({
                         {participantDeafened ? <HeadsetOff style={{ fontSize: '14px' }} /> : <Headset style={{ fontSize: '14px' }} />}
                       </div>
                     </div>
-                  );
-                })}
-                {usersAlreadyInCall.length > 6 && (
-                  <div className="join-preview-status-more">+{usersAlreadyInCall.length - 6}</div>
-                )}
-              </div>
-            )}
-            {!isGroupChat && primaryJoinParticipant && (
-              <div className="join-preview-status-row">
-                <div className={`join-preview-status-pill ${primaryJoinParticipant?.isMuted ? 'off' : 'on'}`}>
-                  {primaryJoinParticipant?.isMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
-                </div>
-                <div className={`join-preview-status-pill ${
-                  (primaryJoinParticipant?.isGlobalAudioMuted || primaryJoinParticipant?.isAudioDisabled || primaryJoinParticipant?.isDeafened) ? 'off' : 'on'
-                }`}>
-                  {(primaryJoinParticipant?.isGlobalAudioMuted || primaryJoinParticipant?.isAudioDisabled || primaryJoinParticipant?.isDeafened)
-                    ? <HeadsetOff style={{ fontSize: '14px' }} />
-                    : <Headset style={{ fontSize: '14px' }} />}
-                </div>
-              </div>
-            )}
+                  </div>
+                );
+              })}
+              {usersAlreadyInCall.length > 8 && (
+                <div className="join-preview-user-more">+{usersAlreadyInCall.length - 8}</div>
+              )}
+            </div>
           </div>
           <div className="join-preview-controls">
             <button type="button" className="join-preview-btn disabled" title="Камера">

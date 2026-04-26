@@ -114,60 +114,63 @@
   color: #f2f3f5;
 }
 
-.join-preview-subtitle {
-  max-width: min(80%, 700px);
-  text-align: center;
-  font-size: 13px;
-  color: var(--textSecondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.join-preview-status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.join-preview-status-list {
+.join-preview-users-grid {
   margin-top: 10px;
+  width: 100%;
   display: grid;
-  gap: 6px;
-  width: min(100%, 430px);
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 12px;
+  justify-items: center;
 }
 
-.join-preview-status-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.join-preview-status-user {
+.join-preview-user-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
-.join-preview-status-name {
-  color: #cfd4df;
-  font-size: 12px;
+.join-preview-user-avatar {
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 3px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.join-preview-user-avatar.speaking {
+  border-color: rgba(88, 101, 242, 0.85);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+}
+
+.join-preview-user-name {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e7eaf1;
+  max-width: 110px;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.join-preview-status-more {
-  margin-top: 2px;
-  color: #99a1b0;
-  font-size: 12px;
-  text-align: center;
+.join-preview-user-status-row {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+}
+
+.join-preview-user-more {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  color: #cfd4df;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .join-preview-status-pill {
