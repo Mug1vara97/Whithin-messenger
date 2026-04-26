@@ -88,6 +88,38 @@
   height: 80px;
 }
 
+.participantAvatarContainer::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  box-sizing: border-box;
+}
+
+.participantItem.participantSpeaking .participantAvatarContainer::after {
+  opacity: 1;
+  border-color: #23a55a;
+  box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 16px rgba(35, 165, 90, 0.45);
+  animation: voiceRingOneToOne 1.2s ease-in-out infinite;
+}
+
+@keyframes voiceRingOneToOne {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 12px rgba(35, 165, 90, 0.4);
+    border-color: #23a55a;
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(45, 199, 112, 0.45), 0 0 20px rgba(35, 165, 90, 0.55);
+    border-color: #2dc770;
+  }
+}
+
 .participantAvatar {
   width: 100%;
   height: 100%;
@@ -95,17 +127,19 @@
 }
 
 .avatarCircle {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: #5865f2;
+  background: #4e5058;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   font-weight: 700;
   font-size: 26px;
-  border: 3px solid rgba(255, 255, 255, 0.08);
+  border: none;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -329,20 +363,9 @@
   }
 }
 
-/* Анимации */
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-.participantItem.speaking {
-  animation: pulse 1.5s infinite;
-}
-
-.participantItem.speaking .avatarCircle {
-  background: #43b581;
-  box-shadow: 0 0 20px rgba(67, 181, 129, 0.5);
+/* Индикатор говорения — кольцо вокруг аватара (см. .participantAvatarContainer::after) */
+.participantItem.participantSpeaking {
+  animation: none;
 }
 
 /* Hover эффекты */

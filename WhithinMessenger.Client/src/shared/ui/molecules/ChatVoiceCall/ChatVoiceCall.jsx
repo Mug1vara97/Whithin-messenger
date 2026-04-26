@@ -281,13 +281,15 @@ const ChatVoiceCall = ({
                 return (
               <div
                 key={participant.id}
-                className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''}`}
+                className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''} ${
+                  participant.isSpeaking ? styles.participantSpeaking : ''
+                }`}
               >
                 <div className={styles.participantAvatarContainer}>
                   <div className={styles.participantAvatar}>
                     <div
                       className={styles.avatarCircle}
-                      style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#5865f2' } : undefined}
+                      style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#4e5058' } : undefined}
                     >
                       {participant.avatar ? (
                         <img
