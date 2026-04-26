@@ -31,6 +31,7 @@ const ActiveCallBar = () => {
     participantMuteStates,
     participantAudioStates,
     participantGlobalAudioStates,
+    participantSpeakingStates,
     toggleMute,
     toggleGlobalAudio,
     toggleNoiseSuppression,
@@ -68,7 +69,10 @@ const ActiveCallBar = () => {
     videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
     videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
     videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
-    videoParticipant.isSpeaking = participant.isSpeaking || false;
+    const participantIsMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+    const participantAudioOn = participantAudioStates?.get(participantUserId) !== false;
+    videoParticipant.isSpeaking =
+      !participantIsMuted && participantAudioOn && (participantSpeakingStates?.get(participantUserId) || false);
     
     return videoParticipant;
   });

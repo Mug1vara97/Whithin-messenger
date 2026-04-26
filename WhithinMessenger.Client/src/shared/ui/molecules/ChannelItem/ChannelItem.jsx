@@ -207,7 +207,7 @@ const ChannelItem = ({
                 >
                   {voiceParticipants.map((participant, participantIndex) => {
                     const odUserId = participant.odUserId || participant.userId;
-                    const isSpeaking = participant.isSpeaking || participantSpeakingStates?.get?.(odUserId) || false;
+                    const isSpeaking = participantSpeakingStates?.get?.(odUserId) || false;
                     const isDeafened = participant.isDeafened || participant.isAudioDisabled || participant.isGlobalAudioMuted;
                     return (
                       <Draggable

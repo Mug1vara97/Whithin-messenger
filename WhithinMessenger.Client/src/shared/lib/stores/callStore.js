@@ -330,21 +330,11 @@ export const useCallStore = create(
               if (currentState.participantSpeakingStates.get(userId)) {
                 get().resetSpeakingState(userId);
               }
-              // Отправляем speaking: false на сервер
-              if (voiceCallApi.socket) {
-                voiceCallApi.socket.emit('speaking', { speaking: false });
-              }
               return;
             }
             
-            // Обновляем локальное состояние
+            // Индикатор говорения — только по локальному анализу микрофона, без сети
             get().updateSpeakingState(userId, isSpeaking);
-            
-            // Отправляем состояние на сервер для рассылки всем участникам
-            if (voiceCallApi.socket) {
-              voiceCallApi.socket.emit('speaking', { speaking: isSpeaking });
-              console.log('[VAD] Sent speaking state to server:', isSpeaking);
-            }
           }
         });
         
@@ -353,81 +343,54 @@ export const useCallStore = create(
         console.log('[VAD] Initialized local voice activity detector for user:', userId);
       },
       
-      // Слушать состояние говорения от сервера для удалённых участников
+      // Удаляем сетевой индикатор говорения (используем только локальный VAD на приёме)
       initializeSpeakingStateListener: () => {
-        if (!voiceCallApi.socket) {
-          console.warn('[VAD] Socket not available for speaking state listener');
-          return;
+        if (voiceCallApi.socket) {
+          voiceCallApi.socket.off('speakingStateChanged');
         }
-        
-        // Удаляем предыдущий обработчик если есть
-        voiceCallApi.socket.off('speakingStateChanged');
-        
-        // Слушаем состояния говорения от сервера
-        voiceCallApi.socket.on('speakingStateChanged', ({ peerId, userId: eventUserId, speaking }) => {
-          console.log('[VAD] Received speaking state from server:', { peerId, userId: eventUserId, speaking });
-          
-          // Не обновляем состояние для локального пользователя (он обновляется через локальный VAD)
-          const currentState = get();
-          if (peerId === voiceCallApi.socket?.id) {
-            return;
-          }
-          
-          // Определяем userId
-          // 1. Используем userId из события если он есть
-          let userId = eventUserId;
-          
-          // 2. Если нет, ищем в peerIdToUserIdMap
-          if (!userId) {
-            userId = currentState.peerIdToUserIdMap?.get(peerId);
-          }
-          
-          // 3. Если не нашли, ищем среди участников по peerId
-          if (!userId) {
-            const participant = currentState.participants.find(p => 
-              p.peerId === peerId || p.socketId === peerId
-            );
-            if (participant) {
-              userId = participant.userId || participant.id;
-            }
-          }
-          
-          // 4. Если всё ещё не нашли userId, используем peerId
-          if (!userId) {
-            console.warn('[VAD] Could not find userId for peerId, participants:', 
-              currentState.participants.map(p => ({ peerId: p.peerId, userId: p.userId }))
-            );
-            userId = peerId;
-          }
-          
-          // Сохраняем маппинг для будущих запросов
-          if (userId && userId !== peerId && !currentState.peerIdToUserIdMap?.has(peerId)) {
-            const newMap = new Map(currentState.peerIdToUserIdMap);
-            newMap.set(peerId, userId);
-            set({ peerIdToUserIdMap: newMap });
-            console.log('[VAD] Added mapping peerId -> userId:', { peerId, userId });
-          }
-          
-          console.log('[VAD] Using userId:', { peerId, userId, speaking });
-          
-          // Проверяем состояние мьюта удалённого участника
-          const participantIsMuted = currentState.participantMuteStates?.get(userId);
-          if (participantIsMuted && speaking) {
-            console.log('[VAD] Skipping speaking state for muted participant:', userId);
-            return; // Не показываем индикацию если участник замьючен
-          }
-          
-          get().updateSpeakingState(userId, speaking);
-        });
-        
-        console.log('[VAD] Speaking state listener initialized');
+        console.log('[VAD] Remote speaking: local analyser per track (no server speaking state)');
       },
       
-      // Инициализация VAD для удалённого участника (устарело - теперь состояние приходит от сервера)
+      // Локальный VAD по входящему MediaStream для каждого удалённого участника
       initializeRemoteVAD: async (userId, stream, audioContext) => {
-        // Больше не используем локальный VAD для удалённых участников
-        // Состояние говорения приходит от сервера через speakingStateChanged событие
-        console.log('[VAD] Remote VAD skipped for user (using server state):', userId);
+        if (!userId || !stream || !audioContext) return;
+
+        const previous = get().voiceActivityDetectors.get(userId);
+        if (previous) {
+          previous.cleanup();
+        }
+        set((state) => {
+          const newDetectors = new Map(state.voiceActivityDetectors);
+          newDetectors.delete(userId);
+          return { voiceActivityDetectors: newDetectors };
+        });
+
+        const detector = new VoiceActivityDetector({
+          audioContext,
+          threshold: 12,
+          holdTime: 250,
+          debounceTime: 150,
+          onSpeakingChange: (isSpeaking) => {
+            const s = get();
+            const isMuted = s.participantMuteStates?.get(userId) === true;
+            const audioOn = s.participantAudioStates?.get(userId) !== false;
+            if (isMuted || !audioOn) {
+              if (s.participantSpeakingStates.get(userId)) {
+                s.resetSpeakingState(userId);
+              }
+              return;
+            }
+            s.updateSpeakingState(userId, isSpeaking);
+          }
+        });
+
+        await detector.start(stream, audioContext);
+        set((state) => {
+          const newDetectors = new Map(state.voiceActivityDetectors);
+          newDetectors.set(userId, detector);
+          return { voiceActivityDetectors: newDetectors };
+        });
+        console.log('[VAD] Remote voice activity detector started for', userId);
       },
       
       // Очистка VAD для участника
@@ -668,6 +631,14 @@ export const useCallStore = create(
             const userId = get().peerIdToUserIdMap.get(peerId) || peerId;
             const mutedState = Boolean(isMuted);
             
+            if (mutedState) {
+              get().resetSpeakingState(userId);
+              const remoteVad = get().voiceActivityDetectors.get(userId);
+              if (remoteVad?.forceReset) {
+                remoteVad.forceReset();
+              }
+            }
+            
             // Обновляем только отдельное состояние мьюта, не весь массив участников
             set((state) => {
               const newMuteStates = new Map(state.participantMuteStates);
@@ -712,6 +683,14 @@ export const useCallStore = create(
                 participantGlobalAudioStates: newGlobalAudioStates
               };
             });
+            
+            if (audioEnabled === false) {
+              get().resetSpeakingState(userId);
+              const remoteVad = get().voiceActivityDetectors.get(userId);
+              if (remoteVad?.forceReset) {
+                remoteVad.forceReset();
+              }
+            }
             
             // Обновляем участников только если нужно (для совместимости)
             set((state) => ({
@@ -852,12 +831,28 @@ export const useCallStore = create(
             if (state.audioElements.has(targetUserId)) {
               console.log('🔊 callStore: Audio element already exists for user:', targetUserId, 'updating...');
               const existingElement = state.audioElements.get(targetUserId);
-              existingElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+              const mediaStream = new MediaStream([track.mediaStreamTrack]);
+              existingElement.srcObject = mediaStream;
               try {
                 await existingElement.play();
                 console.log('🔊 callStore: Updated audio element playback started');
               } catch (error) {
                 console.warn('🔊 callStore: Failed to play updated audio element:', error);
+              }
+              let ctx = get().audioContext;
+              if (ctx && ctx.state !== 'closed') {
+                if (ctx.state === 'suspended') {
+                  try {
+                    await ctx.resume();
+                  } catch (e) {
+                    console.warn('[VAD] audioContext resume failed', e);
+                  }
+                }
+                try {
+                  await get().initializeRemoteVAD(targetUserId, mediaStream, ctx);
+                } catch (vadError) {
+                  console.warn('[VAD] Failed to re-init remote VAD after track update:', targetUserId, vadError);
+                }
               }
               return;
             }
@@ -938,6 +933,12 @@ export const useCallStore = create(
                   console.error('🔊❌ callStore: Audio playback still blocked:', err);
                 }
               }, 1000);
+            }
+
+            try {
+              await get().initializeRemoteVAD(targetUserId, mediaStream, audioContext);
+            } catch (vadError) {
+              console.warn('[VAD] Failed to init remote VAD (LiveKit):', targetUserId, vadError);
             }
           });
 

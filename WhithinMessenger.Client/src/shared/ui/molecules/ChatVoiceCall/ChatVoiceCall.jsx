@@ -62,6 +62,9 @@ const ChatVoiceCall = ({
     userMutedStates,
     showVolumeSliders,
     remoteScreenShares,
+    participantSpeakingStates,
+    participantMuteStates,
+    participantAudioStates,
     startCall,
     endCall,
     toggleMute,
@@ -185,7 +188,7 @@ const ChatVoiceCall = ({
   currentUser.isMuted = isMuted;
   currentUser.isAudioEnabled = isAudioEnabled;
   currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
-  currentUser.isSpeaking = false;
+  currentUser.isSpeaking = !isMuted && (participantSpeakingStates?.get(userId) || false);
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = cameraStream;
   currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
@@ -197,17 +200,20 @@ const ChatVoiceCall = ({
   
   // Добавляем всех остальных участников из глобального состояния
   participants.forEach(participant => {
+    const pid = participant.userId || participant.id || participant.name;
     const videoParticipant = createParticipant(
-      participant.userId || participant.id || participant.name, 
+      pid, 
       participant.name, 
       participant.avatar || null, 
       'online', 
       'participant'
     );
-    videoParticipant.isMuted = participant.isMuted || false;
+    videoParticipant.isMuted = participantMuteStates?.get(pid) ?? participant.isMuted ?? false;
     videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
     videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
-    videoParticipant.isSpeaking = participant.isSpeaking || false;
+    const remoteAudioOn = participantAudioStates?.get(pid) !== false;
+    videoParticipant.isSpeaking =
+      !videoParticipant.isMuted && remoteAudioOn && (participantSpeakingStates?.get(pid) || false);
     videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
     videoParticipant.videoStream = participant.videoStream || null;
     videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
