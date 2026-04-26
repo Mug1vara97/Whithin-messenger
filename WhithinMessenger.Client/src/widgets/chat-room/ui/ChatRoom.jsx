@@ -808,7 +808,15 @@ const ChatRoom = ({
                       className="join-preview-status-item"
                       key={`${participant.odUserId || participant.userId || participant.userName}-status`}
                     >
-                      <span className="join-preview-status-name">{participant.userName || 'User'}</span>
+                      <div className="join-preview-status-user">
+                        <UserAvatar
+                          username={participant.userName || 'U'}
+                          avatarUrl={participant.avatar}
+                          avatarColor={participant.avatarColor}
+                          size={28}
+                        />
+                        <span className="join-preview-status-name">{participant.userName || 'User'}</span>
+                      </div>
                       <div className={`join-preview-status-pill ${participantMuted ? 'off' : 'on'}`}>
                         {participantMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
                       </div>

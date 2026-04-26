@@ -65,6 +65,8 @@ const HomePage = () => {
   const groupChatConnectionRef = useRef(null);
   const chatsRef = useRef([]);
   const callerProfilesRef = useRef(new Map());
+  const waitingForRingtoneGestureRef = useRef(false);
+  const gestureRetryHandlerRef = useRef(null);
 
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
@@ -88,11 +90,56 @@ const HomePage = () => {
   }, []);
 
   const stopIncomingCallRingtone = useCallback(() => {
+    if (gestureRetryHandlerRef.current) {
+      const handler = gestureRetryHandlerRef.current;
+      window.removeEventListener('pointerdown', handler);
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener('touchstart', handler);
+      gestureRetryHandlerRef.current = null;
+    }
+    waitingForRingtoneGestureRef.current = false;
+
     if (!ringtoneAudioRef.current) return;
 
     ringtoneAudioRef.current.pause();
     ringtoneAudioRef.current.currentTime = 0;
     ringtoneAudioRef.current = null;
+  }, []);
+
+  const tryPlayIncomingRingtone = useCallback((audio) => {
+    if (!audio) return;
+
+    audio.play().then(() => {
+      waitingForRingtoneGestureRef.current = false;
+      if (gestureRetryHandlerRef.current) {
+        const handler = gestureRetryHandlerRef.current;
+        window.removeEventListener('pointerdown', handler);
+        window.removeEventListener('keydown', handler);
+        window.removeEventListener('touchstart', handler);
+        gestureRetryHandlerRef.current = null;
+      }
+    }).catch((error) => {
+      if (error?.name === 'NotAllowedError') {
+        if (waitingForRingtoneGestureRef.current) return;
+        waitingForRingtoneGestureRef.current = true;
+
+        const retryPlayback = () => {
+          const currentAudio = ringtoneAudioRef.current;
+          if (!currentAudio) return;
+          currentAudio.play().catch(() => {
+            // Если браузер все еще блокирует, ждем следующий жест пользователя.
+          });
+        };
+
+        gestureRetryHandlerRef.current = retryPlayback;
+        window.addEventListener('pointerdown', retryPlayback, { passive: true });
+        window.addEventListener('keydown', retryPlayback);
+        window.addEventListener('touchstart', retryPlayback, { passive: true });
+        return;
+      }
+
+      console.warn('HomePage: failed to play incoming call ringtone:', error);
+    });
   }, []);
 
   useEffect(() => {
@@ -201,8 +248,12 @@ const HomePage = () => {
     });
   }, [chats, groupChatConnection]);
 
+  const activeIncomingCallKey = incomingCall
+    ? `${incomingCall.chatId}:${incomingCall.callerId || incomingCall.callerName || ''}`
+    : null;
+
   useEffect(() => {
-    if (!incomingCall) {
+    if (!activeIncomingCallKey) {
       stopIncomingCallRingtone();
       return undefined;
     }
@@ -212,14 +263,12 @@ const HomePage = () => {
     audio.volume = 0.45;
     ringtoneAudioRef.current = audio;
 
-    audio.play().catch((error) => {
-      console.warn('HomePage: failed to play incoming call ringtone:', error);
-    });
+    tryPlayIncomingRingtone(audio);
 
     return () => {
       stopIncomingCallRingtone();
     };
-  }, [incomingCall, stopIncomingCallRingtone]);
+  }, [activeIncomingCallKey, stopIncomingCallRingtone, tryPlayIncomingRingtone]);
 
   useEffect(() => {
     if (!incomingCall) return undefined;
