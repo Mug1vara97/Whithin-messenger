@@ -1056,18 +1056,22 @@
 }
 
 .call-mode-modal {
-  max-width: 360px;
+  max-width: 400px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(165deg, rgba(37, 40, 49, 0.95), rgba(30, 33, 42, 0.95));
 }
 
 .call-mode-modal h3 {
   margin: 0;
-  color: var(--text);
-  font-size: 18px;
+  color: #f3f4f8;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .call-mode-modal p {
-  margin: 8px 0 0 0;
-  color: var(--textMuted);
+  margin: 10px 0 0 0;
+  color: #b7becd;
   font-size: 14px;
 }
 
@@ -1078,11 +1082,11 @@
 }
 
 .call-mode-button {
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--text);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: #f3f4f8;
+  border-radius: 12px;
+  padding: 12px 14px;
   font-size: 14px;
   font-weight: 600;
   display: flex;
@@ -1094,8 +1098,8 @@
 }
 
 .call-mode-button:hover {
-  background: var(--hover);
-  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .call-mode-button:active {
@@ -1104,10 +1108,12 @@
 
 .call-mode-button.notify {
   border-color: rgba(67, 181, 129, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(67, 181, 129, 0.2);
 }
 
 .call-mode-button.direct {
   border-color: rgba(88, 101, 242, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(88, 101, 242, 0.2);
 }
 
 .incoming-call-overlay {

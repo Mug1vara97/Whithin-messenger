@@ -862,6 +862,10 @@ const HomePage = () => {
       {incomingCall && (
         <div className="global-incoming-call-overlay">
           <div className="global-incoming-call-card">
+            <div className="global-incoming-call-badge">
+              <span className="global-incoming-call-dot"></span>
+              Дозвон
+            </div>
             <div className="global-incoming-call-avatar-ring">
               <UserAvatar
                 username={incomingCall.callerName}
@@ -871,6 +875,7 @@ const HomePage = () => {
               />
             </div>
             <div className="global-incoming-call-user">{incomingCall.callerName}</div>
+            <div className="global-incoming-call-chat-name">{incomingCall.chatName}</div>
             <div className="global-incoming-call-text">Входящий звонок...</div>
             <div className="global-incoming-call-actions">
               <button
@@ -880,6 +885,7 @@ const HomePage = () => {
                 title="Отклонить"
               >
                 <CallEnd style={{ fontSize: '22px' }} />
+                <span>Отклонить</span>
               </button>
               <button
                 type="button"
@@ -888,6 +894,7 @@ const HomePage = () => {
                 title="Принять"
               >
                 <Call style={{ fontSize: '22px' }} />
+                <span>Принять</span>
               </button>
             </div>
           </div>

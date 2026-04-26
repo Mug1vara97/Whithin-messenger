@@ -495,13 +495,8 @@ const ChatRoom = ({
     console.log('handleStartCall: clicked', { isPrivateChat, isGroupChat, isCallActiveInThisChat, otherUserInCall });
     
     if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat) {
-      if (isPrivateChat) {
-        setShowCallTypeSelector(true);
-        return;
-      }
-
-      console.log('handleStartCall: starting group call without notification');
-      handleCallWithoutNotification();
+      setShowCallTypeSelector(true);
+      return;
     } else {
       console.log('handleStartCall: conditions not met for starting call');
     }
@@ -1145,7 +1140,7 @@ const ChatRoom = ({
         >
           <div className="modal-content call-mode-modal">
             <h3>Как начать звонок?</h3>
-            <p>Выберите режим для звонка 1-на-1</p>
+            <p>{isGroupChat ? 'Выберите режим для группового звонка' : 'Выберите режим для звонка 1-на-1'}</p>
             <div className="call-mode-actions">
               <button
                 type="button"
