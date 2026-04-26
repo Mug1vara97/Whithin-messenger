@@ -21,7 +21,7 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
+import { Call, CallEnd, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -105,7 +105,10 @@ const ChatRoom = ({
   const [existingCallParticipants, setExistingCallParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
+  const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
   const notificationConnectionRef = useRef(null);
+  const ringtoneAudioRef = useRef(null);
 
   const inputRef = useRef(null);
 
@@ -405,6 +408,14 @@ const ChatRoom = ({
     loadChatParticipants();
   };
 
+  const stopIncomingCallRingtone = useCallback(() => {
+    if (!ringtoneAudioRef.current) return;
+
+    ringtoneAudioRef.current.pause();
+    ringtoneAudioRef.current.currentTime = 0;
+    ringtoneAudioRef.current = null;
+  }, []);
+
   const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -475,19 +486,7 @@ const ChatRoom = ({
     handleContextMenu(e, messageId, isOwnMessage, canDelete, 'message');
   };
 
-  const handleStartCall = () => {
-    console.log('handleStartCall: clicked', { isPrivateChat, isGroupChat, isCallActiveInThisChat, otherUserInCall });
-    
-    if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat) {
-      console.log('handleStartCall: starting call without notification');
-      // Прямой старт звонка без уведомления
-      handleCallWithoutNotification();
-    } else {
-      console.log('handleStartCall: conditions not met for starting call');
-    }
-  };
-
-  const handleCallWithNotification = () => {
+  const startChatCall = useCallback(() => {
     const callData = {
       roomId: chatId.toString(),
       roomName: `Звонок с ${groupName}`,
@@ -496,14 +495,39 @@ const ChatRoom = ({
       isPrivateCall: true,
       chatId: chatId
     };
-    
-    if (connection) {
-      connection.invoke('SendCallNotification', chatId, username, userId, groupName);
-    }
-    
+
     if (onJoinVoiceChannel) {
       onJoinVoiceChannel(callData);
     }
+  }, [chatId, groupName, onJoinVoiceChannel, userId, username]);
+
+  const handleStartCall = () => {
+    console.log('handleStartCall: clicked', { isPrivateChat, isGroupChat, isCallActiveInThisChat, otherUserInCall });
+    
+    if ((isPrivateChat || isGroupChat) && !isCallActiveInThisChat) {
+      if (isPrivateChat) {
+        setShowCallTypeSelector(true);
+        return;
+      }
+
+      console.log('handleStartCall: starting group call without notification');
+      handleCallWithoutNotification();
+    } else {
+      console.log('handleStartCall: conditions not met for starting call');
+    }
+  };
+
+  const handleCallWithNotification = async () => {
+    if (connection) {
+      try {
+        await connection.invoke('SendCallNotification', chatId, username, userId);
+      } catch (error) {
+        console.error('Failed to send call notification:', error);
+      }
+    }
+
+    startChatCall();
+    setShowCallTypeSelector(false);
     closeContextMenu();
   };
 
@@ -511,28 +535,85 @@ const ChatRoom = ({
     console.log('handleCallWithoutNotification: called with data:', { 
       chatId, groupName, username, userId, onJoinVoiceChannel 
     });
-    
-    const callData = {
-      roomId: chatId.toString(),
-      roomName: `Звонок с ${groupName}`,
-      userName: username,
-      userId: userId,
-      isPrivateCall: true,
-      chatId: chatId
-    };
-    
-    console.log('handleCallWithoutNotification: callData created:', callData);
-    
-    if (onJoinVoiceChannel) {
-      console.log('handleCallWithoutNotification: calling onJoinVoiceChannel');
-      onJoinVoiceChannel(callData);
-    } else {
-      console.log('handleCallWithoutNotification: onJoinVoiceChannel is not available');
-    }
-    
-    // Не вызываем closeContextMenu, так как мы не в контекстном меню
+
+    startChatCall();
+    setShowCallTypeSelector(false);
+    closeContextMenu();
     console.log('handleCallWithoutNotification: call started');
   };
+
+  const handleAcceptIncomingCall = () => {
+    setIncomingCall(null);
+    startChatCall();
+  };
+
+  const handleDeclineIncomingCall = () => {
+    setIncomingCall(null);
+  };
+
+  useEffect(() => {
+    if (!connection || !chatId) return undefined;
+
+    const handleIncomingCall = (payload) => {
+      const incomingChatId = payload?.chatId || payload?.ChatId;
+      const callerId = payload?.callerId || payload?.CallerId;
+      const caller = payload?.caller || payload?.Caller;
+      const roomId = payload?.roomId || payload?.RoomId;
+
+      if (String(incomingChatId) !== String(chatId)) return;
+      if (String(callerId) === String(userId)) return;
+      if (!isPrivateChat) return;
+
+      setIncomingCall({
+        chatId: incomingChatId,
+        roomId: roomId || String(incomingChatId),
+        caller: caller || groupName || 'Неизвестный',
+        callerId
+      });
+    };
+
+    connection.on('IncomingCall', handleIncomingCall);
+
+    return () => {
+      connection.off('IncomingCall', handleIncomingCall);
+    };
+  }, [chatId, connection, groupName, isPrivateChat, userId]);
+
+  useEffect(() => {
+    if (!incomingCall) {
+      stopIncomingCallRingtone();
+      return undefined;
+    }
+
+    const audio = new Audio('/patriot.mp3');
+    audio.loop = true;
+    audio.volume = 0.45;
+    ringtoneAudioRef.current = audio;
+
+    audio.play().catch((error) => {
+      console.warn('Failed to play incoming call ringtone:', error);
+    });
+
+    return () => {
+      stopIncomingCallRingtone();
+    };
+  }, [incomingCall, stopIncomingCallRingtone]);
+
+  useEffect(() => {
+    if (!incomingCall) return undefined;
+
+    const timeoutId = setTimeout(() => {
+      setIncomingCall(null);
+    }, 30000);
+
+    return () => clearTimeout(timeoutId);
+  }, [incomingCall]);
+
+  useEffect(() => {
+    if (isCallActiveInThisChat) {
+      setIncomingCall(null);
+    }
+  }, [isCallActiveInThisChat]);
 
 
 
@@ -974,34 +1055,6 @@ const ChatRoom = ({
           </div>
         )}
 
-        {contextMenu.visible && contextMenu.type === 'call' && (
-          <div 
-            className="context-menu call-type-menu"
-            style={{
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`,
-              zIndex: 1000000000,
-              position: 'fixed'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              onClick={handleCallWithNotification}
-              className="context-menu-button call-with-notification"
-            >
-              <Call style={{ fontSize: '16px' }} />
-              Звонить с уведомлением
-            </button>
-            <button 
-              onClick={handleCallWithoutNotification}
-              className="context-menu-button call-without-notification"
-            >
-              <Call style={{ fontSize: '16px' }} />
-              Звонить без уведомления
-            </button>
-          </div>
-        )}
-        
         {/* Индикатор загрузки файла */}
         {uploadingFile && (
           <div className="message my-message uploading-message">
@@ -1165,6 +1218,75 @@ const ChatRoom = ({
       
       
       <ForwardModal />
+
+      {showCallTypeSelector && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowCallTypeSelector(false);
+            }
+          }}
+        >
+          <div className="modal-content call-mode-modal">
+            <h3>Как начать звонок?</h3>
+            <p>Выберите режим для звонка 1-на-1</p>
+            <div className="call-mode-actions">
+              <button
+                type="button"
+                className="call-mode-button notify"
+                onClick={handleCallWithNotification}
+              >
+                <Call style={{ fontSize: '18px' }} />
+                С дозвоном
+              </button>
+              <button
+                type="button"
+                className="call-mode-button direct"
+                onClick={handleCallWithoutNotification}
+              >
+                <Call style={{ fontSize: '18px' }} />
+                Просто присоединиться
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {incomingCall && (
+        <div className="incoming-call-overlay">
+          <div className="incoming-call-card">
+            <div className="incoming-call-avatar-ring">
+              <UserAvatar
+                username={incomingCall.caller}
+                avatarUrl={chatUserProfile?.avatar}
+                avatarColor={chatUserProfile?.avatarColor || '#5865F2'}
+                size={96}
+              />
+            </div>
+            <div className="incoming-call-user">{incomingCall.caller}</div>
+            <div className="incoming-call-text">Входящий звонок...</div>
+            <div className="incoming-call-actions">
+              <button
+                type="button"
+                className="incoming-call-button decline"
+                onClick={handleDeclineIncomingCall}
+                title="Отклонить"
+              >
+                <CallEnd style={{ fontSize: '22px' }} />
+              </button>
+              <button
+                type="button"
+                className="incoming-call-button accept"
+                onClick={handleAcceptIncomingCall}
+                title="Принять"
+              >
+                <Call style={{ fontSize: '22px' }} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <ChatInfoModal 
         open={showChatInfo}

@@ -1055,6 +1055,146 @@
   justify-content: flex-start;
 }
 
+.call-mode-modal {
+  max-width: 360px;
+}
+
+.call-mode-modal h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.call-mode-modal p {
+  margin: 8px 0 0 0;
+  color: var(--textMuted);
+  font-size: 14px;
+}
+
+.call-mode-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.call-mode-button {
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.call-mode-button:hover {
+  background: var(--hover);
+  border-color: var(--primary);
+}
+
+.call-mode-button:active {
+  transform: scale(0.98);
+}
+
+.call-mode-button.notify {
+  border-color: rgba(67, 181, 129, 0.55);
+}
+
+.call-mode-button.direct {
+  border-color: rgba(88, 101, 242, 0.55);
+}
+
+.incoming-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.incoming-call-card {
+  pointer-events: auto;
+  width: min(330px, calc(100vw - 32px));
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1f222b;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
+  padding: 20px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.incoming-call-avatar-ring {
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  padding: 5px;
+}
+
+.incoming-call-user {
+  margin-top: 14px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: clamp(24px, 7vw, 34px);
+  line-height: 1;
+  text-transform: lowercase;
+  text-align: center;
+  word-break: break-word;
+}
+
+.incoming-call-text {
+  margin-top: 10px;
+  color: #d0d4df;
+  font-size: clamp(18px, 6vw, 30px);
+  line-height: 1.05;
+  text-align: center;
+}
+
+.incoming-call-actions {
+  margin-top: 24px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.incoming-call-button {
+  width: 82px;
+  height: 62px;
+  border: none;
+  border-radius: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, filter 0.2s ease;
+}
+
+.incoming-call-button:hover {
+  filter: brightness(1.05);
+}
+
+.incoming-call-button:active {
+  transform: scale(0.97);
+}
+
+.incoming-call-button.decline {
+  background: #d83b46;
+}
+
+.incoming-call-button.accept {
+  background: #3fa96b;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
