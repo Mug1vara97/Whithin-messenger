@@ -8,6 +8,10 @@ let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
 
+const logMain = (...args) => console.log('[ELECTRON_MAIN]', ...args);
+const logMainWarn = (...args) => console.warn('[ELECTRON_MAIN]', ...args);
+const logMainError = (...args) => console.error('[ELECTRON_MAIN]', ...args);
+
 function openScreenPickerWindow(sources) {
   return new Promise((resolve) => {
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -168,9 +172,16 @@ app.whenReady().then(() => {
         if (audioSource) {
           response.audio = audioSource;
         }
+        logMain('DisplayMedia resolved:', {
+          sourceId: preferredSource?.id,
+          sourceName: preferredSource?.name,
+          sourceType: selectedSourceType,
+          audioMode,
+          hasAudio: Boolean(response.audio)
+        });
         safeCallback(response);
       } catch (error) {
-        console.error('Display media request failed:', error);
+        logMainError('Display media request failed:', error);
         safeCallback({ video: null });
       }
     },
@@ -187,6 +198,7 @@ app.whenReady().then(() => {
 });
 
 ipcMain.handle('electron:open-external', async (_, url) => {
+  logMain('Open external URL:', url);
   await shell.openExternal(url);
 });
 
@@ -198,30 +210,42 @@ ipcMain.handle('electron:disable-selected-screen-audio', () => {
   if (selectedScreenSource) {
     selectedScreenSource.captureAudio = false;
     selectedScreenSource.audioMode = 'none';
+    logMain('Selected screen audio disabled by renderer retry logic');
   }
   return true;
 });
 
 ipcMain.handle('electron:list-app-audio-sessions', () => {
   if (!nativeAudioCapture.isAvailable()) {
-    return { ok: false, error: nativeAudioCapture.getLoadError(), sessions: [] };
+    const error = nativeAudioCapture.getLoadError();
+    logMainWarn('Native audio addon unavailable in list-app-audio-sessions:', error);
+    return { ok: false, error, sessions: [] };
   }
   try {
-    return { ok: true, sessions: nativeAudioCapture.listAudioSessions() };
+    const sessions = nativeAudioCapture.listAudioSessions();
+    logMain('Listed app audio sessions:', sessions.length);
+    return { ok: true, sessions };
   } catch (error) {
-    return { ok: false, error: String(error?.message || error), sessions: [] };
+    const err = String(error?.message || error);
+    logMainError('list-app-audio-sessions failed:', err);
+    return { ok: false, error: err, sessions: [] };
   }
 });
 
 ipcMain.handle('electron:start-app-audio-capture', (_, sessionId) => {
   if (!nativeAudioCapture.isAvailable()) {
-    return { ok: false, error: nativeAudioCapture.getLoadError() };
+    const error = nativeAudioCapture.getLoadError();
+    logMainWarn('Native audio addon unavailable in start-app-audio-capture:', error);
+    return { ok: false, error };
   }
   try {
     nativeAudioCapture.startCapture(sessionId);
+    logMain('Native app audio capture started:', sessionId);
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
+    const err = String(error?.message || error);
+    logMainError('start-app-audio-capture failed:', err, 'sessionId:', sessionId);
+    return { ok: false, error: err };
   }
 });
 
@@ -231,9 +255,12 @@ ipcMain.handle('electron:stop-app-audio-capture', () => {
   }
   try {
     nativeAudioCapture.stopCapture();
+    logMain('Native app audio capture stopped');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
+    const err = String(error?.message || error);
+    logMainError('stop-app-audio-capture failed:', err);
+    return { ok: false, error: err };
   }
 });
 
@@ -245,7 +272,9 @@ ipcMain.handle('electron:read-app-audio-chunk', (_, maxFrames = 960) => {
     const chunk = nativeAudioCapture.readChunk(maxFrames);
     return { ok: true, chunk };
   } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
+    const err = String(error?.message || error);
+    logMainError('read-app-audio-chunk failed:', err);
+    return { ok: false, error: err };
   }
 });
 
@@ -271,6 +300,7 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     audioMode: selection.audioMode || 'none',
     appAudioSessionId: selection.appAudioSessionId || null
   };
+  logMain('Screen source selected:', selectedScreenSource);
 
   return {
     id: selection.id,

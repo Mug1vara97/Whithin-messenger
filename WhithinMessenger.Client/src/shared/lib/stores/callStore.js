@@ -174,6 +174,7 @@ export const useCallStore = create(
       nativeScreenAudioTrack: null,
       nativeScreenAudioGenerator: null,
       nativeScreenAudioPumpId: null,
+      nativeScreenAudioReplacedMic: false,
       
   // Состояние вебкамеры
   isVideoEnabled: false,
@@ -225,15 +226,23 @@ export const useCallStore = create(
         }
 
         try {
-          if (state.nativeScreenAudioTrack) {
-            const room = voiceCallApi.getRoom();
-            if (room) {
+          const room = voiceCallApi.getRoom();
+          if (state.nativeScreenAudioTrack && room) {
+            const microphonePublication = room.localParticipant.getTrackPublication('microphone');
+            if (state.nativeScreenAudioReplacedMic && microphonePublication?.track?.replaceTrack) {
+              const restorationTrack = state.noiseSuppressionManager?.getProcessedStream?.()?.getAudioTracks?.()[0]
+                || state.localStream?.getAudioTracks?.()[0]
+                || null;
+              if (restorationTrack) {
+                await microphonePublication.track.replaceTrack(restorationTrack);
+              }
+            } else {
               await room.localParticipant.unpublishTrack(state.nativeScreenAudioTrack);
             }
             state.nativeScreenAudioTrack.stop?.();
           }
         } catch (error) {
-          console.warn('Failed to unpublish native screen-share audio track:', error);
+          console.warn('Failed to cleanup native screen-share audio track:', error);
         }
 
         try {
@@ -245,7 +254,8 @@ export const useCallStore = create(
         set({
           nativeScreenAudioTrack: null,
           nativeScreenAudioGenerator: null,
-          nativeScreenAudioPumpId: null
+          nativeScreenAudioPumpId: null,
+          nativeScreenAudioReplacedMic: false
         });
       },
       startNativeScreenAudioCapture: async (sessionId) => {
@@ -299,15 +309,35 @@ export const useCallStore = create(
           }
         }, 20);
 
-        await room.localParticipant.publishTrack(generator, {
-          source: Track.Source.Unknown,
-          name: 'screen_share_audio_native'
-        });
+        // IMPORTANT:
+        // Native app-audio path must NOT publish a second audio m-line
+        // (it causes opus codec collision in Electron/WebRTC + LiveKit).
+        // We only replace existing microphone sender track.
+        let replacedMic = false;
+        let microphonePublication = room.localParticipant.getTrackPublication('microphone');
+
+        if (!microphonePublication?.track) {
+          // Attempt to initialize microphone publication if it is missing.
+          await room.localParticipant.setMicrophoneEnabled(true);
+          microphonePublication = room.localParticipant.getTrackPublication('microphone');
+        }
+
+        if (microphonePublication?.track?.replaceTrack) {
+          await microphonePublication.track.replaceTrack(generator);
+          replacedMic = true;
+        } else {
+          await writer.close();
+          writer.releaseLock?.();
+          generator.stop?.();
+          await window.electronAPI.stopAppAudioCapture?.();
+          throw new Error('Native app audio requires existing microphone publication (replaceTrack unavailable)');
+        }
 
         set({
           nativeScreenAudioTrack: generator,
           nativeScreenAudioGenerator: writer,
-          nativeScreenAudioPumpId: pumpId
+          nativeScreenAudioPumpId: pumpId,
+          nativeScreenAudioReplacedMic: replacedMic
         });
 
         return true;
