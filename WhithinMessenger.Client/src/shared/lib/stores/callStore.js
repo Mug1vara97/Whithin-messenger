@@ -8,6 +8,26 @@ import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 
+const CALL_OUTPUT_DEVICE_KEY = 'callOutputDeviceId';
+const SCREEN_SHARE_OUTPUT_DEVICE_KEY = 'screenShareOutputDeviceId';
+
+const getOutputDeviceForRole = (role) => {
+  if (role === 'screen-share') {
+    return localStorage.getItem(SCREEN_SHARE_OUTPUT_DEVICE_KEY) || 'default';
+  }
+  return localStorage.getItem(CALL_OUTPUT_DEVICE_KEY) || 'default';
+};
+
+const applyAudioSink = async (audioElement, role = 'call') => {
+  if (!audioElement?.setSinkId) return;
+  try {
+    const sinkId = getOutputDeviceForRole(role);
+    await audioElement.setSinkId(sinkId || 'default');
+  } catch (error) {
+    console.warn(`Failed to set audio output (${role})`, error);
+  }
+};
+
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
   if (!banner) return false;
@@ -164,6 +184,13 @@ export const useCallStore = create(
       // Actions
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
+      applyAudioOutputSettings: async () => {
+        const state = get();
+        for (const [key, audioElement] of state.audioElements.entries()) {
+          const role = String(key).startsWith('screen-share-audio-') ? 'screen-share' : 'call';
+          await applyAudioSink(audioElement, role);
+        }
+      },
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
 
@@ -816,6 +843,7 @@ export const useCallStore = create(
               audioElement.volume = 1.0;
               audioElement.playsInline = true;
               audioElement.style.display = 'none';
+              await applyAudioSink(audioElement, 'screen-share');
               document.body.appendChild(audioElement);
               
               try {
@@ -880,6 +908,7 @@ export const useCallStore = create(
             audioElement.playsInline = true;
             audioElement.controls = false;
             audioElement.style.display = 'none';
+            await applyAudioSink(audioElement, 'call');
             document.body.appendChild(audioElement);
             console.log('🔊 callStore: Created audio element for user:', targetUserId);
             
@@ -1612,6 +1641,7 @@ export const useCallStore = create(
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
+              await applyAudioSink(audioElement, 'screen-share');
               
               // Добавляем в DOM для воспроизведения
               document.body.appendChild(audioElement);
@@ -1681,6 +1711,7 @@ export const useCallStore = create(
           audioElement.playsInline = true;
           audioElement.controls = false;
           audioElement.style.display = 'none';
+          await applyAudioSink(audioElement, 'call');
           document.body.appendChild(audioElement);
           
           // Создаем Web Audio API chain

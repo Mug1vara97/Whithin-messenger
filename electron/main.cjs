@@ -120,6 +120,13 @@ function createWindow() {
 app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(
     async (request, callback) => {
+      let callbackSent = false;
+      const safeCallback = (payload) => {
+        if (callbackSent) return;
+        callbackSent = true;
+        callback(payload);
+      };
+
       try {
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
@@ -138,24 +145,25 @@ app.whenReady().then(() => {
           sourceNameLower.includes('electron');
 
         if (!preferredSource) {
-          callback({ video: null, audio: null });
+          safeCallback({ video: null, audio: null });
           return;
         }
 
         let audioSource = null;
         if (shouldCaptureAudio && !isWhithinWindow) {
-          // Capture only selected app window audio; never stream full-screen system audio.
-          audioSource = selectedSourceType === 'window' ? preferredSource : null;
+          // Electron accepts "loopback"/"loopbackWithMute" for audio, not DesktopCapturerSource.
+          // Keep audio only for app-window sharing and disable for full-screen sharing.
+          audioSource = selectedSourceType === 'window' ? 'loopback' : null;
         }
 
-        callback({
+        safeCallback({
           video: preferredSource,
           // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
           audio: audioSource
         });
       } catch (error) {
         console.error('Display media request failed:', error);
-        callback({ video: null, audio: null });
+        safeCallback({ video: null, audio: null });
       }
     },
     { useSystemPicker: true }

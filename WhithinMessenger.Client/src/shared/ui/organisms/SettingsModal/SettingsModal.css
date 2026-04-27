@@ -83,6 +83,11 @@
   margin-bottom: 8px;
 }
 
+.setting-select-label {
+  align-items: center;
+  justify-content: space-between;
+}
+
 .setting-label input[type="checkbox"] {
   margin-right: 12px;
   width: 18px;
