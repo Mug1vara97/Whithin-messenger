@@ -668,14 +668,9 @@ class VoiceCallApi {
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
-          // Request screen-share audio only when explicitly enabled by picker logic.
-          audio: includeAudio
-            ? {
-                autoGainControl: false,
-                googAutoGainControl: false,
-                googAutoGainControl2: false
-              }
-            : false,
+          // Use browser/electron defaults for stream audio for best compatibility.
+          // Custom audio constraints here can cause source start failures on some setups.
+          audio: includeAudio ? true : false,
           resolution: VideoPresets.h720.resolution,
           frameRate: 60
         },
