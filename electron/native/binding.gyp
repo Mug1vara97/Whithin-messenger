@@ -21,7 +21,8 @@
             "libraries": [
               "-lole32",
               "-luuid",
-              "-luser32"
+              "-luser32",
+              "-lRuntimeObject"
             ]
           }
         ]

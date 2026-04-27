@@ -300,8 +300,8 @@ export const useCallStore = create(
         }, 20);
 
         await room.localParticipant.publishTrack(generator, {
-          source: Track.Source.ScreenShareAudio,
-          name: 'screen_share_audio'
+          source: Track.Source.Unknown,
+          name: 'screen_share_audio_native'
         });
 
         set({

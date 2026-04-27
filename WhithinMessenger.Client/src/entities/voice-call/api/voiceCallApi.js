@@ -70,9 +70,11 @@ class VoiceCallApi {
 
   getPublicationMediaType(publication) {
     const source = publication?.source;
+    const trackName = publication?.trackName || publication?.name || publication?.track?.name || '';
     if (source === Track.Source.ScreenShare) return 'screen';
     if (source === Track.Source.Camera) return 'camera';
     if (source === Track.Source.ScreenShareAudio) return 'screen';
+    if (source === Track.Source.Unknown && String(trackName).includes('screen_share_audio')) return 'screen';
     return 'microphone';
   }
 

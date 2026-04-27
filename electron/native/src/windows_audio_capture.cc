@@ -1,8 +1,13 @@
 #include <napi.h>
 #include <windows.h>
 #include <TlHelp32.h>
-#include <mmdeviceapi.h>
 #include <audioclient.h>
+#include <mmreg.h>
+#include <ks.h>
+#include <ksmedia.h>
+#include <Mmdeviceapi.h>
+#include <audioclientactivationparams.h>
+#include <functiondiscoverykeys_devpkey.h>
 
 #include <algorithm>
 #include <atomic>
@@ -14,6 +19,14 @@
 
 namespace {
 
+using ActivateAudioInterfaceAsyncFn = HRESULT(WINAPI*)(
+  LPCWSTR,
+  REFIID,
+  PROPVARIANT*,
+  IActivateAudioInterfaceCompletionHandler*,
+  IActivateAudioInterfaceAsyncOperation**
+);
+
 struct SessionInfo {
   std::string id;
   std::string processName;
@@ -24,13 +37,90 @@ struct SessionInfo {
 std::mutex g_stateMutex;
 std::atomic<bool> g_captureActive{false};
 std::string g_selectedSessionId;
+uint32_t g_selectedPid = 0;
 std::thread g_captureThread;
 uint32_t g_sampleRate = 48000;
-uint32_t g_channels = 2;
+uint32_t g_channels = 1;
 std::vector<int16_t> g_ringBuffer;
 size_t g_ringReadPos = 0;
 size_t g_ringWritePos = 0;
 size_t g_ringSize = 0;
+
+class ActivateAudioInterfaceHandler : public IActivateAudioInterfaceCompletionHandler {
+ public:
+  ActivateAudioInterfaceHandler() : refCount_(1), activateResult_(E_FAIL), audioClient_(nullptr) {
+    completedEvent_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+  }
+
+  virtual ~ActivateAudioInterfaceHandler() {
+    if (audioClient_) {
+      audioClient_->Release();
+      audioClient_ = nullptr;
+    }
+    if (completedEvent_) {
+      CloseHandle(completedEvent_);
+      completedEvent_ = nullptr;
+    }
+  }
+
+  HRESULT Wait(DWORD timeoutMs) {
+    if (!completedEvent_) return E_FAIL;
+    DWORD waitResult = WaitForSingleObject(completedEvent_, timeoutMs);
+    if (waitResult != WAIT_OBJECT_0) {
+      return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    }
+    return activateResult_;
+  }
+
+  IAudioClient* DetachAudioClient() {
+    IAudioClient* result = audioClient_;
+    audioClient_ = nullptr;
+    return result;
+  }
+
+  STDMETHODIMP ActivateCompleted(IActivateAudioInterfaceAsyncOperation* operation) override {
+    if (!operation) {
+      activateResult_ = E_POINTER;
+    } else {
+      IUnknown* activatedInterface = nullptr;
+      activateResult_ = operation->GetActivateResult(&activateResult_, &activatedInterface);
+      if (SUCCEEDED(activateResult_) && activatedInterface) {
+        activateResult_ = activatedInterface->QueryInterface(__uuidof(IAudioClient), reinterpret_cast<void**>(&audioClient_));
+        activatedInterface->Release();
+      }
+    }
+    if (completedEvent_) {
+      SetEvent(completedEvent_);
+    }
+    return S_OK;
+  }
+
+  STDMETHODIMP QueryInterface(REFIID iid, void** obj) override {
+    if (!obj) return E_POINTER;
+    if (iid == __uuidof(IUnknown) || iid == __uuidof(IActivateAudioInterfaceCompletionHandler)) {
+      *obj = static_cast<IActivateAudioInterfaceCompletionHandler*>(this);
+      AddRef();
+      return S_OK;
+    }
+    *obj = nullptr;
+    return E_NOINTERFACE;
+  }
+
+  STDMETHODIMP_(ULONG) AddRef() override { return static_cast<ULONG>(InterlockedIncrement(&refCount_)); }
+  STDMETHODIMP_(ULONG) Release() override {
+    ULONG refs = static_cast<ULONG>(InterlockedDecrement(&refCount_));
+    if (refs == 0) {
+      delete this;
+    }
+    return refs;
+  }
+
+ private:
+  long refCount_;
+  HANDLE completedEvent_;
+  HRESULT activateResult_;
+  IAudioClient* audioClient_;
+};
 
 void RingInit(size_t samples) {
   g_ringBuffer.assign(samples, 0);
@@ -99,30 +189,57 @@ std::vector<SessionInfo> EnumerateProcessSessions() {
   return sessions;
 }
 
-bool ConvertToInt16Stereo(const BYTE* input, UINT32 frames, const WAVEFORMATEX* format, std::vector<int16_t>& out) {
-  const uint16_t inChannels = format->nChannels > 0 ? format->nChannels : 1;
-  out.resize(static_cast<size_t>(frames) * 2);
+uint32_t ExtractPidFromSessionId(const std::string& sessionId) {
+  const size_t sep = sessionId.find(':');
+  if (sep == std::string::npos) {
+    return 0;
+  }
+  try {
+    return static_cast<uint32_t>(std::stoul(sessionId.substr(0, sep)));
+  } catch (...) {
+    return 0;
+  }
+}
 
-  if (format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT && format->wBitsPerSample == 32) {
+bool ConvertToInt16Mono(const BYTE* input, UINT32 frames, const WAVEFORMATEX* format, std::vector<int16_t>& out) {
+  const uint16_t inChannels = format->nChannels > 0 ? format->nChannels : 1;
+  uint16_t bitsPerSample = format->wBitsPerSample;
+  bool isFloat = false;
+
+  if (format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
+    isFloat = true;
+  } else if (format->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+    const auto* ext = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(format);
+    bitsPerSample = ext->Samples.wValidBitsPerSample ? ext->Samples.wValidBitsPerSample : ext->Format.wBitsPerSample;
+    if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) {
+      isFloat = true;
+    } else if (ext->SubFormat == KSDATAFORMAT_SUBTYPE_PCM) {
+      isFloat = false;
+    } else {
+      return false;
+    }
+  }
+
+  out.resize(static_cast<size_t>(frames));
+
+  if (isFloat && bitsPerSample == 32) {
     const float* src = reinterpret_cast<const float*>(input);
     for (UINT32 i = 0; i < frames; ++i) {
       float l = src[static_cast<size_t>(i) * inChannels];
       float r = inChannels > 1 ? src[static_cast<size_t>(i) * inChannels + 1] : l;
-      l = std::max(-1.0f, std::min(1.0f, l));
-      r = std::max(-1.0f, std::min(1.0f, r));
-      out[static_cast<size_t>(i) * 2] = static_cast<int16_t>(l * 32767.0f);
-      out[static_cast<size_t>(i) * 2 + 1] = static_cast<int16_t>(r * 32767.0f);
+      float m = (l + r) * 0.5f;
+      m = std::max(-1.0f, std::min(1.0f, m));
+      out[static_cast<size_t>(i)] = static_cast<int16_t>(m * 32767.0f);
     }
     return true;
   }
 
-  if (format->wBitsPerSample == 16) {
+  if (!isFloat && bitsPerSample == 16) {
     const int16_t* src = reinterpret_cast<const int16_t*>(input);
     for (UINT32 i = 0; i < frames; ++i) {
       int16_t l = src[static_cast<size_t>(i) * inChannels];
       int16_t r = inChannels > 1 ? src[static_cast<size_t>(i) * inChannels + 1] : l;
-      out[static_cast<size_t>(i) * 2] = l;
-      out[static_cast<size_t>(i) * 2 + 1] = r;
+      out[static_cast<size_t>(i)] = static_cast<int16_t>((static_cast<int32_t>(l) + static_cast<int32_t>(r)) / 2);
     }
     return true;
   }
@@ -136,30 +253,75 @@ void CaptureLoop() {
     return;
   }
 
-  IMMDeviceEnumerator* deviceEnum = nullptr;
-  IMMDevice* device = nullptr;
   IAudioClient* audioClient = nullptr;
   IAudioCaptureClient* captureClient = nullptr;
   WAVEFORMATEX* mixFormat = nullptr;
+  IActivateAudioInterfaceAsyncOperation* asyncOp = nullptr;
 
   do {
-    hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
-                          __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(&deviceEnum));
-    if (FAILED(hr)) break;
+    uint32_t pid = 0;
+    {
+      std::lock_guard<std::mutex> lock(g_stateMutex);
+      pid = g_selectedPid;
+    }
+    if (pid == 0) break;
 
-    hr = deviceEnum->GetDefaultAudioEndpoint(eRender, eConsole, &device);
-    if (FAILED(hr)) break;
+    AUDIOCLIENT_ACTIVATION_PARAMS activationParams = {};
+    activationParams.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
+    activationParams.ProcessLoopbackParams.ProcessLoopbackMode = PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
+    activationParams.ProcessLoopbackParams.TargetProcessId = pid;
 
-    hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&audioClient));
-    if (FAILED(hr)) break;
+    PROPVARIANT activateParamsVariant;
+    PropVariantInit(&activateParamsVariant);
+    activateParamsVariant.vt = VT_BLOB;
+    activateParamsVariant.blob.cbSize = sizeof(activationParams);
+    activateParamsVariant.blob.pBlobData = reinterpret_cast<BYTE*>(&activationParams);
+
+    auto* completionHandler = new ActivateAudioInterfaceHandler();
+    HMODULE mmdevapi = LoadLibraryW(L"Mmdevapi.dll");
+    if (!mmdevapi) {
+      completionHandler->Release();
+      break;
+    }
+
+    auto activateAudioInterfaceAsyncFn =
+      reinterpret_cast<ActivateAudioInterfaceAsyncFn>(GetProcAddress(mmdevapi, "ActivateAudioInterfaceAsync"));
+    if (!activateAudioInterfaceAsyncFn) {
+      FreeLibrary(mmdevapi);
+      completionHandler->Release();
+      break;
+    }
+
+    hr = activateAudioInterfaceAsyncFn(
+      VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
+      __uuidof(IAudioClient),
+      &activateParamsVariant,
+      completionHandler,
+      &asyncOp
+    );
+    FreeLibrary(mmdevapi);
+    if (FAILED(hr)) {
+      completionHandler->Release();
+      break;
+    }
+
+    hr = completionHandler->Wait(8000);
+    if (SUCCEEDED(hr)) {
+      audioClient = completionHandler->DetachAudioClient();
+    }
+    completionHandler->Release();
+    if (FAILED(hr) || !audioClient) {
+      break;
+    }
 
     hr = audioClient->GetMixFormat(&mixFormat);
-    if (FAILED(hr) || !mixFormat) break;
+    if (FAILED(hr)) break;
+    if (!mixFormat) break;
 
     {
       std::lock_guard<std::mutex> lock(g_stateMutex);
       g_sampleRate = mixFormat->nSamplesPerSec > 0 ? mixFormat->nSamplesPerSec : 48000;
-      g_channels = 2;
+      g_channels = 1;
       RingInit(static_cast<size_t>(g_sampleRate) * g_channels * 5);
     }
 
@@ -192,12 +354,12 @@ void CaptureLoop() {
         if (FAILED(hr)) break;
 
         if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
-          std::vector<int16_t> silence(static_cast<size_t>(numFrames) * 2, 0);
+          std::vector<int16_t> silence(static_cast<size_t>(numFrames) * g_channels, 0);
           std::lock_guard<std::mutex> lock(g_stateMutex);
           RingPush(silence.data(), silence.size());
         } else if (data && numFrames > 0) {
           std::vector<int16_t> converted;
-          if (ConvertToInt16Stereo(data, numFrames, mixFormat, converted)) {
+          if (ConvertToInt16Mono(data, numFrames, mixFormat, converted)) {
             std::lock_guard<std::mutex> lock(g_stateMutex);
             RingPush(converted.data(), converted.size());
           }
@@ -217,8 +379,7 @@ void CaptureLoop() {
   if (captureClient) captureClient->Release();
   if (mixFormat) CoTaskMemFree(mixFormat);
   if (audioClient) audioClient->Release();
-  if (device) device->Release();
-  if (deviceEnum) deviceEnum->Release();
+  if (asyncOp) asyncOp->Release();
   CoUninitialize();
 }
 
@@ -247,6 +408,11 @@ Napi::Value StartCapture(const Napi::CallbackInfo& info) {
   }
 
   std::string sessionId = info[0].As<Napi::String>().Utf8Value();
+  uint32_t pid = ExtractPidFromSessionId(sessionId);
+  if (pid == 0) {
+    Napi::Error::New(env, "Invalid sessionId, pid is required").ThrowAsJavaScriptException();
+    return env.Null();
+  }
   if (g_captureActive.load()) {
     g_captureActive.store(false);
     if (g_captureThread.joinable()) {
@@ -256,8 +422,9 @@ Napi::Value StartCapture(const Napi::CallbackInfo& info) {
   {
     std::lock_guard<std::mutex> lock(g_stateMutex);
     g_selectedSessionId = sessionId;
+    g_selectedPid = pid;
     g_sampleRate = 48000;
-    g_channels = 2;
+    g_channels = 1;
     RingInit(static_cast<size_t>(g_sampleRate) * g_channels * 5);
   }
   g_captureActive.store(true);
@@ -274,6 +441,7 @@ Napi::Value StopCapture(const Napi::CallbackInfo& info) {
   {
     std::lock_guard<std::mutex> lock(g_stateMutex);
     g_selectedSessionId.clear();
+    g_selectedPid = 0;
     RingInit(0);
   }
   return Napi::Boolean::New(env, true);
@@ -289,7 +457,7 @@ Napi::Value ReadChunk(const Napi::CallbackInfo& info) {
   }
 
   uint32_t sampleRate = 48000;
-  uint32_t channels = 2;
+  uint32_t channels = 1;
   {
     std::lock_guard<std::mutex> lock(g_stateMutex);
     sampleRate = g_sampleRate;
