@@ -15,6 +15,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const saved = localStorage.getItem('soundNotificationsEnabled');
     return saved == null ? true : JSON.parse(saved);
   });
+  const [overlayPid, setOverlayPid] = useState('');
+  const [overlayStatus, setOverlayStatus] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +46,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
       })
     );
   }, [soundNotificationsEnabled]);
+
+  useEffect(() => {
+    if (!isOpen || !window.electronAPI?.overlayStatus) return;
+    window.electronAPI.overlayStatus().then(setOverlayStatus).catch(() => {});
+  }, [isOpen]);
 
   const handleNoiseSuppressionToggle = () => {
     setNoiseSuppression(!noiseSuppression);
@@ -119,10 +126,26 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleOverlayAttach = async () => {
+    if (!window.electronAPI?.overlayAttach) return;
+    const pid = Number(overlayPid);
+    if (!pid) return;
+    const status = await window.electronAPI.overlayAttach(pid);
+    setOverlayStatus(status);
+  };
+
+  const handleOverlayDetach = async () => {
+    if (!window.electronAPI?.overlayDetach) return;
+    await window.electronAPI.overlayDetach();
+    const status = await window.electronAPI.overlayStatus();
+    setOverlayStatus(status);
+  };
+
   const getActionName = (action) => {
     const actionNames = {
       toggleMic: 'Переключить микрофон',
-      toggleAudio: 'Переключить наушники'
+      toggleAudio: 'Переключить наушники',
+      toggleOverlay: 'Переключить overlay'
     };
     return actionNames[action] || action;
   };
@@ -293,7 +316,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <div className="setting-item-info">
                 <span className="setting-text">🔄 Сбросить горячие клавиши</span>
                 <p className="setting-description">
-                  Вернуть все горячие клавиши к значениям по умолчанию (F1, F2)
+                  Вернуть все горячие клавиши к значениям по умолчанию (F1, F2, F3)
                 </p>
               </div>
               <button 
@@ -302,6 +325,62 @@ const SettingsModal = ({ isOpen, onClose }) => {
               >
                 Сбросить
               </button>
+            </div>
+            <div className="setting-item">
+              <div className="setting-item-info">
+                <span className="setting-text">🕹️ Переключить overlay</span>
+                <p className="setting-description">
+                  Показывать/скрывать игровой overlay с участниками звонка
+                </p>
+              </div>
+              {editingHotkey === 'toggleOverlay' ? (
+                <div className="hotkey-edit-container">
+                  <input
+                    type="text"
+                    className="hotkey-input"
+                    value={hotkeyStorage.formatKey(tempKey)}
+                    onKeyDown={handleHotkeyKeyDown}
+                    onMouseDown={handleHotkeyMouseDown}
+                    onMouseUp={handleHotkeyMouseUp}
+                    placeholder="Нажмите клавишу..."
+                    autoFocus
+                    readOnly
+                  />
+                  <button className="hotkey-save-btn" onClick={() => handleHotkeySave('toggleOverlay')}>✓</button>
+                  <button className="hotkey-cancel-btn" onClick={handleHotkeyCancel}>✕</button>
+                </div>
+              ) : (
+                <div className="hotkey-display-container">
+                  <span className="hotkey-display">{hotkeyStorage.formatKey(hotkeys.toggleOverlay)}</span>
+                  <button className="hotkey-edit-btn" onClick={() => handleHotkeyEdit('toggleOverlay')}>
+                    Изменить
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="setting-section">
+            <h3>Game Overlay</h3>
+            <div className="setting-item">
+              <label className="setting-label">
+                <span className="setting-text">PID игры</span>
+                <input
+                  type="number"
+                  className="hotkey-input"
+                  value={overlayPid}
+                  onChange={(e) => setOverlayPid(e.target.value)}
+                  placeholder="Например: 12345"
+                />
+              </label>
+            </div>
+            <div className="setting-item">
+              <button className="hotkey-edit-btn" onClick={handleOverlayAttach}>Attach</button>
+              <button className="hotkey-cancel-btn" onClick={handleOverlayDetach}>Detach</button>
+            </div>
+            <div className="setting-item">
+              <p className="setting-description">
+                Статус: {overlayStatus?.mode || 'n/a'} / {overlayStatus?.ok ? 'ok' : 'error'}
+              </p>
             </div>
           </div>
         </div>

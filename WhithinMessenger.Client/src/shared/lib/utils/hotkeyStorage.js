@@ -3,7 +3,8 @@ class HotkeyStorage {
         this.storageKey = 'voiceChatHotkeys';
         this.defaultHotkeys = {
             toggleMic: 'F1',
-            toggleAudio: 'F2'
+            toggleAudio: 'F2',
+            toggleOverlay: 'F3'
         };
     }
 

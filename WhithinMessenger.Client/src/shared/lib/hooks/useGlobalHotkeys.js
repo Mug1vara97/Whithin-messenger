@@ -20,6 +20,12 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
           console.log('✅ Выполнена команда: переключение наушников');
         }
         break;
+      case 'toggle-overlay':
+        if (window.electronAPI?.overlayToggle) {
+          window.electronAPI.overlayToggle();
+          console.log('✅ Выполнена команда: переключение оверлея');
+        }
+        break;
       default:
         console.log('❓ Неизвестная горячая клавиша:', shortcut);
     }
@@ -30,7 +36,8 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     if (window.electronAPI && window.electronAPI.updateGlobalShortcuts) {
       const electronHotkeys = {
         'toggle-mic': hotkeys.toggleMic,
-        'toggle-audio': hotkeys.toggleAudio
+        'toggle-audio': hotkeys.toggleAudio,
+        'toggle-overlay': hotkeys.toggleOverlay
       };
       window.electronAPI.updateGlobalShortcuts(electronHotkeys);
       console.log('🔄 Горячие клавиши обновлены в Electron:', electronHotkeys);
