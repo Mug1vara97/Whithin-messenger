@@ -28,6 +28,20 @@ const applyAudioSink = async (audioElement, role = 'call') => {
   }
 };
 
+const NATIVE_AUDIO_FRAME_SIZE = 960; // 20ms @ 48kHz
+
+const supportsTrackGenerator = () => {
+  return typeof window !== 'undefined' && typeof window.MediaStreamTrackGenerator === 'function';
+};
+
+const int16ToFloat32 = (input) => {
+  const output = new Float32Array(input.length);
+  for (let i = 0; i < input.length; i += 1) {
+    output[i] = Math.max(-1, Math.min(1, input[i] / 32768));
+  }
+  return output;
+};
+
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
   if (!banner) return false;
@@ -156,6 +170,10 @@ export const useCallStore = create(
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
       remoteScreenShares: new Map(),
+      selectedScreenShare: null,
+      nativeScreenAudioTrack: null,
+      nativeScreenAudioGenerator: null,
+      nativeScreenAudioPumpId: null,
       
   // Состояние вебкамеры
   isVideoEnabled: false,
@@ -190,6 +208,100 @@ export const useCallStore = create(
           const role = String(key).startsWith('screen-share-audio-') ? 'screen-share' : 'call';
           await applyAudioSink(audioElement, role);
         }
+      },
+      stopNativeScreenAudioCapture: async () => {
+        const state = get();
+        if (state.nativeScreenAudioPumpId) {
+          clearInterval(state.nativeScreenAudioPumpId);
+        }
+
+        try {
+          if (state.nativeScreenAudioTrack) {
+            const room = voiceCallApi.getRoom();
+            if (room) {
+              await room.localParticipant.unpublishTrack(state.nativeScreenAudioTrack);
+            }
+            state.nativeScreenAudioTrack.stop?.();
+          }
+        } catch (error) {
+          console.warn('Failed to unpublish native screen-share audio track:', error);
+        }
+
+        try {
+          await window.electronAPI?.stopAppAudioCapture?.();
+        } catch (error) {
+          console.warn('Failed to stop native app audio capture:', error);
+        }
+
+        set({
+          nativeScreenAudioTrack: null,
+          nativeScreenAudioGenerator: null,
+          nativeScreenAudioPumpId: null
+        });
+      },
+      startNativeScreenAudioCapture: async (sessionId) => {
+        if (!window.electronAPI?.startAppAudioCapture || !supportsTrackGenerator()) {
+          return false;
+        }
+
+        const room = voiceCallApi.getRoom();
+        if (!room) {
+          return false;
+        }
+
+        await get().stopNativeScreenAudioCapture();
+
+        const startResult = await window.electronAPI.startAppAudioCapture(sessionId);
+        if (!startResult?.ok) {
+          throw new Error(startResult?.error || 'Failed to start native app audio capture');
+        }
+
+        const generator = new MediaStreamTrackGenerator({ kind: 'audio' });
+        const writer = generator.writable.getWriter();
+        const sampleRate = 48000;
+        const channels = 2;
+        let frameTimestamp = 0;
+
+        const pumpId = setInterval(async () => {
+          try {
+            const chunkResult = await window.electronAPI.readAppAudioChunk(NATIVE_AUDIO_FRAME_SIZE);
+            if (!chunkResult?.ok || !chunkResult.chunk?.pcm) {
+              return;
+            }
+            const pcmPayload = chunkResult.chunk.pcm?.data || chunkResult.chunk.pcm;
+            const int16 = pcmPayload instanceof Int16Array
+              ? pcmPayload
+              : new Int16Array(Array.isArray(pcmPayload) ? pcmPayload : []);
+            const float32 = int16ToFloat32(int16);
+            const numberOfFrames = chunkResult.chunk.frames || NATIVE_AUDIO_FRAME_SIZE;
+            const audioData = new AudioData({
+              format: 'f32',
+              sampleRate,
+              numberOfFrames,
+              numberOfChannels: channels,
+              timestamp: frameTimestamp,
+              data: float32
+            });
+            frameTimestamp += Math.floor((numberOfFrames / sampleRate) * 1_000_000);
+            await writer.write(audioData);
+            audioData.close();
+          } catch (error) {
+            console.warn('Native audio pump error:', error);
+          }
+        }, 20);
+
+        await room.localParticipant.publishTrack(generator, {
+          source: Track.Source.ScreenShareAudio,
+          name: 'screen_share_audio'
+        });
+
+        set({
+          nativeScreenAudioTrack: generator,
+          nativeScreenAudioGenerator: writer,
+          nativeScreenAudioPumpId: pumpId
+        });
+
+        return true;
       },
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
@@ -2517,6 +2629,8 @@ export const useCallStore = create(
           audioNotificationManager.playUserLeftSound().catch(error => {
             console.warn('Failed to play user left sound for self:', error);
           });
+
+          await get().stopNativeScreenAudioCapture();
           
           await voiceCallApi.disconnect();
           
@@ -2550,7 +2664,8 @@ export const useCallStore = create(
             screenShareSessionId: 0,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
-            localCameraTrackPublishedHandler: null
+            localCameraTrackPublishedHandler: null,
+            selectedScreenShare: null
           });
           
           console.log('Call ended successfully');
@@ -2579,18 +2694,25 @@ export const useCallStore = create(
           }
 
           // В Electron показываем нативное меню выбора экрана/окна перед стартом шаринга.
+          let selectedSource = null;
           if (window.electronAPI?.chooseScreenSource) {
-            const selectedSource = await window.electronAPI.chooseScreenSource();
+            selectedSource = await window.electronAPI.chooseScreenSource();
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
+            set({ selectedScreenShare: selectedSource });
           }
+
+          const useNativeAudioPath =
+            Boolean(selectedSource?.captureAudio) &&
+            selectedSource?.audioMode === 'native-app' &&
+            Boolean(selectedSource?.appAudioSessionId);
 
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
           try {
-            await voiceCallApi.setScreenShareEnabled(true);
+            await voiceCallApi.setScreenShareEnabled(true, { includeAudio: !useNativeAudioPath });
           } catch (startError) {
             const message = String(startError?.message || '');
             const isAudioSourceError =
@@ -2601,9 +2723,23 @@ export const useCallStore = create(
             if (isAudioSourceError && window.electronAPI?.disableSelectedScreenAudio) {
               console.warn('Screen-share audio source failed, retrying without audio...');
               await window.electronAPI.disableSelectedScreenAudio();
-              await voiceCallApi.setScreenShareEnabled(true);
+              await voiceCallApi.setScreenShareEnabled(true, { includeAudio: false });
             } else {
               throw startError;
+            }
+          }
+
+          const selected = get().selectedScreenShare;
+          const shouldUseNativeAppAudio =
+            Boolean(selected?.captureAudio) &&
+            selected?.audioMode === 'native-app' &&
+            Boolean(selected?.appAudioSessionId);
+
+          if (shouldUseNativeAppAudio) {
+            try {
+              await get().startNativeScreenAudioCapture(selected.appAudioSessionId);
+            } catch (nativeAudioError) {
+              console.warn('Failed to start native app audio capture, continuing without app audio:', nativeAudioError);
             }
           }
           
@@ -2707,6 +2843,8 @@ export const useCallStore = create(
           const state = get();
           const room = voiceCallApi.getRoom();
 
+          await get().stopNativeScreenAudioCapture();
+
           if (room && state.localScreenTrackPublishedHandler) {
             room.off(RoomEvent.LocalTrackPublished, state.localScreenTrackPublishedHandler);
           }
@@ -2720,7 +2858,8 @@ export const useCallStore = create(
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
-            localScreenTrackPublishedHandler: null
+            localScreenTrackPublishedHandler: null,
+            selectedScreenShare: null
           });
 
           console.log('Screen sharing stopped successfully');

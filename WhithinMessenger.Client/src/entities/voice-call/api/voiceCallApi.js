@@ -634,7 +634,7 @@ class VoiceCallApi {
   }
 
   // Enable/disable screen share
-  async setScreenShareEnabled(enabled) {
+  async setScreenShareEnabled(enabled, options = {}) {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
@@ -664,16 +664,20 @@ class VoiceCallApi {
       // Use 720p/60 for smoother motion with lower network pressure than 1080p/60.
       // We intentionally cap video bitrate to preserve screen-share audio quality
       // when microphone and screen-share audio are active at the same time.
+      const includeAudio = options.includeAudio !== false;
+
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
           // Always request capture of system/tab audio for screen sharing.
           // Browsers may still require explicit user consent in the picker UI.
-          audio: {
-            autoGainControl: false,
-            googAutoGainControl: false,
-            googAutoGainControl2: false
-          },
+          audio: includeAudio
+            ? {
+                autoGainControl: false,
+                googAutoGainControl: false,
+                googAutoGainControl2: false
+              }
+            : false,
           resolution: VideoPresets.h720.resolution,
           frameRate: 60
         },

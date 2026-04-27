@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
   disableSelectedScreenAudio: () => ipcRenderer.invoke('electron:disable-selected-screen-audio'),
+  listAppAudioSessions: () => ipcRenderer.invoke('electron:list-app-audio-sessions'),
+  startAppAudioCapture: (sessionId) => ipcRenderer.invoke('electron:start-app-audio-capture', sessionId),
+  stopAppAudioCapture: () => ipcRenderer.invoke('electron:stop-app-audio-capture'),
+  readAppAudioChunk: (maxFrames) => ipcRenderer.invoke('electron:read-app-audio-chunk', maxFrames),
 
   updateGlobalShortcuts: (shortcuts) => ipcRenderer.invoke('electron:update-global-shortcuts', shortcuts),
 

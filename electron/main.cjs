@@ -1,5 +1,6 @@
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, shell, desktopCapturer, session, globalShortcut } = require('electron');
+const nativeAudioCapture = require('./native');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
@@ -43,7 +44,8 @@ function openScreenPickerWindow(sources) {
         type: sourceType,
         thumbnail: source.thumbnail?.toDataURL?.() || null,
         // Audio can be shared only for app windows, never for full-screen share.
-        canShareAudio: sourceType === 'window' && !isWhithinWindow
+        canShareAudio: sourceType === 'window' && !isWhithinWindow,
+        nativeCaptureAvailable: nativeAudioCapture.isAvailable()
       };
     });
 
@@ -138,6 +140,7 @@ app.whenReady().then(() => {
           : sources.find((source) => source.name.toLowerCase().includes('screen')) || sources[0];
 
         const shouldCaptureAudio = Boolean(selectedScreenSource?.captureAudio);
+        const audioMode = selectedScreenSource?.audioMode || 'none';
         const selectedSourceType = selectedScreenSource?.type;
         const sourceNameLower = (preferredSource?.name || '').toLowerCase();
         const isWhithinWindow =
@@ -145,25 +148,30 @@ app.whenReady().then(() => {
           sourceNameLower.includes('electron');
 
         if (!preferredSource) {
-          safeCallback({ video: null, audio: null });
+          safeCallback({ video: null });
           return;
         }
 
-        let audioSource = null;
+        let audioSource;
         if (shouldCaptureAudio && !isWhithinWindow) {
           // Electron accepts "loopback"/"loopbackWithMute" for audio, not DesktopCapturerSource.
           // Keep audio only for app-window sharing and disable for full-screen sharing.
-          audioSource = selectedSourceType === 'window' ? 'loopback' : null;
+          if (audioMode === 'loopback') {
+            audioSource = selectedSourceType === 'window' ? 'loopback' : undefined;
+          } else {
+            audioSource = undefined;
+          }
         }
 
-        safeCallback({
-          video: preferredSource,
-          // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
-          audio: audioSource
-        });
+        const response = { video: preferredSource };
+        // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
+        if (audioSource) {
+          response.audio = audioSource;
+        }
+        safeCallback(response);
       } catch (error) {
         console.error('Display media request failed:', error);
-        safeCallback({ video: null, audio: null });
+        safeCallback({ video: null });
       }
     },
     { useSystemPicker: true }
@@ -189,8 +197,56 @@ ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
 ipcMain.handle('electron:disable-selected-screen-audio', () => {
   if (selectedScreenSource) {
     selectedScreenSource.captureAudio = false;
+    selectedScreenSource.audioMode = 'none';
   }
   return true;
+});
+
+ipcMain.handle('electron:list-app-audio-sessions', () => {
+  if (!nativeAudioCapture.isAvailable()) {
+    return { ok: false, error: nativeAudioCapture.getLoadError(), sessions: [] };
+  }
+  try {
+    return { ok: true, sessions: nativeAudioCapture.listAudioSessions() };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error), sessions: [] };
+  }
+});
+
+ipcMain.handle('electron:start-app-audio-capture', (_, sessionId) => {
+  if (!nativeAudioCapture.isAvailable()) {
+    return { ok: false, error: nativeAudioCapture.getLoadError() };
+  }
+  try {
+    nativeAudioCapture.startCapture(sessionId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('electron:stop-app-audio-capture', () => {
+  if (!nativeAudioCapture.isAvailable()) {
+    return { ok: true };
+  }
+  try {
+    nativeAudioCapture.stopCapture();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('electron:read-app-audio-chunk', (_, maxFrames = 960) => {
+  if (!nativeAudioCapture.isAvailable()) {
+    return { ok: false, error: nativeAudioCapture.getLoadError() };
+  }
+  try {
+    const chunk = nativeAudioCapture.readChunk(maxFrames);
+    return { ok: true, chunk };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
 });
 
 ipcMain.handle('electron:choose-screen-source', async () => {
@@ -211,14 +267,18 @@ ipcMain.handle('electron:choose-screen-source', async () => {
   selectedScreenSource = {
     id: selection.id,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio)
+    captureAudio: Boolean(selection.captureAudio),
+    audioMode: selection.audioMode || 'none',
+    appAudioSessionId: selection.appAudioSessionId || null
   };
 
   return {
     id: selection.id,
     name: selection.name,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio)
+    captureAudio: Boolean(selection.captureAudio),
+    audioMode: selection.audioMode || 'none',
+    appAudioSessionId: selection.appAudioSessionId || null
   };
 });
 

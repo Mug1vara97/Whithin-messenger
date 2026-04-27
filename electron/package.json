@@ -7,12 +7,17 @@
   "type": "commonjs",
   "main": "main.cjs",
   "scripts": {
+    "rebuild-native": "node-gyp rebuild --directory ./native",
     "start": "electron ./main.cjs",
     "dev": "cross-env WEB_CLIENT_URL=http://localhost:5173 electron ./main.cjs",
     "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs"
   },
+  "dependencies": {
+    "node-addon-api": "^8.3.1"
+  },
   "devDependencies": {
     "cross-env": "^10.1.0",
-    "electron": "^41.3.0"
+    "electron": "^41.3.0",
+    "node-gyp": "^11.5.0"
   }
 }
