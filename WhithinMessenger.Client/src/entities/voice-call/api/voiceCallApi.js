@@ -659,6 +659,9 @@ class VoiceCallApi {
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
+          // Always request capture of system/tab audio for screen sharing.
+          // Browsers may still require explicit user consent in the picker UI.
+          audio: true,
           resolution: VideoPresets.h1080.resolution,
           frameRate: 30
         },
