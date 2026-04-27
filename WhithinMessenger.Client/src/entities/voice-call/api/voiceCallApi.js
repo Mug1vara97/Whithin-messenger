@@ -661,6 +661,8 @@ class VoiceCallApi {
 
       // Demonstration screen-share profile tuned for stability across restarts.
       // VP8 + no simulcast is less fragile than VP9/SVC in some desktop runtimes.
+      // Keep 1080p/60 for quality, but cap bitrate to reduce stutter and
+      // protect audio stability when mic + screen-share-audio are active together.
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
@@ -668,11 +670,15 @@ class VoiceCallApi {
           // Browsers may still require explicit user consent in the picker UI.
           audio: true,
           resolution: VideoPresets.h1080.resolution,
-          frameRate: 30
+          frameRate: 60
         },
         {
           videoCodec: 'vp8',
-          videoEncoding: VideoPresets.h1080.encoding,
+          videoEncoding: {
+            ...VideoPresets.h1080.encoding,
+            maxBitrate: 4_000_000,
+            maxFramerate: 60
+          },
           simulcast: false
         }
       );
