@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Screen Picker</title>
+    <style>
+      :root {
+        --bg: #111214;
+        --surface: #1a1b1e;
+        --surface-hover: #22242a;
+        --border: #2b2d31;
+        --primary: #5865f2;
+        --text: #f2f3f5;
+        --muted: #b5bac1;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        color: var(--text);
+        background: linear-gradient(180deg, #0f1014 0%, var(--bg) 100%);
+      }
+      .container { padding: 20px 24px 16px; }
+      .title { font-size: 20px; font-weight: 700; margin: 0; }
+      .subtitle { margin: 6px 0 16px; color: var(--muted); font-size: 13px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        max-height: 470px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        cursor: pointer;
+        overflow: hidden;
+        transition: transform .12s ease, border-color .12s ease, background .12s ease;
+      }
+      .card:hover { background: var(--surface-hover); border-color: #3b3e45; transform: translateY(-1px); }
+      .card.active { border-color: var(--primary); box-shadow: 0 0 0 1px rgba(88,101,242,.45) inset; }
+      .thumb { width: 100%; height: 132px; background: #0b0c0f; object-fit: cover; display: block; }
+      .meta { padding: 10px; }
+      .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .type { margin-top: 5px; font-size: 12px; color: var(--muted); text-transform: capitalize; }
+      .toolbar {
+        margin-top: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+      .checkbox input { accent-color: var(--primary); width: 16px; height: 16px; }
+      .actions { display: flex; gap: 10px; }
+      .btn {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        height: 36px;
+        padding: 0 14px;
+        background: #1f2125;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .btn.primary { border-color: transparent; background: var(--primary); }
+      .btn:disabled { opacity: .5; cursor: not-allowed; }
+      .hint { font-size: 12px; color: #ffbf66; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="title">Choose what to share</h1>
+      <p class="subtitle">Select a screen or app window for screen sharing</p>
+      <div id="sources" class="grid"></div>
+      <div class="toolbar">
+        <label class="checkbox">
+          <input id="captureAudio" type="checkbox" />
+          Share system audio
+        </label>
+        <div class="actions">
+          <button id="cancelBtn" class="btn" type="button">Cancel</button>
+          <button id="shareBtn" class="btn primary" type="button" disabled>Share</button>
+        </div>
+      </div>
+      <div id="audioHint" class="hint" style="display:none; margin-top:8px;">
+        Audio is disabled for the app window to prevent call echo.
+      </div>
+    </div>
+    <script>
+      const sourcesNode = document.getElementById('sources');
+      const captureAudioNode = document.getElementById('captureAudio');
+      const shareBtn = document.getElementById('shareBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+      const audioHint = document.getElementById('audioHint');
+
+      let selected = null;
+      let allSources = [];
+
+      function render() {
+        sourcesNode.innerHTML = '';
+        allSources.forEach((source) => {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `card ${selected?.id === source.id ? 'active' : ''}`;
+          card.innerHTML = `
+            <img class="thumb" src="${source.thumbnail || ''}" alt="">
+            <div class="meta">
+              <div class="name">${source.name || 'Unknown source'}</div>
+              <div class="type">${source.type}</div>
+            </div>
+          `;
+          card.addEventListener('click', () => {
+            selected = source;
+            shareBtn.disabled = false;
+            const canShareAudio = Boolean(source.canShareAudio);
+            captureAudioNode.disabled = !canShareAudio;
+            if (!canShareAudio) {
+              captureAudioNode.checked = false;
+              audioHint.style.display = 'block';
+            } else {
+              audioHint.style.display = 'none';
+            }
+            render();
+          });
+          sourcesNode.appendChild(card);
+        });
+      }
+
+      window.screenPickerAPI.onSources((sources) => {
+        allSources = sources || [];
+        render();
+      });
+
+      shareBtn.addEventListener('click', () => {
+        if (!selected) return;
+        window.screenPickerAPI.submitSelection({
+          id: selected.id,
+          name: selected.name,
+          type: selected.type,
+          captureAudio: Boolean(captureAudioNode.checked && !captureAudioNode.disabled)
+        });
+      });
+
+      cancelBtn.addEventListener('click', () => window.screenPickerAPI.cancel());
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') window.screenPickerAPI.cancel();
+      });
+    </script>
+  </body>
+</html>

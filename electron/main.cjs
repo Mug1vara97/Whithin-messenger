@@ -1,11 +1,75 @@
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, desktopCapturer, session, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, desktopCapturer, session, globalShortcut } = require('electron');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
 let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
+
+function openScreenPickerWindow(sources) {
+  return new Promise((resolve) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      resolve(null);
+      return;
+    }
+
+    const pickerWindow = new BrowserWindow({
+      width: 960,
+      height: 680,
+      parent: mainWindow,
+      modal: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      autoHideMenuBar: true,
+      title: 'Choose source for screen sharing',
+      backgroundColor: '#0f1014',
+      webPreferences: {
+        preload: path.join(__dirname, 'picker-preload.cjs'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false
+      }
+    });
+
+    const payload = sources.map((source) => {
+      const sourceNameLower = (source.name || '').toLowerCase();
+      const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
+      return {
+        id: source.id,
+        name: source.name,
+        type: source.id.startsWith('screen:') ? 'screen' : 'window',
+        thumbnail: source.thumbnail?.toDataURL?.() || null,
+        canShareAudio: !isWhithinWindow
+      };
+    });
+
+    let isResolved = false;
+    const finalize = (value) => {
+      if (isResolved) return;
+      isResolved = true;
+      ipcMain.removeListener('electron:screen-picker-submit', handleSubmit);
+      ipcMain.removeListener('electron:screen-picker-cancel', handleCancel);
+      if (!pickerWindow.isDestroyed()) {
+        pickerWindow.close();
+      }
+      resolve(value);
+    };
+
+    const handleSubmit = (_event, data) => finalize(data);
+    const handleCancel = () => finalize(null);
+
+    ipcMain.once('electron:screen-picker-submit', handleSubmit);
+    ipcMain.once('electron:screen-picker-cancel', handleCancel);
+
+    pickerWindow.on('closed', () => finalize(null));
+    pickerWindow.webContents.on('did-finish-load', () => {
+      pickerWindow.webContents.send('electron:screen-picker-sources', payload);
+    });
+    pickerWindow.loadFile(path.join(__dirname, 'screen-picker.html'));
+  });
+}
 
 function registerGlobalShortcuts(shortcuts = {}) {
   globalShortcut.unregisterAll();
@@ -117,53 +181,21 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     return null;
   }
 
-  const sourceButtons = sources.slice(0, 9).map((source, index) => {
-    const normalizedName = source.name?.trim() || `Source ${index + 1}`;
-    const sourceType = source.id.startsWith('screen:') ? 'Screen' : 'Window';
-    return `${index + 1}. [${sourceType}] ${normalizedName}`;
-  });
-
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: 'question',
-    buttons: [...sourceButtons, 'Cancel'],
-    cancelId: sourceButtons.length,
-    defaultId: 0,
-    title: 'Choose source for screen sharing',
-    message: 'Select a screen or window to share'
-  });
-
-  if (result.response >= sourceButtons.length) {
+  const selection = await openScreenPickerWindow(sources);
+  if (!selection?.id) {
     return null;
   }
 
-  const selectedSource = sources[result.response];
-  const sourceType = selectedSource.id.startsWith('screen:') ? 'screen' : 'window';
-  const sourceNameLower = (selectedSource.name || '').toLowerCase();
-  const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
-
-  let captureAudio = false;
-  if (!isWhithinWindow) {
-    const audioResult = await dialog.showMessageBox(mainWindow, {
-      type: 'question',
-      buttons: ['Share with audio', 'Share without audio'],
-      cancelId: 1,
-      defaultId: 0,
-      title: 'Screen share audio',
-      message: 'Include system audio in screen sharing?'
-    });
-    captureAudio = audioResult.response === 0;
-  }
-
   selectedScreenSource = {
-    id: selectedSource.id,
-    captureAudio
+    id: selection.id,
+    captureAudio: Boolean(selection.captureAudio)
   };
 
   return {
-    id: selectedSource.id,
-    name: selectedSource.name,
-    type: sourceType,
-    captureAudio
+    id: selection.id,
+    name: selection.name,
+    type: selection.type,
+    captureAudio: Boolean(selection.captureAudio)
   };
 });
 
