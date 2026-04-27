@@ -2547,6 +2547,14 @@ export const useCallStore = create(
             await get().stopScreenShare();
           }
 
+          // В Electron показываем нативное меню выбора экрана/окна перед стартом шаринга.
+          if (window.electronAPI?.chooseScreenSource) {
+            const selectedSource = await window.electronAPI.chooseScreenSource();
+            if (!selectedSource) {
+              throw new Error('Screen sharing cancelled by user');
+            }
+          }
+
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
