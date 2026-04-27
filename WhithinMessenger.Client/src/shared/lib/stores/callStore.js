@@ -216,6 +216,15 @@ export const useCallStore = create(
         }
 
         try {
+          if (state.nativeScreenAudioGenerator) {
+            await state.nativeScreenAudioGenerator.close();
+            state.nativeScreenAudioGenerator.releaseLock?.();
+          }
+        } catch (error) {
+          console.warn('Failed to close native screen audio writer:', error);
+        }
+
+        try {
           if (state.nativeScreenAudioTrack) {
             const room = voiceCallApi.getRoom();
             if (room) {
@@ -258,8 +267,6 @@ export const useCallStore = create(
 
         const generator = new MediaStreamTrackGenerator({ kind: 'audio' });
         const writer = generator.writable.getWriter();
-        const sampleRate = 48000;
-        const channels = 2;
         let frameTimestamp = 0;
 
         const pumpId = setInterval(async () => {
@@ -274,6 +281,8 @@ export const useCallStore = create(
               : new Int16Array(Array.isArray(pcmPayload) ? pcmPayload : []);
             const float32 = int16ToFloat32(int16);
             const numberOfFrames = chunkResult.chunk.frames || NATIVE_AUDIO_FRAME_SIZE;
+            const sampleRate = chunkResult.chunk.sampleRate || 48000;
+            const channels = chunkResult.chunk.channels || 2;
             const audioData = new AudioData({
               format: 'f32',
               sampleRate,
