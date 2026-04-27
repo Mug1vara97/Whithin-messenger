@@ -7,11 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
-  overlayAttach: (pid) => ipcRenderer.invoke('electron:overlay-attach', pid),
-  overlayDetach: () => ipcRenderer.invoke('electron:overlay-detach'),
-  overlayToggle: () => ipcRenderer.invoke('electron:overlay-toggle'),
-  overlaySetState: (state) => ipcRenderer.invoke('electron:overlay-set-state', state),
-  overlayStatus: () => ipcRenderer.invoke('electron:overlay-status'),
 
   updateGlobalShortcuts: (shortcuts) => ipcRenderer.invoke('electron:update-global-shortcuts', shortcuts),
 

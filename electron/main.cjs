@@ -1,15 +1,11 @@
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, shell, desktopCapturer, session, globalShortcut } = require('electron');
-const gameOverlay = require('./native/overlay');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
 let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
-let overlayWindow = null;
-let overlayState = { participants: [], visible: false };
-let overlayTargetPid = null;
 
 function openScreenPickerWindow(sources) {
   return new Promise((resolve) => {
@@ -40,12 +36,13 @@ function openScreenPickerWindow(sources) {
     const payload = sources.map((source) => {
       const sourceNameLower = (source.name || '').toLowerCase();
       const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
+      const sourceType = source.id.startsWith('screen:') ? 'screen' : 'window';
       return {
         id: source.id,
         name: source.name,
-        type: source.id.startsWith('screen:') ? 'screen' : 'window',
+        type: sourceType,
         thumbnail: source.thumbnail?.toDataURL?.() || null,
-        canShareAudio: !isWhithinWindow
+        canShareAudio: sourceType === 'window' && !isWhithinWindow
       };
     });
 
@@ -84,9 +81,6 @@ function registerGlobalShortcuts(shortcuts = {}) {
     }
 
     const registered = globalShortcut.register(accelerator, () => {
-      if (action === 'toggle-overlay') {
-        toggleOverlayVisibility();
-      }
       if (!shortcutCallbackWebContents || shortcutCallbackWebContents.isDestroyed()) {
         return;
       }
@@ -97,49 +91,6 @@ function registerGlobalShortcuts(shortcuts = {}) {
       console.warn(`Failed to register shortcut "${accelerator}" for action "${action}"`);
     }
   });
-}
-
-function createFallbackOverlayWindow() {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    return overlayWindow;
-  }
-  overlayWindow = new BrowserWindow({
-    width: 360,
-    height: 420,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    focusable: false,
-    resizable: false,
-    movable: false,
-    hasShadow: false,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-  overlayWindow.loadFile(path.join(__dirname, 'overlay-fallback.html'));
-  overlayWindow.on('closed', () => { overlayWindow = null; });
-  return overlayWindow;
-}
-
-function syncFallbackOverlay() {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  overlayWindow.webContents.send('overlay-state', overlayState);
-  if (overlayState.visible) overlayWindow.showInactive();
-  else overlayWindow.hide();
-}
-
-function toggleOverlayVisibility() {
-  overlayState.visible = !overlayState.visible;
-  if (gameOverlay.isAvailable()) {
-    try {
-      gameOverlay.setVisible(overlayState.visible);
-    } catch {}
-  }
-  syncFallbackOverlay();
 }
 
 function createWindow() {
@@ -193,10 +144,10 @@ app.whenReady().then(() => {
         }
 
         let audioSource = null;
-        if (shouldCaptureAudio && !isWhithinWindow) {
-          // For window sharing, prefer capturing audio from the selected source only.
-          // This reduces chance of mixing in call voices from system output.
-          audioSource = selectedSourceType === 'window' ? preferredSource : 'loopback';
+        if (shouldCaptureAudio && !isWhithinWindow && selectedSourceType === 'window') {
+          // Capture audio only from the selected app window.
+          // Never use system loopback here to avoid picking up call audio.
+          audioSource = preferredSource;
         }
 
         callback({
@@ -227,67 +178,6 @@ ipcMain.handle('electron:open-external', async (_, url) => {
 
 ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
   registerGlobalShortcuts(shortcuts);
-});
-
-ipcMain.handle('electron:overlay-attach', (_, pid) => {
-  overlayTargetPid = pid;
-  if (gameOverlay.isAvailable()) {
-    try {
-      const ok = gameOverlay.attach(pid);
-      if (ok) return { ok: true, mode: 'injected' };
-    } catch (error) {
-      return { ok: false, mode: 'injected', error: String(error?.message || error) };
-    }
-  }
-  createFallbackOverlayWindow();
-  syncFallbackOverlay();
-  return { ok: true, mode: 'fallback' };
-});
-
-ipcMain.handle('electron:overlay-detach', () => {
-  overlayTargetPid = null;
-  if (gameOverlay.isAvailable()) {
-    try { gameOverlay.detach(); } catch {}
-  }
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-  }
-  return { ok: true };
-});
-
-ipcMain.handle('electron:overlay-toggle', () => {
-  toggleOverlayVisibility();
-  return { ok: true, visible: overlayState.visible };
-});
-
-ipcMain.handle('electron:overlay-set-state', (_, payload) => {
-  overlayState = {
-    ...overlayState,
-    ...payload
-  };
-  if (gameOverlay.isAvailable()) {
-    try {
-      gameOverlay.setState(JSON.stringify(overlayState));
-    } catch {}
-  }
-  syncFallbackOverlay();
-  return { ok: true };
-});
-
-ipcMain.handle('electron:overlay-status', () => {
-  if (gameOverlay.isAvailable()) {
-    try {
-      return { ok: true, mode: 'injected', status: gameOverlay.status(), pid: overlayTargetPid };
-    } catch (error) {
-      return { ok: false, mode: 'injected', error: String(error?.message || error), pid: overlayTargetPid };
-    }
-  }
-  return {
-    ok: true,
-    mode: 'fallback',
-    status: { attached: Boolean(overlayWindow), visible: overlayState.visible },
-    pid: overlayTargetPid
-  };
 });
 
 ipcMain.handle('electron:choose-screen-source', async () => {

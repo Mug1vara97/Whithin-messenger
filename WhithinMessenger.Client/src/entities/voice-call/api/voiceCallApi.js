@@ -634,10 +634,11 @@ class VoiceCallApi {
   }
 
   // Enable/disable screen share
-  async setScreenShareEnabled(enabled) {
+  async setScreenShareEnabled(enabled, options = {}) {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
+    const { includeAudio = true } = options;
     
     if (enabled) {
       // Defensive cleanup for stale publications before enabling a new share.
@@ -667,13 +668,14 @@ class VoiceCallApi {
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
-          // Always request capture of system/tab audio for screen sharing.
-          // Browsers may still require explicit user consent in the picker UI.
-          audio: {
-            autoGainControl: false,
-            googAutoGainControl: false,
-            googAutoGainControl2: false
-          },
+          // Request screen-share audio only when explicitly enabled by picker logic.
+          audio: includeAudio
+            ? {
+                autoGainControl: false,
+                googAutoGainControl: false,
+                googAutoGainControl2: false
+              }
+            : false,
           resolution: VideoPresets.h720.resolution,
           frameRate: 60
         },

@@ -160,50 +160,10 @@ export const useCallStore = create(
       
       // Флаги состояния
       connecting: false,
-      overlaySyncIntervalId: null,
       
       // Actions
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
-      pushOverlayState: async () => {
-        if (!window.electronAPI?.overlaySetState) return;
-        const state = get();
-        const participants = [
-          {
-            userId: state.currentUserId,
-            name: state.currentUserName || 'You',
-            isMuted: state.isMuted,
-            isGlobalAudioMuted: state.isGlobalAudioMuted
-          },
-          ...state.participants.map((p) => ({
-            userId: p.userId || p.id,
-            name: p.name || p.userName || 'User',
-            isMuted: state.participantMuteStates?.get(p.userId || p.id) ?? p.isMuted ?? false,
-            isGlobalAudioMuted: state.participantGlobalAudioStates?.get(p.userId || p.id) ?? p.isGlobalAudioMuted ?? false
-          }))
-        ];
-        try {
-          await window.electronAPI.overlaySetState({ visible: true, participants });
-        } catch (error) {
-          console.warn('Failed to push overlay state:', error);
-        }
-      },
-      startOverlaySync: () => {
-        const state = get();
-        if (state.overlaySyncIntervalId) return;
-        const intervalId = setInterval(() => {
-          get().pushOverlayState();
-        }, 1000);
-        set({ overlaySyncIntervalId: intervalId });
-      },
-      stopOverlaySync: () => {
-        const state = get();
-        if (state.overlaySyncIntervalId) {
-          clearInterval(state.overlaySyncIntervalId);
-          set({ overlaySyncIntervalId: null });
-        }
-        window.electronAPI?.overlaySetState?.({ visible: false, participants: [] }).catch(() => {});
-      },
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
 
@@ -1300,8 +1260,6 @@ export const useCallStore = create(
           }
           
           set({ isConnected: true, connecting: false, processedProducers: new Set() });
-          get().startOverlaySync();
-          get().pushOverlayState();
           
           // Отправляем начальные состояния на сервер
           if (voiceCallApi.socket) {
@@ -2362,7 +2320,6 @@ export const useCallStore = create(
       leaveRoom: async () => {
         try {
           const state = get();
-          get().stopOverlaySync();
           
           if (!state.currentRoomId) {
             return;
@@ -2452,7 +2409,6 @@ export const useCallStore = create(
       endCall: async () => {
         try {
           const state = get();
-          get().stopOverlaySync();
           
           // Очищаем voiceChannelParticipants для текущего канала
           if (state.currentRoomId) {
@@ -2584,6 +2540,7 @@ export const useCallStore = create(
         try {
           const state = get();
           const screenShareSessionId = Date.now();
+          let includeAudio = true;
           set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
@@ -2597,12 +2554,27 @@ export const useCallStore = create(
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
+            includeAudio = Boolean(selectedSource.captureAudio && selectedSource.type === 'window');
           }
 
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true);
+          try {
+            await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
+          } catch (shareError) {
+            const isAudioSourceError =
+              includeAudio &&
+              typeof shareError?.message === 'string' &&
+              shareError.message.toLowerCase().includes('could not start audio source');
+
+            if (isAudioSourceError) {
+              console.warn('Screen-share audio source failed, retrying without audio');
+              await voiceCallApi.setScreenShareEnabled(true, { includeAudio: false });
+            } else {
+              throw shareError;
+            }
+          }
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
