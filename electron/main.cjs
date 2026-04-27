@@ -36,12 +36,14 @@ function openScreenPickerWindow(sources) {
     const payload = sources.map((source) => {
       const sourceNameLower = (source.name || '').toLowerCase();
       const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
+      const sourceType = source.id.startsWith('screen:') ? 'screen' : 'window';
       return {
         id: source.id,
         name: source.name,
-        type: source.id.startsWith('screen:') ? 'screen' : 'window',
+        type: sourceType,
         thumbnail: source.thumbnail?.toDataURL?.() || null,
-        canShareAudio: !isWhithinWindow
+        // Audio can be shared only for app windows, never for full-screen share.
+        canShareAudio: sourceType === 'window' && !isWhithinWindow
       };
     });
 
@@ -135,8 +137,6 @@ app.whenReady().then(() => {
           sourceNameLower.includes('whithin') ||
           sourceNameLower.includes('electron');
 
-        selectedScreenSource = null;
-
         if (!preferredSource) {
           callback({ video: null, audio: null });
           return;
@@ -144,9 +144,8 @@ app.whenReady().then(() => {
 
         let audioSource = null;
         if (shouldCaptureAudio && !isWhithinWindow) {
-          // For window sharing, prefer capturing audio from the selected source only.
-          // This reduces chance of mixing in call voices from system output.
-          audioSource = selectedSourceType === 'window' ? preferredSource : 'loopback';
+          // Capture only selected app window audio; never stream full-screen system audio.
+          audioSource = selectedSourceType === 'window' ? preferredSource : null;
         }
 
         callback({
@@ -177,6 +176,13 @@ ipcMain.handle('electron:open-external', async (_, url) => {
 
 ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
   registerGlobalShortcuts(shortcuts);
+});
+
+ipcMain.handle('electron:disable-selected-screen-audio', () => {
+  if (selectedScreenSource) {
+    selectedScreenSource.captureAudio = false;
+  }
+  return true;
 });
 
 ipcMain.handle('electron:choose-screen-source', async () => {

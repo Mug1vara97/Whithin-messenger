@@ -2558,7 +2558,23 @@ export const useCallStore = create(
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true);
+          try {
+            await voiceCallApi.setScreenShareEnabled(true);
+          } catch (startError) {
+            const message = String(startError?.message || '');
+            const isAudioSourceError =
+              message.includes('Could not start audio source') ||
+              message.includes('NotReadableError') ||
+              message.includes('Failed to start audio');
+
+            if (isAudioSourceError && window.electronAPI?.disableSelectedScreenAudio) {
+              console.warn('Screen-share audio source failed, retrying without audio...');
+              await window.electronAPI.disableSelectedScreenAudio();
+              await voiceCallApi.setScreenShareEnabled(true);
+            } else {
+              throw startError;
+            }
+          }
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
