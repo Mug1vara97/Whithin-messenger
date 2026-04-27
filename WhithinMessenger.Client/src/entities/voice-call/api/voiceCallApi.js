@@ -669,7 +669,14 @@ class VoiceCallApi {
         {
           // Always request capture of system/tab audio for screen sharing.
           // Browsers may still require explicit user consent in the picker UI.
-          audio: true,
+          // Keep processing off for screen-share audio to avoid AGC ducking.
+          audio: {
+            autoGainControl: false,
+            echoCancellation: false,
+            noiseSuppression: false,
+            googAutoGainControl: false,
+            googAutoGainControl2: false
+          },
           resolution: VideoPresets.h720.resolution,
           frameRate: 60
         },
