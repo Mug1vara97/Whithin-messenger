@@ -129,6 +129,7 @@ app.whenReady().then(() => {
           : sources.find((source) => source.name.toLowerCase().includes('screen')) || sources[0];
 
         const shouldCaptureAudio = Boolean(selectedScreenSource?.captureAudio);
+        const selectedSourceType = selectedScreenSource?.type;
         const sourceNameLower = (preferredSource?.name || '').toLowerCase();
         const isWhithinWindow =
           sourceNameLower.includes('whithin') ||
@@ -141,10 +142,17 @@ app.whenReady().then(() => {
           return;
         }
 
+        let audioSource = null;
+        if (shouldCaptureAudio && !isWhithinWindow) {
+          // For window sharing, prefer capturing audio from the selected source only.
+          // This reduces chance of mixing in call voices from system output.
+          audioSource = selectedSourceType === 'window' ? preferredSource : 'loopback';
+        }
+
         callback({
           video: preferredSource,
           // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
-          audio: shouldCaptureAudio && !isWhithinWindow ? 'loopback' : null
+          audio: audioSource
         });
       } catch (error) {
         console.error('Display media request failed:', error);
@@ -188,6 +196,7 @@ ipcMain.handle('electron:choose-screen-source', async () => {
 
   selectedScreenSource = {
     id: selection.id,
+    type: selection.type,
     captureAudio: Boolean(selection.captureAudio)
   };
 
