@@ -8,40 +8,6 @@ import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 
-const CALL_OUTPUT_DEVICE_KEY = 'callOutputDeviceId';
-const SCREEN_SHARE_OUTPUT_DEVICE_KEY = 'screenShareOutputDeviceId';
-
-const getOutputDeviceForRole = (role) => {
-  if (role === 'screen-share') {
-    return localStorage.getItem(SCREEN_SHARE_OUTPUT_DEVICE_KEY) || 'default';
-  }
-  return localStorage.getItem(CALL_OUTPUT_DEVICE_KEY) || 'default';
-};
-
-const applyAudioSink = async (audioElement, role = 'call') => {
-  if (!audioElement?.setSinkId) return;
-  try {
-    const sinkId = getOutputDeviceForRole(role);
-    await audioElement.setSinkId(sinkId || 'default');
-  } catch (error) {
-    console.warn(`Failed to set audio output (${role})`, error);
-  }
-};
-
-const NATIVE_AUDIO_FRAME_SIZE = 960; // 20ms @ 48kHz
-
-const supportsTrackGenerator = () => {
-  return typeof window !== 'undefined' && typeof window.MediaStreamTrackGenerator === 'function';
-};
-
-const int16ToFloat32 = (input) => {
-  const output = new Float32Array(input.length);
-  for (let i = 0; i < input.length; i += 1) {
-    output[i] = Math.max(-1, Math.min(1, input[i] / 32768));
-  }
-  return output;
-};
-
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
   if (!banner) return false;
@@ -170,11 +136,6 @@ export const useCallStore = create(
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
       remoteScreenShares: new Map(),
-      selectedScreenShare: null,
-      nativeScreenAudioTrack: null,
-      nativeScreenAudioGenerator: null,
-      nativeScreenAudioPumpId: null,
-      nativeScreenAudioReplacedMic: false,
       
   // Состояние вебкамеры
   isVideoEnabled: false,
@@ -203,145 +164,6 @@ export const useCallStore = create(
       // Actions
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
-      applyAudioOutputSettings: async () => {
-        const state = get();
-        for (const [key, audioElement] of state.audioElements.entries()) {
-          const role = String(key).startsWith('screen-share-audio-') ? 'screen-share' : 'call';
-          await applyAudioSink(audioElement, role);
-        }
-      },
-      stopNativeScreenAudioCapture: async () => {
-        const state = get();
-        if (state.nativeScreenAudioPumpId) {
-          clearInterval(state.nativeScreenAudioPumpId);
-        }
-
-        try {
-          if (state.nativeScreenAudioGenerator) {
-            await state.nativeScreenAudioGenerator.close();
-            state.nativeScreenAudioGenerator.releaseLock?.();
-          }
-        } catch (error) {
-          console.warn('Failed to close native screen audio writer:', error);
-        }
-
-        try {
-          const room = voiceCallApi.getRoom();
-          if (state.nativeScreenAudioTrack && room) {
-            const microphonePublication = room.localParticipant.getTrackPublication('microphone');
-            if (state.nativeScreenAudioReplacedMic && microphonePublication?.track?.replaceTrack) {
-              const restorationTrack = state.noiseSuppressionManager?.getProcessedStream?.()?.getAudioTracks?.()[0]
-                || state.localStream?.getAudioTracks?.()[0]
-                || null;
-              if (restorationTrack) {
-                await microphonePublication.track.replaceTrack(restorationTrack);
-              }
-            } else {
-              await room.localParticipant.unpublishTrack(state.nativeScreenAudioTrack);
-            }
-            state.nativeScreenAudioTrack.stop?.();
-          }
-        } catch (error) {
-          console.warn('Failed to cleanup native screen-share audio track:', error);
-        }
-
-        try {
-          await window.electronAPI?.stopAppAudioCapture?.();
-        } catch (error) {
-          console.warn('Failed to stop native app audio capture:', error);
-        }
-
-        set({
-          nativeScreenAudioTrack: null,
-          nativeScreenAudioGenerator: null,
-          nativeScreenAudioPumpId: null,
-          nativeScreenAudioReplacedMic: false
-        });
-      },
-      startNativeScreenAudioCapture: async (sessionId) => {
-        if (!window.electronAPI?.startAppAudioCapture || !supportsTrackGenerator()) {
-          return false;
-        }
-
-        const room = voiceCallApi.getRoom();
-        if (!room) {
-          return false;
-        }
-
-        await get().stopNativeScreenAudioCapture();
-
-        const startResult = await window.electronAPI.startAppAudioCapture(sessionId);
-        if (!startResult?.ok) {
-          throw new Error(startResult?.error || 'Failed to start native app audio capture');
-        }
-
-        const generator = new MediaStreamTrackGenerator({ kind: 'audio' });
-        const writer = generator.writable.getWriter();
-        let frameTimestamp = 0;
-
-        const pumpId = setInterval(async () => {
-          try {
-            const chunkResult = await window.electronAPI.readAppAudioChunk(NATIVE_AUDIO_FRAME_SIZE);
-            if (!chunkResult?.ok || !chunkResult.chunk?.pcm) {
-              return;
-            }
-            const pcmPayload = chunkResult.chunk.pcm?.data || chunkResult.chunk.pcm;
-            const int16 = pcmPayload instanceof Int16Array
-              ? pcmPayload
-              : new Int16Array(Array.isArray(pcmPayload) ? pcmPayload : []);
-            const float32 = int16ToFloat32(int16);
-            const numberOfFrames = chunkResult.chunk.frames || NATIVE_AUDIO_FRAME_SIZE;
-            const sampleRate = chunkResult.chunk.sampleRate || 48000;
-            const channels = chunkResult.chunk.channels || 2;
-            const audioData = new AudioData({
-              format: 'f32',
-              sampleRate,
-              numberOfFrames,
-              numberOfChannels: channels,
-              timestamp: frameTimestamp,
-              data: float32
-            });
-            frameTimestamp += Math.floor((numberOfFrames / sampleRate) * 1_000_000);
-            await writer.write(audioData);
-            audioData.close();
-          } catch (error) {
-            console.warn('Native audio pump error:', error);
-          }
-        }, 20);
-
-        // IMPORTANT:
-        // Native app-audio path must NOT publish a second audio m-line
-        // (it causes opus codec collision in Electron/WebRTC + LiveKit).
-        // We only replace existing microphone sender track.
-        let replacedMic = false;
-        let microphonePublication = room.localParticipant.getTrackPublication('microphone');
-
-        if (!microphonePublication?.track) {
-          // Attempt to initialize microphone publication if it is missing.
-          await room.localParticipant.setMicrophoneEnabled(true);
-          microphonePublication = room.localParticipant.getTrackPublication('microphone');
-        }
-
-        if (microphonePublication?.track?.replaceTrack) {
-          await microphonePublication.track.replaceTrack(generator);
-          replacedMic = true;
-        } else {
-          await writer.close();
-          writer.releaseLock?.();
-          generator.stop?.();
-          await window.electronAPI.stopAppAudioCapture?.();
-          throw new Error('Native app audio requires existing microphone publication (replaceTrack unavailable)');
-        }
-
-        set({
-          nativeScreenAudioTrack: generator,
-          nativeScreenAudioGenerator: writer,
-          nativeScreenAudioPumpId: pumpId,
-          nativeScreenAudioReplacedMic: replacedMic
-        });
-
-        return true;
-      },
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
 
@@ -994,7 +816,6 @@ export const useCallStore = create(
               audioElement.volume = 1.0;
               audioElement.playsInline = true;
               audioElement.style.display = 'none';
-              await applyAudioSink(audioElement, 'screen-share');
               document.body.appendChild(audioElement);
               
               try {
@@ -1059,7 +880,6 @@ export const useCallStore = create(
             audioElement.playsInline = true;
             audioElement.controls = false;
             audioElement.style.display = 'none';
-            await applyAudioSink(audioElement, 'call');
             document.body.appendChild(audioElement);
             console.log('🔊 callStore: Created audio element for user:', targetUserId);
             
@@ -1792,7 +1612,6 @@ export const useCallStore = create(
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
-              await applyAudioSink(audioElement, 'screen-share');
               
               // Добавляем в DOM для воспроизведения
               document.body.appendChild(audioElement);
@@ -1862,7 +1681,6 @@ export const useCallStore = create(
           audioElement.playsInline = true;
           audioElement.controls = false;
           audioElement.style.display = 'none';
-          await applyAudioSink(audioElement, 'call');
           document.body.appendChild(audioElement);
           
           // Создаем Web Audio API chain
@@ -2668,8 +2486,6 @@ export const useCallStore = create(
           audioNotificationManager.playUserLeftSound().catch(error => {
             console.warn('Failed to play user left sound for self:', error);
           });
-
-          await get().stopNativeScreenAudioCapture();
           
           await voiceCallApi.disconnect();
           
@@ -2703,8 +2519,7 @@ export const useCallStore = create(
             screenShareSessionId: 0,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
-            localCameraTrackPublishedHandler: null,
-            selectedScreenShare: null
+            localCameraTrackPublishedHandler: null
           });
           
           console.log('Call ended successfully');
@@ -2733,54 +2548,17 @@ export const useCallStore = create(
           }
 
           // В Electron показываем нативное меню выбора экрана/окна перед стартом шаринга.
-          let selectedSource = null;
           if (window.electronAPI?.chooseScreenSource) {
-            selectedSource = await window.electronAPI.chooseScreenSource();
+            const selectedSource = await window.electronAPI.chooseScreenSource();
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
-            set({ selectedScreenShare: selectedSource });
           }
-
-          const useNativeAudioPath =
-            Boolean(selectedSource?.captureAudio) &&
-            selectedSource?.audioMode === 'native-app' &&
-            Boolean(selectedSource?.appAudioSessionId);
 
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          try {
-            await voiceCallApi.setScreenShareEnabled(true, { includeAudio: !useNativeAudioPath });
-          } catch (startError) {
-            const message = String(startError?.message || '');
-            const isAudioSourceError =
-              message.includes('Could not start audio source') ||
-              message.includes('NotReadableError') ||
-              message.includes('Failed to start audio');
-
-            if (isAudioSourceError && window.electronAPI?.disableSelectedScreenAudio) {
-              console.warn('Screen-share audio source failed, retrying without audio...');
-              await window.electronAPI.disableSelectedScreenAudio();
-              await voiceCallApi.setScreenShareEnabled(true, { includeAudio: false });
-            } else {
-              throw startError;
-            }
-          }
-
-          const selected = get().selectedScreenShare;
-          const shouldUseNativeAppAudio =
-            Boolean(selected?.captureAudio) &&
-            selected?.audioMode === 'native-app' &&
-            Boolean(selected?.appAudioSessionId);
-
-          if (shouldUseNativeAppAudio) {
-            try {
-              await get().startNativeScreenAudioCapture(selected.appAudioSessionId);
-            } catch (nativeAudioError) {
-              console.warn('Failed to start native app audio capture, continuing without app audio:', nativeAudioError);
-            }
-          }
+          await voiceCallApi.setScreenShareEnabled(true);
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
@@ -2882,8 +2660,6 @@ export const useCallStore = create(
           const state = get();
           const room = voiceCallApi.getRoom();
 
-          await get().stopNativeScreenAudioCapture();
-
           if (room && state.localScreenTrackPublishedHandler) {
             room.off(RoomEvent.LocalTrackPublished, state.localScreenTrackPublishedHandler);
           }
@@ -2897,8 +2673,7 @@ export const useCallStore = create(
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
-            localScreenTrackPublishedHandler: null,
-            selectedScreenShare: null
+            localScreenTrackPublishedHandler: null
           });
 
           console.log('Screen sharing stopped successfully');

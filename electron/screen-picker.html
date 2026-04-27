@@ -68,21 +68,6 @@
       .btn.primary { border-color: transparent; background: var(--primary); }
       .btn:disabled { opacity: .5; cursor: not-allowed; }
       .hint { font-size: 12px; color: #ffbf66; }
-      .audio-options {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-      .audio-mode-select {
-        min-width: 180px;
-        height: 32px;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        background: #1f2125;
-        color: var(--text);
-      }
     </style>
   </head>
   <body>
@@ -91,62 +76,28 @@
       <p class="subtitle">Select a screen or app window for screen sharing</p>
       <div id="sources" class="grid"></div>
       <div class="toolbar">
-        <div class="audio-options">
-          <label for="audioMode">Audio mode:</label>
-          <select id="audioMode" class="audio-mode-select">
-            <option value="loopback">Loopback (fallback)</option>
-            <option value="native-app">Selected app audio (native)</option>
-            <option value="none">No audio</option>
-          </select>
-          <select id="appSession" class="audio-mode-select" style="display:none;"></select>
-        </div>
+        <label class="checkbox">
+          <input id="captureAudio" type="checkbox" />
+          Share system audio
+        </label>
         <div class="actions">
           <button id="cancelBtn" class="btn" type="button">Cancel</button>
           <button id="shareBtn" class="btn primary" type="button" disabled>Share</button>
         </div>
       </div>
       <div id="audioHint" class="hint" style="display:none; margin-top:8px;">
-        Audio is available only for app windows (not full screen or Whithin window).
+        Audio is disabled for the app window to prevent call echo.
       </div>
     </div>
     <script>
       const sourcesNode = document.getElementById('sources');
-      const audioModeNode = document.getElementById('audioMode');
-      const appSessionNode = document.getElementById('appSession');
+      const captureAudioNode = document.getElementById('captureAudio');
       const shareBtn = document.getElementById('shareBtn');
       const cancelBtn = document.getElementById('cancelBtn');
       const audioHint = document.getElementById('audioHint');
 
       let selected = null;
       let allSources = [];
-      let appSessions = [];
-
-      function renderAppSessions() {
-        appSessionNode.innerHTML = '';
-        appSessions.forEach((session) => {
-          const option = document.createElement('option');
-          option.value = session.id;
-          option.textContent = `${session.displayName || session.processName} (PID ${session.pid})`;
-          appSessionNode.appendChild(option);
-        });
-      }
-
-      function syncAudioModeState() {
-        const canShareAudio = Boolean(selected?.canShareAudio);
-        if (!canShareAudio) {
-          audioModeNode.value = 'none';
-          audioModeNode.disabled = true;
-          appSessionNode.style.display = 'none';
-          audioHint.style.display = 'block';
-          return;
-        }
-
-        audioModeNode.disabled = false;
-        audioHint.style.display = 'none';
-
-        const isNative = audioModeNode.value === 'native-app';
-        appSessionNode.style.display = isNative ? 'inline-block' : 'none';
-      }
 
       function render() {
         sourcesNode.innerHTML = '';
@@ -164,7 +115,14 @@
           card.addEventListener('click', () => {
             selected = source;
             shareBtn.disabled = false;
-            syncAudioModeState();
+            const canShareAudio = Boolean(source.canShareAudio);
+            captureAudioNode.disabled = !canShareAudio;
+            if (!canShareAudio) {
+              captureAudioNode.checked = false;
+              audioHint.style.display = 'block';
+            } else {
+              audioHint.style.display = 'none';
+            }
             render();
           });
           sourcesNode.appendChild(card);
@@ -176,26 +134,13 @@
         render();
       });
 
-      window.screenPickerAPI.listAppAudioSessions()
-        .then((result) => {
-          if (result?.ok) {
-            appSessions = result.sessions || [];
-            renderAppSessions();
-          }
-        })
-        .catch(() => {});
-
-      audioModeNode.addEventListener('change', syncAudioModeState);
-
       shareBtn.addEventListener('click', () => {
         if (!selected) return;
         window.screenPickerAPI.submitSelection({
           id: selected.id,
           name: selected.name,
           type: selected.type,
-          captureAudio: selected.canShareAudio && audioModeNode.value !== 'none',
-          audioMode: audioModeNode.value,
-          appAudioSessionId: audioModeNode.value === 'native-app' ? (appSessionNode.value || null) : null
+          captureAudio: Boolean(captureAudioNode.checked && !captureAudioNode.disabled)
         });
       });
 

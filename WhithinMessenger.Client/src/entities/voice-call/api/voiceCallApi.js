@@ -70,11 +70,9 @@ class VoiceCallApi {
 
   getPublicationMediaType(publication) {
     const source = publication?.source;
-    const trackName = publication?.trackName || publication?.name || publication?.track?.name || '';
     if (source === Track.Source.ScreenShare) return 'screen';
     if (source === Track.Source.Camera) return 'camera';
     if (source === Track.Source.ScreenShareAudio) return 'screen';
-    if (source === Track.Source.Unknown && String(trackName).includes('screen_share_audio')) return 'screen';
     return 'microphone';
   }
 
@@ -636,7 +634,7 @@ class VoiceCallApi {
   }
 
   // Enable/disable screen share
-  async setScreenShareEnabled(enabled, options = {}) {
+  async setScreenShareEnabled(enabled) {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
@@ -666,20 +664,16 @@ class VoiceCallApi {
       // Use 720p/60 for smoother motion with lower network pressure than 1080p/60.
       // We intentionally cap video bitrate to preserve screen-share audio quality
       // when microphone and screen-share audio are active at the same time.
-      const includeAudio = options.includeAudio !== false;
-
       await this.room.localParticipant.setScreenShareEnabled(
         true,
         {
           // Always request capture of system/tab audio for screen sharing.
           // Browsers may still require explicit user consent in the picker UI.
-          audio: includeAudio
-            ? {
-                autoGainControl: false,
-                googAutoGainControl: false,
-                googAutoGainControl2: false
-              }
-            : false,
+          audio: {
+            autoGainControl: false,
+            googAutoGainControl: false,
+            googAutoGainControl2: false
+          },
           resolution: VideoPresets.h720.resolution,
           frameRate: 60
         },

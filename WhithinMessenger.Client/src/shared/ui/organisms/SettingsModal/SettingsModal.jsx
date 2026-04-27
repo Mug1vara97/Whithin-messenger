@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
-import { useCallStore } from '../../../lib/stores/callStore';
 import './SettingsModal.css';
-
-const CALL_OUTPUT_DEVICE_KEY = 'callOutputDeviceId';
-const SCREEN_SHARE_OUTPUT_DEVICE_KEY = 'screenShareOutputDeviceId';
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const [noiseSuppression, setNoiseSuppression] = useState(() => {
@@ -19,13 +15,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const saved = localStorage.getItem('soundNotificationsEnabled');
     return saved == null ? true : JSON.parse(saved);
   });
-  const [audioOutputs, setAudioOutputs] = useState([]);
-  const [callOutputDeviceId, setCallOutputDeviceId] = useState(() => (
-    localStorage.getItem(CALL_OUTPUT_DEVICE_KEY) || 'default'
-  ));
-  const [screenShareOutputDeviceId, setScreenShareOutputDeviceId] = useState(() => (
-    localStorage.getItem(SCREEN_SHARE_OUTPUT_DEVICE_KEY) || 'default'
-  ));
 
   useEffect(() => {
     if (isOpen) {
@@ -55,35 +44,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
       })
     );
   }, [soundNotificationsEnabled]);
-
-  useEffect(() => {
-    const loadAudioOutputs = async () => {
-      if (!navigator?.mediaDevices?.enumerateDevices) return;
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const outputs = devices.filter((device) => device.kind === 'audiooutput');
-        setAudioOutputs(outputs);
-      } catch (error) {
-        console.warn('Failed to enumerate audio output devices:', error);
-      }
-    };
-
-    loadAudioOutputs();
-    navigator?.mediaDevices?.addEventListener?.('devicechange', loadAudioOutputs);
-    return () => {
-      navigator?.mediaDevices?.removeEventListener?.('devicechange', loadAudioOutputs);
-    };
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(CALL_OUTPUT_DEVICE_KEY, callOutputDeviceId);
-    useCallStore.getState().applyAudioOutputSettings?.();
-  }, [callOutputDeviceId]);
-
-  useEffect(() => {
-    localStorage.setItem(SCREEN_SHARE_OUTPUT_DEVICE_KEY, screenShareOutputDeviceId);
-    useCallStore.getState().applyAudioOutputSettings?.();
-  }, [screenShareOutputDeviceId]);
 
   const handleNoiseSuppressionToggle = () => {
     setNoiseSuppression(!noiseSuppression);
@@ -193,48 +153,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
               </label>
               <p className="setting-description">
                 Автоматически удаляет фоновый шум из вашего микрофона
-              </p>
-            </div>
-
-            <div className="setting-item">
-              <label className="setting-label setting-select-label">
-                <span className="setting-text">Выход звонка</span>
-                <select
-                  className="setting-select"
-                  value={callOutputDeviceId}
-                  onChange={(e) => setCallOutputDeviceId(e.target.value)}
-                >
-                  <option value="default">Системный (по умолчанию)</option>
-                  {audioOutputs.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label || `Устройство ${device.deviceId.slice(0, 6)}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="setting-description">
-                Куда выводить голоса участников звонка
-              </p>
-            </div>
-
-            <div className="setting-item">
-              <label className="setting-label setting-select-label">
-                <span className="setting-text">Выход звука демонстрации</span>
-                <select
-                  className="setting-select"
-                  value={screenShareOutputDeviceId}
-                  onChange={(e) => setScreenShareOutputDeviceId(e.target.value)}
-                >
-                  <option value="default">Системный (по умолчанию)</option>
-                  {audioOutputs.map((device) => (
-                    <option key={`screen-${device.deviceId}`} value={device.deviceId}>
-                      {device.label || `Устройство ${device.deviceId.slice(0, 6)}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="setting-description">
-                Рекомендуется выбрать наушники (мониторинг) или virtual cable
               </p>
             </div>
           </div>

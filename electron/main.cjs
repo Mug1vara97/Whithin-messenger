@@ -1,16 +1,11 @@
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, shell, desktopCapturer, session, globalShortcut } = require('electron');
-const nativeAudioCapture = require('./native');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
 let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
-
-const logMain = (...args) => console.log('[ELECTRON_MAIN]', ...args);
-const logMainWarn = (...args) => console.warn('[ELECTRON_MAIN]', ...args);
-const logMainError = (...args) => console.error('[ELECTRON_MAIN]', ...args);
 
 function openScreenPickerWindow(sources) {
   return new Promise((resolve) => {
@@ -41,15 +36,12 @@ function openScreenPickerWindow(sources) {
     const payload = sources.map((source) => {
       const sourceNameLower = (source.name || '').toLowerCase();
       const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
-      const sourceType = source.id.startsWith('screen:') ? 'screen' : 'window';
       return {
         id: source.id,
         name: source.name,
-        type: sourceType,
+        type: source.id.startsWith('screen:') ? 'screen' : 'window',
         thumbnail: source.thumbnail?.toDataURL?.() || null,
-        // Audio can be shared only for app windows, never for full-screen share.
-        canShareAudio: sourceType === 'window' && !isWhithinWindow,
-        nativeCaptureAvailable: nativeAudioCapture.isAvailable()
+        canShareAudio: !isWhithinWindow
       };
     });
 
@@ -126,13 +118,6 @@ function createWindow() {
 app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(
     async (request, callback) => {
-      let callbackSent = false;
-      const safeCallback = (payload) => {
-        if (callbackSent) return;
-        callbackSent = true;
-        callback(payload);
-      };
-
       try {
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
@@ -144,45 +129,34 @@ app.whenReady().then(() => {
           : sources.find((source) => source.name.toLowerCase().includes('screen')) || sources[0];
 
         const shouldCaptureAudio = Boolean(selectedScreenSource?.captureAudio);
-        const audioMode = selectedScreenSource?.audioMode || 'none';
         const selectedSourceType = selectedScreenSource?.type;
         const sourceNameLower = (preferredSource?.name || '').toLowerCase();
         const isWhithinWindow =
           sourceNameLower.includes('whithin') ||
           sourceNameLower.includes('electron');
 
+        selectedScreenSource = null;
+
         if (!preferredSource) {
-          safeCallback({ video: null });
+          callback({ video: null, audio: null });
           return;
         }
 
-        let audioSource;
+        let audioSource = null;
         if (shouldCaptureAudio && !isWhithinWindow) {
-          // Electron accepts "loopback"/"loopbackWithMute" for audio, not DesktopCapturerSource.
-          // Keep audio only for app-window sharing and disable for full-screen sharing.
-          if (audioMode === 'loopback') {
-            audioSource = selectedSourceType === 'window' ? 'loopback' : undefined;
-          } else {
-            audioSource = undefined;
-          }
+          // For window sharing, prefer capturing audio from the selected source only.
+          // This reduces chance of mixing in call voices from system output.
+          audioSource = selectedSourceType === 'window' ? preferredSource : 'loopback';
         }
 
-        const response = { video: preferredSource };
-        // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
-        if (audioSource) {
-          response.audio = audioSource;
-        }
-        logMain('DisplayMedia resolved:', {
-          sourceId: preferredSource?.id,
-          sourceName: preferredSource?.name,
-          sourceType: selectedSourceType,
-          audioMode,
-          hasAudio: Boolean(response.audio)
+        callback({
+          video: preferredSource,
+          // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
+          audio: audioSource
         });
-        safeCallback(response);
       } catch (error) {
-        logMainError('Display media request failed:', error);
-        safeCallback({ video: null });
+        console.error('Display media request failed:', error);
+        callback({ video: null, audio: null });
       }
     },
     { useSystemPicker: true }
@@ -198,84 +172,11 @@ app.whenReady().then(() => {
 });
 
 ipcMain.handle('electron:open-external', async (_, url) => {
-  logMain('Open external URL:', url);
   await shell.openExternal(url);
 });
 
 ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
   registerGlobalShortcuts(shortcuts);
-});
-
-ipcMain.handle('electron:disable-selected-screen-audio', () => {
-  if (selectedScreenSource) {
-    selectedScreenSource.captureAudio = false;
-    selectedScreenSource.audioMode = 'none';
-    logMain('Selected screen audio disabled by renderer retry logic');
-  }
-  return true;
-});
-
-ipcMain.handle('electron:list-app-audio-sessions', () => {
-  if (!nativeAudioCapture.isAvailable()) {
-    const error = nativeAudioCapture.getLoadError();
-    logMainWarn('Native audio addon unavailable in list-app-audio-sessions:', error);
-    return { ok: false, error, sessions: [] };
-  }
-  try {
-    const sessions = nativeAudioCapture.listAudioSessions();
-    logMain('Listed app audio sessions:', sessions.length);
-    return { ok: true, sessions };
-  } catch (error) {
-    const err = String(error?.message || error);
-    logMainError('list-app-audio-sessions failed:', err);
-    return { ok: false, error: err, sessions: [] };
-  }
-});
-
-ipcMain.handle('electron:start-app-audio-capture', (_, sessionId) => {
-  if (!nativeAudioCapture.isAvailable()) {
-    const error = nativeAudioCapture.getLoadError();
-    logMainWarn('Native audio addon unavailable in start-app-audio-capture:', error);
-    return { ok: false, error };
-  }
-  try {
-    nativeAudioCapture.startCapture(sessionId);
-    logMain('Native app audio capture started:', sessionId);
-    return { ok: true };
-  } catch (error) {
-    const err = String(error?.message || error);
-    logMainError('start-app-audio-capture failed:', err, 'sessionId:', sessionId);
-    return { ok: false, error: err };
-  }
-});
-
-ipcMain.handle('electron:stop-app-audio-capture', () => {
-  if (!nativeAudioCapture.isAvailable()) {
-    return { ok: true };
-  }
-  try {
-    nativeAudioCapture.stopCapture();
-    logMain('Native app audio capture stopped');
-    return { ok: true };
-  } catch (error) {
-    const err = String(error?.message || error);
-    logMainError('stop-app-audio-capture failed:', err);
-    return { ok: false, error: err };
-  }
-});
-
-ipcMain.handle('electron:read-app-audio-chunk', (_, maxFrames = 960) => {
-  if (!nativeAudioCapture.isAvailable()) {
-    return { ok: false, error: nativeAudioCapture.getLoadError() };
-  }
-  try {
-    const chunk = nativeAudioCapture.readChunk(maxFrames);
-    return { ok: true, chunk };
-  } catch (error) {
-    const err = String(error?.message || error);
-    logMainError('read-app-audio-chunk failed:', err);
-    return { ok: false, error: err };
-  }
 });
 
 ipcMain.handle('electron:choose-screen-source', async () => {
@@ -296,19 +197,14 @@ ipcMain.handle('electron:choose-screen-source', async () => {
   selectedScreenSource = {
     id: selection.id,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio),
-    audioMode: selection.audioMode || 'none',
-    appAudioSessionId: selection.appAudioSessionId || null
+    captureAudio: Boolean(selection.captureAudio)
   };
-  logMain('Screen source selected:', selectedScreenSource);
 
   return {
     id: selection.id,
     name: selection.name,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio),
-    audioMode: selection.audioMode || 'none',
-    appAudioSessionId: selection.appAudioSessionId || null
+    captureAudio: Boolean(selection.captureAudio)
   };
 });
 
