@@ -68,6 +68,14 @@ class VoiceCallApi {
     this.eventHandlers = new Map();
   }
 
+  getPublicationMediaType(publication) {
+    const source = publication?.source;
+    if (source === Track.Source.ScreenShare) return 'screen';
+    if (source === Track.Source.Camera) return 'camera';
+    if (source === Track.Source.ScreenShareAudio) return 'screen';
+    return 'microphone';
+  }
+
   async waitForScreenShareCleared(timeoutMs = 3000) {
     if (!this.room) return;
 
@@ -402,8 +410,7 @@ class VoiceCallApi {
         kind: publication.kind,
         appData: {
           userId: participant.identity,
-          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
-                     publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+          mediaType: this.getPublicationMediaType(publication)
         }
       });
     });
@@ -425,8 +432,7 @@ class VoiceCallApi {
         kind: track.kind,
         participantIdentity: participant.identity,
         userId: participant.identity,
-        mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
-                   publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+        mediaType: this.getPublicationMediaType(publication)
       });
     });
 
@@ -438,8 +444,8 @@ class VoiceCallApi {
         participantIdentity: participant.identity
       });
       
-      // Emit mute state change for audio
-      if (publication.kind === Track.Kind.Audio) {
+      // Emit mute state change only for microphone audio, not screen-share audio.
+      if (publication.kind === Track.Kind.Audio && publication.source === Track.Source.Microphone) {
         this.emit('peerMuteStateChanged', {
           peerId: participant.identity,
           isMuted: false,
@@ -468,8 +474,8 @@ class VoiceCallApi {
         participantIdentity: participant.identity
       });
       
-      // Emit mute state change for audio
-      if (publication.kind === Track.Kind.Audio) {
+      // Emit mute state change only for microphone audio, not screen-share audio.
+      if (publication.kind === Track.Kind.Audio && publication.source === Track.Source.Microphone) {
         this.emit('peerMuteStateChanged', {
           peerId: participant.identity,
           isMuted: true,
@@ -512,8 +518,7 @@ class VoiceCallApi {
             kind: publication.kind,
             participantIdentity: participant.identity,
             userId: participant.identity,
-            mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
-                       publication.source === Track.Source.Camera ? 'camera' : 'microphone'
+            mediaType: this.getPublicationMediaType(publication)
           });
         }
       });
