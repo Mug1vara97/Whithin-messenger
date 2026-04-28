@@ -750,14 +750,11 @@ class VoiceCallApi {
       const startProfiles = includeAudio
         ? [
             {
-              name: 'balanced-audio',
+              name: 'vp8-audio-720p60',
               capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false,
-                  channelCount: 2
-                },
+                // Keep audio capture defaults to avoid Opus fmtp/profile mismatch
+                // with microphone track in the same PeerConnection.
+                audio: true,
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
               },
@@ -770,33 +767,6 @@ class VoiceCallApi {
                 },
                 simulcast: false
               }
-            },
-            {
-              name: 'compatibility-audio',
-              capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false
-                },
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 30
-              },
-              publish: {
-                videoCodec: 'vp8',
-                simulcast: false
-              }
-            },
-            {
-              name: 'minimal-audio',
-              capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false
-                }
-              },
-              publish: null
             }
           ]
         : [

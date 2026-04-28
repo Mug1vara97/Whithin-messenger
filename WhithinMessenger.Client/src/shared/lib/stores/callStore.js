@@ -132,6 +132,7 @@ export const useCallStore = create(
       isScreenSharing: false,
       isScreenShareTransitioning: false,
       screenShareSessionId: 0,
+      isScreenShareAudioModeActive: false,
       screenShareStream: null,
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
@@ -2397,6 +2398,7 @@ export const useCallStore = create(
             remoteScreenShares: new Map(),
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
+            isScreenShareAudioModeActive: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null,
@@ -2524,6 +2526,7 @@ export const useCallStore = create(
             connecting: false,
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
+            isScreenShareAudioModeActive: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2548,7 +2551,7 @@ export const useCallStore = create(
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
-          set({ screenShareSessionId });
+          set({ screenShareSessionId, isScreenShareAudioModeActive: false });
           
           // Останавливаем существующую демонстрацию экрана, если есть
           if (state.isScreenSharing) {
@@ -2628,7 +2631,7 @@ export const useCallStore = create(
             set({ localScreenTrackPublishedHandler: handleLocalTrackPublished });
           }
           
-          set({ isScreenSharing: true });
+          set({ isScreenSharing: true, isScreenShareAudioModeActive: includeAudio });
 
         } catch (error) {
           console.error('Error starting screen share:', error);
@@ -2643,7 +2646,7 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          set({ isScreenSharing: false });
+          set({ isScreenSharing: false, isScreenShareAudioModeActive: false });
           
           // Показываем ошибку только если это не отмена пользователем
           if (!isCancelled) {
@@ -2682,6 +2685,7 @@ export const useCallStore = create(
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
+            isScreenShareAudioModeActive: false,
             localScreenTrackPublishedHandler: null
           });
 

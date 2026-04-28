@@ -70,6 +70,7 @@ const VoiceCallView = ({
     isGlobalAudioMuted,
     currentCall,
     isScreenSharing,
+    isScreenShareAudioModeActive,
     screenShareStream,
     remoteScreenShares,
     isVideoEnabled,
@@ -367,6 +368,17 @@ const VoiceCallView = ({
                         Разрешить воспроизведение
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {isScreenSharing && (
+                  <div className="screen-share-audio-block">
+                    <strong>Separate Demo Audio (temporary)</strong>
+                    <span>
+                      {isScreenShareAudioModeActive
+                        ? 'Audio stream is sent separately from screen video.'
+                        : 'Screen sharing is active without separate audio stream.'}
+                    </span>
                   </div>
                 )}
 

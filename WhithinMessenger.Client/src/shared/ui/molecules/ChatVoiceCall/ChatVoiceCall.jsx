@@ -55,6 +55,7 @@ const ChatVoiceCall = ({
     isGlobalAudioMuted,
     currentCall,
     isScreenSharing,
+    isScreenShareAudioModeActive,
     screenShareStream,
     isVideoEnabled,
     cameraStream,
@@ -323,6 +324,16 @@ const ChatVoiceCall = ({
 
       {/* Нижняя панель управления */}
       <div className={styles.bottomControls}>
+        {isScreenSharing && (
+          <div className={styles.screenShareAudioBlock}>
+            <div className={styles.screenShareAudioTitle}>Separate Demo Audio (temporary)</div>
+            <div className={styles.screenShareAudioText}>
+              {isScreenShareAudioModeActive
+                ? 'Audio stream is sent as a separate channel from screen video.'
+                : 'Screen sharing is active without separate audio channel.'}
+            </div>
+          </div>
+        )}
         <div className={styles.controlSection}>
           <div className={styles.mainControls}>
             {/* Микрофон */}

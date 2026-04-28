@@ -36,6 +36,7 @@ export const CallProvider = ({ children }) => {
   const audioBlocked = useCallStore(state => state.audioBlocked);
   const connecting = useCallStore(state => state.connecting);
   const isScreenSharing = useCallStore(state => state.isScreenSharing);
+  const isScreenShareAudioModeActive = useCallStore(state => state.isScreenShareAudioModeActive);
   const screenShareStream = useCallStore(state => state.screenShareStream);
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
   const isVideoEnabled = useCallStore(state => state.isVideoEnabled);
@@ -131,6 +132,7 @@ export const CallProvider = ({ children }) => {
     audioBlocked,
     connecting,
     isScreenSharing,
+    isScreenShareAudioModeActive,
     screenShareStream,
     remoteScreenShares,
     isVideoEnabled,
@@ -190,6 +192,7 @@ export const CallProvider = ({ children }) => {
     audioBlocked,
     connecting,
     isScreenSharing,
+    isScreenShareAudioModeActive,
     screenShareStream,
     remoteScreenShares,
     isVideoEnabled,
