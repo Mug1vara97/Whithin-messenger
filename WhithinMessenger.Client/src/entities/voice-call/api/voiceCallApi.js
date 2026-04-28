@@ -37,14 +37,14 @@ const getRoomOptions = () => {
     },
     adaptiveStream: true,
     dynacast: true,
-    // Do not hard-pin audio capture format (sampleRate/channelCount).
-    // When screen-share audio is enabled, browser/Electron may provide
-    // a different Opus fmtp profile than microphone. Forcing mono here
-    // can lead to SDP bundle codec collisions for multiple audio tracks.
     audioCaptureDefaults: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
+      // Align microphone capture profile with display-audio profile to reduce
+      // Opus fmtp collisions when both microphone and screen-audio are published.
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      sampleRate: 48000,
+      channelCount: 2
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,
@@ -752,9 +752,13 @@ class VoiceCallApi {
             {
               name: 'vp8-audio-720p60',
               capture: {
-                // Keep audio capture defaults to avoid Opus fmtp/profile mismatch
-                // with microphone track in the same PeerConnection.
-                audio: true,
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                  sampleRate: 48000,
+                  channelCount: 2
+                },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
               },

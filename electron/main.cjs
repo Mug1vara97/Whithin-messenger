@@ -638,6 +638,12 @@ if (!gotSingleInstanceLock) {
   app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(
     async (request, callback) => {
+      let isCallbackSent = false;
+      const safeCallback = (payload) => {
+        if (isCallbackSent) return;
+        isCallbackSent = true;
+        callback(payload);
+      };
       try {
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
@@ -665,14 +671,16 @@ if (!gotSingleInstanceLock) {
         selectedScreenSource = null;
 
         if (!preferredSource) {
-          callback({ video: null, audio: null });
+          // Deny request without passing invalid null source types.
+          safeCallback({});
           return;
         }
 
         let audioSource = null;
         if (shouldCaptureAudio) {
           if (selectedSourceType === 'window' && !isWhithinWindow) {
-            // Захват звука только выбранного окна.
+            // Для window-поделивания оставляем audio выбранного окна,
+            // иначе loopback подмешивает весь системный вывод и эхо звонка.
             audioSource = preferredSource;
           } else if (selectedSourceType === 'screen') {
             // Для полного экрана нужен loopback, иначе аудио-трек не создаётся.
@@ -680,14 +688,15 @@ if (!gotSingleInstanceLock) {
           }
         }
 
-        callback({
+        safeCallback({
           video: preferredSource,
           // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
           audio: audioSource
         });
       } catch (error) {
         console.error('Display media request failed:', error);
-        callback({ video: null, audio: null });
+        // Deny request safely; callback can be called only once.
+        safeCallback({});
       }
     },
     { useSystemPicker: true }
