@@ -2369,6 +2369,10 @@ export const useCallStore = create(
               console.warn('Error disconnecting gain node:', e);
             }
           });
+
+          if (state.audioContext && state.audioContext.state !== 'closed') {
+            await state.audioContext.close();
+          }
           
           // Выходим из комнаты LiveKit, но сохраняем соединение
           await voiceCallApi.leaveRoom();
@@ -2395,7 +2399,10 @@ export const useCallStore = create(
             screenShareSessionId: 0,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
-            localCameraTrackPublishedHandler: null
+            localCameraTrackPublishedHandler: null,
+            localStream: null,
+            noiseSuppressionManager: null,
+            audioContext: null
           });
           
           console.log('leaveRoom: Left room successfully, connection preserved');
@@ -2554,7 +2561,7 @@ export const useCallStore = create(
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
-            includeAudio = Boolean(selectedSource.captureAudio && selectedSource.type === 'window');
+            includeAudio = Boolean(selectedSource.captureAudio);
           }
 
           console.log('Starting screen share via LiveKit...');

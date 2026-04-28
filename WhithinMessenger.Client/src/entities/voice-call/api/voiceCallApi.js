@@ -57,6 +57,33 @@ const getRoomOptions = () => {
   };
 };
 
+/**
+ * Явно отключает локальный захват LiveKit до disconnect.
+ * Иначе в Electron/Chromium индикатор «микрофон в использовании» в ОС
+ * может оставаться активным после выхода из звонка.
+ */
+async function releaseLiveKitLocalCapture(room) {
+  if (!room?.localParticipant) return;
+  const lp = room.localParticipant;
+  try {
+    await lp.setMicrophoneEnabled(false);
+  } catch (e) {
+    console.warn('releaseLiveKitLocalCapture: setMicrophoneEnabled(false)', e);
+  }
+  try {
+    await lp.setCameraEnabled(false);
+  } catch (e) {
+    console.warn('releaseLiveKitLocalCapture: setCameraEnabled(false)', e);
+  }
+  try {
+    if (typeof lp.setScreenShareEnabled === 'function') {
+      await lp.setScreenShareEnabled(false);
+    }
+  } catch (e) {
+    console.warn('releaseLiveKitLocalCapture: setScreenShareEnabled(false)', e);
+  }
+}
+
 class VoiceCallApi {
   constructor() {
     this.socket = null;
@@ -216,6 +243,7 @@ class VoiceCallApi {
 
   async disconnect() {
     if (this.room) {
+      await releaseLiveKitLocalCapture(this.room);
       await this.room.disconnect();
       this.room = null;
     }
@@ -233,6 +261,7 @@ class VoiceCallApi {
     const previousRoomId = this.roomId;
     
     if (this.room) {
+      await releaseLiveKitLocalCapture(this.room);
       await this.room.disconnect();
       this.room = null;
       this.roomId = null;
@@ -269,16 +298,20 @@ class VoiceCallApi {
   }
 
   async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
-    return new Promise((resolve, reject) => {
-      // Если уже есть активная комната, выходим из неё перед присоединением к новой
-      if (this.room && this.roomId !== roomId) {
-        console.log(`joinRoom: Leaving current room (${this.roomId}) before joining new room (${roomId})`);
-        this.room.disconnect().catch(err => {
-          console.warn('Error disconnecting from previous room:', err);
-        });
-        this.room = null;
+    // Если уже есть активная комната, выходим из неё перед присоединением к новой (await — иначе старый захват микрофона может пересекаться с новым)
+    if (this.room && this.roomId !== roomId) {
+      console.log(`joinRoom: Leaving current room (${this.roomId}) before joining new room (${roomId})`);
+      const oldRoom = this.room;
+      this.room = null;
+      try {
+        await releaseLiveKitLocalCapture(oldRoom);
+        await oldRoom.disconnect();
+      } catch (err) {
+        console.warn('Error disconnecting from previous room:', err);
       }
-      
+    }
+
+    return new Promise((resolve, reject) => {
       this.socket.emit('join', {
         roomId,
         name,
