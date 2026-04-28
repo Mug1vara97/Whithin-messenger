@@ -151,6 +151,25 @@ class VoiceCallApi {
     return this.hasLocalScreenShareAudioPublication();
   }
 
+  tuneLocalScreenShareAudioTrack() {
+    if (!this.room) return;
+    try {
+      for (const publication of this.room.localParticipant.audioTrackPublications.values()) {
+        if (publication.source !== Track.Source.ScreenShareAudio) continue;
+        const mediaTrack = publication.track?.mediaStreamTrack;
+        if (!mediaTrack) continue;
+
+        // For screen-share audio we want transparent transport of program sound,
+        // not voice-oriented post-processing.
+        if ('contentHint' in mediaTrack) {
+          mediaTrack.contentHint = 'music';
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to tune screen-share audio track:', error);
+    }
+  }
+
   async connect(userId, userName, serverUrl = VOICE_SERVER_URL) {
     if (this.socket && this.isConnected) {
       return this.socket;
@@ -733,7 +752,12 @@ class VoiceCallApi {
             {
               name: 'balanced-audio',
               capture: {
-                audio: true,
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                  channelCount: 2
+                },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
               },
@@ -750,7 +774,11 @@ class VoiceCallApi {
             {
               name: 'compatibility-audio',
               capture: {
-                audio: true,
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 30
               },
@@ -762,7 +790,11 @@ class VoiceCallApi {
             {
               name: 'minimal-audio',
               capture: {
-                audio: true
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                }
               },
               publish: null
             }
@@ -803,6 +835,7 @@ class VoiceCallApi {
 
           const audioPublished = await this.waitForScreenShareAudioPublished();
           if (audioPublished) {
+            this.tuneLocalScreenShareAudioTrack();
             return;
           }
 
