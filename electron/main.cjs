@@ -603,6 +603,19 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(windowOptions);
 
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    const key = String(input.key || '').toLowerCase();
+    const isToggleDevTools =
+      key === 'f12' || ((input.control || input.meta) && input.shift && key === 'i');
+    if (isToggleDevTools) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+      }
+    }
+  });
+
   attachExternalLinksPolicy(mainWindow.webContents);
   installCustomTitlebarChrome(mainWindow.webContents);
 
