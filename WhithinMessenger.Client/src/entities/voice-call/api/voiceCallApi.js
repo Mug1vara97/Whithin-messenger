@@ -37,12 +37,14 @@ const getRoomOptions = () => {
     },
     adaptiveStream: true,
     dynacast: true,
+    // Do not hard-pin audio capture format (sampleRate/channelCount).
+    // When screen-share audio is enabled, browser/Electron may provide
+    // a different Opus fmtp profile than microphone. Forcing mono here
+    // can lead to SDP bundle codec collisions for multiple audio tracks.
     audioCaptureDefaults: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: 48000,
-      channelCount: 1
+      autoGainControl: true
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,
@@ -108,16 +110,45 @@ class VoiceCallApi {
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
-      const hasScreenSharePublication = Array.from(
+      const hasScreenShareVideoPublication = Array.from(
         this.room.localParticipant.videoTrackPublications.values()
       ).some((publication) => publication.source === Track.Source.ScreenShare);
 
-      if (!hasScreenSharePublication) {
+      const hasScreenShareAudioPublication = Array.from(
+        this.room.localParticipant.audioTrackPublications.values()
+      ).some((publication) => publication.source === Track.Source.ScreenShareAudio);
+
+      if (!hasScreenShareVideoPublication && !hasScreenShareAudioPublication) {
         return;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+  }
+
+  hasLocalScreenShareAudioPublication() {
+    if (!this.room) return false;
+    return Array.from(
+      this.room.localParticipant.audioTrackPublications.values()
+    ).some((publication) => {
+      const isScreenAudio = publication.source === Track.Source.ScreenShareAudio;
+      const trackReady = publication.track?.mediaStreamTrack?.readyState !== 'ended';
+      return isScreenAudio && trackReady;
+    });
+  }
+
+  async waitForScreenShareAudioPublished(timeoutMs = 2200) {
+    if (!this.room) return false;
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (this.hasLocalScreenShareAudioPublication()) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+
+    return this.hasLocalScreenShareAudioPublication();
   }
 
   async connect(userId, userName, serverUrl = VOICE_SERVER_URL) {
@@ -675,11 +706,15 @@ class VoiceCallApi {
     
     if (enabled) {
       // Defensive cleanup for stale publications before enabling a new share.
-      const hasActiveOrStaleScreenPublication = Array.from(
+      const hasActiveOrStaleScreenVideoPublication = Array.from(
         this.room.localParticipant.videoTrackPublications.values()
       ).some((publication) => publication.source === Track.Source.ScreenShare);
 
-      if (hasActiveOrStaleScreenPublication) {
+      const hasActiveOrStaleScreenAudioPublication = Array.from(
+        this.room.localParticipant.audioTrackPublications.values()
+      ).some((publication) => publication.source === Track.Source.ScreenShareAudio);
+
+      if (hasActiveOrStaleScreenVideoPublication || hasActiveOrStaleScreenAudioPublication) {
         try {
           await this.room.localParticipant.setScreenShareEnabled(false);
           await this.waitForScreenShareCleared();
@@ -693,30 +728,109 @@ class VoiceCallApi {
       // on remote subscribers in some browser/runtime combinations.
       await new Promise((resolve) => setTimeout(resolve, 120));
 
-      // Demonstration screen-share profile tuned for stability across restarts.
-      // VP8 + no simulcast is less fragile than VP9/SVC in some desktop runtimes.
-      // Use 720p/60 for smoother motion with lower network pressure than 1080p/60.
-      // We intentionally cap video bitrate to preserve screen-share audio quality
-      // when microphone and screen-share audio are active at the same time.
-      await this.room.localParticipant.setScreenShareEnabled(
-        true,
-        {
-          // Use browser/electron defaults for stream audio for best compatibility.
-          // Custom audio constraints here can cause source start failures on some setups.
-          audio: includeAudio ? true : false,
-          resolution: VideoPresets.h720.resolution,
-          frameRate: 60
-        },
-        {
-          videoCodec: 'vp8',
-          videoEncoding: {
-            ...VideoPresets.h720.encoding,
-            maxBitrate: 2_500_000,
-            maxFramerate: 60
-          },
-          simulcast: false
+      const startProfiles = includeAudio
+        ? [
+            {
+              name: 'balanced-audio',
+              capture: {
+                audio: true,
+                resolution: VideoPresets.h720.resolution,
+                frameRate: 60
+              },
+              publish: {
+                videoCodec: 'vp8',
+                videoEncoding: {
+                  ...VideoPresets.h720.encoding,
+                  maxBitrate: 2_500_000,
+                  maxFramerate: 60
+                },
+                simulcast: false
+              }
+            },
+            {
+              name: 'compatibility-audio',
+              capture: {
+                audio: true,
+                resolution: VideoPresets.h720.resolution,
+                frameRate: 30
+              },
+              publish: {
+                videoCodec: 'vp8',
+                simulcast: false
+              }
+            },
+            {
+              name: 'minimal-audio',
+              capture: {
+                audio: true
+              },
+              publish: null
+            }
+          ]
+        : [
+            {
+              name: 'video-only',
+              capture: {
+                audio: false,
+                resolution: VideoPresets.h720.resolution,
+                frameRate: 60
+              },
+              publish: {
+                videoCodec: 'vp8',
+                videoEncoding: {
+                  ...VideoPresets.h720.encoding,
+                  maxBitrate: 2_500_000,
+                  maxFramerate: 60
+                },
+                simulcast: false
+              }
+            }
+          ];
+
+      let lastError = null;
+      for (let i = 0; i < startProfiles.length; i += 1) {
+        const profile = startProfiles[i];
+        try {
+          if (profile.publish) {
+            await this.room.localParticipant.setScreenShareEnabled(true, profile.capture, profile.publish);
+          } else {
+            await this.room.localParticipant.setScreenShareEnabled(true, profile.capture);
+          }
+
+          if (!includeAudio) {
+            return;
+          }
+
+          const audioPublished = await this.waitForScreenShareAudioPublished();
+          if (audioPublished) {
+            return;
+          }
+
+          lastError = new Error(
+            `Screen-share audio track was not published (profile: ${profile.name})`
+          );
+          console.warn(lastError.message);
+        } catch (error) {
+          lastError = error;
+          console.warn(`Screen share start failed for profile "${profile.name}":`, error);
         }
-      );
+
+        // Cleanup before next profile attempt.
+        try {
+          await this.room.localParticipant.setScreenShareEnabled(false);
+        } catch (disableError) {
+          console.warn('Failed to disable screen share after failed attempt:', disableError);
+        }
+        await this.waitForScreenShareCleared();
+
+        // Short settle window before next retry.
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+      throw new Error('Failed to start screen sharing');
     } else {
       await this.room.localParticipant.setScreenShareEnabled(false);
       await this.waitForScreenShareCleared();

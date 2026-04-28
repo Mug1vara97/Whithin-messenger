@@ -93,6 +93,7 @@ const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 124;
 let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
+let lastSelectedScreenSource = null;
 let tray = null;
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
@@ -643,12 +644,19 @@ if (!gotSingleInstanceLock) {
           thumbnailSize: { width: 320, height: 180 }
         });
 
-        const preferredSource = selectedScreenSource?.id
-          ? sources.find((source) => source.id === selectedScreenSource.id)
+        const now = Date.now();
+        const recentSelection =
+          lastSelectedScreenSource && now - lastSelectedScreenSource.selectedAt < 15000
+            ? lastSelectedScreenSource
+            : null;
+        const pendingSelection = selectedScreenSource || recentSelection;
+
+        const preferredSource = pendingSelection?.id
+          ? sources.find((source) => source.id === pendingSelection.id)
           : sources.find((source) => source.name.toLowerCase().includes('screen')) || sources[0];
 
-        const shouldCaptureAudio = Boolean(selectedScreenSource?.captureAudio);
-        const selectedSourceType = selectedScreenSource?.type;
+        const shouldCaptureAudio = Boolean(pendingSelection?.captureAudio);
+        const selectedSourceType = pendingSelection?.type;
         const sourceNameLower = (preferredSource?.name || '').toLowerCase();
         const isWhithinWindow =
           sourceNameLower.includes('whithin') ||
@@ -751,6 +759,12 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     id: selection.id,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio)
+  };
+  lastSelectedScreenSource = {
+    id: selection.id,
+    type: selection.type,
+    captureAudio: Boolean(selection.captureAudio),
+    selectedAt: Date.now()
   };
 
   return {

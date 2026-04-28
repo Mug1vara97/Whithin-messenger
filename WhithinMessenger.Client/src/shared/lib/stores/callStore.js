@@ -2567,21 +2567,7 @@ export const useCallStore = create(
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          try {
-            await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
-          } catch (shareError) {
-            const isAudioSourceError =
-              includeAudio &&
-              typeof shareError?.message === 'string' &&
-              shareError.message.toLowerCase().includes('could not start audio source');
-
-            if (isAudioSourceError) {
-              console.warn('Screen-share audio source failed, retrying without audio');
-              await voiceCallApi.setScreenShareEnabled(true, { includeAudio: false });
-            } else {
-              throw shareError;
-            }
-          }
+          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
