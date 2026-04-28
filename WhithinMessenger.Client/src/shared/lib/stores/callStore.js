@@ -132,7 +132,6 @@ export const useCallStore = create(
       isScreenSharing: false,
       isScreenShareTransitioning: false,
       screenShareSessionId: 0,
-      isScreenShareAudioModeActive: false,
       screenShareStream: null,
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
@@ -2398,7 +2397,6 @@ export const useCallStore = create(
             remoteScreenShares: new Map(),
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
-            isScreenShareAudioModeActive: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null,
@@ -2526,7 +2524,6 @@ export const useCallStore = create(
             connecting: false,
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
-            isScreenShareAudioModeActive: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2551,7 +2548,7 @@ export const useCallStore = create(
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
-          set({ screenShareSessionId, isScreenShareAudioModeActive: false });
+          set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
           if (state.isScreenSharing) {
@@ -2570,25 +2567,7 @@ export const useCallStore = create(
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          try {
-            await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
-          } catch (shareError) {
-            const isAudioSourceError =
-              includeAudio &&
-              typeof shareError?.message === 'string' &&
-              (shareError.message.toLowerCase().includes('could not start audio source') ||
-               shareError.message.toLowerCase().includes('notreadableerror'));
-
-            if (!isAudioSourceError) {
-              throw shareError;
-            }
-
-            console.warn('Screen-share audio source failed, retrying without audio');
-            await voiceCallApi.setScreenShareEnabled(true, { includeAudio: false });
-            set({
-              error: 'Screen-share audio source is unavailable on this source. Screen sharing started without sound.'
-            });
-          }
+          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
@@ -2649,7 +2628,7 @@ export const useCallStore = create(
             set({ localScreenTrackPublishedHandler: handleLocalTrackPublished });
           }
           
-          set({ isScreenSharing: true, isScreenShareAudioModeActive: includeAudio });
+          set({ isScreenSharing: true });
 
         } catch (error) {
           console.error('Error starting screen share:', error);
@@ -2664,7 +2643,7 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          set({ isScreenSharing: false, isScreenShareAudioModeActive: false });
+          set({ isScreenSharing: false });
           
           // Показываем ошибку только если это не отмена пользователем
           if (!isCancelled) {
@@ -2703,7 +2682,6 @@ export const useCallStore = create(
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
-            isScreenShareAudioModeActive: false,
             localScreenTrackPublishedHandler: null
           });
 

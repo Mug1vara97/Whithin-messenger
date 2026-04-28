@@ -37,10 +37,14 @@ const getRoomOptions = () => {
     },
     adaptiveStream: true,
     dynacast: true,
+    // Do not hard-pin audio capture format (sampleRate/channelCount).
+    // When screen-share audio is enabled, browser/Electron may provide
+    // a different Opus fmtp profile than microphone. Forcing mono here
+    // can lead to SDP bundle codec collisions for multiple audio tracks.
     audioCaptureDefaults: {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,
@@ -746,12 +750,13 @@ class VoiceCallApi {
       const startProfiles = includeAudio
         ? [
             {
-              name: 'vp8-audio-720p60',
+              name: 'balanced-audio',
               capture: {
                 audio: {
                   echoCancellation: false,
                   noiseSuppression: false,
-                  autoGainControl: false
+                  autoGainControl: false,
+                  channelCount: 2
                 },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
@@ -765,6 +770,33 @@ class VoiceCallApi {
                 },
                 simulcast: false
               }
+            },
+            {
+              name: 'compatibility-audio',
+              capture: {
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                },
+                resolution: VideoPresets.h720.resolution,
+                frameRate: 30
+              },
+              publish: {
+                videoCodec: 'vp8',
+                simulcast: false
+              }
+            },
+            {
+              name: 'minimal-audio',
+              capture: {
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                }
+              },
+              publish: null
             }
           ]
         : [
