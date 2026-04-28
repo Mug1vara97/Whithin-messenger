@@ -38,13 +38,9 @@ const getRoomOptions = () => {
     adaptiveStream: true,
     dynacast: true,
     audioCaptureDefaults: {
-      // Align microphone capture profile with display-audio profile to reduce
-      // Opus fmtp collisions when both microphone and screen-audio are published.
       echoCancellation: false,
       noiseSuppression: false,
-      autoGainControl: false,
-      sampleRate: 48000,
-      channelCount: 2
+      autoGainControl: false
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,
@@ -755,9 +751,7 @@ class VoiceCallApi {
                 audio: {
                   echoCancellation: false,
                   noiseSuppression: false,
-                  autoGainControl: false,
-                  sampleRate: 48000,
-                  channelCount: 2
+                  autoGainControl: false
                 },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
