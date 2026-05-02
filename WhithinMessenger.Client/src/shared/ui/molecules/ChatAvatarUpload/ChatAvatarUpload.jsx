@@ -1,6 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import tokenManager from '../../../lib/services/tokenManager';
 import './ChatAvatarUpload.css';
+
+const getAuthHeaders = () => {
+  const token = tokenManager.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarUpdated, connection }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -68,6 +74,7 @@ const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarU
 
       const response = await fetch(`${BASE_URL}/api/chat/${chatId}/avatar`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
         credentials: 'include'
       });
@@ -87,8 +94,14 @@ const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarU
           fileInputRef.current.value = '';
         }
       } else {
-        const error = await response.json();
-        alert(`Ошибка загрузки: ${error.error || 'Неизвестная ошибка'}`);
+        let message = 'Неизвестная ошибка';
+        try {
+          const error = await response.json();
+          message = error.error || error.message || message;
+        } catch {
+          if (response.status === 401) message = 'Требуется авторизация (войдите снова)';
+        }
+        alert(`Ошибка загрузки: ${message}`);
       }
     } catch (error) {
       console.error('❌ Error uploading chat avatar:', error);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
@@ -33,7 +33,9 @@ const ChatRoom = ({
   chatTypeId,
   activePrivateCall,
   activeChatCall,
-  onEndChatCall
+  onEndChatCall,
+  /** When messages load/update; parent debounces the server «mark chat read» call */
+  onMessagesActivity
 }) => {
   const { user } = useAuthContext();
   const connectionContext = useConnectionContext();
@@ -54,6 +56,18 @@ const ChatRoom = ({
     forwardMessage,
     scrollToBottom
   } = useChat(chatId, username, userId);
+
+  const messagesTailKey = useMemo(() => {
+    if (!messages?.length) return '0:';
+    const tail = messages[messages.length - 1];
+    const mid = tail?.messageId ?? tail?.MessageId ?? tail?.id ?? tail?.Id ?? '';
+    return `${messages.length}:${mid}`;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!chatId || typeof onMessagesActivity !== 'function') return;
+    onMessagesActivity(chatId);
+  }, [chatId, messagesTailKey, onMessagesActivity]);
 
   const {
     searchQuery,

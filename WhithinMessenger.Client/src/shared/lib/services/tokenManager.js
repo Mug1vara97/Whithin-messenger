@@ -1,3 +1,19 @@
+/** Декодирует payload-сегмент JWT (base64url, без проверки подписи). */
+function decodeJwtPayloadSegment(segment) {
+  if (!segment) {
+    throw new Error('Missing JWT payload segment');
+  }
+  const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const json = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  return JSON.parse(json);
+}
+
 class TokenManager {
   constructor() {
     this.ACCESS_TOKEN_KEY = 'accessToken';
@@ -88,13 +104,9 @@ class TokenManager {
       if (parts.length !== 3) {
         throw new Error('Invalid JWT format');
       }
-      
-      // Декодируем payload (вторая часть)
-      const payload = parts[1];
-      // Добавляем padding если нужно
-      const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
-      const decodedPayload = atob(paddedPayload);
-      return JSON.parse(decodedPayload);
+
+      // Payload — base64url (не смешиваем с atob напрямую: ломает Android/WebView для токенов .NET и др.)
+      return decodeJwtPayloadSegment(parts[1]);
     } catch (error) {
       console.error('TokenManager: Error decoding token:', error);
       return null;
@@ -104,11 +116,11 @@ class TokenManager {
   getUserFromToken() {
     const decoded = this.decodeToken();
     if (decoded) {
-      return {
-        id: decoded.UserId,
-        username: decoded.Username,
-        email: decoded.email,
-      };
+      const id = decoded.UserId ?? decoded.userId;
+      const username =
+        decoded.Username ?? decoded.username ?? decoded.unique_name ?? decoded.preferred_username ?? decoded.sub;
+      const email = decoded.email ?? decoded.Email ?? '';
+      return { id, username, email };
     }
     return null;
   }

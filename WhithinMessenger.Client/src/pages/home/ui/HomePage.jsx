@@ -54,7 +54,7 @@ const HomePage = () => {
     refreshNotifications,
     refreshUnreadCount
   } = useNotifications();
-  const lastAutoReadRef = useRef({ chatId: null, at: 0 });
+  const markReadTimerRef = useRef(null);
 
   // Состояние для активного звонка в чате
   const [activeChatCall, setActiveChatCall] = useState(null);
@@ -659,47 +659,44 @@ const HomePage = () => {
     await deleteNotification(notificationId);
   }, [deleteNotification]);
 
-  const markCurrentChatNotificationsAsRead = useCallback(async () => {
-    const currentChatId = selectedChat?.chatId || selectedChat?.chat_id;
-    if (!currentChatId) return;
-    if (document.visibilityState !== 'visible') return;
-    if (showFriends || showDiscovery || showNotificationsModal) return;
+  /**
+   * Server channel unread counters do not appear in DM-only `messageUnreadCountByChat` from ChatList hub,
+   * so we must always sync read state once the chat is visible and listing/messages settle.
+   * New realtime messages bump `messagesTailKey` in ChatRoom and re-trigger a debounced read.
+   */
+  const scheduleMarkChatNotificationsRead = useCallback(
+    (explicitChatId) => {
+      const targetId = explicitChatId || selectedChat?.chatId || selectedChat?.chat_id;
+      if (!targetId) return;
+      if (document.visibilityState !== 'visible') return;
+      if (showFriends || showDiscovery || showNotificationsModal) return;
 
-    const unreadInCurrentChat = messageUnreadCountByChat[currentChatId] || 0;
-    if (unreadInCurrentChat <= 0) return;
-
-    const now = Date.now();
-    if (
-      lastAutoReadRef.current.chatId === currentChatId &&
-      now - lastAutoReadRef.current.at < 1200
-    ) {
-      return;
-    }
-
-    lastAutoReadRef.current = { chatId: currentChatId, at: now };
-
-    try {
-      await markChatAsRead(currentChatId);
-    } catch (err) {
-      console.error('Failed to auto-mark chat notifications as read', err);
-    }
-  }, [
-    selectedChat,
-    showFriends,
-    showDiscovery,
-    showNotificationsModal,
-    messageUnreadCountByChat,
-    markChatAsRead
-  ]);
+      window.clearTimeout(markReadTimerRef.current);
+      markReadTimerRef.current = window.setTimeout(async () => {
+        try {
+          await markChatAsRead(targetId);
+        } catch (err) {
+          console.error('Failed to auto-mark chat notifications as read', err);
+        }
+      }, 400);
+    },
+    [selectedChat, showFriends, showDiscovery, showNotificationsModal, markChatAsRead]
+  );
 
   useEffect(() => {
-    markCurrentChatNotificationsAsRead();
-  }, [markCurrentChatNotificationsAsRead]);
+    return () => {
+      window.clearTimeout(markReadTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    scheduleMarkChatNotificationsRead();
+  }, [scheduleMarkChatNotificationsRead]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        markCurrentChatNotificationsAsRead();
+        scheduleMarkChatNotificationsRead();
       }
     };
 
@@ -707,7 +704,7 @@ const HomePage = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [markCurrentChatNotificationsAsRead]);
+  }, [scheduleMarkChatNotificationsRead]);
 
   useEffect(() => {
     if (showNotificationsModal) {
@@ -818,6 +815,7 @@ const HomePage = () => {
                       onJoinVoiceChannel={handleJoinVoiceChannel}
                       activeChatCall={activeChatCall}
                       onEndChatCall={handleEndChatCall}
+                      onMessagesActivity={scheduleMarkChatNotificationsRead}
                     />
                   )}
                 </div>

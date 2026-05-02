@@ -1,5 +1,6 @@
 {
-  "name": "electron",
+  "name": "whithin-desktop",
+  "productName": "Whithin",
   "version": "1.0.0",
   "description": "Whithin desktop shell",
   "license": "ISC",
@@ -9,9 +10,17 @@
   "scripts": {
     "start": "electron ./main.cjs",
     "dev": "cross-env WEB_CLIENT_URL=http://localhost:5173 electron ./main.cjs",
-    "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs"
+    "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "config": {
+    "forge": "./forge.config.cjs"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
     "cross-env": "^10.1.0",
     "electron": "^41.3.0"
   }

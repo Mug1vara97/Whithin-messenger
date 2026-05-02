@@ -217,11 +217,16 @@ coverage/
 
 Whithin-android/
 
-## Electron
+## Electron 
 
 electron/node_modules/
 electron/dist/
 electron/out/
 electron/release/
+electron/.webpack/
+electron/.vite/
+electron/.cache/
+electron/.env
+electron/.env.*
 electron/*.log
 

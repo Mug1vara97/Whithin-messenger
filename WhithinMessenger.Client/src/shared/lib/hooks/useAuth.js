@@ -22,12 +22,33 @@ export const useAuth = () => {
           console.log('useAuth: Token is valid, getting user info...');
           // Если токен валиден, получаем информацию о пользователе
           const userFromToken = tokenManager.getUserFromToken();
-          if (userFromToken) {
+          const hasMinimalUser =
+            !!userFromToken && !!(userFromToken.id || userFromToken.username);
+          let restoredUser = false;
+          if (hasMinimalUser) {
             console.log('useAuth: User from token:', userFromToken);
             updateUser(userFromToken);
+            restoredUser = true;
           } else {
-            console.log('useAuth: Cannot get user from token, making API request...');
-            // Если не можем получить пользователя из токена, делаем запрос к серверу
+            try {
+              const raw = localStorage.getItem('user');
+              if (raw) {
+                const cached = JSON.parse(raw);
+                if (cached && (cached.id || cached.username)) {
+                  console.log(
+                    'useAuth: User from cached localStorage:',
+                    cached.id || cached.username
+                  );
+                  updateUser(cached);
+                  restoredUser = true;
+                }
+              }
+            } catch (_) {
+              /* noop */
+            }
+          }
+          if (!restoredUser) {
+            console.log('useAuth: Cannot get user from token or cache, making API request...');
             try {
               const user = await authApi.getCurrentUser();
               if (user) {
@@ -36,7 +57,10 @@ export const useAuth = () => {
               }
             } catch (apiError) {
               // Не очищаем сессию из-за временных проблем сети/бэкенда.
-              console.warn('useAuth: failed to fetch current user, keeping token session', apiError);
+              console.warn(
+                'useAuth: failed to fetch current user, keeping token session',
+                apiError
+              );
             }
           }
         } else {
