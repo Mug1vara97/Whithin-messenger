@@ -400,24 +400,50 @@
   color: #8e9297;
 }
 
-/* Видеокружок (Telegram-style) */
-.media-video-note {
+/* Видеокружок: оболочка + кольцо прогресса */
+.media-video-note-shell {
   position: relative;
   width: 200px;
   height: 200px;
   max-width: min(200px, 72vw);
   max-height: min(200px, 72vw);
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  background: #1a1c1f;
   cursor: pointer;
   outline: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
-.media-video-note:focus-visible {
-  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.85), 0 4px 16px rgba(0, 0, 0, 0.35);
+.media-video-note-shell:focus-visible {
+  filter: drop-shadow(0 0 0 2px rgba(88, 101, 242, 0.9)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.media-video-note__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.media-video-note__ring-track {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 3.5;
+}
+
+.media-video-note__ring-progress {
+  stroke: #5865f2;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.12s linear;
+}
+
+.media-video-note {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #1a1c1f;
+  z-index: 0;
 }
 
 .media-video-note__video {
@@ -432,6 +458,18 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  z-index: 2;
+}
+
+.media-video-note__badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.35) 0%, transparent 65%);
 }
 
 /* Адаптивность */

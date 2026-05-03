@@ -5,10 +5,178 @@ import AudioMessage from '../AudioMessage/AudioMessage';
 import VideoPlayer from './VideoPlayer';
 import ImageIcon from '@mui/icons-material/Image';
 import VideocamIcon from '@mui/icons-material/Videocam';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import DownloadIcon from '@mui/icons-material/Download';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import './MediaFile.css';
+
+const VIDEO_NOTE_RING_R = 45;
+const VIDEO_NOTE_RING_LEN = 2 * Math.PI * VIDEO_NOTE_RING_R;
+
+/** Видеокружок: один проход без зацикливания, клик — play/pause, кольцо прогресса, после конца — снова play с начала. */
+function VideoNoteCircle({ src, onPlaybackFailed }) {
+  const videoRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [ended, setEnded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setProgress(0);
+    setEnded(false);
+    setPlaying(false);
+    const v = videoRef.current;
+    if (v) {
+      try {
+        v.pause();
+        v.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [src]);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+    const t = window.setTimeout(() => setLoading(false), 12000);
+    return () => window.clearTimeout(t);
+  }, [loading, src]);
+
+  const markReady = useCallback(() => {
+    setLoading(false);
+  }, []);
+
+  const handleTimeUpdate = useCallback(() => {
+    const v = videoRef.current;
+    if (!v?.duration || !Number.isFinite(v.duration) || v.duration <= 0) return;
+    setProgress(Math.min(1, v.currentTime / v.duration));
+  }, []);
+
+  const handleClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const v = videoRef.current;
+      if (!v) return;
+      if (ended) {
+        v.currentTime = 0;
+        setEnded(false);
+        setProgress(0);
+        v.muted = false;
+        v.play().catch(() => {});
+        return;
+      }
+      if (v.paused) {
+        v.muted = false;
+        v.play().catch(() => {});
+      } else {
+        v.pause();
+      }
+    },
+    [ended]
+  );
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClick(e);
+      }
+    },
+    [handleClick]
+  );
+
+  const dashOffset = VIDEO_NOTE_RING_LEN * (1 - progress);
+
+  return (
+    <div
+      className="media-video-note-shell"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      title={
+        ended
+          ? 'Нажмите — посмотреть снова'
+          : playing
+            ? 'Нажмите — пауза'
+            : 'Нажмите — воспроизвести со звуком'
+      }
+    >
+      <svg
+        className="media-video-note__ring"
+        viewBox="0 0 100 100"
+        aria-hidden
+      >
+        <circle
+          className="media-video-note__ring-track"
+          cx="50"
+          cy="50"
+          r={VIDEO_NOTE_RING_R}
+          fill="none"
+        />
+        <circle
+          className="media-video-note__ring-progress"
+          cx="50"
+          cy="50"
+          r={VIDEO_NOTE_RING_R}
+          fill="none"
+          strokeDasharray={VIDEO_NOTE_RING_LEN}
+          strokeDashoffset={dashOffset}
+          transform="rotate(-90 50 50)"
+        />
+      </svg>
+      <div className="media-video-note">
+        <video
+          ref={videoRef}
+          className="media-video-note__video"
+          src={src}
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={markReady}
+          onLoadedData={markReady}
+          onCanPlay={markReady}
+          onTimeUpdate={handleTimeUpdate}
+          onPlay={() => {
+            setPlaying(true);
+            setEnded(false);
+          }}
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            const v = videoRef.current;
+            if (v) {
+              try {
+                v.pause();
+              } catch {
+                /* ignore */
+              }
+            }
+            setEnded(true);
+            setPlaying(false);
+            setProgress(1);
+          }}
+          onError={() => {
+            setLoading(false);
+            onPlaybackFailed?.();
+          }}
+        />
+        {loading && (
+          <div className="media-skeleton media-skeleton-video media-video-note__skeleton">
+            <div className="skeleton-shimmer" />
+            <div className="skeleton-icon"><VideocamIcon sx={{ fontSize: 40 }} /></div>
+          </div>
+        )}
+        {!loading && !playing && (
+          <div className="media-video-note__badge" aria-hidden>
+            <PlayArrowIcon sx={{ fontSize: 44, color: '#fff' }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const MediaFile = ({ mediaFile }) => {
   const [error, setError] = useState(null);
@@ -16,36 +184,13 @@ const MediaFile = ({ mediaFile }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
-  const videoNoteRef = useRef(null);
 
   useEffect(() => {
     if (mediaFile?.contentType?.startsWith('video/')) {
       setVideoError(false);
       setVideoLoading(true);
-      const v = videoNoteRef.current;
-      if (v && mediaFile?.isVideoNote) {
-        try {
-          v.pause();
-          v.currentTime = 0;
-        } catch {
-          /* ignore */
-        }
-      }
     }
   }, [mediaFile?.filePath, mediaFile?.isVideoNote]);
-
-  const handleVideoNoteClick = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const v = videoNoteRef.current;
-      if (!v || videoError) return;
-      v.muted = false;
-      v.currentTime = 0;
-      v.play().catch(() => {});
-    },
-    [videoError]
-  );
 
   const handleDownload = async (e, url, fileName) => {
     e.preventDefault();
@@ -102,39 +247,13 @@ const MediaFile = ({ mediaFile }) => {
 
       if (isVideoNote && !videoError) {
         return (
-          <div
-            className="media-video-note"
-            onClick={handleVideoNoteClick}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleVideoNoteClick(e);
-              }
+          <VideoNoteCircle
+            src={videoUrl}
+            onPlaybackFailed={() => {
+              setVideoLoading(false);
+              setVideoError(true);
             }}
-            role="button"
-            tabIndex={0}
-            title="Нажмите — воспроизвести с начала со звуком"
-          >
-            <video
-              ref={videoNoteRef}
-              className="media-video-note__video"
-              src={videoUrl}
-              playsInline
-              loop
-              preload="metadata"
-              onLoadedData={() => setVideoLoading(false)}
-              onError={() => {
-                setVideoLoading(false);
-                setVideoError(true);
-              }}
-            />
-            {videoLoading && (
-              <div className="media-skeleton media-skeleton-video media-video-note__skeleton">
-                <div className="skeleton-shimmer" />
-                <div className="skeleton-icon"><VideocamIcon sx={{ fontSize: 40 }} /></div>
-              </div>
-            )}
-          </div>
+          />
         );
       }
 
