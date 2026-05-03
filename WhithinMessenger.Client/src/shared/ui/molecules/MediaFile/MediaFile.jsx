@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
@@ -11,22 +11,33 @@ import FolderZipIcon from '@mui/icons-material/FolderZip';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import './MediaFile.css';
 
-const VIDEO_NOTE_RING_R = 45;
+/** Радиус кольца в viewBox 0..100 (видео ~176px в оболочке 200px → r≈44; обод снаружи — r≈47). */
+const VIDEO_NOTE_RING_R = 47;
 const VIDEO_NOTE_RING_LEN = 2 * Math.PI * VIDEO_NOTE_RING_R;
 
 /** Видеокружок: один проход без зацикливания, клик — play/pause, кольцо прогресса, после конца — снова play с начала. */
 function VideoNoteCircle({ src, onPlaybackFailed }) {
   const videoRef = useRef(null);
+  const ringProgressRef = useRef(null);
+  const playingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [ended, setEnded] = useState(false);
   const [playing, setPlaying] = useState(false);
+
+  const syncRingDash = useCallback((p) => {
+    const el = ringProgressRef.current;
+    if (el) {
+      el.style.strokeDashoffset = String(VIDEO_NOTE_RING_LEN * (1 - Math.min(1, Math.max(0, p))));
+    }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
     setProgress(0);
     setEnded(false);
     setPlaying(false);
+    playingRef.current = false;
     const v = videoRef.current;
     if (v) {
       try {
@@ -37,6 +48,11 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
       }
     }
   }, [src]);
+
+  useLayoutEffect(() => {
+    if (playing) return;
+    syncRingDash(progress);
+  }, [progress, playing, syncRingDash]);
 
   useEffect(() => {
     if (!loading) return undefined;
@@ -51,8 +67,33 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
   const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
     if (!v?.duration || !Number.isFinite(v.duration) || v.duration <= 0) return;
-    setProgress(Math.min(1, v.currentTime / v.duration));
-  }, []);
+    const p = Math.min(1, v.currentTime / v.duration);
+    if (!playingRef.current) {
+      setProgress(p);
+      syncRingDash(p);
+    }
+  }, [syncRingDash]);
+
+  /** Плавное кольцо: во время воспроизведения dashoffset только через rAF (не timeupdate). */
+  useEffect(() => {
+    if (!playing) return undefined;
+    let frameId = 0;
+    let stopped = false;
+    const tick = () => {
+      if (stopped) return;
+      const v = videoRef.current;
+      if (v?.duration && Number.isFinite(v.duration) && v.duration > 0) {
+        const p = Math.min(1, v.currentTime / v.duration);
+        syncRingDash(p);
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [playing, syncRingDash]);
 
   const handleClick = useCallback(
     (e) => {
@@ -88,8 +129,6 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
     [handleClick]
   );
 
-  const dashOffset = VIDEO_NOTE_RING_LEN * (1 - progress);
-
   return (
     <div
       className="media-video-note-shell"
@@ -118,13 +157,13 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
           fill="none"
         />
         <circle
+          ref={ringProgressRef}
           className="media-video-note__ring-progress"
           cx="50"
           cy="50"
           r={VIDEO_NOTE_RING_R}
           fill="none"
           strokeDasharray={VIDEO_NOTE_RING_LEN}
-          strokeDashoffset={dashOffset}
           transform="rotate(-90 50 50)"
         />
       </svg>
@@ -140,10 +179,18 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
           onCanPlay={markReady}
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => {
+            playingRef.current = true;
             setPlaying(true);
             setEnded(false);
           }}
-          onPause={() => setPlaying(false)}
+          onPause={() => {
+            playingRef.current = false;
+            setPlaying(false);
+            const v = videoRef.current;
+            if (v?.duration && Number.isFinite(v.duration) && v.duration > 0) {
+              setProgress(Math.min(1, v.currentTime / v.duration));
+            }
+          }}
           onEnded={() => {
             const v = videoRef.current;
             if (v) {
@@ -153,6 +200,7 @@ function VideoNoteCircle({ src, onPlaybackFailed }) {
                 /* ignore */
               }
             }
+            playingRef.current = false;
             setEnded(true);
             setPlaying(false);
             setProgress(1);
