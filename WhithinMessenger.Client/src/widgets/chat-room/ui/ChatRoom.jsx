@@ -87,7 +87,11 @@ const ChatRoom = ({
     formatRecordingTime,
     cancelRecording,
     uploadingFile,
-    uploadProgress
+    uploadProgress,
+    isRecordingVideoNote,
+    videoNoteRecordingTime,
+    handleVideoNoteRecording,
+    cancelVideoNoteRecording
   } = useMediaHandlers(connection, chatId, userId, username);
 
   const {
@@ -1060,14 +1064,18 @@ const ChatRoom = ({
           </div>
         )}
         
-        {isRecording ? (
+        {isRecording || isRecordingVideoNote ? (
           <div className="recording-indicator-input">
             <span className="recording-dot">●</span>
-            <span className="recording-time">{formatRecordingTime(recordingTime)}</span>
-            <span className="recording-hint">Запись... (ESC для отмены)</span>
+            <span className="recording-time">
+              {formatRecordingTime(isRecordingVideoNote ? videoNoteRecordingTime : recordingTime)}
+            </span>
+            <span className="recording-hint">
+              {isRecordingVideoNote ? 'Видеокружок…' : 'Запись... (ESC для отмены)'}
+            </span>
             <button 
               type="button"
-              onClick={cancelRecording}
+              onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
               className="cancel-recording-button"
               title="Отменить запись"
             >
@@ -1101,10 +1109,10 @@ const ChatRoom = ({
         {!editingMessageId && (
           <>
             <div className="voice-message-wrapper">
-              {isRecording && (
+              {(isRecording || isRecordingVideoNote) && (
                 <button 
                   type="button"
-                  onClick={cancelRecording}
+                  onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
                   className="cancel-recording-button-left"
                   title="Отменить запись"
                 >
@@ -1114,10 +1122,20 @@ const ChatRoom = ({
               <button
                 type="button"
                 onClick={handleAudioRecording}
+                disabled={isRecordingVideoNote}
                 className={`voice-record-button ${isRecording ? 'recording' : ''}`}
                 title={isRecording ? "Нажмите для остановки и отправки" : "Нажмите для начала записи"}
               >
                 {isRecording ? <Stop /> : <Mic />}
+              </button>
+              <button
+                type="button"
+                onClick={handleVideoNoteRecording}
+                disabled={isRecording}
+                className={`video-note-button ${isRecordingVideoNote ? 'recording' : ''}`}
+                title={isRecordingVideoNote ? "Нажмите для остановки и отправки кружка" : "Видеокружок (до 60 с, фронтальная камера)"}
+              >
+                {isRecordingVideoNote ? <Stop /> : <Videocam />}
               </button>
             </div>
             

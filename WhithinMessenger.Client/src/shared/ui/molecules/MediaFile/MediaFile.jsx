@@ -37,7 +37,11 @@ const MediaFile = ({ mediaFile }) => {
   };
 
   const renderMediaContent = () => {
-    if (mediaFile.contentType.startsWith('image/')) {
+    const ct = mediaFile?.contentType || '';
+    if (!ct) {
+      return <div className="media-error">Неизвестный тип файла</div>;
+    }
+    if (ct.startsWith('image/')) {
       const imageUrl = buildMediaUrl(mediaFile.filePath);
       
       
@@ -69,8 +73,35 @@ const MediaFile = ({ mediaFile }) => {
       );
     }
 
-    if (mediaFile.contentType.startsWith('video/')) {
+    if (ct.startsWith('video/')) {
       const videoUrl = buildMediaUrl(mediaFile.filePath);
+      const isVideoNote = !!mediaFile.isVideoNote;
+
+      if (isVideoNote && !videoError) {
+        return (
+          <div className="media-video-note">
+            <video
+              className="media-video-note__video"
+              src={videoUrl}
+              playsInline
+              muted
+              loop
+              autoPlay
+              onLoadedData={() => setVideoLoading(false)}
+              onError={() => {
+                setVideoLoading(false);
+                setVideoError(true);
+              }}
+            />
+            {videoLoading && (
+              <div className="media-skeleton media-skeleton-video media-video-note__skeleton">
+                <div className="skeleton-shimmer" />
+                <div className="skeleton-icon"><VideocamIcon sx={{ fontSize: 40 }} /></div>
+              </div>
+            )}
+          </div>
+        );
+      }
 
       // Если ошибка воспроизведения — fallback с кнопкой скачивания
       if (videoError) {
@@ -141,7 +172,7 @@ const MediaFile = ({ mediaFile }) => {
       );
     }
 
-    if (mediaFile.contentType.startsWith('audio/')) {
+    if (ct.startsWith('audio/')) {
       return <AudioMessage mediaFile={mediaFile} />;
     }
 
@@ -190,7 +221,7 @@ const MediaFile = ({ mediaFile }) => {
       </div>
       
       {/* Компонент предварительного просмотра */}
-      {mediaFile.contentType.startsWith('image/') && (
+      {(mediaFile?.contentType || '').startsWith('image/') && (
         <ImagePreview
           mediaFile={mediaFile}
           isOpen={showPreview}

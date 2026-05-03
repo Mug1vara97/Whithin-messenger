@@ -23,11 +23,16 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     }
     
     if (mediaFile.contentType.startsWith('video/')) {
+      const isNote = !!mediaFile.isVideoNote;
       return (
         <video 
           src={buildMediaUrl(mediaFile.filePath)}
           controls 
-          className="replied-video"
+          playsInline
+          muted={isNote}
+          loop={isNote}
+          autoPlay={isNote}
+          className={isNote ? 'replied-video replied-video--note' : 'replied-video'}
         />
       );
     }

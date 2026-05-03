@@ -463,6 +463,9 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsVideoNote")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 

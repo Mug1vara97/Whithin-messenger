@@ -117,7 +117,8 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 FilePath = filePath,
                 ContentType = contentType,
                 FileSize = finalFileSize,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = DateTimeOffset.UtcNow,
+                IsVideoNote = request.IsVideoNote && _videoConverterService.IsVideoFile(contentType)
             };
 
             if (_fileService.IsImageFile(contentType))
@@ -149,7 +150,8 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 MessageId = savedMessage.Id,  // ID сообщения для удаления/редактирования
                 MediaFileId = savedMediaFile.Id,  // ID медиафайла
                 FilePath = savedMediaFile.FilePath,
-                ThumbnailPath = savedMediaFile.ThumbnailPath
+                ThumbnailPath = savedMediaFile.ThumbnailPath,
+                IsVideoNote = savedMediaFile.IsVideoNote
             };
         }
         catch (Exception ex)

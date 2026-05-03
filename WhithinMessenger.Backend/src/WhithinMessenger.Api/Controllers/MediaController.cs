@@ -39,7 +39,8 @@ public class MediaController : ControllerBase
         [FromForm] IFormFile file,
         [FromForm] string? caption = null,
         [FromForm] Guid? userId = null,
-        [FromForm] string? username = null)
+        [FromForm] string? username = null,
+        [FromForm] bool isVideoNote = false)
     {
         try
         {
@@ -67,7 +68,7 @@ public class MediaController : ControllerBase
             _logger.LogInformation($"MediaController: Username provided in form: {username}");
         }
 
-            var command = new UploadMediaCommand(userId.Value, chatId, file, caption, username);
+            var command = new UploadMediaCommand(userId.Value, chatId, file, caption, username, isVideoNote);
             var result = await _mediator.Send(command);
 
             if (result.Success)
@@ -85,7 +86,8 @@ public class MediaController : ControllerBase
                             contentType = file.ContentType,
                             fileSize = file.Length,
                             thumbnailPath = result.ThumbnailPath,
-                            createdAt = DateTimeOffset.UtcNow
+                            createdAt = DateTimeOffset.UtcNow,
+                            isVideoNote = result.IsVideoNote
                         }
                     };
 

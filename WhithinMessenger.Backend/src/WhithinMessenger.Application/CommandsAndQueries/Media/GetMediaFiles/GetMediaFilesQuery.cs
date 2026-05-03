@@ -30,4 +30,5 @@ public record MediaFileDto
     public DateTimeOffset CreatedAt { get; init; }
     public string SenderUsername { get; init; } = string.Empty;
     public string? Caption { get; init; }
+    public bool IsVideoNote { get; init; }
 }

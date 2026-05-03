@@ -8,7 +8,8 @@ public record UploadMediaCommand(
     Guid ChatId,
     IFormFile File,
     string? Caption = null,
-    string? Username = null
+    string? Username = null,
+    bool IsVideoNote = false
 ) : IRequest<UploadMediaResult>;
 
 public record UploadMediaResult
@@ -18,5 +19,6 @@ public record UploadMediaResult
     public Guid? MediaFileId { get; init; }
     public string? FilePath { get; init; }
     public string? ThumbnailPath { get; init; }
+    public bool IsVideoNote { get; init; }
     public string? ErrorMessage { get; init; }
 }

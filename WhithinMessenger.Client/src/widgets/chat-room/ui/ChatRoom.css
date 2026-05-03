@@ -896,6 +896,36 @@
   animation: pulse 1s infinite;
 }
 
+.video-note-button {
+  background: none;
+  border: none;
+  color: var(--textMuted);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.video-note-button:hover:not(:disabled) {
+  color: var(--text);
+  background-color: var(--hover);
+}
+
+.video-note-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.video-note-button.recording {
+  color: #e91e63;
+  animation: pulse 1s infinite;
+}
+
 @keyframes pulse {
   0% { opacity: 1; }
   50% { opacity: 0.5; }

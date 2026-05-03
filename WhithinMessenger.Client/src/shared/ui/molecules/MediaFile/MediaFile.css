@@ -400,6 +400,34 @@
   color: #8e9297;
 }
 
+/* Видеокружок (Telegram-style) */
+.media-video-note {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  max-width: min(200px, 72vw);
+  max-height: min(200px, 72vw);
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  background: #1a1c1f;
+}
+
+.media-video-note__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  vertical-align: middle;
+}
+
+.media-video-note__skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
   .media-file-header {

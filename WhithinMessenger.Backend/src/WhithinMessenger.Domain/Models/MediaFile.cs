@@ -23,6 +23,9 @@ public class MediaFile
     public DateTimeOffset? UpdatedAt { get; set; }
     
     public bool IsDeleted { get; set; }
+
+    /// <summary>Видеосообщение «кружок» (как в Telegram): круглый превью в чате.</summary>
+    public bool IsVideoNote { get; set; }
     
     public Message Message { get; set; } = null!;
 }

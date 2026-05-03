@@ -23,6 +23,7 @@ public class MediaFileDto
     public long FileSize { get; set; }
     public string? ThumbnailPath { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public bool IsVideoNote { get; set; }
 }
 
 public class ReplyMessageDto

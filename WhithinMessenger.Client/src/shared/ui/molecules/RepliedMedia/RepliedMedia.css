@@ -14,6 +14,15 @@
   border: 1px solid #40444b;
 }
 
+.replied-video--note {
+  width: 88px;
+  height: 88px;
+  max-width: 88px;
+  max-height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .replied-text {
   color: #b9bbbe;
   font-size: 13px;
