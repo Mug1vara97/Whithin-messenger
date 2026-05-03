@@ -412,6 +412,12 @@
   border: 2px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   background: #1a1c1f;
+  cursor: pointer;
+  outline: none;
+}
+
+.media-video-note:focus-visible {
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.85), 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .media-video-note__video {

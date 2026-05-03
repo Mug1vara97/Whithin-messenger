@@ -14,6 +14,20 @@
   border: 1px solid #40444b;
 }
 
+.replied-video-note-wrap {
+  display: inline-block;
+  vertical-align: middle;
+  cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden;
+  line-height: 0;
+  outline: none;
+}
+
+.replied-video-note-wrap:focus-visible {
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.85);
+}
+
 .replied-video--note {
   width: 88px;
   height: 88px;
@@ -21,6 +35,7 @@
   max-height: 88px;
   border-radius: 50%;
   object-fit: cover;
+  display: block;
 }
 
 .replied-text {

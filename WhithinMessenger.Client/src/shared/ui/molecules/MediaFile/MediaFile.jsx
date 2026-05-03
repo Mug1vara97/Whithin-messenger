@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
@@ -16,13 +16,36 @@ const MediaFile = ({ mediaFile }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const videoNoteRef = useRef(null);
 
   useEffect(() => {
     if (mediaFile?.contentType?.startsWith('video/')) {
       setVideoError(false);
       setVideoLoading(true);
+      const v = videoNoteRef.current;
+      if (v && mediaFile?.isVideoNote) {
+        try {
+          v.pause();
+          v.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+      }
     }
-  }, [mediaFile?.filePath]);
+  }, [mediaFile?.filePath, mediaFile?.isVideoNote]);
+
+  const handleVideoNoteClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const v = videoNoteRef.current;
+      if (!v || videoError) return;
+      v.muted = false;
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    },
+    [videoError]
+  );
 
   const handleDownload = async (e, url, fileName) => {
     e.preventDefault();
@@ -79,14 +102,26 @@ const MediaFile = ({ mediaFile }) => {
 
       if (isVideoNote && !videoError) {
         return (
-          <div className="media-video-note">
+          <div
+            className="media-video-note"
+            onClick={handleVideoNoteClick}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleVideoNoteClick(e);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title="Нажмите — воспроизвести с начала со звуком"
+          >
             <video
+              ref={videoNoteRef}
               className="media-video-note__video"
               src={videoUrl}
               playsInline
-              muted
               loop
-              autoPlay
+              preload="metadata"
               onLoadedData={() => setVideoLoading(false)}
               onError={() => {
                 setVideoLoading(false);

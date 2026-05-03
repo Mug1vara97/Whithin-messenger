@@ -1,7 +1,45 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import './RepliedMedia.css';
+
+/** Видеокружок в превью ответа: по клику — с начала, со звуком (без автозапуска). */
+const RepliedVideoNote = ({ src }) => {
+  const ref = useRef(null);
+  const onPlay = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const v = ref.current;
+    if (!v) return;
+    v.muted = false;
+    v.currentTime = 0;
+    v.play().catch(() => {});
+  }, []);
+  return (
+    <span
+      className="replied-video-note-wrap"
+      onClick={onPlay}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPlay(e);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      title="Нажмите — воспроизвести с начала со звуком"
+    >
+      <video
+        ref={ref}
+        src={src}
+        playsInline
+        loop
+        preload="metadata"
+        className="replied-video replied-video--note"
+      />
+    </span>
+  );
+};
 
 const RepliedMedia = ({ content, mediaFiles }) => {
   // Если есть медиафайлы, используем их
@@ -24,15 +62,16 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     
     if (mediaFile.contentType.startsWith('video/')) {
       const isNote = !!mediaFile.isVideoNote;
+      const url = buildMediaUrl(mediaFile.filePath);
+      if (isNote) {
+        return <RepliedVideoNote src={url} />;
+      }
       return (
         <video 
-          src={buildMediaUrl(mediaFile.filePath)}
+          src={url}
           controls 
           playsInline
-          muted={isNote}
-          loop={isNote}
-          autoPlay={isNote}
-          className={isNote ? 'replied-video replied-video--note' : 'replied-video'}
+          className="replied-video"
         />
       );
     }
