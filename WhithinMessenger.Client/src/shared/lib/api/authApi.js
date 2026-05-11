@@ -1,24 +1,23 @@
 import apiClient from './apiClient';
 import tokenManager from '../services/tokenManager';
 
+const applyAuthTokens = (payload) => {
+  if (payload?.token) {
+    tokenManager.setToken(payload.token);
+  }
+
+  if (payload?.refreshToken) {
+    tokenManager.setRefreshToken(payload.refreshToken);
+  }
+};
+
 export const authApi = {
   async login(credentials) {
     try {
       console.log('Sending login request:', credentials);
       const response = await apiClient.post('/auth/login', credentials);
       console.log('Login response:', response);
-      
-      // Сохраняем JWT токен
-      if (response.data.token) {
-        console.log('Saving JWT token:', response.data.token);
-        tokenManager.setToken(response.data.token);
-      } else {
-        console.warn('No token in response:', response.data);
-      }
-
-      if (response.data.refreshToken) {
-        tokenManager.setRefreshToken(response.data.refreshToken);
-      }
+      applyAuthTokens(response.data);
       
       return response.data;
     } catch (error) {
@@ -62,6 +61,27 @@ export const authApi = {
     }
   }
   ,
+  async createQrLoginSession() {
+    try {
+      const response = await apiClient.post('/auth/qr/session');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to create QR session');
+    }
+  },
+  async getQrLoginSessionStatus(sessionId) {
+    try {
+      const response = await apiClient.get(`/auth/qr/session/${encodeURIComponent(sessionId)}`);
+      applyAuthTokens(response.data);
+      return response.data;
+    } catch (error) {
+      const status = error.response?.data?.status;
+      if (status === 'expired' || error.response?.status === 404) {
+        return { status: 'expired' };
+      }
+      throw new Error(error.response?.data?.error || 'Failed to check QR session');
+    }
+  },
   async refreshToken() {
     const refreshToken = tokenManager.getRefreshToken();
     if (!refreshToken) {
@@ -69,12 +89,7 @@ export const authApi = {
     }
 
     const response = await apiClient.post('/auth/refresh', { refreshToken });
-    if (response.data?.token) {
-      tokenManager.setToken(response.data.token);
-    }
-    if (response.data?.refreshToken) {
-      tokenManager.setRefreshToken(response.data.refreshToken);
-    }
+    applyAuthTokens(response.data);
     return response.data;
   }
 };

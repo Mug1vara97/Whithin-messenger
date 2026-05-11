@@ -108,6 +108,39 @@ export const useAuth = () => {
     }
   }, [updateUser]);
 
+  const consumeQrLoginSession = useCallback(async (sessionId) => {
+    try {
+      const response = await authApi.getQrLoginSessionStatus(sessionId);
+
+      if (!response || response.status !== 'approved') {
+        return {
+          success: false,
+          status: response?.status || 'pending'
+        };
+      }
+
+      if (!response.user) {
+        throw new Error('Invalid QR login response from server');
+      }
+
+      localStorage.setItem('user', JSON.stringify(response.user));
+      updateUser(response.user);
+
+      return {
+        success: true,
+        status: 'approved'
+      };
+    } catch (error) {
+      const errorMessage = error.message || 'QR login failed';
+      setError(errorMessage);
+      return {
+        success: false,
+        status: 'error',
+        error: errorMessage
+      };
+    }
+  }, [updateUser]);
+
   const register = useCallback(async (userData) => {
     try {
       setIsAuthLoading(true);
@@ -166,6 +199,7 @@ export const useAuth = () => {
     isAuthenticated: !!user,
     error,
     login,
+    consumeQrLoginSession,
     register,
     logout,
     clearError

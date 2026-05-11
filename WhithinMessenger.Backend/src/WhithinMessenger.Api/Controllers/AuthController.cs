@@ -1,7 +1,9 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Register;
 using WhithinMessenger.Application.Options;
@@ -16,6 +18,10 @@ namespace WhithinMessenger.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private static readonly ConcurrentDictionary<string, QrLoginSessionState> QrLoginSessions = new();
+    private static readonly TimeSpan QrLoginSessionLifetime = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan QrLoginApprovalRetention = TimeSpan.FromMinutes(1);
+
     private readonly IMediator _mediator;
     private readonly ITokenGenerator _tokenGenerator;
     private readonly WithinDbContext _dbContext;
@@ -79,6 +85,130 @@ public class AuthController : ControllerBase
         }
 
         return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("qr/session")]
+    public IActionResult CreateQrLoginSession()
+    {
+        CleanupExpiredQrSessions();
+
+        var sessionId = Guid.NewGuid().ToString("N");
+        var expiresAt = DateTimeOffset.UtcNow.Add(QrLoginSessionLifetime);
+
+        var state = new QrLoginSessionState
+        {
+            SessionId = sessionId,
+            ExpiresAt = expiresAt
+        };
+
+        QrLoginSessions[sessionId] = state;
+
+        var qrPayload = $"within://qr-login?session={sessionId}";
+        var webLink = $"{Request.Scheme}://{Request.Host}/qr-login?session={sessionId}";
+
+        return Ok(new
+        {
+            SessionId = sessionId,
+            QrPayload = qrPayload,
+            WebLink = webLink,
+            ExpiresAt = expiresAt
+        });
+    }
+
+    [HttpGet("qr/session/{sessionId}")]
+    public async Task<IActionResult> GetQrLoginSessionStatus([FromRoute] string sessionId)
+    {
+        CleanupExpiredQrSessions();
+
+        if (!QrLoginSessions.TryGetValue(sessionId, out var session))
+        {
+            return NotFound(new { Status = "expired", Error = "QR session expired or not found" });
+        }
+
+        if (session.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            QrLoginSessions.TryRemove(sessionId, out _);
+            return NotFound(new { Status = "expired", Error = "QR session expired" });
+        }
+
+        if (session.ApprovedByUserId is null)
+        {
+            return Ok(new
+            {
+                Status = "pending",
+                ExpiresAt = session.ExpiresAt
+            });
+        }
+
+        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == session.ApprovedByUserId.Value);
+        if (user is null)
+        {
+            QrLoginSessions.TryRemove(sessionId, out _);
+            return BadRequest(new { Status = "failed", Error = "User not found for approved session" });
+        }
+
+        await CleanupExpiredRefreshTokensAsync(user.Id);
+
+        var token = _tokenGenerator.GenerateAccessToken(
+            user.Id.ToString(),
+            user.UserName ?? string.Empty,
+            user.Email ?? string.Empty
+        );
+        var refreshToken = await CreateRefreshTokenAsync(user.Id);
+
+        QrLoginSessions.TryRemove(sessionId, out _);
+
+        return Ok(new
+        {
+            Status = "approved",
+            Token = token,
+            RefreshToken = refreshToken,
+            User = new
+            {
+                Id = user.Id,
+                Username = user.UserName,
+                Email = user.Email
+            }
+        });
+    }
+
+    [Authorize]
+    [HttpPost("qr/approve")]
+    public IActionResult ApproveQrLogin([FromBody] ApproveQrLoginRequest request)
+    {
+        CleanupExpiredQrSessions();
+
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return BadRequest(new { Error = "SessionId is required" });
+        }
+
+        if (!QrLoginSessions.TryGetValue(request.SessionId, out var session))
+        {
+            return NotFound(new { Error = "QR session expired or not found" });
+        }
+
+        if (session.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            QrLoginSessions.TryRemove(request.SessionId, out _);
+            return NotFound(new { Error = "QR session expired" });
+        }
+
+        if (session.ApprovedByUserId.HasValue)
+        {
+            return Conflict(new { Error = "QR session already approved" });
+        }
+
+        var userIdClaim = User.FindFirst("UserId")?.Value;
+        if (!Guid.TryParse(userIdClaim, out var approvedByUserId))
+        {
+            return Unauthorized(new { Error = "Invalid user token" });
+        }
+
+        session.ApprovedByUserId = approvedByUserId;
+        session.ApprovedAt = DateTimeOffset.UtcNow;
+
+        return Ok(new { Message = "QR login approved" });
     }
 
     [HttpPost("refresh")]
@@ -211,9 +341,35 @@ public class AuthController : ControllerBase
         _dbContext.RefreshTokens.RemoveRange(expiredTokens);
         await _dbContext.SaveChangesAsync();
     }
+
+    private static void CleanupExpiredQrSessions()
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var entry in QrLoginSessions)
+        {
+            var session = entry.Value;
+            var approvedExpired = session.ApprovedAt.HasValue &&
+                                  session.ApprovedAt.Value.Add(QrLoginApprovalRetention) <= now;
+
+            if (session.ExpiresAt <= now || approvedExpired)
+            {
+                QrLoginSessions.TryRemove(entry.Key, out _);
+            }
+        }
+    }
+
+    private sealed class QrLoginSessionState
+    {
+        public required string SessionId { get; init; }
+        public DateTimeOffset ExpiresAt { get; init; }
+        public Guid? ApprovedByUserId { get; set; }
+        public DateTimeOffset? ApprovedAt { get; set; }
+    }
 }
 
 public record LoginRequest(string Username, string Password);
 public record RegisterRequest(string Username, string Password, string Email);
 public record RefreshTokenRequest(string RefreshToken);
 public record LogoutRequest(string? RefreshToken);
+public record ApproveQrLoginRequest(string SessionId);
