@@ -722,29 +722,8 @@ class VoiceCallApi {
       throw new Error('Not connected to room');
     }
     const { includeAudio = true } = options;
-    const logPrefix = '[screen-share-livekit]';
     
     if (enabled) {
-      console.log(`${logPrefix} enable requested`, {
-        includeAudio,
-        isElectron: Boolean(window?.electronAPI?.isElectron),
-        hasRoom: Boolean(this.room),
-        audioPublications: this.room
-          ? Array.from(this.room.localParticipant.audioTrackPublications.values()).map((p) => ({
-              sid: p.trackSid,
-              source: p.source,
-              muted: p.isMuted
-            }))
-          : [],
-        videoPublications: this.room
-          ? Array.from(this.room.localParticipant.videoTrackPublications.values()).map((p) => ({
-              sid: p.trackSid,
-              source: p.source,
-              muted: p.isMuted
-            }))
-          : []
-      });
-
       // Defensive cleanup for stale publications before enabling a new share.
       const hasActiveOrStaleScreenVideoPublication = Array.from(
         this.room.localParticipant.videoTrackPublications.values()
@@ -771,25 +750,13 @@ class VoiceCallApi {
       const startProfiles = includeAudio
         ? [
             {
-              // Keep the first profile as permissive as possible for Electron window-audio capture.
-              name: 'compatibility-audio',
-              capture: {
-                audio: true,
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 30
-              },
-              publish: {
-                videoCodec: 'vp8',
-                simulcast: false
-              }
-            },
-            {
               name: 'balanced-audio',
               capture: {
                 audio: {
                   echoCancellation: false,
                   noiseSuppression: false,
-                  autoGainControl: false
+                  autoGainControl: false,
+                  channelCount: 2
                 },
                 resolution: VideoPresets.h720.resolution,
                 frameRate: 60
@@ -805,9 +772,29 @@ class VoiceCallApi {
               }
             },
             {
+              name: 'compatibility-audio',
+              capture: {
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                },
+                resolution: VideoPresets.h720.resolution,
+                frameRate: 30
+              },
+              publish: {
+                videoCodec: 'vp8',
+                simulcast: false
+              }
+            },
+            {
               name: 'minimal-audio',
               capture: {
-                audio: true
+                audio: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+                }
               },
               publish: null
             }
@@ -836,13 +823,6 @@ class VoiceCallApi {
       for (let i = 0; i < startProfiles.length; i += 1) {
         const profile = startProfiles[i];
         try {
-          console.log(`${logPrefix} trying profile`, {
-            profile: profile.name,
-            includeAudio,
-            capture: profile.capture,
-            hasPublish: Boolean(profile.publish)
-          });
-
           if (profile.publish) {
             await this.room.localParticipant.setScreenShareEnabled(true, profile.capture, profile.publish);
           } else {
@@ -855,7 +835,6 @@ class VoiceCallApi {
 
           const audioPublished = await this.waitForScreenShareAudioPublished();
           if (audioPublished) {
-            console.log(`${logPrefix} audio track published`, { profile: profile.name });
             this.tuneLocalScreenShareAudioTrack();
             return;
           }
@@ -863,15 +842,10 @@ class VoiceCallApi {
           lastError = new Error(
             `Screen-share audio track was not published (profile: ${profile.name})`
           );
-          console.warn(`${logPrefix} ${lastError.message}`);
+          console.warn(lastError.message);
         } catch (error) {
           lastError = error;
-          console.warn(`${logPrefix} profile failed`, {
-            profile: profile.name,
-            message: error?.message,
-            name: error?.name,
-            stack: error?.stack
-          });
+          console.warn(`Screen share start failed for profile "${profile.name}":`, error);
         }
 
         // Cleanup before next profile attempt.
@@ -886,50 +860,7 @@ class VoiceCallApi {
         await new Promise((resolve) => setTimeout(resolve, 120));
       }
 
-      if (includeAudio) {
-        const audioFailureText = String(lastError?.message || '').toLowerCase();
-        const shouldFallbackToVideoOnly =
-          audioFailureText.includes('could not start audio source') ||
-          audioFailureText.includes('audio source') ||
-          audioFailureText.includes('screen-share audio track was not published');
-
-        if (shouldFallbackToVideoOnly) {
-          console.warn(
-            'Screen-share audio could not be started. Falling back to video-only screen sharing.'
-          );
-
-          try {
-            await this.room.localParticipant.setScreenShareEnabled(
-              true,
-              {
-                audio: false,
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 60
-              },
-              {
-                videoCodec: 'vp8',
-                videoEncoding: {
-                  ...VideoPresets.h720.encoding,
-                  maxBitrate: 2_500_000,
-                  maxFramerate: 60
-                },
-                simulcast: false
-              }
-            );
-            return;
-          } catch (fallbackError) {
-            console.error('Video-only fallback screen share start failed:', fallbackError);
-            throw fallbackError;
-          }
-        }
-      }
-
       if (lastError) {
-        console.error(`${logPrefix} all profiles failed`, {
-          message: lastError?.message,
-          name: lastError?.name,
-          stack: lastError?.stack
-        });
         throw lastError;
       }
       throw new Error('Failed to start screen sharing');
