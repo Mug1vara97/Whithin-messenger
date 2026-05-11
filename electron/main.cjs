@@ -98,6 +98,8 @@ let tray = null;
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 
+const SCREEN_SHARE_LOG_PREFIX = '[screen-share]';
+
 const ELECTRON_KEY_ALIASES = {
   ArrowUp: 'Up',
   ArrowDown: 'Down',
@@ -190,11 +192,21 @@ function openScreenPickerWindow(sources) {
         name: source.name,
         type: sourceType,
         thumbnail: source.thumbnail?.toDataURL?.() || null,
-        // Для экрана используем system audio (loopback), для окна — audio конкретного окна.
+        // Политика: звук только для шаринга отдельного окна (не full screen).
         // Окно самого Whithin исключаем, чтобы не ловить эхо звонка.
-        canShareAudio: sourceType === 'screen' || (sourceType === 'window' && !isWhithinWindow)
+        canShareAudio: sourceType === 'window' && !isWhithinWindow
       };
     });
+
+    console.log(
+      `${SCREEN_SHARE_LOG_PREFIX} picker opened with sources:`,
+      payload.map((s) => ({
+        id: s.id,
+        type: s.type,
+        canShareAudio: s.canShareAudio,
+        name: s.name
+      }))
+    );
 
     let isResolved = false;
     const finalize = (value) => {
@@ -208,13 +220,22 @@ function openScreenPickerWindow(sources) {
       resolve(value);
     };
 
-    const handleSubmit = (_event, data) => finalize(data);
-    const handleCancel = () => finalize(null);
+    const handleSubmit = (_event, data) => {
+      console.log(`${SCREEN_SHARE_LOG_PREFIX} picker submit:`, data);
+      finalize(data);
+    };
+    const handleCancel = () => {
+      console.log(`${SCREEN_SHARE_LOG_PREFIX} picker cancelled by user`);
+      finalize(null);
+    };
 
     ipcMain.once('electron:screen-picker-submit', handleSubmit);
     ipcMain.once('electron:screen-picker-cancel', handleCancel);
 
-    pickerWindow.on('closed', () => finalize(null));
+    pickerWindow.on('closed', () => {
+      console.log(`${SCREEN_SHARE_LOG_PREFIX} picker window closed`);
+      finalize(null);
+    });
     pickerWindow.webContents.on('did-finish-load', () => {
       pickerWindow.webContents.send('electron:screen-picker-sources', payload);
     });
@@ -655,9 +676,27 @@ if (!gotSingleInstanceLock) {
       const safeCallback = (payload) => {
         if (isCallbackSent) return;
         isCallbackSent = true;
+        console.log(`${SCREEN_SHARE_LOG_PREFIX} callback payload:`, {
+          hasVideo: Boolean(payload?.video),
+          videoId: payload?.video?.id || null,
+          videoName: payload?.video?.name || null,
+          audioMode:
+            payload?.audio === 'loopback'
+              ? 'loopback'
+              : payload?.audio
+                ? `source:${payload.audio.id || 'unknown'}`
+                : 'none'
+        });
         callback(payload);
       };
       try {
+        console.log(`${SCREEN_SHARE_LOG_PREFIX} incoming display media request`, {
+          frameOrigin: request?.frame?.url || null,
+          hasUserGesture: Boolean(request?.userGesture),
+          selectedScreenSource,
+          lastSelectedScreenSource
+        });
+
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
           thumbnailSize: { width: 320, height: 180 }
@@ -681,6 +720,15 @@ if (!gotSingleInstanceLock) {
           sourceNameLower.includes('whithin') ||
           sourceNameLower.includes('electron');
 
+        console.log(`${SCREEN_SHARE_LOG_PREFIX} media source decision`, {
+          requestedSelection: pendingSelection,
+          preferredSourceId: preferredSource?.id || null,
+          preferredSourceName: preferredSource?.name || null,
+          preferredSourceType: selectedSourceType || null,
+          shouldCaptureAudio,
+          isWhithinWindow
+        });
+
         selectedScreenSource = null;
 
         if (!preferredSource) {
@@ -695,11 +743,15 @@ if (!gotSingleInstanceLock) {
             // Для window-поделивания оставляем audio выбранного окна,
             // иначе loopback подмешивает весь системный вывод и эхо звонка.
             audioSource = preferredSource;
-          } else if (selectedSourceType === 'screen') {
-            // Для полного экрана нужен loopback, иначе аудио-трек не создаётся.
-            audioSource = 'loopback';
           }
         }
+
+        console.log(`${SCREEN_SHARE_LOG_PREFIX} final capture config`, {
+          videoSourceId: preferredSource.id,
+          videoSourceName: preferredSource.name,
+          selectedSourceType,
+          audioSource: audioSource ? audioSource.id : null
+        });
 
         safeCallback({
           video: preferredSource,
@@ -707,7 +759,11 @@ if (!gotSingleInstanceLock) {
           audio: audioSource
         });
       } catch (error) {
-        console.error('Display media request failed:', error);
+        console.error(`${SCREEN_SHARE_LOG_PREFIX} display media request failed:`, {
+          message: error?.message,
+          name: error?.name,
+          stack: error?.stack
+        });
         // Deny request safely; callback can be called only once.
         safeCallback({});
       }
@@ -774,6 +830,7 @@ ipcMain.handle('electron:choose-screen-source', async () => {
 
   const selection = await openScreenPickerWindow(sources);
   if (!selection?.id) {
+    console.log(`${SCREEN_SHARE_LOG_PREFIX} no source selected`);
     return null;
   }
 
@@ -788,6 +845,11 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     captureAudio: Boolean(selection.captureAudio),
     selectedAt: Date.now()
   };
+
+  console.log(`${SCREEN_SHARE_LOG_PREFIX} source stored for next request`, {
+    selectedScreenSource,
+    lastSelectedScreenSource
+  });
 
   return {
     id: selection.id,
