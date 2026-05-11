@@ -54,6 +54,29 @@ const ICE_SERVERS = [
   }
 ];
 
+const SCREEN_SHARE_AUDIO_KEY_PREFIX = 'screen-share-audio-';
+
+const isScreenShareAudioElementKey = (peerId) =>
+  typeof peerId === 'string' && peerId.startsWith(SCREEN_SHARE_AUDIO_KEY_PREFIX);
+
+const getAudioElementVolumeByPolicy = (state, peerId) => {
+  const shouldSuppressCallAudio =
+    state.suppressCallAudioDuringScreenShare && !isScreenShareAudioElementKey(peerId);
+  if (shouldSuppressCallAudio) return 0;
+  if (state.isGlobalAudioMuted) return 0;
+
+  const volume = state.userVolumes.get(peerId) || 100;
+  const isIndividuallyMuted = state.userMutedStates.get(peerId) || false;
+  return isIndividuallyMuted ? 0 : (volume / 100.0);
+};
+
+const applyAudioPlaybackPolicy = (state) => {
+  state.audioElements.forEach((audioElement, peerId) => {
+    if (!audioElement) return;
+    audioElement.volume = getAudioElementVolumeByPolicy(state, peerId);
+  });
+};
+
 export const useCallStore = create(
   devtools(
     (set, get) => ({
@@ -130,6 +153,7 @@ export const useCallStore = create(
       
       // Состояние демонстрации экрана
       isScreenSharing: false,
+      suppressCallAudioDuringScreenShare: false,
       isScreenShareTransitioning: false,
       screenShareSessionId: 0,
       screenShareStream: null,
@@ -164,6 +188,7 @@ export const useCallStore = create(
       // Actions
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
+      applyAudioPlaybackPolicy: () => applyAudioPlaybackPolicy(get()),
       
       setAudioBlocked: (blocked) => set({ audioBlocked: blocked }),
 
@@ -888,9 +913,7 @@ export const useCallStore = create(
             const gainNode = audioContext.createGain();
             
             // Set initial volume
-            const initialVolume = state.userVolumes.get(targetUserId) || 100;
-            const isMuted = state.userMutedStates.get(targetUserId) || false;
-            const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+            const audioVolume = getAudioElementVolumeByPolicy(state, targetUserId);
             audioElement.volume = audioVolume;
             gainNode.gain.value = audioVolume;
             
@@ -915,6 +938,7 @@ export const useCallStore = create(
                 userVolumes: newUserVolumes
               };
             });
+            get().applyAudioPlaybackPolicy();
             
             // Try to play audio element
             try {
@@ -1689,9 +1713,7 @@ export const useCallStore = create(
           source.connect(gainNode);
           
           // Устанавливаем начальную громкость
-          const initialVolume = state.userVolumes.get(userId) || 100;
-          const isMuted = state.userMutedStates.get(userId) || false;
-          const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
+          const audioVolume = getAudioElementVolumeByPolicy(state, userId);
           audioElement.volume = audioVolume;
           
           // Сохраняем ссылки
@@ -1712,6 +1734,7 @@ export const useCallStore = create(
               userVolumes: newUserVolumes
             };
           });
+          get().applyAudioPlaybackPolicy();
           
           // Инициализация Voice Activity Detection (VAD) для удалённого участника
           try {
@@ -1963,11 +1986,8 @@ export const useCallStore = create(
             newPreviousVolumes.set(peerId, currentVolume);
             return { previousVolumes: newPreviousVolumes };
           });
-          audioElement.volume = 0;
         } else {
-          const currentVolume = state.userVolumes.get(peerId) || 100;
-          const audioVolume = state.isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
-          audioElement.volume = audioVolume;
+          // volume will be recalculated by policy below
         }
 
         set((state) => {
@@ -1975,6 +1995,7 @@ export const useCallStore = create(
           newUserMutedStates.set(peerId, newIsMuted);
           return { userMutedStates: newUserMutedStates };
         });
+        get().applyAudioPlaybackPolicy();
       },
       
       // Изменение громкости отдельного пользователя
@@ -1983,14 +2004,12 @@ export const useCallStore = create(
         const audioElement = state.audioElements.get(peerId);
         if (!audioElement) return;
 
-        const audioVolume = state.isGlobalAudioMuted ? 0 : (newVolume / 100.0);
-        audioElement.volume = audioVolume;
-
         set((state) => {
           const newUserVolumes = new Map(state.userVolumes);
           newUserVolumes.set(peerId, newVolume);
           return { userVolumes: newUserVolumes };
         });
+        get().applyAudioPlaybackPolicy();
 
         // Если размутиваем через слайдер, обновляем состояние мута
         if (newVolume > 0 && state.userMutedStates.get(peerId)) {
@@ -2070,19 +2089,8 @@ export const useCallStore = create(
           });
         }
         
-        // Управляем HTML Audio элементами
-        state.audioElements.forEach((audioElement, peerId) => {
-          if (audioElement) {
-            if (newMutedState) {
-              audioElement.volume = 0;
-            } else {
-              const volume = state.userVolumes.get(peerId) || 100;
-              const isIndividuallyMuted = state.userMutedStates.get(peerId) || false;
-              const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
-              audioElement.volume = audioVolume;
-            }
-          }
-        });
+        // Управляем HTML Audio элементами с учетом политики изоляции loopback fallback.
+        get().applyAudioPlaybackPolicy();
         
         // Воспроизводим звук глобального мьюта/размьюта (только локально)
         if (newMutedState) {
@@ -2397,6 +2405,7 @@ export const useCallStore = create(
             remoteScreenShares: new Map(),
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
+            suppressCallAudioDuringScreenShare: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null,
@@ -2524,6 +2533,7 @@ export const useCallStore = create(
             connecting: false,
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,
+            suppressCallAudioDuringScreenShare: false,
             localScreenTrackId: null,
             localScreenTrackPublishedHandler: null,
             localCameraTrackPublishedHandler: null
@@ -2548,6 +2558,7 @@ export const useCallStore = create(
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
+          let selectedElectronSource = null;
           set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
@@ -2561,13 +2572,57 @@ export const useCallStore = create(
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
-            includeAudio = Boolean(selectedSource.captureAudio);
+            selectedElectronSource = selectedSource;
+            includeAudio =
+              selectedSource.type === 'window' &&
+              Boolean(selectedSource.captureAudio);
           }
 
           console.log('Starting screen share via LiveKit...');
           
           // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
+          try {
+            await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
+          } catch (shareError) {
+            const isAudioSourceError =
+              includeAudio &&
+              typeof shareError?.message === 'string' &&
+              shareError.message.toLowerCase().includes('audio source');
+
+            if (!isAudioSourceError) {
+              throw shareError;
+            }
+
+            const canTryLoopbackFallback =
+              selectedElectronSource?.type === 'window' &&
+              typeof window.electronAPI?.setWindowAudioCaptureMode === 'function';
+
+            if (!canTryLoopbackFallback) {
+              throw shareError;
+            }
+
+            console.warn(
+              'Window audio source failed; retrying screen share with loopback fallback',
+              selectedElectronSource
+            );
+
+            await window.electronAPI.setWindowAudioCaptureMode('loopback');
+            try {
+              await voiceCallApi.setScreenShareEnabled(true, { includeAudio: true });
+              set({
+                suppressCallAudioDuringScreenShare: true,
+                error:
+                  'Захват звука конкретного окна недоступен в этой сессии Windows. Включен системный звук (как fallback).'
+              });
+              get().applyAudioPlaybackPolicy();
+            } finally {
+              await window.electronAPI.setWindowAudioCaptureMode('source');
+            }
+          }
+          if (!get().suppressCallAudioDuringScreenShare) {
+            set({ suppressCallAudioDuringScreenShare: false });
+            get().applyAudioPlaybackPolicy();
+          }
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
@@ -2643,7 +2698,8 @@ export const useCallStore = create(
             error.name === 'AbortError'
           );
           
-          set({ isScreenSharing: false });
+          set({ isScreenSharing: false, suppressCallAudioDuringScreenShare: false });
+          get().applyAudioPlaybackPolicy();
           
           // Показываем ошибку только если это не отмена пользователем
           if (!isCancelled) {
@@ -2679,11 +2735,13 @@ export const useCallStore = create(
           // Очищаем состояние
           set({
             screenShareSessionId: 0,
+            suppressCallAudioDuringScreenShare: false,
             localScreenTrackId: null,
             screenShareStream: null,
             isScreenSharing: false,
             localScreenTrackPublishedHandler: null
           });
+          get().applyAudioPlaybackPolicy();
 
           console.log('Screen sharing stopped successfully');
         } catch (error) {

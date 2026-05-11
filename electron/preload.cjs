@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
+  setWindowAudioCaptureMode: (mode) =>
+    ipcRenderer.invoke('electron:set-window-audio-capture-mode', mode),
 
   updateGlobalShortcuts: (shortcuts) => ipcRenderer.invoke('electron:update-global-shortcuts', shortcuts),
 

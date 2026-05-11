@@ -99,6 +99,9 @@ let tray = null;
 let allowAppQuit = false;
 
 const SCREEN_SHARE_LOG_PREFIX = '[screen-share]';
+let windowAudioCaptureMode = (
+  process.env.ELECTRON_WINDOW_AUDIO_CAPTURE_MODE || 'source'
+).toLowerCase();
 
 const ELECTRON_KEY_ALIASES = {
   ArrowUp: 'Up',
@@ -740,9 +743,18 @@ if (!gotSingleInstanceLock) {
         let audioSource = null;
         if (shouldCaptureAudio) {
           if (selectedSourceType === 'window' && !isWhithinWindow) {
-            // Для window-поделивания оставляем audio выбранного окна,
-            // иначе loopback подмешивает весь системный вывод и эхо звонка.
-            audioSource = preferredSource;
+            const useLoopbackForWindowAudio = windowAudioCaptureMode === 'loopback';
+            // Строгий режим: по умолчанию берем аудио именно выбранного окна,
+            // чтобы не подмешивать системный микс звонка.
+            audioSource = useLoopbackForWindowAudio ? 'loopback' : preferredSource;
+
+            console.log(`${SCREEN_SHARE_LOG_PREFIX} window audio routing`, {
+              mode: windowAudioCaptureMode,
+              platform: process.platform,
+              useLoopbackForWindowAudio,
+              selectedWindowId: preferredSource.id,
+              selectedWindowName: preferredSource.name
+            });
           }
         }
 
@@ -750,7 +762,12 @@ if (!gotSingleInstanceLock) {
           videoSourceId: preferredSource.id,
           videoSourceName: preferredSource.name,
           selectedSourceType,
-          audioSource: audioSource ? audioSource.id : null
+          audioSource:
+            audioSource === 'loopback'
+              ? 'loopback'
+              : audioSource
+                ? audioSource.id
+                : null
         });
 
         safeCallback({
@@ -868,6 +885,24 @@ ipcMain.on('electron:remove-shortcut-listener', (event) => {
     shortcutCallbackWebContents = null;
   }
   globalShortcut.unregisterAll();
+});
+
+ipcMain.handle('electron:set-window-audio-capture-mode', (_event, mode) => {
+  const normalized = String(mode || '').trim().toLowerCase();
+  const allowed = new Set(['source', 'loopback']);
+  if (!allowed.has(normalized)) {
+    return {
+      success: false,
+      mode: windowAudioCaptureMode,
+      error: `Unsupported audio capture mode: ${mode}`
+    };
+  }
+
+  windowAudioCaptureMode = normalized;
+  console.log(`${SCREEN_SHARE_LOG_PREFIX} window audio capture mode changed`, {
+    mode: windowAudioCaptureMode
+  });
+  return { success: true, mode: windowAudioCaptureMode };
 });
 
 app.on('window-all-closed', () => {
