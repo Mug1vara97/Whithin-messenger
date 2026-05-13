@@ -201,12 +201,18 @@
 
 /* Canvas initially hidden */
 .ghost-background canvas {
-  opacity: 0 !important;
-  transition: opacity 2s ease-in;
+  opacity: 1 !important;
+  transition: opacity 0.4s ease-in;
 }
 
 .ghost-background canvas.fade-in {
   opacity: 1 !important;
+}
+
+/* For startup preloader background mode: show canvas instantly */
+.ghost-background.ghost-background--background-only canvas {
+  opacity: 1 !important;
+  transition: none !important;
 }
 
 /* Responsive design */

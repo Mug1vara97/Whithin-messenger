@@ -61,17 +61,18 @@ class PreloaderManager {
 let scene, camera, renderer, preloader;
 
        // Initialize animation function
-       function initializeAnimation() {
+       function initializeAnimation(options = {}) {
+         const { hideGhost = false, container = null, stateKey = 'ghostAnimationInitialized' } = options;
          console.log('initializeAnimation function called');
-         console.log('window.ghostAnimationInitialized:', window.ghostAnimationInitialized);
+         console.log(`window.${stateKey}:`, window[stateKey]);
          
-         if (window.ghostAnimationInitialized) {
+         if (window[stateKey]) {
            console.log('Ghost animation already initialized, skipping...');
            return;
          }
 
          console.log('Initializing ghost animation...');
-         window.ghostAnimationInitialized = true;
+         window[stateKey] = true;
 
   // Initialize preloader
   preloader = new PreloaderManager();
@@ -113,9 +114,9 @@ renderer.toneMappingExposure = 0.9;
 renderer.setClearColor(0x000000, 0);
 
          // Add canvas to the ghost background container
-         const container = document.querySelector('.ghost-background');
-         if (container) {
-           container.appendChild(renderer.domElement);
+         const targetContainer = container || document.querySelector('.ghost-background');
+         if (targetContainer) {
+           targetContainer.appendChild(renderer.domElement);
            console.log('Canvas added to ghost-background container');
          } else {
            document.body.appendChild(renderer.domElement);
@@ -433,6 +434,7 @@ scene.add(ambientLight);
 // Create ghost group
 const ghostGroup = new THREE.Group();
 scene.add(ghostGroup);
+ghostGroup.visible = !hideGhost;
 
 // Enhanced ghost geometry
 const ghostGeometry = new THREE.SphereGeometry(2, 40, 40);
@@ -1338,14 +1340,15 @@ window.dispatchEvent(fakeEvent);
 }
 
 // Export the initialization function for React component
-export const initializeGhostAnimation = (preloaderParam) => {
+export const initializeGhostAnimation = (preloaderParam, options = {}) => {
+  const { stateKey = 'ghostAnimationInitialized' } = options;
   console.log('initializeGhostAnimation called');
-  console.log('window.ghostAnimationInitialized:', window.ghostAnimationInitialized);
+  console.log(`window.${stateKey}:`, window[stateKey]);
   
   // Initialize animation if not already done
-  if (!window.ghostAnimationInitialized) {
+  if (!window[stateKey]) {
     console.log('Calling initializeAnimation...');
-    initializeAnimation();
+    initializeAnimation(options);
   } else {
     console.log('Animation already initialized, skipping...');
   }
