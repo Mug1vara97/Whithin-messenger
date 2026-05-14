@@ -19,7 +19,7 @@
 }
 
 .category-header:hover {
-  background-color: var(--hover);
+  background: var(--hover);
 }
 
 .category-name-container {
@@ -81,7 +81,7 @@
 
 .add-channel-button:hover {
   color: var(--text);
-  background-color: var(--hover);
+  background: var(--hover);
 }
 
 .category-channels {
@@ -93,7 +93,7 @@
 }
 
 .channel-list.dragging-over {
-  background-color: var(--hover);
+  background: var(--hover);
   border-radius: 4px;
   border: 2px dashed var(--accent);
 }

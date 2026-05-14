@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, FormField } from '../../atoms';
 import GhostBackground from '../../atoms/GhostBackground';
 import { validateLogin } from '../../../lib/validation';
@@ -19,6 +20,16 @@ const LoginForm = () => {
   const [qrImage, setQrImage] = useState('');
   const [qrError, setQrError] = useState('');
   const [qrHint, setQrHint] = useState('Откройте камеру на Android и сканируйте код');
+  const qrFlowDismissedRef = useRef(false);
+
+  const closeQrOverlay = useCallback(() => {
+    qrFlowDismissedRef.current = true;
+    setIsQrLoading(false);
+    setQrSession(null);
+    setQrImage('');
+    setQrError('');
+    setQrHint('Откройте камеру на Android и сканируйте код');
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -48,12 +59,16 @@ const LoginForm = () => {
   };
 
   const createQrSession = async () => {
+    qrFlowDismissedRef.current = false;
     try {
       setIsQrLoading(true);
       setQrError('');
       setQrHint('Создаем QR-сессию...');
 
       const response = await authApi.createQrLoginSession();
+      if (qrFlowDismissedRef.current) {
+        return;
+      }
       if (!response?.sessionId || !response?.qrPayload) {
         throw new Error('Server returned invalid QR session payload');
       }
@@ -61,11 +76,15 @@ const LoginForm = () => {
       setQrSession(response);
       setQrHint('Сканируйте QR-код в приложении Whithin на Android');
     } catch (sessionError) {
-      setQrError(sessionError.message || 'Не удалось создать QR-код');
-      setQrSession(null);
-      setQrHint('');
+      if (!qrFlowDismissedRef.current) {
+        setQrError(sessionError.message || 'Не удалось создать QR-код');
+        setQrSession(null);
+        setQrHint('');
+      }
     } finally {
-      setIsQrLoading(false);
+      if (!qrFlowDismissedRef.current) {
+        setIsQrLoading(false);
+      }
     }
   };
 
@@ -152,6 +171,29 @@ const LoginForm = () => {
     };
   }, [consumeQrLoginSession, qrSession]);
 
+  const qrOverlayOpen = isQrLoading || Boolean(qrSession);
+
+  useEffect(() => {
+    if (!qrOverlayOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [qrOverlayOpen]);
+
+  useEffect(() => {
+    if (!qrOverlayOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeQrOverlay();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [qrOverlayOpen, closeQrOverlay]);
+
   return (
     <div className="auth-container">
       <GhostBackground />
@@ -216,15 +258,7 @@ const LoginForm = () => {
             >
               {isQrLoading ? 'Generating QR...' : 'Log In with Android QR'}
             </Button>
-
-            {qrError && <div className="auth-error">{qrError}</div>}
-
-            {qrImage && (
-              <div className="auth-qr-box">
-                <img src={qrImage} alt="QR code for web login" className="auth-qr-image" />
-                <p className="auth-qr-hint">{qrHint}</p>
-              </div>
-            )}
+            {qrError && !(isQrLoading || qrSession) && <div className="auth-error">{qrError}</div>}
           </div>
         </form>
 
@@ -232,6 +266,45 @@ const LoginForm = () => {
           Need an account? <a href="/register">Register</a>
         </p>
       </div>
+
+      {qrOverlayOpen &&
+        createPortal(
+          <div
+            className="auth-qr-overlay"
+            role="presentation"
+            onClick={(e) => e.target === e.currentTarget && closeQrOverlay()}
+          >
+            <div
+              className="auth-qr-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-qr-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="auth-qr-close"
+                onClick={closeQrOverlay}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+              <h3 id="auth-qr-title" className="auth-qr-title">
+                Вход через Android
+              </h3>
+              {qrError && <div className="auth-error auth-qr-error">{qrError}</div>}
+              {isQrLoading && !qrSession && <p className="auth-qr-hint">{qrHint}</p>}
+              {qrImage && (
+                <div className="auth-qr-box">
+                  <img src={qrImage} alt="QR-код для входа в веб-клиент" className="auth-qr-image" />
+                  <p className="auth-qr-hint">{qrHint}</p>
+                </div>
+              )}
+              {qrSession && !qrImage && !qrError && <p className="auth-qr-hint">{qrHint}</p>}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

@@ -48,7 +48,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  background-color: var(--background);
+  background: var(--background);
   color: var(--text);
   height: 100vh;
   overflow: hidden;
@@ -77,11 +77,11 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--primary, #5865f2), var(--primary-hover, #4752c4));
+  background: var(--primary, #5865f2);
   border-radius: 999px;
   border: 2px solid var(--surface, #2f3136);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--primary, #5865f2);
+  background: var(--primary-hover, #4752c4);
 }

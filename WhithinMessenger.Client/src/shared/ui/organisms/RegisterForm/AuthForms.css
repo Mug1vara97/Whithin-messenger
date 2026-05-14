@@ -1,6 +1,6 @@
 body {
   font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  background-color: var(--background);
+  background: var(--background);
   margin: 0;
   padding: 0;
 }

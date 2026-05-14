@@ -12,7 +12,7 @@
 }
 
 .modal-content {
-  background-color: var(--background-secondary);
+  background: var(--background-secondary);
   border-radius: 8px;
   padding: 20px;
   width: 100%;
@@ -127,7 +127,7 @@
 }
 
 .cancel-button:hover:not(:disabled) {
-  background-color: var(--hover);
+  background: var(--hover);
 }
 
 .cancel-button:disabled {
@@ -136,7 +136,7 @@
 }
 
 .create-button {
-  background-color: var(--primary);
+  background: var(--primary);
   color: white;
   padding: 8px 16px;
   border: none;
@@ -148,7 +148,7 @@
 }
 
 .create-button:hover:not(:disabled) {
-  background-color: var(--primary-hover);
+  background: var(--primary-hover);
 }
 
 .create-button:disabled {

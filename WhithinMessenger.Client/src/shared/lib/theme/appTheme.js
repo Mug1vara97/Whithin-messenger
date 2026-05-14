@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'whithin-app-theme';
 
-/** Базовая тема (совпадает с :root в index.css) */
+/** Базовая тема (совпадает с :root в index.css). Для ключей с acceptsGradient допускается linear-gradient(...). */
 export const DEFAULT_THEME = {
   '--background': '#36393f',
   '--background-primary': '#2f3136',
@@ -16,23 +16,40 @@ export const DEFAULT_THEME = {
   '--server-list-background': '#1e1f22'
 };
 
+/** acceptsGradient: можно задать linear-gradient / radial-gradient (свойство background, не color). */
 export const THEME_COLOR_FIELDS = [
-  { key: '--background', label: 'Фон приложения' },
-  { key: '--background-primary', label: 'Фон панелей' },
-  { key: '--surface', label: 'Поверхности' },
-  { key: '--surface-hover', label: 'Наведение на элементы' },
-  { key: '--text', label: 'Текст' },
-  { key: '--text-muted', label: 'Приглушённый текст' },
-  { key: '--text-secondary', label: 'Вторичный текст' },
-  { key: '--primary', label: 'Акцент (кнопки, ссылки)' },
-  { key: '--primary-hover', label: 'Акцент при наведении' },
-  { key: '--border', label: 'Границы' },
-  { key: '--server-list-background', label: 'Полоса серверов' }
+  { key: '--background', label: 'Фон приложения', acceptsGradient: true },
+  { key: '--background-primary', label: 'Фон панелей', acceptsGradient: true },
+  { key: '--background-secondary', label: 'Фон вторичный', acceptsGradient: true },
+  { key: '--surface', label: 'Поверхности', acceptsGradient: true },
+  { key: '--surface-hover', label: 'Наведение на элементы', acceptsGradient: true },
+  { key: '--text', label: 'Текст', acceptsGradient: false },
+  { key: '--text-muted', label: 'Приглушённый текст', acceptsGradient: false },
+  { key: '--text-secondary', label: 'Вторичный текст', acceptsGradient: false },
+  { key: '--primary', label: 'Акцент (кнопки, ссылки)', acceptsGradient: true },
+  { key: '--primary-hover', label: 'Акцент при наведении', acceptsGradient: true },
+  { key: '--border', label: 'Границы', acceptsGradient: false },
+  { key: '--server-list-background', label: 'Полоса серверов', acceptsGradient: true }
 ];
 
+/** Первый #rrggbb / #rgb в строке (для color input и rgba). */
+export function extractFirstHexFromThemeValue(value) {
+  if (!value || typeof value !== 'string') return null;
+  const s = value.trim();
+  const m = s.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  if (h.length !== 6) return null;
+  return `#${h}`;
+}
+
 function hexToRgbTriplet(hex) {
-  if (!hex || typeof hex !== 'string') return '88, 101, 242';
-  let h = hex.trim().replace('#', '');
+  const normalized = extractFirstHexFromThemeValue(hex) || (typeof hex === 'string' && hex.startsWith('#') ? hex : null);
+  if (!normalized) return '88, 101, 242';
+  let h = normalized.replace('#', '');
   if (h.length === 3) {
     h = h.split('').map((c) => c + c).join('');
   }
@@ -69,6 +86,15 @@ export function applyThemeToRoot(theme) {
   const primary = merged['--primary'];
   if (primary) {
     root.style.setProperty('--primary-rgb', hexToRgbTriplet(primary));
+  }
+  const surfaceHover = merged['--surface-hover'];
+  if (surfaceHover) {
+    root.style.setProperty('--hover', surfaceHover);
+    root.style.setProperty('--background-modifier-hover', surfaceHover);
+  }
+  const bg = merged['--background'];
+  if (bg) {
+    root.style.setProperty('--bottom', bg);
   }
 }
 

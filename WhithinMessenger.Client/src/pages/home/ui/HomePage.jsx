@@ -40,7 +40,7 @@ const HomePage = () => {
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
-  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat } = useChatList(user?.id || null, (chatId) => {
+  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats } = useChatList(user?.id || null, (chatId) => {
     navigate(`/channels/@me/${chatId}`);
   });
   const { createServer, servers, createConnection } = useServerContext();
@@ -67,6 +67,8 @@ const HomePage = () => {
   const callerProfilesRef = useRef(new Map());
   const waitingForRingtoneGestureRef = useRef(false);
   const gestureRetryHandlerRef = useRef(null);
+  /** Синхронизация URL /channels/@me/:chatId со списком чатов (избегаем редиректа на / пока чаты не загрузились). */
+  const privateChatRouteResolveRef = useRef({ chatId: null, refreshCalls: 0 });
 
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
@@ -540,24 +542,39 @@ const HomePage = () => {
   }, [selectedChat, serverData, serverDataFromPanel, serverId, navigate]);
 
   useEffect(() => {
-    if (chatId && chats && chats.length > 0) {
-
-      const foundChat = chats.find(chat => (chat.chatId || chat.chat_id) === chatId);
-      
-      if (foundChat) {
-        setSelectedChat(foundChat);
-        setSelectedServer(null);
-      } else {
-        setSelectedChat(null);
-        setSelectedServer(null);
-        navigate('/', { replace: true });
-      }
-    } else if (chatId && chats && chats.length === 0) {
-      setSelectedChat(null);
-      setSelectedServer(null);
-      navigate('/', { replace: true });
+    if (!chatId) {
+      privateChatRouteResolveRef.current = { chatId: null, refreshCalls: 0 };
+      return;
     }
-  }, [chatId, chats, navigate]);
+    if (!initialChatsLoaded) {
+      return;
+    }
+
+    const id = String(chatId);
+    if (privateChatRouteResolveRef.current.chatId !== id) {
+      privateChatRouteResolveRef.current = { chatId: id, refreshCalls: 0 };
+    }
+
+    const foundChat = chats.find((c) => String(c.chatId || c.chat_id) === id);
+
+    if (foundChat) {
+      privateChatRouteResolveRef.current.refreshCalls = 0;
+      setSelectedChat(foundChat);
+      setSelectedServer(null);
+      return;
+    }
+
+    if (privateChatRouteResolveRef.current.refreshCalls < 2) {
+      privateChatRouteResolveRef.current.refreshCalls += 1;
+      void refreshChats();
+      return;
+    }
+
+    privateChatRouteResolveRef.current = { chatId: null, refreshCalls: 0 };
+    setSelectedChat(null);
+    setSelectedServer(null);
+    navigate('/channels/@me', { replace: true });
+  }, [chatId, chats, navigate, initialChatsLoaded, refreshChats]);
 
   const handleChatSelected = (chat) => {
     if (chat && !chat.isServerChat) {

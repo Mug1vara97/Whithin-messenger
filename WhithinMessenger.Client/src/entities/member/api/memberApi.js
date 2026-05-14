@@ -1,4 +1,4 @@
-import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import apiClient from '../../../shared/lib/api/apiClient';
 
 export const memberApi = {
   getServerMembers: (connection, serverId) => {
@@ -10,20 +10,26 @@ export const memberApi = {
     return connection.invoke("KickMember", serverId, memberId);
   },
 
-  openPrivateChat: async (currentUserId, targetUserId) => {
-    const response = await fetch(`${BASE_URL}/api/server/openChat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        currentUserId: currentUserId,
-        targetUserId: targetUserId
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Ошибка открытия чата');
+  /** Личный чат: ChatController POST /api/chat/create-private (текущий пользователь из JWT). */
+  openPrivateChat: async (_currentUserId, targetUserId) => {
+    try {
+      const { data } = await apiClient.post('/chat/create-private', {
+        targetUserId
+      });
+      const chatId = data?.chatId ?? data?.ChatId;
+      if (!chatId) {
+        const msg = data?.error || data?.Error || 'Не удалось открыть чат';
+        throw new Error(typeof msg === 'string' ? msg : 'Не удалось открыть чат');
+      }
+      return {
+        chatId,
+        exists: data?.exists ?? data?.Exists
+      };
+    } catch (err) {
+      const fromApi = err.response?.data?.error || err.response?.data?.Error;
+      const message =
+        typeof fromApi === 'string' ? fromApi : err.message || 'Не удалось открыть чат';
+      throw new Error(message);
     }
-
-    return response.json();
   }
 };

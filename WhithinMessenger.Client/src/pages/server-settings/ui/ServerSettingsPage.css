@@ -1,9 +1,13 @@
 .server-settings-page {
   min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: #36393f;
   color: #dcddde;
   font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   display: flex;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .server-settings-loading,
@@ -106,14 +110,21 @@
 
 .server-settings-sidebar {
   width: 240px;
+  flex-shrink: 0;
   background: #2f3136;
   border-right: 1px solid #40444b;
   padding: 20px 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .server-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   padding: 0 20px 20px 20px;
   border-bottom: 1px solid #40444b;
   margin-bottom: 10px;
@@ -176,6 +187,28 @@
   color: #ffffff;
   font-size: 16px;
   font-weight: 600;
+}
+
+/* В сайдбаре имя справа от аватара; перебиваем ниже общий .server-avatar 60px */
+.server-header .server-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 16px;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.server-header .server-name {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
 }
 
 .settings-nav {
@@ -265,9 +298,13 @@
 
 .server-settings-main {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 40px;
   overflow-y: auto;
+  overflow-x: hidden;
   background: #36393f;
+  -webkit-overflow-scrolling: touch;
 }
 
 .settings-content {
@@ -613,37 +650,48 @@
   margin-bottom: 15px;
 }
 
-/* Responsive design */
+/* Адаптив: колонка; страница может расти по высоте, прокрутка — у окна */
 @media (max-width: 768px) {
-  .server-settings-content {
+  .server-settings-page {
+    height: auto;
+    max-height: none;
+    min-height: 100vh;
     flex-direction: column;
+    overflow: visible;
   }
-  
+
   .server-settings-sidebar {
     width: 100%;
+    max-height: none;
+    overflow-y: visible;
     border-right: none;
     border-bottom: 1px solid #40444b;
   }
-  
+
+  .server-settings-content {
+    flex-direction: column;
+  }
+
   .settings-nav {
     flex-direction: row;
     overflow-x: auto;
     padding: 0 20px;
   }
-  
+
   .settings-nav-item {
     white-space: nowrap;
     border-left: none;
     border-bottom: 3px solid transparent;
   }
-  
+
   .settings-nav-item.active {
     border-left: none;
     border-bottom-color: #5865f2;
   }
-  
+
   .server-settings-main {
+    min-height: 0;
+    overflow: visible;
     padding: 20px;
   }
 }
-

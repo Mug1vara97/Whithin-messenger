@@ -3,8 +3,7 @@
   background: #36393f;
   color: #dcddde;
   font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  height: 100%;
-  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .member-management-header {
@@ -158,6 +157,17 @@
 .context-menu-item.danger:hover {
   background: #f04747;
   color: white;
+}
+
+.context-menu-item--disabled,
+.context-menu-item--disabled:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.context-menu-item--disabled:hover {
+  background: none;
+  color: #dcddde;
 }
 
 .role-management-modal {

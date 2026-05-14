@@ -16,12 +16,12 @@
 }
 
 .channel-item:hover {
-  background-color: var(--hover);
+  background: var(--hover);
   color: var(--text);
 }
 
 .channel-item.active {
-  background-color: var(--hover);
+  background: var(--hover);
   color: var(--text);
 }
 
@@ -120,7 +120,7 @@
 
 .channel-item .settings-button:hover {
   color: var(--text) !important;
-  background-color: var(--surface-hover) !important;
+  background: var(--surface-hover) !important;
   opacity: 1;
   transform: none !important;
 }
@@ -147,7 +147,7 @@
 }
 
 .voice-control-button:hover {
-  background-color: var(--surface-hover) !important;
+  background: var(--surface-hover) !important;
   opacity: 1;
   transform: scale(1.1);
 }
@@ -207,7 +207,7 @@
 }
 
 .voice-participant:hover {
-  background-color: var(--hover);
+  background: var(--hover);
 }
 
 .voice-participant.speaking {

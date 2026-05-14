@@ -1,7 +1,7 @@
 .message-input-container {
   position: relative;
   padding: 0.575rem;
-  background-color: var(--bottom);
+  background: var(--bottom);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background-color: var(--background);
+  background: var(--background);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 8px 12px;
@@ -79,16 +79,16 @@
 .media-button:hover,
 .voice-button:hover {
   color: var(--text);
-  background-color: var(--hover);
+  background: var(--hover);
 }
 
 .send-button {
-  background-color: var(--primary);
+  background: var(--primary);
   color: white;
 }
 
 .send-button:hover:not(:disabled) {
-  background-color: var(--primaryHover);
+  background: var(--primary-hover, #4752c4);
   transform: scale(1.05);
 }
 

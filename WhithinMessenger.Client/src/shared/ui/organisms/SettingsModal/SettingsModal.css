@@ -12,7 +12,7 @@
 }
 
 .settings-modal {
-  background-color: var(--surface, #36393f);
+  background: var(--surface, #36393f);
   border-radius: 8px;
   width: 90%;
   max-width: 600px;
@@ -53,7 +53,7 @@
 }
 
 .close-button:hover {
-  background-color: var(--hover, #40444b);
+  background: var(--hover, #40444b);
   color: var(--text, #dcddde);
 }
 
@@ -105,7 +105,7 @@
 
 .setting-select {
   margin-left: auto;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   color: var(--text, #dcddde);
   border: 1px solid var(--border, #4f545c);
   padding: 8px 12px;

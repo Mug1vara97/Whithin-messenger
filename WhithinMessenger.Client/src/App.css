@@ -83,7 +83,7 @@ body {
 
 .main-area {
   flex: 1;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -94,7 +94,7 @@ body {
 
 .chat-area {
   flex: 1;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -229,7 +229,7 @@ body {
 .home-header {
   text-align: center;
   padding: 20px;
-  background-color: var(--surface, #36393f);
+  background: var(--surface, #36393f);
   border-bottom: 1px solid var(--border, #4f545c);
   color: var(--text, #dcddde);
 }

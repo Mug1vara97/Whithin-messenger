@@ -6,7 +6,7 @@
 }
 
 .categories-list.dragging-over {
-  background-color: var(--hover);
+  background: var(--hover);
   border-radius: 4px;
 }
 
@@ -34,7 +34,7 @@
 }
 
 .uncategorized-channels.dragging-over {
-  background-color: var(--hover);
+  background: var(--hover);
   border-radius: 4px;
   border: 2px dashed var(--accent);
 }

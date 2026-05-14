@@ -24,16 +24,21 @@
     "cross-env": "^10.1.0",
     "electron": "^41.3.0",
     "electron-builder": "^26.0.12",
-    "png-to-ico": "^3.0.1"
+    "png-to-ico": "^3.0.1",
+    "rcedit": "^4.0.1"
   },
   "build": {
     "appId": "ru.whithin.desktop",
     "productName": "Whithin",
     "executableName": "Whithin",
     "asar": true,
+    "asarUnpack": [
+      "node_modules/global-mouse-events/**/*.node"
+    ],
     "directories": {
       "output": "release"
     },
+    "afterPack": "./scripts/after-pack.cjs",
     "files": [
       "main.cjs",
       "preload.cjs",
@@ -42,10 +47,14 @@
       "tray.png",
       "app-icon.png",
       "app-icon.ico",
-      "package.json"
+      "package.json",
+      "node_modules/global-mouse-events/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
     ],
     "win": {
       "icon": "app-icon.ico",
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]
@@ -57,5 +66,8 @@
       "uninstallerIcon": "app-icon.ico",
       "installerHeaderIcon": "app-icon.ico"
     }
+  },
+  "dependencies": {
+    "global-mouse-events": "^1.2.0"
   }
 }

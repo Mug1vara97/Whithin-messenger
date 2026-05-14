@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 9px;
-  background-color: var(--background);
+  background: var(--background);
   border-bottom: 1px solid var(--borderBottom);
   color: var(--text);
   height: 52px;
@@ -81,7 +81,7 @@
 }
 
 .friends-panel__add-button:hover {
-  background-color: var(--hover-background);
+  background: var(--hover);
 }
 
 .friends-panel__add-button svg {
@@ -95,7 +95,7 @@
   position: relative;
   padding: 8px 12px;
   border-bottom: 1px solid var(--borderBottom);
-  background-color: var(--background);
+  background: var(--background);
 }
 
 .friends-panel__search-input {

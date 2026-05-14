@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
-import { MEMBER_STATUS_COLORS } from '../../../entities/member/model';
+import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { Button } from '../../../shared/ui/atoms/Button';
 import UserAvatar from '../../../shared/ui/atoms/UserAvatar';
@@ -17,6 +17,42 @@ const MemberManagement = ({
 }) => {
   const { members, fetchMembers, kickMember, openPrivateChat } = useMembers(connection, serverId, userId);
   const { roles, fetchRoles, assignRole, removeRole } = useRoles(connection, serverId, userId);
+  const { friends, fetchFriends } = useFriends();
+  const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
+
+  const friendActionForMember = useCallback(
+    (memberId) => {
+      const mid = String(memberId);
+      const me = String(userId ?? '');
+      if (!me || mid === me) return { kind: 'self' };
+      if (friends.some((f) => String(f.userId) === mid)) return { kind: 'friend' };
+      const incoming = pendingRequests.find((r) => String(r.requesterId) === mid);
+      if (incoming) return { kind: 'incoming', requestId: incoming.id };
+      if (sentRequests.some((r) => String(r.addresseeId) === mid)) return { kind: 'outgoing' };
+      return { kind: 'stranger' };
+    },
+    [friends, pendingRequests, sentRequests, userId]
+  );
+
+  const handleAddFriend = async (memberId) => {
+    try {
+      await sendRequest(memberId);
+      await fetchFriends();
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    } catch (error) {
+      alert(error?.message || 'Не удалось отправить запрос в друзья');
+    }
+  };
+
+  const handleAcceptIncomingFriend = async (friendshipId) => {
+    try {
+      await acceptRequest(friendshipId);
+      await fetchFriends();
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    } catch (error) {
+      alert(error?.message || 'Не удалось принять запрос');
+    }
+  };
 
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -47,10 +83,17 @@ const MemberManagement = ({
   const handlePrivateMessage = async (memberId) => {
     try {
       const chatData = await openPrivateChat(memberId);
-      onNavigateToChat(chatData.chatId);
-      setContextMenu({ ...contextMenu, visible: false });
+      const chatId = chatData?.chatId ?? chatData?.ChatId;
+      if (!chatId) {
+        throw new Error('Сервер не вернул идентификатор чата');
+      }
+      if (typeof onNavigateToChat === 'function') {
+        onNavigateToChat(chatId);
+      }
+      setContextMenu((prev) => ({ ...prev, visible: false }));
     } catch (error) {
       console.error('Ошибка при открытии/создании чата:', error);
+      alert(error?.message || 'Не удалось открыть личный чат');
     }
   };
 
@@ -80,7 +123,7 @@ const MemberManagement = ({
   const ContextMenu = () => {
     if (!contextMenu.visible) return null;
 
-    const member = members.find(m => m.userId === contextMenu.memberId);
+    const member = members.find((m) => String(m.userId) === String(contextMenu.memberId));
     if (!member) return null;
 
     const calculatePosition = (x, y) => {
@@ -109,14 +152,48 @@ const MemberManagement = ({
         }}
       >
         <div className="context-menu-content">
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              handlePrivateMessage(member.userId);
-            }}
-          >
-            Написать
-          </button>
+          {(() => {
+            const fa = friendActionForMember(member.userId);
+            if (fa.kind === 'self') return null;
+            if (fa.kind === 'friend') {
+              return (
+                <button
+                  type="button"
+                  className="context-menu-item"
+                  onClick={() => handlePrivateMessage(member.userId)}
+                >
+                  Написать
+                </button>
+              );
+            }
+            if (fa.kind === 'incoming') {
+              return (
+                <button
+                  type="button"
+                  className="context-menu-item"
+                  onClick={() => handleAcceptIncomingFriend(fa.requestId)}
+                >
+                  Принять запрос в друзья
+                </button>
+              );
+            }
+            if (fa.kind === 'outgoing') {
+              return (
+                <button type="button" className="context-menu-item context-menu-item--disabled" disabled>
+                  Запрос отправлен
+                </button>
+              );
+            }
+            return (
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={() => handleAddFriend(member.userId)}
+              >
+                Добавить в друзья
+              </button>
+            );
+          })()}
           <button
             className="context-menu-item"
             onClick={() => {
@@ -126,18 +203,18 @@ const MemberManagement = ({
                 x: x - 230,
                 y: y
               });
-              setContextMenu({ ...contextMenu, visible: false });
+              setContextMenu((prev) => ({ ...prev, visible: false }));
             }}
           >
             Роли
           </button>
-          {(isServerOwner || userPermissions?.kickMembers) && (
+          {(isServerOwner || userPermissions?.kickMembers) && String(member.userId) !== String(userId) && (
             <button
               className="context-menu-item danger"
               onClick={() => {
                 setSelectedMember(member);
                 setShowKickModal(true);
-                setContextMenu({ ...contextMenu, visible: false });
+                setContextMenu((prev) => ({ ...prev, visible: false }));
               }}
             >
               Удалить с сервера

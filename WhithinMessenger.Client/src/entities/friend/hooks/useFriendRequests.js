@@ -56,13 +56,14 @@ export const useFriendRequests = () => {
     try {
       const connection = await getFriendConnection();
       if (!connection) {
-        return;
+        throw new Error('Нет подключения');
       }
       await connection.invoke('AcceptFriendRequest', friendshipId);
       setPendingRequests(prev => prev.filter(req => req.id !== friendshipId));
     } catch (err) {
       setError(err.message || 'Ошибка принятия запроса');
       console.error('Error accepting friend request:', err);
+      throw err;
     }
   }, [getFriendConnection, user?.id]);
 
@@ -92,13 +93,14 @@ export const useFriendRequests = () => {
     try {
       const connection = await getFriendConnection();
       if (!connection) {
-        return;
+        throw new Error('Нет подключения');
       }
       await connection.invoke('SendFriendRequest', targetUserId);
       await fetchFriendRequests();
     } catch (err) {
       setError(err.message || 'Ошибка отправки запроса');
       console.error('Error sending friend request:', err);
+      throw err;
     }
   }, [fetchFriendRequests, getFriendConnection, user?.id]);
 

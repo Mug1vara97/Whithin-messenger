@@ -97,6 +97,10 @@ let selectedScreenSource = null;
 let lastSelectedScreenSource = null;
 let tray = null;
 let mouseShortcutBindings = [];
+/** Windows: низкоуровневый хук для боковых кнопок (Chromium часто не шлёт X1/X2 в before-input-event). */
+let win32GlobalMouseEvents = null;
+let win32GlobalMouseHookInitialized = false;
+let lastWin32MouseShortcutDispatch = { action: null, at: 0 };
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 
@@ -228,7 +232,19 @@ function isMouseShortcutMatch(binding, input) {
   );
 }
 
-function dispatchShortcutAction(action) {
+function dispatchShortcutAction(action, options = {}) {
+  const dedupeMs = typeof options.dedupeMs === 'number' ? options.dedupeMs : 0;
+  if (dedupeMs > 0) {
+    const now = Date.now();
+    if (
+      lastWin32MouseShortcutDispatch.action === action &&
+      now - lastWin32MouseShortcutDispatch.at < dedupeMs
+    ) {
+      return false;
+    }
+    lastWin32MouseShortcutDispatch = { action, at: now };
+  }
+
   const target =
     shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()
       ? shortcutCallbackWebContents
@@ -244,6 +260,71 @@ function dispatchShortcutAction(action) {
   console.log('[mouse-bind-debug] dispatch action -> renderer:', action, 'targetId:', target.id);
   target.send('global-shortcut-triggered', action);
   return true;
+}
+
+function getWin32GlobalMouseEvents() {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+  if (win32GlobalMouseEvents) {
+    return win32GlobalMouseEvents;
+  }
+  try {
+    win32GlobalMouseEvents = require('global-mouse-events');
+    return win32GlobalMouseEvents;
+  } catch (err) {
+    console.warn('[shortcuts] global-mouse-events unavailable (mouse side buttons may not work):', err.message);
+    return null;
+  }
+}
+
+/** Кнопки из пакета global-mouse-events (WM_*BUTTON / XBUTTON через index.js). */
+function globalMousePackageButtonToBindingButton(rawButton) {
+  const n = Math.round(Number(rawButton));
+  if (n === 1) return 'left';
+  if (n === 2) return 'right';
+  if (n === 3) return 'middle';
+  if (n === 4) return 'back';
+  if (n === 5) return 'forward';
+  return null;
+}
+
+function win32GlobalMouseDownHandler(payload) {
+  if (!mouseShortcutBindings.length) {
+    return;
+  }
+  const bindingButton = globalMousePackageButtonToBindingButton(payload?.button);
+  if (!bindingButton) {
+    return;
+  }
+  const input = {
+    type: 'mouseDown',
+    button: bindingButton,
+    control: false,
+    alt: false,
+    shift: false,
+    meta: false
+  };
+  const matched = mouseShortcutBindings.find((binding) => isMouseShortcutMatch(binding, input));
+  if (matched && dispatchShortcutAction(matched.action, { dedupeMs: 120 })) {
+    console.log('[mouse-bind-debug] win32 global hook matched:', matched);
+  }
+}
+
+function syncWin32GlobalMouseHook() {
+  const mod = getWin32GlobalMouseEvents();
+  if (!mod) {
+    return;
+  }
+  if (mouseShortcutBindings.length > 0) {
+    if (!win32GlobalMouseHookInitialized) {
+      mod.on('mousedown', win32GlobalMouseDownHandler);
+      win32GlobalMouseHookInitialized = true;
+    }
+    mod.resumeMouseEvents();
+  } else if (win32GlobalMouseHookInitialized) {
+    mod.pauseMouseEvents();
+  }
 }
 
 function openScreenPickerWindow(sources) {
@@ -667,6 +748,7 @@ function registerGlobalShortcuts(shortcuts = {}) {
   });
 
   console.log('[mouse-bind-debug] total mouse bindings:', mouseShortcutBindings.length);
+  syncWin32GlobalMouseHook();
 }
 
 function getTrayImage() {
@@ -804,7 +886,7 @@ function createWindow() {
         meta: Boolean(input.meta)
       });
       const matched = mouseShortcutBindings.find((binding) => isMouseShortcutMatch(binding, input));
-      if (matched && dispatchShortcutAction(matched.action)) {
+      if (matched && dispatchShortcutAction(matched.action, { dedupeMs: 120 })) {
         console.log('[mouse-bind-debug] before-input-event matched binding:', matched);
         _event.preventDefault();
         return;
@@ -839,7 +921,7 @@ function createWindow() {
         !binding.modifiers.meta
     );
 
-    if (matched && dispatchShortcutAction(matched.action)) {
+    if (matched && dispatchShortcutAction(matched.action, { dedupeMs: 120 })) {
       console.log('[mouse-bind-debug] app-command matched binding:', matched);
       event.preventDefault();
     }
@@ -1069,6 +1151,11 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (win32GlobalMouseHookInitialized && win32GlobalMouseEvents) {
+    try {
+      win32GlobalMouseEvents.pauseMouseEvents();
+    } catch (_) {}
+  }
   if (tray) {
     tray.destroy();
     tray = null;

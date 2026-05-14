@@ -6,6 +6,7 @@ import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoi
 export const useChatList = (userId, onChatCreated = null) => {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
+  const [initialChatsLoaded, setInitialChatsLoaded] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading] = useState(false);
@@ -23,9 +24,12 @@ export const useChatList = (userId, onChatCreated = null) => {
         connectionRef.current.stop();
         connectionRef.current = null;
       }
+      setInitialChatsLoaded(false);
+      setChats([]);
       return;
     }
 
+    setInitialChatsLoaded(false);
     const createConnection = async () => {
       if (connectionRef.current && connectionRef.current.state === signalR.HubConnectionState.Connected) {
         console.log('useChatList: Connection already exists and is connected, skipping creation');
@@ -88,6 +92,7 @@ export const useChatList = (userId, onChatCreated = null) => {
     if (!connection) return;
 
     const handleReceiveChats = (receivedChats) => {
+      setInitialChatsLoaded(true);
       if (Array.isArray(receivedChats)) {
         const sortedChats = [...receivedChats].sort((a, b) => {
           const timeA = new Date(a.lastMessageTime || 0).getTime();
@@ -220,7 +225,16 @@ export const useChatList = (userId, onChatCreated = null) => {
       connection.off("chatunreadupdated", handleChatUnreadUpdated);
       connection.off("error", handleError);
     };
-  }, [connection, userId]);
+  }, [connection, userId, navigate, onChatCreated]);
+
+  const refreshChats = useCallback(async () => {
+    if (!connection || !isConnected) return;
+    try {
+      await connection.invoke('GetUserChats');
+    } catch (err) {
+      console.error('Error refreshing chats:', err);
+    }
+  }, [connection, isConnected]);
 
   useEffect(() => {
     if (connection && isConnected) {
@@ -287,6 +301,8 @@ export const useChatList = (userId, onChatCreated = null) => {
 
   return {
     chats,
+    initialChatsLoaded,
+    refreshChats,
     unreadCountByChat,
     searchResults,
     isSearching,

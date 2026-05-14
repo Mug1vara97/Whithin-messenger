@@ -1,6 +1,6 @@
 body {
   font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  background-color: var(--background);
+  background: var(--background);
   margin: 0;
   padding: 0;
 }
@@ -130,6 +130,82 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   text-align: center;
+}
+
+.auth-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.auth-qr-modal {
+  position: relative;
+  width: min(100%, 380px);
+  padding: 36px 28px 24px;
+  border-radius: 16px;
+  background: rgba(47, 49, 54, 0.42);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.auth-qr-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8e9297);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.auth-qr-close:hover {
+  background: var(--hover, #40444b);
+  color: var(--text, #dcddde);
+}
+
+.auth-qr-title {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text, #dcddde);
+}
+
+.auth-qr-error {
+  width: 100%;
+  margin-top: 0;
+}
+
+.auth-qr-modal .auth-qr-box {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.auth-qr-modal .auth-qr-image {
+  width: min(280px, 72vw);
+  height: min(280px, 72vw);
 }
 
 .auth-link a {

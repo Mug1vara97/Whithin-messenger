@@ -140,7 +140,7 @@ const ServerSettingsPage = () => {
   };
 
   const handleNavigateToChat = (chatId) => {
-    navigate(`/server/${serverId}/channel/${chatId}`);
+    navigate(`/channels/@me/${chatId}`);
   };
 
   console.log('ServerSettingsPage - connectionRef.current:', connectionRef.current);

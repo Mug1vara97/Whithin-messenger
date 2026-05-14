@@ -2,7 +2,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   color: var(--text, #dcddde);
   display: flex;
   align-items: center;
@@ -17,11 +17,11 @@
 
 .server-icon:hover {
   border-radius: 16px;
-  background-color: var(--primary, #5865f2);
+  background: var(--primary, #5865f2);
 }
 
 .server-icon.active {
-  background-color: var(--primary, #5865f2);
+  background: var(--primary, #5865f2);
   border-radius: 16px;
 }
 
@@ -43,20 +43,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   color: var(--text, #dcddde);
   border-radius: 50%;
   transition: all 0.2s ease;
 }
 
 .server-icon:hover .server-initials {
-  background-color: var(--primary, #5865f2);
+  background: var(--primary, #5865f2);
   color: white;
   border-radius: 16px;
 }
 
 .server-icon.active .server-initials {
-  background-color: var(--primary, #5865f2);
+  background: var(--primary, #5865f2);
   color: white;
   border-radius: 16px;
 }

@@ -14,7 +14,7 @@
 }
 
 .create-modal {
-  background-color: var(--surface, #36393f);
+  background: var(--surface, #36393f);
   padding: 24px;
   border-radius: 8px;
   width: 440px;
@@ -71,7 +71,7 @@
 }
 
 .modal-close-button:hover {
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   color: var(--text, #dcddde);
 }
 
@@ -79,7 +79,7 @@
   width: 100%;
   padding: 12px 16px;
   margin-bottom: 16px;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   border: 1px solid var(--border, #4f545c);
   border-radius: 6px;
   color: var(--text, #dcddde);
@@ -102,7 +102,7 @@
 .server-type-toggle {
   margin: 16px 0;
   padding: 16px;
-  background-color: var(--background, #2f3136);
+  background: var(--background, #2f3136);
   border-radius: 8px;
   border: 1px solid var(--border, #4f545c);
 }
@@ -160,12 +160,12 @@
 }
 
 .modal-actions button:last-child {
-  background-color: var(--primary, #5865f2);
+  background: var(--primary, #5865f2);
   color: white;
 }
 
 .modal-actions button:last-child:hover {
-  background-color: var(--primary-hover, #4752c4);
+  background: var(--primary-hover, #4752c4);
 }
 
 .modal-actions button:last-child:disabled {
@@ -175,7 +175,7 @@
 
 /* Стили для модального окна уведомлений */
 .notifications-modal {
-  background-color: var(--surface, #36393f);
+  background: var(--surface, #36393f);
   padding: 24px;
   border-radius: 8px;
   width: 400px;
