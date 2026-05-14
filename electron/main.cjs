@@ -199,7 +199,15 @@ function parseMouseHotkey(webkit) {
 }
 
 function normalizeInputMouseButton(input) {
-  const raw = String(input?.button ?? '').toLowerCase();
+  const b = input?.button;
+  if (typeof b === 'number') {
+    if (b === 3) return 'back';
+    if (b === 4) return 'forward';
+    if (b === 0) return 'left';
+    if (b === 1) return 'middle';
+    if (b === 2) return 'right';
+  }
+  const raw = String(b ?? '').toLowerCase();
   if (raw === 'back' || raw === 'x1' || raw === 'xbutton1' || raw === 'button4' || raw === '3') return 'back';
   if (raw === 'forward' || raw === 'x2' || raw === 'xbutton2' || raw === 'button5' || raw === '4') return 'forward';
   if (raw === 'left') return 'left';
@@ -779,7 +787,13 @@ function createWindow() {
       return;
     }
 
-    if ((input.type === 'mouseDown' || input.type === 'mouseUp') && mouseShortcutBindings.length > 0) {
+    const isMouseLikePointer =
+      input.type === 'mouseDown' ||
+      input.type === 'mouseUp' ||
+      input.type === 'pointerDown' ||
+      input.type === 'pointerUp';
+
+    if (isMouseLikePointer && mouseShortcutBindings.length > 0) {
       console.log('[mouse-bind-debug] before-input-event mouse:', {
         type: input.type,
         button: input.button,
@@ -804,13 +818,17 @@ function createWindow() {
     }
 
     const cmd = String(command || '').toLowerCase();
-    console.log('[mouse-bind-debug] app-command received:', cmd);
     const backCommands = new Set(['browser-backward', 'browser-back', 'backward', 'back']);
     const forwardCommands = new Set(['browser-forward', 'forward']);
     const button = backCommands.has(cmd) ? 'back' : forwardCommands.has(cmd) ? 'forward' : null;
     if (!button) {
+      // Не back/forward — к мышиным биндам не относится (часто бывает `unknown` от системы).
+      if (cmd && cmd !== 'unknown') {
+        console.log('[mouse-bind-debug] app-command ignored (not mouse back/forward):', cmd);
+      }
       return;
     }
+    console.log('[mouse-bind-debug] app-command mouse navigation:', cmd, '->', button);
 
     const matched = mouseShortcutBindings.find(
       (binding) =>

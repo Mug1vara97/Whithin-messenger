@@ -4,7 +4,6 @@ import { userApi } from '../../../../entities/user/api';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
-import { useGlobalHotkeys } from '../../../lib/hooks/useGlobalHotkeys';
 import {
     getUserStatusColor,
     getUserStatusLabel,
@@ -25,9 +24,6 @@ const UserPanel = ({
 }) => {
     // Подключаемся к глобальному состоянию звонка напрямую в компоненте
     const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio } = useGlobalCall();
-    
-    // Подключаем глобальные горячие клавиши
-    useGlobalHotkeys(toggleMute, toggleGlobalAudio);
     
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);

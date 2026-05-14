@@ -29,6 +29,7 @@
   "build": {
     "appId": "ru.whithin.desktop",
     "productName": "Whithin",
+    "executableName": "Whithin",
     "asar": true,
     "directories": {
       "output": "release"
@@ -44,7 +45,6 @@
       "package.json"
     ],
     "win": {
-      "signAndEditExecutable": false,
       "icon": "app-icon.ico",
       "target": [
         "nsis"

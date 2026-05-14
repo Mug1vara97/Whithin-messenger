@@ -83,15 +83,18 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
       handleGlobalShortcut(action);
     };
 
-    // Для разных драйверов/браузерного слоя события могут приходить как mousedown/mouseup/auxclick.
     window.addEventListener('mousedown', handleMouseHotkey, true);
     window.addEventListener('mouseup', handleMouseHotkey, true);
     window.addEventListener('auxclick', handleMouseHotkey, true);
+    window.addEventListener('pointerdown', handleMouseHotkey, true);
+    window.addEventListener('pointerup', handleMouseHotkey, true);
 
     return () => {
       window.removeEventListener('mousedown', handleMouseHotkey, true);
       window.removeEventListener('mouseup', handleMouseHotkey, true);
       window.removeEventListener('auxclick', handleMouseHotkey, true);
+      window.removeEventListener('pointerdown', handleMouseHotkey, true);
+      window.removeEventListener('pointerup', handleMouseHotkey, true);
     };
   }, [currentHotkeys, handleGlobalShortcut]);
 
