@@ -59,6 +59,42 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     }
   }, [handleGlobalShortcut, currentHotkeys, updateElectronHotkeys]);
 
+  useEffect(() => {
+    const hotkeyToAction = {
+      [currentHotkeys.toggleMic]: 'toggle-mic',
+      [currentHotkeys.toggleAudio]: 'toggle-audio'
+    };
+
+    const handleMouseHotkey = (event) => {
+      const isSupportedMouseButton =
+        event.button === 3 || event.button === 4 || event.button === 1;
+      if (!isSupportedMouseButton) {
+        return;
+      }
+
+      const mouseString = hotkeyStorage.parseMouseEvent(event);
+      const action = hotkeyToAction[mouseString];
+      if (!action) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleGlobalShortcut(action);
+    };
+
+    // Для разных драйверов/браузерного слоя события могут приходить как mousedown/mouseup/auxclick.
+    window.addEventListener('mousedown', handleMouseHotkey, true);
+    window.addEventListener('mouseup', handleMouseHotkey, true);
+    window.addEventListener('auxclick', handleMouseHotkey, true);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseHotkey, true);
+      window.removeEventListener('mouseup', handleMouseHotkey, true);
+      window.removeEventListener('auxclick', handleMouseHotkey, true);
+    };
+  }, [currentHotkeys, handleGlobalShortcut]);
+
   // Слушаем изменения горячих клавиш в localStorage
   useEffect(() => {
     const handleStorageChange = () => {

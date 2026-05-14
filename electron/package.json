@@ -1,7 +1,7 @@
 {
-  "name": "whithin-desktop",
+  "name": "whithin",
   "productName": "Whithin",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "description": "Whithin desktop shell",
   "license": "ISC",
   "author": "",
@@ -11,8 +11,8 @@
     "start": "electron ./main.cjs",
     "dev": "cross-env WEB_CLIENT_URL=http://localhost:5173 electron ./main.cjs",
     "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs",
-    "package": "electron-forge package",
-    "make": "electron-forge make"
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis"
   },
   "config": {
     "forge": "./forge.config.cjs"
@@ -22,6 +22,40 @@
     "@electron-forge/maker-squirrel": "^7.10.2",
     "@electron-forge/maker-zip": "^7.10.2",
     "cross-env": "^10.1.0",
-    "electron": "^41.3.0"
+    "electron": "^41.3.0",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.1"
+  },
+  "build": {
+    "appId": "ru.whithin.desktop",
+    "productName": "Whithin",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "picker-preload.cjs",
+      "screen-picker.html",
+      "tray.png",
+      "app-icon.png",
+      "app-icon.ico",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "icon": "app-icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "app-icon.ico",
+      "uninstallerIcon": "app-icon.ico",
+      "installerHeaderIcon": "app-icon.ico"
+    }
   }
 }

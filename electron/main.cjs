@@ -220,13 +220,22 @@ function isMouseShortcutMatch(binding, input) {
   );
 }
 
-function navigateRendererHistory(win, direction) {
-  if (!win || win.isDestroyed()) {
-    return;
+function dispatchShortcutAction(action) {
+  const target =
+    shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()
+      ? shortcutCallbackWebContents
+      : mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow.webContents
+      : null;
+
+  if (!target || target.isDestroyed()) {
+    console.log('[mouse-bind-debug] dispatch skipped: no alive target for action', action);
+    return false;
   }
 
-  const script = direction === 'forward' ? 'window.history.forward();' : 'window.history.back();';
-  win.webContents.executeJavaScript(script).catch(() => {});
+  console.log('[mouse-bind-debug] dispatch action -> renderer:', action, 'targetId:', target.id);
+  target.send('global-shortcut-triggered', action);
+  return true;
 }
 
 function openScreenPickerWindow(sources) {
@@ -608,6 +617,7 @@ function installCustomTitlebarChrome(webContents) {
 function registerGlobalShortcuts(shortcuts = {}) {
   globalShortcut.unregisterAll();
   mouseShortcutBindings = [];
+  console.log('[mouse-bind-debug] registerGlobalShortcuts payload:', shortcuts);
 
   Object.entries(shortcuts).forEach(([action, accelerator]) => {
     if (!accelerator) {
@@ -617,6 +627,12 @@ function registerGlobalShortcuts(shortcuts = {}) {
     const mouseBinding = parseMouseHotkey(String(accelerator));
     if (mouseBinding) {
       mouseShortcutBindings.push({ action, ...mouseBinding });
+      console.log('[mouse-bind-debug] mouse binding registered:', {
+        action,
+        accelerator,
+        button: mouseBinding.button,
+        modifiers: mouseBinding.modifiers
+      });
       return;
     }
 
@@ -630,18 +646,19 @@ function registerGlobalShortcuts(shortcuts = {}) {
     }
 
     const registered = globalShortcut.register(acc, () => {
-      if (!shortcutCallbackWebContents || shortcutCallbackWebContents.isDestroyed()) {
-        return;
-      }
-      shortcutCallbackWebContents.send('global-shortcut-triggered', action);
+      dispatchShortcutAction(action);
     });
 
     if (!registered) {
       console.warn(
         `Failed to register shortcut "${acc}" (from "${accelerator}") for action "${action}"`
       );
+    } else {
+      console.log('[mouse-bind-debug] keyboard shortcut registered:', { action, accelerator, acc });
     }
   });
+
+  console.log('[mouse-bind-debug] total mouse bindings:', mouseShortcutBindings.length);
 }
 
 function getTrayImage() {
@@ -762,10 +779,19 @@ function createWindow() {
       return;
     }
 
-    if (input.type === 'mouseDown' && mouseShortcutBindings.length > 0) {
+    if ((input.type === 'mouseDown' || input.type === 'mouseUp') && mouseShortcutBindings.length > 0) {
+      console.log('[mouse-bind-debug] before-input-event mouse:', {
+        type: input.type,
+        button: input.button,
+        normalizedButton: normalizeInputMouseButton(input),
+        control: Boolean(input.control),
+        alt: Boolean(input.alt),
+        shift: Boolean(input.shift),
+        meta: Boolean(input.meta)
+      });
       const matched = mouseShortcutBindings.find((binding) => isMouseShortcutMatch(binding, input));
-      if (matched && shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()) {
-        shortcutCallbackWebContents.send('global-shortcut-triggered', matched.action);
+      if (matched && dispatchShortcutAction(matched.action)) {
+        console.log('[mouse-bind-debug] before-input-event matched binding:', matched);
         _event.preventDefault();
         return;
       }
@@ -778,7 +804,10 @@ function createWindow() {
     }
 
     const cmd = String(command || '').toLowerCase();
-    const button = cmd === 'browser-backward' ? 'back' : cmd === 'browser-forward' ? 'forward' : null;
+    console.log('[mouse-bind-debug] app-command received:', cmd);
+    const backCommands = new Set(['browser-backward', 'browser-back', 'backward', 'back']);
+    const forwardCommands = new Set(['browser-forward', 'forward']);
+    const button = backCommands.has(cmd) ? 'back' : forwardCommands.has(cmd) ? 'forward' : null;
     if (!button) {
       return;
     }
@@ -792,8 +821,8 @@ function createWindow() {
         !binding.modifiers.meta
     );
 
-    if (matched && shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()) {
-      shortcutCallbackWebContents.send('global-shortcut-triggered', matched.action);
+    if (matched && dispatchShortcutAction(matched.action)) {
+      console.log('[mouse-bind-debug] app-command matched binding:', matched);
       event.preventDefault();
     }
   });
@@ -964,6 +993,7 @@ ipcMain.on('electron:navigation-reload', (event) => {
 });
 
 ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
+  console.log('[mouse-bind-debug] ipc update-global-shortcuts called');
   registerGlobalShortcuts(shortcuts);
 });
 
@@ -1004,10 +1034,12 @@ ipcMain.handle('electron:choose-screen-source', async () => {
 
 ipcMain.on('electron:register-shortcut-listener', (event) => {
   shortcutCallbackWebContents = event.sender;
+  console.log('[mouse-bind-debug] shortcut listener registered, sender id:', event.sender.id);
 });
 
 ipcMain.on('electron:remove-shortcut-listener', (event) => {
   if (shortcutCallbackWebContents && shortcutCallbackWebContents.id === event.sender.id) {
+    console.log('[mouse-bind-debug] shortcut listener removed, sender id:', event.sender.id);
     shortcutCallbackWebContents = null;
   }
   globalShortcut.unregisterAll();
