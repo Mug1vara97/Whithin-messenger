@@ -34,30 +34,10 @@ const GhostBackground = ({
       };
     }
 
-    if (window.__startupPreloaderActive) {
-      const waitForBoot = window.setInterval(() => {
-        if (!window.__startupPreloaderActive && !window[stateKey]) {
-          window.clearInterval(waitForBoot);
-          initializeGhostAnimation(undefined, { hideGhost, container, stateKey });
-        }
-      }, 180);
-      return () => {
-        window.clearInterval(waitForBoot);
-      };
-    }
-
-    if (window[stateKey]) {
-      const retryTimer = window.setInterval(() => {
-        if (!window[stateKey]) {
-          window.clearInterval(retryTimer);
-          initializeGhostAnimation(undefined, { hideGhost, container, stateKey });
-        }
-      }, 180);
-      return () => {
-        window.clearInterval(retryTimer);
-      };
-    }
-
+    // Always reinitialize on auth mount (e.g. after logout),
+    // so stale global state can't block the background.
+    cleanupLocalCanvas();
+    window[stateKey] = false;
     initializeGhostAnimation(undefined, { hideGhost, container, stateKey });
 
     // Cleanup function

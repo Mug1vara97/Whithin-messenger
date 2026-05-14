@@ -6,10 +6,10 @@
 
 .chat-sidebar {
   width: 240px;
-  background-color: #2f3136;
+  background-color: var(--surface, #2f3136);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #202225;
+  border-right: 1px solid var(--border, #4f545c);
   height: 100%;
   overflow: hidden;
 }
@@ -24,6 +24,7 @@
   flex-direction: column;
   height: 100%;
   flex: 1;
+  background-color: var(--surface, #2f3136);
 }
 
 /* Заголовок списка чатов */
@@ -56,7 +57,7 @@
 
 .friends-section {
   padding: 8px 12px;
-  border-bottom: 1px solid #202225;
+  border-bottom: 1px solid var(--border, #4f545c);
 }
 
 .friends-button {
@@ -135,6 +136,7 @@
   margin: 0;
   flex: 1;
   overflow-y: auto;
+  background-color: var(--surface, #2f3136);
 }
 
 /* Элемент чата */

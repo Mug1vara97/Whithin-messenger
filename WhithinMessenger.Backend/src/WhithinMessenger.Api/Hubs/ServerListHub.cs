@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
+using WhithinMessenger.Domain.Interfaces;
 using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs;
@@ -9,10 +10,12 @@ namespace WhithinMessenger.Api.Hubs;
 public class ServerListHub : Hub
 {
     private readonly IMediator _mediator;
+    private readonly IServerRepository _serverRepository;
 
-    public ServerListHub(IMediator mediator)
+    public ServerListHub(IMediator mediator, IServerRepository serverRepository)
     {
         _mediator = mediator;
+        _serverRepository = serverRepository;
     }
 
     private Guid? GetCurrentUserId()
@@ -187,6 +190,33 @@ public class ServerListHub : Hub
         catch (Exception ex)
         {
             await Clients.Caller.SendAsync("Error", $"Ошибка при уведомлении об обновлении списка: {ex.Message}");
+        }
+    }
+
+    public async Task ReorderServers(List<Guid> serverIds)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            if (serverIds == null || serverIds.Count == 0)
+            {
+                return;
+            }
+
+            await _serverRepository.SaveUserServerOrderAsync(userId.Value, serverIds, Context.ConnectionAborted);
+
+            // Синхронизируем все вкладки/устройства текущего пользователя.
+            await Clients.Group($"serverlist_{userId.Value}").SendAsync("ServerListUpdated");
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при сохранении порядка серверов: {ex.Message}");
         }
     }
 

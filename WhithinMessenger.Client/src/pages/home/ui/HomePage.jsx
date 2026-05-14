@@ -356,11 +356,10 @@ const HomePage = () => {
 
   useEffect(() => {
     if (serverId && serverData) {
-      console.log('HomePage: serverData updated, current selectedChat:', selectedChat);
       console.log('HomePage: Setting selectedServer to:', serverData);
       setSelectedServer(serverData);
     }
-  }, [serverId, serverData, selectedChat]);
+  }, [serverId, serverData]);
 
   useEffect(() => {
     if (selectedServer && servers && serverId) {

@@ -1,10 +1,10 @@
 /* UserPanel.css */
 .user-panel {
-    background-color: #2f3136;
+    background-color: var(--surface, #2f3136);
     padding: 0.575rem;
     margin: 0;
     margin-top: auto;
-    border-top: 1px solid #40444b;
+    border-top: 1px solid var(--border, #4f545c);
     display: flex;
     align-items: center;
     height: 63px;

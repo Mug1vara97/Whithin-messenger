@@ -1,6 +1,7 @@
 .server-list {
   width: 72px;
   background-color: var(--server-list-background, #1e1f22);
+  border-right: 1px solid var(--border, #4f545c);
   padding: 12px 0;
   display: flex;
   flex-direction: column;
@@ -8,9 +9,123 @@
   z-index: 10;
   height: 100%;
   overflow: hidden;
+  position: relative;
+  --rail-duration: 0.65s;
 }
 
-.server-list ul {
+.server-list-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  gap: 8px;
+}
+
+/** Средняя зона: серверы сразу под «Чатами», при нехватке места — только здесь скролл. */
+.server-list-servers-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.server-list-servers-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.server-list-droppable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.server-list-droppable .server-item {
+  flex-shrink: 0;
+}
+
+.server-list-bottom {
+  flex-shrink: 0;
+}
+
+/** Скользящая метка слева (аналог .menu__border из animated-tab-bar, вертикальная ось). */
+.rail-selection-notch {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 40px;
+  border-radius: 0 10px 10px 0;
+  background: var(--text, #f2f3f5);
+  pointer-events: none;
+  z-index: 25;
+  opacity: 0;
+  transition:
+    transform var(--rail-time-out, var(--rail-duration)) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease;
+  will-change: transform;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.22);
+}
+
+.rail-selection-notch--visible {
+  opacity: 1;
+}
+
+/** Вкладки навигации: круг-фон и «подъём» как .menu__item.active */
+.rail-tab-button {
+  position: relative;
+  z-index: 2;
+  will-change: transform;
+  transition:
+    transform var(--rail-time-out, var(--rail-duration)) cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius var(--rail-duration) ease,
+    background-color var(--rail-duration) ease,
+    color var(--rail-duration) ease;
+}
+
+.rail-tab-button::before {
+  content: "";
+  z-index: -1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--rail-duration) ease, background-color var(--rail-duration) ease;
+  background-color: var(--rail-tab-bg, var(--primary, #5865f2));
+}
+
+.rail-tab-active {
+  transform: none;
+  border-radius: 16px;
+}
+
+.rail-tab-active::before {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.rail-tab-button:not(.rail-tab-active):hover {
+  border-radius: 16px;
+  background-color: var(--primary, #5865f2);
+  color: white;
+}
+
+.server-list-ul {
   width: 100%;
   list-style: none;
   padding: 0;
@@ -19,7 +134,6 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  min-height: 100%;
 }
 
 .server-item {
@@ -57,7 +171,7 @@
   position: relative;
 }
 
-.server-button:hover {
+.server-button:not(.rail-tab-button):hover {
   border-radius: 16px;
   background-color: var(--primary, #5865f2);
   color: white;
@@ -86,6 +200,15 @@
 .settings-button svg {
   width: 20px;
   height: 20px;
+}
+
+.theme-paint-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.theme-paint-button:hover {
+  transform: scale(1.05);
 }
 
 .notification-button {
@@ -136,41 +259,22 @@
 }
 
 .server-item.dragging {
-  opacity: 0.8;
-  -webkit-transform: scale(1.1) !important;
-  transform: scale(1.1) !important;
+  opacity: 0.88;
   z-index: 1000;
   cursor: grabbing !important;
 }
 
-.server-item.dragging .server-icon {
-  background-color: var(--primary, #5865f2);
+.server-item.dragging .server-button {
   border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
-@keyframes pulse {
-  0% { -webkit-transform: scale(1); transform: scale(1); }
-  50% { -webkit-transform: scale(1.05); transform: scale(1.05); }
-  100% { -webkit-transform: scale(1); transform: scale(1); }
-}
-
-@-webkit-keyframes pulse {
-  0% { -webkit-transform: scale(1); }
-  50% { -webkit-transform: scale(1.05); }
-  100% { -webkit-transform: scale(1); }
-}
-
-.server-item.dragging {
-  -webkit-animation: pulse 0.5s infinite;
-  animation: pulse 0.5s infinite;
-}
-
-.server-list-ul[data-rbd-droppable-id] [data-rbd-placeholder-context-id] {
+.server-list-droppable [data-rbd-placeholder-context-id],
+.server-list-droppable [data-rfd-placeholder-context-id] {
   width: 48px;
   height: 48px;
   margin: 4px 0;
-  background-color: rgba(var(--primary, 88, 101, 242), 0.3);
+  background-color: rgba(var(--primary-rgb, 88, 101, 242), 0.35);
   border-radius: 50%;
   transition: all 0.2s ease;
 }

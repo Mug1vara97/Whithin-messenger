@@ -31,13 +31,73 @@ public class ServerRepository : IServerRepository
 
     public async Task<List<Server>> GetUserServersAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _context.Servers
+        var servers = await _context.Servers
             .Where(s => s.ServerMembers.Any(sm => sm.UserId == userId))
             .Include(s => s.ChatCategories)
                 .ThenInclude(c => c.Chats)
             .Include(s => s.Chats.Where(c => c.CategoryId == null))
-            .OrderBy(s => s.Name)
             .ToListAsync(cancellationToken);
+
+        var orderMap = await _context.UserServerOrders
+            .Where(o => o.UserId == userId)
+            .ToDictionaryAsync(o => o.ServerId, o => o.Position, cancellationToken);
+
+        return servers
+            .OrderBy(s => orderMap.TryGetValue(s.Id, out var pos) ? pos : int.MaxValue)
+            .ThenBy(s => s.Name)
+            .ToList();
+    }
+
+    public async Task SaveUserServerOrderAsync(Guid userId, IReadOnlyList<Guid> orderedServerIds, CancellationToken cancellationToken = default)
+    {
+        var normalized = (orderedServerIds ?? Array.Empty<Guid>())
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        var memberServerIds = await _context.ServerMembers
+            .Where(sm => sm.UserId == userId)
+            .Select(sm => sm.ServerId)
+            .ToListAsync(cancellationToken);
+
+        var memberServerSet = memberServerIds.ToHashSet();
+        var validOrdered = normalized.Where(memberServerSet.Contains).ToList();
+
+        var existing = await _context.UserServerOrders
+            .Where(o => o.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        // Удаляем записи порядка для серверов, в которых пользователь больше не состоит.
+        var stale = existing.Where(o => !memberServerSet.Contains(o.ServerId)).ToList();
+        if (stale.Count > 0)
+        {
+            _context.UserServerOrders.RemoveRange(stale);
+        }
+
+        var existingByServerId = existing
+            .Where(o => memberServerSet.Contains(o.ServerId))
+            .ToDictionary(o => o.ServerId, o => o);
+
+        for (var i = 0; i < validOrdered.Count; i++)
+        {
+            var serverId = validOrdered[i];
+            if (existingByServerId.TryGetValue(serverId, out var order))
+            {
+                order.Position = i;
+            }
+            else
+            {
+                _context.UserServerOrders.Add(new UserServerOrder
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    ServerId = serverId,
+                    Position = i
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<Server> CreateAsync(Server server, CancellationToken cancellationToken = default)

@@ -7,7 +7,6 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import GhostBackground from '../../atoms/GhostBackground';
 import './StartupPreloader.css';
 
 const PIXELATE_SHADER = {
@@ -15,7 +14,7 @@ const PIXELATE_SHADER = {
     tDiffuse: { value: null },
     pixelSize: { value: 2.8 },
     resolution: { value: new THREE.Vector2(1, 1) },
-    tint: { value: new THREE.Vector3(1.0, 1.0, 1.0) }
+    tint: { value: new THREE.Vector3(0.96, 0.97, 1.02) }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -153,9 +152,9 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       renderer.setClearColor(0x000000, 0);
       viewport.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xff4500, 0.14);
-      const keyLight = new THREE.DirectionalLight(0xff7a45, 0.34);
-      const rimLight = new THREE.DirectionalLight(0xff4500, 0.22);
+      const ambientLight = new THREE.AmbientLight(0xb9bbbe, 0.28);
+      const keyLight = new THREE.DirectionalLight(0x5865f2, 0.42);
+      const rimLight = new THREE.DirectionalLight(0x7289da, 0.28);
       keyLight.position.set(8, 7, 6);
       rimLight.position.set(-6, -4, 5);
       scene.add(ambientLight, keyLight, rimLight);
@@ -163,16 +162,16 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       d20Geometry = new THREE.IcosahedronGeometry(2.7, 0);
       innerGeometry = new THREE.IcosahedronGeometry(2.56, 0);
       innerMaterial = new THREE.MeshBasicMaterial({
-        color: 0x0f2027,
+        color: 0x2f3136,
         transparent: true,
-        opacity: 0.94
+        opacity: 0.96
       });
       const innerMesh = new THREE.Mesh(innerGeometry, innerMaterial);
 
       d20Material = new THREE.MeshBasicMaterial({
-        color: 0x0f2027,
+        color: 0x36393f,
         transparent: true,
-        opacity: 0.28
+        opacity: 0.32
       });
       d20 = new THREE.Mesh(d20Geometry, d20Material);
       d20.add(innerMesh);
@@ -184,7 +183,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       lineGeometry = new LineSegmentsGeometry();
       lineGeometry.setPositions(edgeGeometry.attributes.position.array);
       edgeMaterial = new LineMaterial({
-        color: 0xff4500,
+        color: 0x5865f2,
         linewidth: 2.8,
         transparent: true,
         opacity: 0.95
@@ -195,10 +194,10 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       lineGlowGeometry = new LineSegmentsGeometry();
       lineGlowGeometry.setPositions(edgeGeometry.attributes.position.array);
       edgeGlowMaterial = new LineMaterial({
-        color: 0xff4500,
+        color: 0x5865f2,
         linewidth: 7.2,
         transparent: true,
-        opacity: 0.22
+        opacity: 0.2
       });
       const d20EdgesGlow = new LineSegments2(lineGlowGeometry, edgeGlowMaterial);
       d20.add(d20EdgesGlow);
@@ -230,7 +229,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ff4500';
+        ctx.fillStyle = '#dcddde';
         ctx.fillText(String(d20FaceNumbers[i / 3] ?? (i / 3) + 1), 8, 8.5);
 
         const texture = new THREE.CanvasTexture(canvas);
@@ -318,14 +317,6 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
 
   return (
     <div className={`startup-preloader ${isExiting ? 'is-exiting' : ''}`}>
-      <div className="startup-preloader__auth-bg">
-        <GhostBackground
-          backgroundOnly
-          hideGhost
-          zIndex={0}
-          stateKey="startupGhostAnimationInitialized"
-        />
-      </div>
       <div className="startup-preloader__noise" />
       <div className="startup-preloader__scanlines" />
 

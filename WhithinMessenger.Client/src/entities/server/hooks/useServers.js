@@ -298,17 +298,22 @@ export const useServers = (userId, onServerSelected = null, selectedServerId = n
   }, [userId]);
 
   const reorderServers = useCallback(async (serverIds) => {
-    if (!userId || !connectionRef.current) return;
+    if (!userId || !Array.isArray(serverIds) || serverIds.length === 0) return;
 
     try {
       setError(null);
-      await connectionRef.current.invoke('ReorderServers', serverIds);
+      // Optimistic reorder для моментального UX.
       setServers(prev => {
-        const reorderedServers = serverIds.map(id => 
-          prev.find(server => server.serverId === id)
-        ).filter(Boolean);
-        return reorderedServers;
+        const byId = new Map(prev.map(server => [server.serverId, server]));
+        const reordered = serverIds.map(id => byId.get(id)).filter(Boolean);
+        const reorderedSet = new Set(serverIds);
+        const rest = prev.filter(server => !reorderedSet.has(server.serverId));
+        return [...reordered, ...rest];
       });
+
+      if (connectionRef.current) {
+        await connectionRef.current.invoke('ReorderServers', serverIds);
+      }
     } catch (err) {
       console.error('Error reordering servers:', err);
       setError(err.message);

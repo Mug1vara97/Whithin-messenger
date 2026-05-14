@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowMinimize: () => ipcRenderer.send('electron:window-minimize'),
   windowToggleMaximize: () => ipcRenderer.send('electron:window-toggle-maximize'),
   windowClose: () => ipcRenderer.send('electron:window-close'),
+  navigationBack: () => ipcRenderer.send('electron:navigation-back'),
+  navigationForward: () => ipcRenderer.send('electron:navigation-forward'),
+  navigationReload: () => ipcRenderer.send('electron:navigation-reload'),
 
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),

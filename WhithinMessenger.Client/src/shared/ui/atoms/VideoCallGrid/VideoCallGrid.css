@@ -165,8 +165,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  -webkit-backdrop-filter: blur(10px); /* Added for Safari */
-  backdrop-filter: blur(10px);
 }
 
 .bottom-info {
@@ -1017,18 +1015,6 @@
   color: #b9bbbe;
 }
 
-.screen-share-audio-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  background: rgba(88, 101, 242, 0.2);
-  border-radius: 3px;
-  margin-left: 6px;
-  flex-shrink: 0;
-}
-
 .close-screen-share-btn {
   background: #ed4245;
   color: white;
@@ -1061,7 +1047,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin-left: 8px;
+  margin-left: 0;
   padding: 0;
   background: rgba(88, 101, 242, 0.25);
   color: #b9bbbe;

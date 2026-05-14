@@ -1128,15 +1128,6 @@ const ChatRoom = ({
               >
                 {isRecording ? <Stop /> : <Mic />}
               </button>
-              <button
-                type="button"
-                onClick={handleVideoNoteRecording}
-                disabled={isRecording}
-                className={`video-note-button ${isRecordingVideoNote ? 'recording' : ''}`}
-                title={isRecordingVideoNote ? "Нажмите для остановки и отправки кружка" : "Видеокружок (до 60 с, фронтальная камера)"}
-              >
-                {isRecordingVideoNote ? <Stop /> : <Videocam />}
-              </button>
             </div>
             
             <input

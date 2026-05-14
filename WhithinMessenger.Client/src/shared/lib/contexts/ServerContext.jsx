@@ -225,13 +225,28 @@ export const ServerProvider = ({ children }) => {
   }, []);
 
   const reorderServers = useCallback(async (serverIds) => {
+    if (!Array.isArray(serverIds) || serverIds.length === 0) return;
+
+    // Optimistic reorder для моментального UX.
+    setServers((prev) => {
+      const byId = new Map(prev.map((server) => [server.serverId, server]));
+      const reordered = serverIds
+        .map((id) => byId.get(id))
+        .filter(Boolean);
+
+      // Добавляем хвостом серверы, которых нет в serverIds (защита от рассинхрона).
+      const reorderedSet = new Set(serverIds);
+      const untouched = prev.filter((server) => !reorderedSet.has(server.serverId));
+      return [...reordered, ...untouched];
+    });
+
     if (!connectionRef.current) return;
 
     try {
       await connectionRef.current.invoke('ReorderServers', serverIds);
     } catch (err) {
+      // Не блокируем локальный reorder, даже если синхронизация не удалась.
       console.error('ServerContext: Error reordering servers:', err);
-      setError(err.message);
     }
   }, []);
 

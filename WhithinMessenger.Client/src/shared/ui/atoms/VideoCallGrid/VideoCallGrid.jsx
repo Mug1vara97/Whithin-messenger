@@ -505,22 +505,6 @@ const VideoCallGrid = ({
                 <div className="screen-share-status">
                   <span className="status-indicator screen-share-indicator"></span>
                   <span className="status-text">Демонстрация экрана</span>
-                  <div className="screen-share-audio-indicator">
-                    <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16, color: '#5865f2' }} />
-                  </div>
-                  <button
-                    type="button"
-                    className="screen-share-fullscreen-btn"
-                    onClick={(e) => handleScreenShareFullscreen(participant.id, e)}
-                    title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
-                    aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
-                  >
-                    {fullscreenScreenShareId === participant.id ? (
-                      <FullscreenExitIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
-                    ) : (
-                      <FullscreenIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
-                    )}
-                  </button>
                 </div>
               ) : (
                 <>
@@ -545,54 +529,72 @@ const VideoCallGrid = ({
             
             {/* Volume controls */}
             <div className="tile-volume-controls">
-              <button 
-                className={`tile-volume-btn ${
-                  isAudioMuted || volume === 0
-                    ? 'muted'
-                    : isSpeaking
-                    ? 'speaking'
-                    : 'silent'
-                }`}
-                onClick={handleVolumeClick}
-                onContextMenu={handleVolumeRightClick}
-                title="ЛКМ - мут, ПКМ - слайдер"
-              >
-                {isAudioMuted || volume === 0 ? (
-                  <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                ) : (
-                  <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                )}
-              </button>
+              {isScreenShare ? (
+                <button
+                  type="button"
+                  className="screen-share-fullscreen-btn"
+                  onClick={(e) => handleScreenShareFullscreen(participant.id, e)}
+                  title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                  aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                >
+                  {fullscreenScreenShareId === participant.id ? (
+                    <FullscreenExitIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                  ) : (
+                    <FullscreenIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                  )}
+                </button>
+              ) : (
+                <>
+                  <button 
+                    className={`tile-volume-btn ${
+                      isAudioMuted || volume === 0
+                        ? 'muted'
+                        : isSpeaking
+                        ? 'speaking'
+                        : 'silent'
+                    }`}
+                    onClick={handleVolumeClick}
+                    onContextMenu={handleVolumeRightClick}
+                    title="ЛКМ - мут, ПКМ - слайдер"
+                  >
+                    {isAudioMuted || volume === 0 ? (
+                      <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+                    ) : (
+                      <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+                    )}
+                  </button>
 
-              {/* Volume slider */}
-              {showSlider && (
-                <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
-                  <Slider
-                    value={volume}
-                    onChange={handleSliderChange}
-                    orientation="vertical"
-                    min={0}
-                    max={100}
-                    step={1}
-                    size="small"
-                    sx={{
-                      color: '#5865f2',
-                      height: '80px',
-                      '& .MuiSlider-track': {
-                        backgroundColor: '#5865f2',
-                      },
-                      '& .MuiSlider-thumb': {
-                        backgroundColor: '#fff',
-                        width: 12,
-                        height: 12,
-                        '&:hover': {
-                          boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
-                        },
-                      },
-                    }}
-                  />
-                  <span className="volume-percentage">{volume}%</span>
-                </div>
+                  {/* Volume slider */}
+                  {showSlider && (
+                    <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
+                      <Slider
+                        value={volume}
+                        onChange={handleSliderChange}
+                        orientation="vertical"
+                        min={0}
+                        max={100}
+                        step={1}
+                        size="small"
+                        sx={{
+                          color: '#5865f2',
+                          height: '80px',
+                          '& .MuiSlider-track': {
+                            backgroundColor: '#5865f2',
+                          },
+                          '& .MuiSlider-thumb': {
+                            backgroundColor: '#fff',
+                            width: 12,
+                            height: 12,
+                            '&:hover': {
+                              boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
+                            },
+                          },
+                        }}
+                      />
+                      <span className="volume-percentage">{volume}%</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

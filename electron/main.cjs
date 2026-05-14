@@ -83,18 +83,20 @@ const SERVER_LIST_BAR_COLOR = '#1e1f22';
 
 /** Подпись в левой части кастомной шапки (Win/Linux) */
 const APP_DISPLAY_NAME = 'Whithin';
+const APP_ICON_PATH = path.join(__dirname, 'app-icon.png');
 
 /** Высота полоски шапки; синхронно с preload.cjs TITLE_BAR_OVERLAY_HEIGHT */
 const TITLE_BAR_OVERLAY_HEIGHT = 32;
 
-/** Зона справа: три кнопки с иконками + отступы */
-const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 124;
+/** Зона справа: reload + три кнопки окна */
+const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 176;
 
 let mainWindow = null;
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
 let lastSelectedScreenSource = null;
 let tray = null;
+let mouseShortcutBindings = [];
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 
@@ -153,6 +155,78 @@ function webHotkeyToElectronAccelerator(webkit) {
     return p;
   });
   return out.join('+');
+}
+
+function parseMouseHotkey(webkit) {
+  if (!webkit || typeof webkit !== 'string') {
+    return null;
+  }
+
+  const parts = webkit
+    .split('+')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (!parts.length) {
+    return null;
+  }
+
+  const normalized = parts.map((p) => p.toLowerCase());
+  const buttonToken =
+    normalized.find((p) => ['mouse4', 'mouse5', 'leftclick', 'middleclick', 'rightclick'].includes(p)) || null;
+
+  if (!buttonToken) {
+    return null;
+  }
+
+  const buttonMap = {
+    mouse4: 'back',
+    mouse5: 'forward',
+    leftclick: 'left',
+    middleclick: 'middle',
+    rightclick: 'right'
+  };
+
+  return {
+    button: buttonMap[buttonToken],
+    modifiers: {
+      control: normalized.includes('ctrl') || normalized.includes('control'),
+      alt: normalized.includes('alt'),
+      shift: normalized.includes('shift'),
+      meta: normalized.includes('cmd') || normalized.includes('command') || normalized.includes('meta')
+    }
+  };
+}
+
+function normalizeInputMouseButton(input) {
+  const raw = String(input?.button ?? '').toLowerCase();
+  if (raw === 'back' || raw === 'x1' || raw === 'xbutton1' || raw === 'button4' || raw === '3') return 'back';
+  if (raw === 'forward' || raw === 'x2' || raw === 'xbutton2' || raw === 'button5' || raw === '4') return 'forward';
+  if (raw === 'left') return 'left';
+  if (raw === 'middle') return 'middle';
+  if (raw === 'right') return 'right';
+  return raw || null;
+}
+
+function isMouseShortcutMatch(binding, input) {
+  if (!binding || !input) return false;
+  const btn = normalizeInputMouseButton(input);
+  if (!btn || btn !== binding.button) return false;
+  return (
+    Boolean(input.control) === Boolean(binding.modifiers.control) &&
+    Boolean(input.alt) === Boolean(binding.modifiers.alt) &&
+    Boolean(input.shift) === Boolean(binding.modifiers.shift) &&
+    Boolean(input.meta) === Boolean(binding.modifiers.meta)
+  );
+}
+
+function navigateRendererHistory(win, direction) {
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+
+  const script = direction === 'forward' ? 'window.history.forward();' : 'window.history.back();';
+  win.webContents.executeJavaScript(script).catch(() => {});
 }
 
 function openScreenPickerWindow(sources) {
@@ -319,6 +393,33 @@ button.electron-tl svg {
   display: block !important;
   pointer-events: none !important;
 }
+button.electron-nav svg {
+  display: block !important;
+  pointer-events: none !important;
+}
+button.electron-nav {
+  color: #9aa1ac !important;
+}
+button.electron-nav:hover {
+  color: #d2d6de !important;
+}
+button.electron-reload-pill {
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 24px !important;
+  margin-right: 6px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #9aa1ac !important;
+}
+button.electron-reload-pill:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #d2d6de !important;
+}
+button.electron-reload-pill:active {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
 button.electron-tl:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   filter: none !important;
@@ -405,7 +506,20 @@ function installCustomTitlebarChrome(webContents) {
             var cMax = '#28c840';
             var cMin = '#ffbd2e';
             var cClose = '#ff5f57';
+            var cNav = '#9aa1ac';
             var sw = '1.35';
+            var iconReload =
+              '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
+              '<path d="M9.2 3.2A4.2 4.2 0 106 10.2" fill="none" stroke="' +
+              cNav +
+              '" stroke-width="' +
+              sw +
+              '" stroke-linecap="round"/>' +
+              '<path d="M9.2 3.2v2.4H6.8" fill="none" stroke="' +
+              cNav +
+              '" stroke-width="' +
+              sw +
+              '" stroke-linecap="round" stroke-linejoin="round"/></svg>';
             var iconMax =
               '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
               '<rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1" fill="none" stroke="' +
@@ -444,6 +558,20 @@ function installCustomTitlebarChrome(webContents) {
               ctr.appendChild(b);
             }
             addTl(
+              'electron-nav electron-reload-pill',
+              'Перезагрузить',
+              function () {
+                try {
+                  window.location.reload();
+                } catch (_) {
+                  if (window.electronAPI.navigationReload) {
+                    window.electronAPI.navigationReload();
+                  }
+                }
+              },
+              iconReload
+            );
+            addTl(
               'electron-tl-max',
               'Развернуть',
               function () {
@@ -479,15 +607,25 @@ function installCustomTitlebarChrome(webContents) {
 
 function registerGlobalShortcuts(shortcuts = {}) {
   globalShortcut.unregisterAll();
+  mouseShortcutBindings = [];
 
   Object.entries(shortcuts).forEach(([action, accelerator]) => {
     if (!accelerator) {
       return;
     }
 
+    const mouseBinding = parseMouseHotkey(String(accelerator));
+    if (mouseBinding) {
+      mouseShortcutBindings.push({ action, ...mouseBinding });
+      return;
+    }
+
     const acc = webHotkeyToElectronAccelerator(String(accelerator));
     if (!acc) {
-      console.warn(`[shortcuts] Skip unsupported or mouse-only hotkey for "${action}":`, accelerator);
+      if (/Mouse|Click|AuxClick/i.test(String(accelerator))) {
+        return;
+      }
+      console.warn(`[shortcuts] Skip unsupported hotkey for "${action}":`, accelerator);
       return;
     }
 
@@ -517,6 +655,13 @@ function getTrayImage() {
   return nativeImage.createFromDataURL(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
   );
+}
+
+function getWindowIconPath() {
+  if (fs.existsSync(APP_ICON_PATH)) {
+    return APP_ICON_PATH;
+  }
+  return undefined;
 }
 
 function showMainWindow() {
@@ -581,6 +726,7 @@ function createTray() {
 function createWindow() {
   const windowOptions = {
     title: APP_DISPLAY_NAME,
+    icon: getWindowIconPath(),
     width: 1400,
     height: 900,
     minWidth: 1100,
@@ -613,6 +759,42 @@ function createWindow() {
       } else {
         mainWindow.webContents.openDevTools({ mode: 'detach' });
       }
+      return;
+    }
+
+    if (input.type === 'mouseDown' && mouseShortcutBindings.length > 0) {
+      const matched = mouseShortcutBindings.find((binding) => isMouseShortcutMatch(binding, input));
+      if (matched && shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()) {
+        shortcutCallbackWebContents.send('global-shortcut-triggered', matched.action);
+        _event.preventDefault();
+        return;
+      }
+    }
+  });
+
+  mainWindow.on('app-command', (event, command) => {
+    if (!mouseShortcutBindings.length) {
+      return;
+    }
+
+    const cmd = String(command || '').toLowerCase();
+    const button = cmd === 'browser-backward' ? 'back' : cmd === 'browser-forward' ? 'forward' : null;
+    if (!button) {
+      return;
+    }
+
+    const matched = mouseShortcutBindings.find(
+      (binding) =>
+        binding.button === button &&
+        !binding.modifiers.control &&
+        !binding.modifiers.alt &&
+        !binding.modifiers.shift &&
+        !binding.modifiers.meta
+    );
+
+    if (matched && shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()) {
+      shortcutCallbackWebContents.send('global-shortcut-triggered', matched.action);
+      event.preventDefault();
     }
   });
 
@@ -755,6 +937,29 @@ ipcMain.on('electron:window-close', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win && !win.isDestroyed()) {
     win.close();
+  }
+});
+
+ipcMain.on('electron:navigation-back', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+  navigateRendererHistory(win, 'back');
+});
+
+ipcMain.on('electron:navigation-forward', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+  navigateRendererHistory(win, 'forward');
+});
+
+ipcMain.on('electron:navigation-reload', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.webContents.reload();
   }
 });
 

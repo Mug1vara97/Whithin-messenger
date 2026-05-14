@@ -58,3 +58,30 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary, #5865f2) var(--surface, #2f3136);
+}
+
+/* Chromium / WebKit */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--surface, #2f3136);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary, #5865f2), var(--primary-hover, #4752c4));
+  border-radius: 999px;
+  border: 2px solid var(--surface, #2f3136);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--primary, #5865f2);
+}
