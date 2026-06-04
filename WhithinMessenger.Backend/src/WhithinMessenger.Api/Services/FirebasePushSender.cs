@@ -73,6 +73,33 @@ public class FirebasePushSender : IFirebasePushSender
         );
     }
 
+    public async Task SendFriendRequestNotificationAsync(
+        string deviceToken,
+        Guid requestId,
+        Guid senderId,
+        string senderUsername,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var displayName = string.IsNullOrWhiteSpace(senderUsername) ? "Пользователь" : senderUsername.Trim();
+        var title = "Запрос в друзья";
+        var message = $"{displayName} хочет добавить вас в друзья";
+
+        await SendDataPushAsync(
+            deviceToken,
+            new Dictionary<string, string>
+            {
+                ["type"] = "friend_request",
+                ["request_id"] = requestId.ToString(),
+                ["sender_id"] = senderId.ToString(),
+                ["sender_username"] = displayName,
+                ["title"] = title,
+                ["message"] = message
+            },
+            cancellationToken
+        );
+    }
+
     private async Task SendDataPushAsync(
         string deviceToken,
         Dictionary<string, string> data,

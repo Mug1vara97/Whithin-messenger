@@ -17,4 +17,12 @@ public interface IFirebasePushSender
         string callerName,
         CancellationToken cancellationToken = default
     );
+
+    Task SendFriendRequestNotificationAsync(
+        string deviceToken,
+        Guid requestId,
+        Guid senderId,
+        string senderUsername,
+        CancellationToken cancellationToken = default
+    );
 }

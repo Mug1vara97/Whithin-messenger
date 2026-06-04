@@ -10,15 +10,18 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserRepository _userRepository;
     private readonly IFriendRealtimeNotifier _friendRealtimeNotifier;
+    private readonly INotificationService _notificationService;
 
     public SendFriendRequestCommandHandler(
         IFriendshipRepository friendshipRepository, 
         IUserRepository userRepository,
-        IFriendRealtimeNotifier friendRealtimeNotifier)
+        IFriendRealtimeNotifier friendRealtimeNotifier,
+        INotificationService notificationService)
     {
         _friendshipRepository = friendshipRepository;
         _userRepository = userRepository;
         _friendRealtimeNotifier = friendRealtimeNotifier;
+        _notificationService = notificationService;
     }
 
     public async Task<SendFriendRequestResult> Handle(SendFriendRequestCommand request, CancellationToken cancellationToken)
@@ -64,11 +67,20 @@ public class SendFriendRequestCommandHandler : IRequestHandler<SendFriendRequest
 
         await _friendshipRepository.CreateAsync(friendship, cancellationToken);
 
+        var senderUsername = requester.UserName ?? string.Empty;
+
         await _friendRealtimeNotifier.NotifyFriendRequestReceivedAsync(
             addresseeId: request.AddresseeId,
             requestId: friendship.Id,
             senderId: request.RequesterId,
-            senderUsername: requester.UserName ?? string.Empty,
+            senderUsername: senderUsername,
+            cancellationToken: cancellationToken);
+
+        await _notificationService.SendFriendRequestPushAsync(
+            addresseeId: request.AddresseeId,
+            requestId: friendship.Id,
+            senderId: request.RequesterId,
+            senderUsername: senderUsername,
             cancellationToken: cancellationToken);
 
         return new SendFriendRequestResult(true, FriendshipId: friendship.Id);

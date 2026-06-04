@@ -117,6 +117,38 @@ public class NotificationService : INotificationService
         }
     }
 
+    public async Task SendFriendRequestPushAsync(
+        Guid addresseeId,
+        Guid requestId,
+        Guid senderId,
+        string senderUsername,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await _userPushTokenStore.GetTokensAsync(addresseeId, cancellationToken);
+        if (tokens.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var token in tokens)
+        {
+            try
+            {
+                await _firebasePushSender.SendFriendRequestNotificationAsync(
+                    deviceToken: token,
+                    requestId: requestId,
+                    senderId: senderId,
+                    senderUsername: senderUsername,
+                    cancellationToken: cancellationToken
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Friend-request push failed for user {addresseeId}: {ex.Message}");
+            }
+        }
+    }
+
     private async Task SendPushToRegisteredDevicesAsync(
         Guid userId,
         Guid chatId,
