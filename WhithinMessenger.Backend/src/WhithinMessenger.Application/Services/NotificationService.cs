@@ -31,6 +31,7 @@ public class NotificationService : INotificationService
         string type,
         string content,
         Guid? serverId = null,
+        string? chatDisplayName = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -69,6 +70,7 @@ public class NotificationService : INotificationService
                 chatId: chatId,
                 type: type,
                 content: content,
+                chatDisplayName: chatDisplayName,
                 cancellationToken: cancellationToken
             );
 
@@ -154,6 +156,7 @@ public class NotificationService : INotificationService
         Guid chatId,
         string type,
         string content,
+        string? chatDisplayName,
         CancellationToken cancellationToken
     )
     {
@@ -163,12 +166,14 @@ public class NotificationService : INotificationService
             return;
         }
 
-        var title = type switch
-        {
-            "direct_message" => "New message",
-            "group_message" => "New message in group",
-            _ => "Whithin"
-        };
+        var resolvedChatTitle = !string.IsNullOrWhiteSpace(chatDisplayName)
+            ? chatDisplayName.Trim()
+            : type switch
+            {
+                "direct_message" => "New message",
+                "group_message" => "New message in group",
+                _ => "Whithin"
+            };
 
         foreach (var token in tokens)
         {
@@ -177,7 +182,7 @@ public class NotificationService : INotificationService
                 await _firebasePushSender.SendChatNotificationAsync(
                     deviceToken: token,
                     chatId: chatId,
-                    title: title,
+                    title: resolvedChatTitle,
                     message: content,
                     cancellationToken: cancellationToken
                 );

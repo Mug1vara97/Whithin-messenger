@@ -797,13 +797,20 @@ public class GroupChatHub : Hub
 
                 foreach (var memberId in notificationMembers)
                 {
+                    var pushChatTitle = chatName;
+                    if (!isGroupChat && chat.Type?.TypeName == "Private")
+                    {
+                        pushChatTitle = senderUsername;
+                    }
+
                     await _notificationService.CreateNotificationAsync(
                         memberId,
                         chatId,
                         messageId,
                         notificationType,
                         notificationContent,
-                        chat.ServerId
+                        chat.ServerId,
+                        pushChatTitle
                     );
 
                     var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, memberId);
