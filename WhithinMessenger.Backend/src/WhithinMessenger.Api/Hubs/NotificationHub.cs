@@ -9,6 +9,9 @@ namespace WhithinMessenger.Api.Hubs;
 public class NotificationHub : Hub
 {
     private static readonly ConcurrentDictionary<Guid, int> ActiveConnections = new();
+
+    public static bool HasActiveConnection(Guid userId) =>
+        ActiveConnections.TryGetValue(userId, out var count) && count > 0;
     private readonly WithinDbContext _context;
 
     public NotificationHub(WithinDbContext context)

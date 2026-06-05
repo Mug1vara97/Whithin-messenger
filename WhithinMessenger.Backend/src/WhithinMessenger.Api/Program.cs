@@ -23,6 +23,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IFirebasePushSender, FirebasePushSender>();
 builder.Services.AddScoped<IFriendRealtimeNotifier, FriendRealtimeNotifier>();
+builder.Services.AddScoped<IMessageReceiptService, MessageReceiptService>();
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
 {

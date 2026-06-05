@@ -7,6 +7,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Media.GetMediaFiles;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Api.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
@@ -18,17 +19,20 @@ public class MediaController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IFileService _fileService;
     private readonly IHubContext<GroupChatHub> _hubContext;
+    private readonly IMessageReceiptService _messageReceiptService;
     private readonly ILogger<MediaController> _logger;
 
     public MediaController(
         IMediator mediator,
         IFileService fileService,
         IHubContext<GroupChatHub> hubContext,
+        IMessageReceiptService messageReceiptService,
         ILogger<MediaController> logger)
     {
         _mediator = mediator;
         _fileService = fileService;
         _hubContext = hubContext;
+        _messageReceiptService = messageReceiptService;
         _logger = logger;
     }
 
@@ -110,6 +114,14 @@ public class MediaController : ControllerBase
                             mediaFiles = mediaFiles,
                             status = MessageStatusHelper.Sent
                         });
+
+                    if (result.MessageId.HasValue)
+                    {
+                        await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+                            chatId,
+                            result.MessageId.Value,
+                            userId.Value);
+                    }
                 }
                 catch (Exception ex)
                 {

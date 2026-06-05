@@ -16,6 +16,7 @@ using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Api.Services;
 using System.Security.Claims;
 using System.Linq;
 
@@ -30,6 +31,7 @@ public class GroupChatHub : Hub
     private readonly INotificationService _notificationService;
     private readonly IChatRepository _chatRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly IMessageReceiptService _messageReceiptService;
 
     public GroupChatHub(
         IMediator mediator,
@@ -38,7 +40,8 @@ public class GroupChatHub : Hub
         ILogger<GroupChatHub> logger,
         INotificationService notificationService,
         IChatRepository chatRepository,
-        IMessageRepository messageRepository)
+        IMessageRepository messageRepository,
+        IMessageReceiptService messageReceiptService)
     {
         _mediator = mediator;
         _chatListHubContext = chatListHubContext;
@@ -47,6 +50,7 @@ public class GroupChatHub : Hub
         _notificationService = notificationService;
         _chatRepository = chatRepository;
         _messageRepository = messageRepository;
+        _messageReceiptService = messageReceiptService;
     }
 
         public async Task JoinGroup(string chatId)
@@ -397,6 +401,11 @@ public class GroupChatHub : Hub
                         result.MessageId,
                         message
                     );
+
+                    await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+                        parsedChatId,
+                        result.MessageId.Value,
+                        userId.Value);
                 }
                 else
                 {
@@ -522,14 +531,14 @@ public class GroupChatHub : Hub
                 }
 
                 var wasMarked = await _messageRepository.MarkMessageReadAsync(messageId, userId.Value);
-                if (!wasMarked)
+
+                if (wasMarked)
                 {
-                    return;
+                    var readAt = DateTimeOffset.UtcNow;
+                    await Clients.Group(chatId.ToString()).SendAsync("MessageRead", messageId, userId, readAt);
                 }
 
-                var readAt = DateTimeOffset.UtcNow;
-                await Clients.Group(chatId.ToString()).SendAsync("MessageRead", messageId, userId, readAt);
-                await BroadcastMessageStatusAsync(messageId, chatId);
+                await _messageReceiptService.BroadcastMessageStatusAsync(chatId, messageId);
             }
             catch (Exception ex)
             {
@@ -556,7 +565,7 @@ public class GroupChatHub : Hub
                     await Clients.Group(chatId.ToString()).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
                 }
 
-                await BroadcastMessageStatusAsync(messageId, chatId);
+                await _messageReceiptService.BroadcastMessageStatusAsync(chatId, messageId);
             }
             catch (Exception ex)
             {
@@ -645,6 +654,11 @@ public class GroupChatHub : Hub
                         result.MessageId,
                         "Отправил медиафайл"
                     );
+
+                    await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+                        parsedChatId,
+                        result.MessageId.Value,
+                        userId.Value);
                 }
                 else
                 {
@@ -768,34 +782,6 @@ public class GroupChatHub : Hub
             Console.Error.WriteLine($"Error sending call notification: {ex.Message}");
         }
     }
-
-        private async Task BroadcastMessageStatusAsync(Guid messageId, Guid chatId)
-        {
-            var message = await _messageRepository.GetByIdAsync(messageId);
-            if (message == null)
-            {
-                return;
-            }
-
-            var chatMembers = await _chatRepository.GetChatMembersAsync(chatId);
-            var recipientCount = Math.Max(0, chatMembers.Count - 1);
-            if (recipientCount <= 0)
-            {
-                return;
-            }
-
-            var status = await _messageRepository.GetMessageStatusAsync(
-                messageId,
-                message.UserId,
-                recipientCount);
-
-            if (string.IsNullOrEmpty(status))
-            {
-                return;
-            }
-
-            await Clients.Group(chatId.ToString()).SendAsync("MessageStatusChanged", messageId, status);
-        }
 
         // Вспомогательный метод для получения текущего пользователя
         private Guid? GetCurrentUserId()

@@ -153,6 +153,7 @@ const HomePage = () => {
 
     let mounted = true;
     let incomingCallHandler = null;
+    let messageSentHandler = null;
 
     const setupIncomingCallListener = async () => {
       try {
@@ -215,7 +216,25 @@ const HomePage = () => {
           }
         };
 
+        messageSentHandler = (payload) => {
+          const messageId = payload?.messageId ?? payload?.MessageId;
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          const senderId = payload?.senderId ?? payload?.SenderId;
+          if (!messageId || !chatIdValue) return;
+          if (String(senderId) === String(user.id)) return;
+
+          const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!uuidPattern.test(String(messageId))) return;
+
+          connection
+            .invoke('AcknowledgeDelivery', String(messageId), String(chatIdValue))
+            .catch((error) => {
+              console.warn('HomePage: AcknowledgeDelivery failed:', error);
+            });
+        };
+
         connection.on('IncomingCall', incomingCallHandler);
+        connection.on('MessageSent', messageSentHandler);
         groupChatConnectionRef.current = connection;
       } catch (error) {
         console.error('HomePage: failed to setup IncomingCall listener', error);
@@ -226,8 +245,13 @@ const HomePage = () => {
 
     return () => {
       mounted = false;
-      if (incomingCallHandler && groupChatConnectionRef.current) {
-        groupChatConnectionRef.current.off('IncomingCall', incomingCallHandler);
+      if (groupChatConnectionRef.current) {
+        if (incomingCallHandler) {
+          groupChatConnectionRef.current.off('IncomingCall', incomingCallHandler);
+        }
+        if (messageSentHandler) {
+          groupChatConnectionRef.current.off('MessageSent', messageSentHandler);
+        }
       }
     };
   }, [getConnection, user?.id]);
