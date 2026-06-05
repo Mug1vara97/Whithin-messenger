@@ -147,10 +147,97 @@
   gap: 14px;
 }
 
+.kindRow {
+  display: flex;
+  gap: 8px;
+}
+
+.kindBtn {
+  flex: 1;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--background-primary, #2f3136);
+  color: var(--text-muted, #8e9297);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kindBtn:hover {
+  background: var(--hover, #40444b);
+  color: var(--text, #dcddde);
+}
+
+.kindBtnActive {
+  border-color: var(--primary, #5865f2);
+  color: var(--text, #dcddde);
+  background: rgba(var(--primary-rgb, 88, 101, 242), 0.18);
+}
+
+.gradientHint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted, #8e9297);
+}
+
 .gradientStopsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 12px;
+}
+
+.stopCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--background-primary, #2f3136);
+}
+
+.stopCardDisabled {
+  opacity: 0.45;
+}
+
+.stopToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary, #b9bbbe);
+  cursor: pointer;
+  user-select: none;
+}
+
+.stopToggle input {
+  accent-color: var(--primary, #5865f2);
+  cursor: pointer;
+}
+
+.enabledCountHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted, #8e9297);
+}
+
+.presetWideBtn {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--background-primary, #2f3136);
+  color: var(--text, #dcddde);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.presetWideBtn:hover {
+  background: var(--hover, #40444b);
 }
 
 @media (max-width: 420px) {

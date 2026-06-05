@@ -8,9 +8,28 @@ import {
   applyThemeToRoot,
   extractFirstHexFromThemeValue
 } from '../../../lib/theme/appTheme';
+import {
+  GRADIENT_STOP_COUNT,
+  MESH_VIVID_PRESET,
+  adjustHue,
+  applyMeshPreset,
+  buildGradientCss,
+  collectHexes,
+  convertGradientKind,
+  createDefaultStops,
+  isAdvancedPaint,
+  linearStopLabel,
+  meshStopLabel,
+  parseGradientUi
+} from '../../../lib/theme/themeGradientEditor';
 import styles from './ThemeColorMenu.module.css';
 
 const colorPickerValue = (raw, key) => extractFirstHexFromThemeValue(raw) || DEFAULT_THEME[key] || '#5865f2';
+
+function isPlainHex(value) {
+  const s = (value || '').trim();
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(s);
+}
 
 function expandHex(hex) {
   if (!hex || typeof hex !== 'string') return '#000000';
@@ -27,110 +46,6 @@ function expandHex(hex) {
   return `#${h.toLowerCase()}`;
 }
 
-function isPlainHex(value) {
-  const s = (value || '').trim();
-  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(s);
-}
-
-function collectHexes(str) {
-  const m = str.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi);
-  return [...m].map((x) => expandHex(`#${x[1]}`));
-}
-
-const GRADIENT_STOP_COUNT = 6;
-
-function stopPositionPercent(index) {
-  if (GRADIENT_STOP_COUNT <= 1) return 0;
-  return Math.round((index / (GRADIENT_STOP_COUNT - 1)) * 100);
-}
-
-function interpolateHex(c1, c2, t) {
-  const parse = (hex) => {
-    const n = parseInt(expandHex(hex).slice(1), 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  };
-  const [r1, g1, b1] = parse(c1);
-  const [r2, g2, b2] = parse(c2);
-  const ratio = Math.min(1, Math.max(0, t));
-  const r = Math.round(r1 + (r2 - r1) * ratio);
-  const g = Math.round(g1 + (g2 - g1) * ratio);
-  const b = Math.round(b1 + (b2 - b1) * ratio);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-/** Дополняет до 6 стопов, равномерно распределяя имеющиеся цвета. */
-function expandToSixStops(hexes, fallbackHex) {
-  const source = (hexes?.length ? hexes : [fallbackHex]).map(expandHex);
-  if (source.length >= GRADIENT_STOP_COUNT) {
-    return source.slice(0, GRADIENT_STOP_COUNT);
-  }
-  if (source.length === 1) {
-    return Array.from({ length: GRADIENT_STOP_COUNT }, () => source[0]);
-  }
-  return Array.from({ length: GRADIENT_STOP_COUNT }, (_, index) => {
-    const t = index / (GRADIENT_STOP_COUNT - 1);
-    const srcIndex = t * (source.length - 1);
-    const lo = Math.floor(srcIndex);
-    const hi = Math.min(source.length - 1, Math.ceil(srcIndex));
-    if (lo === hi) return source[lo];
-    return interpolateHex(source[lo], source[hi], srcIndex - lo);
-  });
-}
-
-function parseLinearGradientAngle(inner) {
-  let angle = 180;
-  const degM = inner.match(/^(-?\d+(?:\.\d+)?)deg\s*,/i);
-  if (degM) {
-    angle = Math.round(parseFloat(degM[1])) % 360;
-  } else {
-    const head = inner.split(',')[0].toLowerCase();
-    if (head.includes('to bottom right') || head.includes('to right bottom')) angle = 135;
-    else if (head.includes('to top right') || head.includes('to right top')) angle = 45;
-    else if (head.includes('to bottom left') || head.includes('to left bottom')) angle = 225;
-    else if (head.includes('to top left') || head.includes('to left top')) angle = 315;
-    else if (head.includes('to right')) angle = 90;
-    else if (head.includes('to left')) angle = 270;
-    else if (head.includes('to bottom')) angle = 180;
-    else if (head.includes('to top')) angle = 0;
-    else {
-      const anyDeg = inner.match(/(-?\d+(?:\.\d+)?)deg/i);
-      if (anyDeg) angle = Math.round(parseFloat(anyDeg[1])) % 360;
-    }
-  }
-  return ((angle % 360) + 360) % 360;
-}
-
-/** Угол (deg) и до 6 цветов из linear-gradient. Поддержка Ndeg и to top/right/... */
-function parseLinearGradientUi(raw) {
-  const s = (raw || '').trim();
-  const open = /^linear-gradient\s*\(\s*(.*)\)$/i.exec(s);
-  if (!open) return null;
-  const inner = open[1];
-  const hexes = collectHexes(inner);
-  if (hexes.length < 2) return null;
-
-  return {
-    angle: parseLinearGradientAngle(inner),
-    stops: expandToSixStops(hexes, hexes[0]),
-  };
-}
-
-function buildLinearGradient(angle, stops) {
-  const a = ((Math.round(Number(angle)) % 360) + 360) % 360;
-  const list = Array.isArray(stops) ? stops : [stops].filter(Boolean);
-  const colors = expandToSixStops(list, list[0] || '#36393f');
-  const parts = colors.map((color, index) => `${expandHex(color)} ${stopPositionPercent(index)}%`);
-  return `linear-gradient(${a}deg, ${parts.join(', ')})`;
-}
-
-function isAdvancedPaint(raw) {
-  const s = (raw || '').trim();
-  if (!s) return false;
-  if (isPlainHex(s)) return false;
-  if (/^linear-gradient\s*\(/i.test(s) && parseLinearGradientUi(s)) return false;
-  return true;
-}
-
 const ANGLE_PRESETS = [
   { label: '→', angle: 90, title: 'Вправо' },
   { label: '←', angle: 270, title: 'Влево' },
@@ -142,55 +57,106 @@ const ANGLE_PRESETS = [
 
 function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
   const advanced = isAdvancedPaint(raw);
-  const parsedLinear = useMemo(() => parseLinearGradientUi(raw), [raw]);
+  const parsed = useMemo(() => parseGradientUi(raw, fallbackHex), [raw, fallbackHex]);
 
   const [tab, setTab] = useState(() => {
     if (advanced) return 'advanced';
-    if (parsedLinear) return 'gradient';
+    if (parsed) return 'gradient';
     return 'solid';
   });
 
+  const [gradientKind, setGradientKind] = useState(() => parsed?.kind || 'linear');
+
   useEffect(() => {
     const adv = isAdvancedPaint(raw);
-    const parsed = parseLinearGradientUi(raw);
+    const nextParsed = parseGradientUi(raw, fallbackHex);
     if (adv) setTab('advanced');
-    else if (parsed) setTab('gradient');
-    else setTab('solid');
-  }, [raw]);
+    else if (nextParsed) {
+      setTab('gradient');
+      setGradientKind(nextParsed.kind);
+    } else setTab('solid');
+  }, [raw, fallbackHex]);
 
   const solidHex = expandHex(isPlainHex(raw) ? raw : extractFirstHexFromThemeValue(raw) || fallbackHex);
 
-  const linearState = parsedLinear || {
+  const gradientState = parsed || {
+    kind: gradientKind,
     angle: 135,
-    stops: expandToSixStops(
-      [
-        expandHex(extractFirstHexFromThemeValue(raw) || fallbackHex),
-        expandHex(fallbackHex),
-      ],
-      fallbackHex
-    ),
+    stops: createDefaultStops(fallbackHex, solidHex),
   };
+
+  const activeKind = tab === 'gradient' ? gradientKind : gradientState.kind;
 
   const setSolid = (hex) => onChange(expandHex(hex));
-  const setLinearPart = (next) => {
-    const angle = next.angle ?? linearState.angle;
-    const stops = [...linearState.stops];
-    if (typeof next.stopIndex === 'number' && next.color) {
-      stops[next.stopIndex] = expandHex(next.color);
-    }
-    onChange(buildLinearGradient(angle, stops));
+
+  const emitGradient = (nextState) => {
+    onChange(buildGradientCss(nextState));
   };
 
-  const simplifyToLinear = () => {
+  const updateGradient = (patch) => {
+    const next = {
+      kind: activeKind,
+      angle: patch.angle ?? gradientState.angle,
+      stops: patch.stops ?? gradientState.stops,
+    };
+    emitGradient(next);
+  };
+
+  const setStopColor = (index, color) => {
+    const stops = gradientState.stops.map((stop, i) =>
+      i === index ? { ...stop, color: expandHex(color) } : stop
+    );
+    updateGradient({ stops });
+  };
+
+  const toggleStop = (index) => {
+    const enabledCount = gradientState.stops.filter((stop) => stop.enabled).length;
+    const stop = gradientState.stops[index];
+    if (stop.enabled && enabledCount <= 1) return;
+
+    const stops = gradientState.stops.map((item, i) =>
+      i === index ? { ...item, enabled: !item.enabled } : item
+    );
+    updateGradient({ stops });
+  };
+
+  const switchGradientKind = (nextKind) => {
+    setGradientKind(nextKind);
+    const converted = convertGradientKind(
+      { ...gradientState, kind: activeKind },
+      nextKind,
+      fallbackHex
+    );
+    emitGradient(converted);
+  };
+
+  const simplifyToEditable = () => {
     const hexes = collectHexes(raw);
+    const meshParsed = parseGradientUi(raw, fallbackHex);
+    if (meshParsed?.kind === 'mesh') {
+      emitGradient(meshParsed);
+      setGradientKind('mesh');
+      setTab('gradient');
+      return;
+    }
     let c1 = expandHex(hexes[0] || fallbackHex);
     let c2 = expandHex(hexes[1] || fallbackHex);
     if (c1 === c2) c2 = adjustHue(c1);
-    const p = parseLinearGradientUi(raw);
-    const angle = p ? p.angle : 135;
-    onChange(buildLinearGradient(angle, expandToSixStops(hexes.length ? hexes : [c1, c2], fallbackHex)));
+    const stops = createDefaultStops(fallbackHex, c1).map((stop, index) => ({
+      ...stop,
+      color: index === 0 ? c1 : index === GRADIENT_STOP_COUNT - 1 ? c2 : stop.color,
+      enabled: index === 0 || index === GRADIENT_STOP_COUNT - 1,
+    }));
+    emitGradient({
+      kind: 'linear',
+      angle: meshParsed?.angle || 135,
+      stops,
+    });
+    setGradientKind('linear');
     setTab('gradient');
   };
+
+  const enabledCount = gradientState.stops.filter((stop) => stop.enabled).length;
 
   return (
     <div className={styles.fieldBlock}>
@@ -218,13 +184,22 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
           className={`${styles.tab} ${tab === 'gradient' ? styles.tabActive : ''}`}
           onClick={() => {
             setTab('gradient');
-            if (!parseLinearGradientUi(raw) && isPlainHex(raw)) {
+            if (!parseGradientUi(raw, fallbackHex) && isPlainHex(raw)) {
               const end = expandHex(fallbackHex);
               const start = solidHex;
               const c2 = start === end ? adjustHue(start) : end;
-              onChange(buildLinearGradient(135, expandToSixStops([start, c2], fallbackHex)));
-            } else if (!parseLinearGradientUi(raw)) {
-              simplifyToLinear();
+              emitGradient({
+                kind: 'linear',
+                angle: 135,
+                stops: createDefaultStops(fallbackHex, start).map((stop, index) => ({
+                  ...stop,
+                  color: index === 0 ? start : index === GRADIENT_STOP_COUNT - 1 ? c2 : stop.color,
+                  enabled: index === 0 || index === GRADIENT_STOP_COUNT - 1,
+                })),
+              });
+              setGradientKind('linear');
+            } else if (!parseGradientUi(raw, fallbackHex)) {
+              simplifyToEditable();
             }
           }}
         >
@@ -257,52 +232,117 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
 
       {tab === 'gradient' && (
         <div className={styles.gradientPanel}>
+          <div className={styles.kindRow} role="group" aria-label="Тип градиента">
+            <button
+              type="button"
+              className={`${styles.kindBtn} ${activeKind === 'linear' ? styles.kindBtnActive : ''}`}
+              onClick={() => switchGradientKind('linear')}
+            >
+              Линейный
+            </button>
+            <button
+              type="button"
+              className={`${styles.kindBtn} ${activeKind === 'mesh' ? styles.kindBtnActive : ''}`}
+              onClick={() => switchGradientKind('mesh')}
+            >
+              Сферный
+            </button>
+          </div>
+
+          <p className={styles.gradientHint}>
+            {activeKind === 'mesh'
+              ? 'Сферный градиент смешивает цвета из углов и центра — как на ярком фоне с красным и пурпурным. Снимите галочку с точки, чтобы не использовать её.'
+              : 'Линейный градиент по линии. Можно включить от 1 до 6 точек — в CSS попадут только отмеченные.'}
+          </p>
+
           <div className={styles.gradientStopsGrid}>
-            {linearState.stops.map((stopColor, index) => (
-              <label key={index} className={styles.miniLabel}>
-                Точка {index + 1} ({stopPositionPercent(index)}%)
+            {gradientState.stops.map((stop, index) => {
+              const stopLabel =
+                activeKind === 'mesh'
+                  ? meshStopLabel(index)
+                  : `Точка ${index + 1} (${linearStopLabel(index)})`;
+              return (
+                <div
+                  key={index}
+                  className={`${styles.stopCard} ${stop.enabled ? '' : styles.stopCardDisabled}`}
+                >
+                  <label className={styles.stopToggle}>
+                    <input
+                      type="checkbox"
+                      checked={stop.enabled}
+                      onChange={() => toggleStop(index)}
+                      aria-label={`${label}: использовать ${stopLabel}`}
+                    />
+                    <span>{stopLabel}</span>
+                  </label>
+                  <input
+                    type="color"
+                    className={styles.colorInput}
+                    value={expandHex(stop.color)}
+                    disabled={!stop.enabled}
+                    onChange={(e) => setStopColor(index, e.target.value)}
+                    aria-label={`${label}: цвет ${stopLabel}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {activeKind === 'linear' && (
+            <>
+              <div className={styles.angleRow}>
+                <span className={styles.angleLabel}>Угол</span>
                 <input
-                  type="color"
-                  className={styles.colorInput}
-                  value={expandHex(stopColor)}
-                  onChange={(e) => setLinearPart({ stopIndex: index, color: e.target.value })}
-                  aria-label={`${label}: точка градиента ${index + 1}`}
+                  type="range"
+                  className={styles.angleRange}
+                  min={0}
+                  max={359}
+                  value={gradientState.angle}
+                  onChange={(e) => updateGradient({ angle: Number(e.target.value) })}
+                  aria-label={`Угол градиента ${gradientState.angle} градусов`}
                 />
-              </label>
-            ))}
-          </div>
-          <div className={styles.angleRow}>
-            <span className={styles.angleLabel}>Угол</span>
-            <input
-              type="range"
-              className={styles.angleRange}
-              min={0}
-              max={359}
-              value={linearState.angle}
-              onChange={(e) => setLinearPart({ angle: Number(e.target.value) })}
-              aria-label={`Угол градиента ${linearState.angle} градусов`}
-            />
-            <span className={styles.angleValue}>{linearState.angle}°</span>
-          </div>
-          <div className={styles.presets} role="group" aria-label="Направление">
-            {ANGLE_PRESETS.map((p) => (
+                <span className={styles.angleValue}>{gradientState.angle}°</span>
+              </div>
+              <div className={styles.presets} role="group" aria-label="Направление">
+                {ANGLE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.angle}
+                    type="button"
+                    className={styles.presetBtn}
+                    title={preset.title}
+                    onClick={() => updateGradient({ angle: preset.angle })}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {activeKind === 'mesh' && (
+            <div className={styles.presets}>
               <button
-                key={p.angle}
                 type="button"
-                className={styles.presetBtn}
-                title={p.title}
-                onClick={() => setLinearPart({ angle: p.angle })}
+                className={styles.presetWideBtn}
+                onClick={() => {
+                  setGradientKind('mesh');
+                  emitGradient(applyMeshPreset(MESH_VIVID_PRESET));
+                }}
               >
-                {p.label}
+                Пресет: яркий закат
               </button>
-            ))}
-          </div>
+            </div>
+          )}
+
+          <p className={styles.enabledCountHint}>
+            Активных точек: {enabledCount} из {GRADIENT_STOP_COUNT}
+          </p>
         </div>
       )}
 
       {tab === 'advanced' && (
         <p className={styles.advancedHint}>
-          Сложное значение (например radial-gradient). Можно упростить до линейного градиента по цветам из строки.
+          Сложное значение (например conic-gradient). Можно упростить до редактора градиента.
         </p>
       )}
 
@@ -310,8 +350,8 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
 
       {(tab === 'advanced' || advanced) && (
         <div className={styles.advancedActions}>
-          <button type="button" className={styles.linkishBtn} onClick={simplifyToLinear}>
-            Упростить до линейного градиента
+          <button type="button" className={styles.linkishBtn} onClick={simplifyToEditable}>
+            Открыть в редакторе градиента
           </button>
         </div>
       )}
@@ -320,28 +360,15 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
         <summary className={styles.cssSummary}>CSS вручную</summary>
         <textarea
           className={styles.cssTextarea}
-          rows={2}
+          rows={3}
           spellCheck={false}
           value={raw}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="#36393f или linear-gradient(...)"
+          placeholder="#36393f, linear-gradient(...) или сферный mesh"
         />
       </details>
     </div>
   );
-}
-
-/** Лёгкое смещение hex для второго стопа, если совпадает с первым. */
-function adjustHue(hex) {
-  const e = expandHex(hex);
-  const n = parseInt(e.slice(1), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  const r2 = Math.min(255, r + 40);
-  const g2 = Math.min(255, g + 20);
-  const b2 = Math.min(255, b + 60);
-  return `#${((1 << 24) + (r2 << 16) + (g2 << 8) + b2).toString(16).slice(1)}`;
 }
 
 const ThemeColorMenu = ({ open, onClose }) => {

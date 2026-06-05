@@ -16,7 +16,7 @@ export const DEFAULT_THEME = {
   '--server-list-background': '#1e1f22'
 };
 
-/** acceptsGradient: можно задать linear-gradient / radial-gradient (свойство background, не color). */
+/** acceptsGradient: linear-gradient, сферный mesh (несколько radial-gradient) или свой CSS background. */
 export const THEME_COLOR_FIELDS = [
   { key: '--background', label: 'Фон приложения', acceptsGradient: true },
   { key: '--background-primary', label: 'Фон панелей', acceptsGradient: true },
