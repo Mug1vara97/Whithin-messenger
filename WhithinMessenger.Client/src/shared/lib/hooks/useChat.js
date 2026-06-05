@@ -3,6 +3,8 @@ import { HubConnectionBuilder } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 
 const TYPING_IDLE_MS = 3000;
+/** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
+const TYPING_HEARTBEAT_MS = 2000;
 const TYPING_EXPIRE_MS = 5000;
 
 export const formatTypingLabel = (users) => {
@@ -25,7 +27,25 @@ export const useChat = (chatId, username, userId) => {
   const currentChatIdRef = useRef(null);
   const typingExpiryTimersRef = useRef(new Map());
   const typingIdleTimerRef = useRef(null);
+  const typingHeartbeatRef = useRef(null);
   const lastTypingSentRef = useRef(false);
+
+  const clearTypingHeartbeat = useCallback(() => {
+    if (typingHeartbeatRef.current) {
+      clearInterval(typingHeartbeatRef.current);
+      typingHeartbeatRef.current = null;
+    }
+  }, []);
+
+  const startTypingHeartbeat = useCallback(() => {
+    clearTypingHeartbeat();
+    typingHeartbeatRef.current = setInterval(() => {
+      if (!connectionRef.current || !chatId || !username || !lastTypingSentRef.current) return;
+      connectionRef.current.invoke('NotifyTyping', chatId, username).catch((err) => {
+        console.warn('NotifyTyping heartbeat failed:', err);
+      });
+    }, TYPING_HEARTBEAT_MS);
+  }, [chatId, username, clearTypingHeartbeat]);
 
   const clearTypingExpiryTimers = useCallback(() => {
     typingExpiryTimersRef.current.forEach((timer) => clearTimeout(timer));
@@ -61,6 +81,7 @@ export const useChat = (chatId, username, userId) => {
   }, [removeTypingUser, userId]);
 
   const notifyStopTyping = useCallback(async () => {
+    clearTypingHeartbeat();
     if (!connectionRef.current || !chatId || !lastTypingSentRef.current) return;
     try {
       await connectionRef.current.invoke('NotifyStopTyping', chatId);
@@ -69,7 +90,7 @@ export const useChat = (chatId, username, userId) => {
     } finally {
       lastTypingSentRef.current = false;
     }
-  }, [chatId]);
+  }, [chatId, clearTypingHeartbeat]);
 
   const notifyTyping = useCallback(() => {
     if (!connectionRef.current || !chatId || !username) return;
@@ -79,6 +100,7 @@ export const useChat = (chatId, username, userId) => {
         console.warn('NotifyTyping failed:', err);
       });
       lastTypingSentRef.current = true;
+      startTypingHeartbeat();
     }
 
     if (typingIdleTimerRef.current) {
@@ -87,7 +109,7 @@ export const useChat = (chatId, username, userId) => {
     typingIdleTimerRef.current = setTimeout(() => {
       notifyStopTyping();
     }, TYPING_IDLE_MS);
-  }, [chatId, username, notifyStopTyping]);
+  }, [chatId, username, notifyStopTyping, startTypingHeartbeat]);
 
   const handleComposerTextChange = useCallback((text) => {
     if (!text?.trim()) {
@@ -129,6 +151,7 @@ export const useChat = (chatId, username, userId) => {
       setError(null);
       setTypingUsers([]);
       clearTypingExpiryTimers();
+      clearTypingHeartbeat();
       lastTypingSentRef.current = false;
       if (typingIdleTimerRef.current) {
         clearTimeout(typingIdleTimerRef.current);
@@ -197,6 +220,7 @@ export const useChat = (chatId, username, userId) => {
           clearTimeout(typingIdleTimerRef.current);
           typingIdleTimerRef.current = null;
         }
+        clearTypingHeartbeat();
         clearTypingExpiryTimers();
         const shouldStopTyping = lastTypingSentRef.current;
         lastTypingSentRef.current = false;
