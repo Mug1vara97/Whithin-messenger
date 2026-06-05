@@ -29,6 +29,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public ICollection<ServerAuditLog> ServerAuditLogs { get; set; } = [];
 
     public ICollection<MessageRead> MessageReads { get; set; } = [];
+    public ICollection<MessageDelivery> MessageDeliveries { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
 }
 

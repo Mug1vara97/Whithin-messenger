@@ -15,6 +15,7 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<Member> Members { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<MessageRead> MessageReads { get; set; }
+    public DbSet<MessageDelivery> MessageDeliveries { get; set; }
     public DbSet<Server> Servers { get; set; }
     public DbSet<ServerMember> ServerMembers { get; set; }
     public DbSet<ServerRole> ServerRoles { get; set; }

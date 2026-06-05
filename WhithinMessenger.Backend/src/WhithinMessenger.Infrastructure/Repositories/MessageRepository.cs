@@ -78,21 +78,118 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .CountAsync(cancellationToken);
         }
 
-        public async Task MarkChatAsReadAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default)
+        public async Task<List<MarkedMessageReadReceipt>> MarkChatAsReadAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default)
         {
-            var unreadMessageIds = await _context.Messages
+            var unreadMessages = await _context.Messages
                 .Where(m => m.ChatId == chatId && m.UserId != userId)
                 .Where(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
-                .Select(m => m.Id)
+                .Select(m => new { m.Id, m.UserId })
                 .ToListAsync(cancellationToken);
 
-            if (unreadMessageIds.Count == 0)
+            if (unreadMessages.Count == 0)
             {
-                return;
+                return [];
             }
 
             var now = DateTimeOffset.UtcNow;
-            var readRows = unreadMessageIds.Select(messageId => new MessageRead
+            var readRows = unreadMessages.Select(message => new MessageRead
+            {
+                Id = Guid.NewGuid(),
+                MessageId = message.Id,
+                UserId = userId,
+                ReadAt = now,
+                Message = null!,
+                User = null!
+            });
+
+            var unreadMessageIds = unreadMessages.Select(message => message.Id).ToList();
+            var alreadyDeliveredIds = await _context.MessageDeliveries
+                .AsNoTracking()
+                .Where(md => unreadMessageIds.Contains(md.MessageId) && md.UserId == userId)
+                .Select(md => md.MessageId)
+                .ToListAsync(cancellationToken);
+
+            var deliveryRows = unreadMessages
+                .Where(message => !alreadyDeliveredIds.Contains(message.Id))
+                .Select(message => new MessageDelivery
+                {
+                    Id = Guid.NewGuid(),
+                    MessageId = message.Id,
+                    UserId = userId,
+                    DeliveredAt = now,
+                    Message = null!,
+                    User = null!
+                })
+                .ToList();
+
+            await _context.MessageReads.AddRangeAsync(readRows, cancellationToken);
+            if (deliveryRows.Count > 0)
+            {
+                await _context.MessageDeliveries.AddRangeAsync(deliveryRows, cancellationToken);
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return unreadMessages
+                .Select(message => new MarkedMessageReadReceipt(message.Id, message.UserId))
+                .ToList();
+        }
+
+        public async Task<bool> MarkMessageDeliveredAsync(Guid messageId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            var message = await _context.Messages
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+
+            if (message == null || message.UserId == userId)
+            {
+                return false;
+            }
+
+            var exists = await _context.MessageDeliveries
+                .AnyAsync(md => md.MessageId == messageId && md.UserId == userId, cancellationToken);
+
+            if (exists)
+            {
+                return false;
+            }
+
+            await _context.MessageDeliveries.AddAsync(new MessageDelivery
+            {
+                Id = Guid.NewGuid(),
+                MessageId = messageId,
+                UserId = userId,
+                DeliveredAt = DateTimeOffset.UtcNow,
+                Message = null!,
+                User = null!
+            }, cancellationToken);
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<bool> MarkMessageReadAsync(Guid messageId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            var message = await _context.Messages
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+
+            if (message == null || message.UserId == userId)
+            {
+                return false;
+            }
+
+            var exists = await _context.MessageReads
+                .AnyAsync(mr => mr.MessageId == messageId && mr.UserId == userId, cancellationToken);
+
+            if (exists)
+            {
+                return false;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+
+            await _context.MessageReads.AddAsync(new MessageRead
             {
                 Id = Guid.NewGuid(),
                 MessageId = messageId,
@@ -100,18 +197,80 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 ReadAt = now,
                 Message = null!,
                 User = null!
-            });
+            }, cancellationToken);
 
-            await _context.MessageReads.AddRangeAsync(readRows, cancellationToken);
+            var hasDelivery = await _context.MessageDeliveries
+                .AnyAsync(md => md.MessageId == messageId && md.UserId == userId, cancellationToken);
+
+            if (!hasDelivery)
+            {
+                await _context.MessageDeliveries.AddAsync(new MessageDelivery
+                {
+                    Id = Guid.NewGuid(),
+                    MessageId = messageId,
+                    UserId = userId,
+                    DeliveredAt = now,
+                    Message = null!,
+                    User = null!
+                }, cancellationToken);
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<string?> GetMessageStatusAsync(
+            Guid messageId,
+            Guid senderUserId,
+            int recipientCount,
+            CancellationToken cancellationToken = default)
+        {
+            var statuses = await GetMessageStatusesAsync(senderUserId, [messageId], recipientCount, cancellationToken);
+            return statuses.GetValueOrDefault(messageId);
+        }
+
+        public async Task<Dictionary<Guid, string>> GetMessageStatusesAsync(
+            Guid senderUserId,
+            IReadOnlyList<Guid> messageIds,
+            int recipientCount,
+            CancellationToken cancellationToken = default)
+        {
+            if (messageIds.Count == 0 || recipientCount <= 0)
+            {
+                return new Dictionary<Guid, string>();
+            }
+
+            var ownMessageIds = await _context.Messages
+                .AsNoTracking()
+                .Where(m => messageIds.Contains(m.Id) && m.UserId == senderUserId)
+                .Select(m => m.Id)
+                .ToListAsync(cancellationToken);
+
+            if (ownMessageIds.Count == 0)
+            {
+                return new Dictionary<Guid, string>();
+            }
+
+            var readCounts = await _context.MessageReads
+                .AsNoTracking()
+                .Where(mr => ownMessageIds.Contains(mr.MessageId) && mr.UserId != senderUserId)
+                .GroupBy(mr => mr.MessageId)
+                .Select(group => new { MessageId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(x => x.MessageId, x => x.Count, cancellationToken);
+
+            var deliveredCounts = await _context.MessageDeliveries
+                .AsNoTracking()
+                .Where(md => ownMessageIds.Contains(md.MessageId) && md.UserId != senderUserId)
+                .GroupBy(md => md.MessageId)
+                .Select(group => new { MessageId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(x => x.MessageId, x => x.Count, cancellationToken);
+
+            return ownMessageIds.ToDictionary(
+                messageId => messageId,
+                messageId => MessageStatusHelper.Resolve(
+                    recipientCount,
+                    deliveredCounts.GetValueOrDefault(messageId),
+                    readCounts.GetValueOrDefault(messageId)));
         }
     }
 }
-
-
-
-
-
-
-
-

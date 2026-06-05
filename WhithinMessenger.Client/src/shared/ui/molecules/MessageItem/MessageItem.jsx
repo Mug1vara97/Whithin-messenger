@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { UserAvatar } from '../../atoms';
+import { UserAvatar, MessageStatusIndicator } from '../../atoms';
+import { MessageStatus } from '../../../../entities/message/model/types';
 import MediaFile from '../MediaFile/MediaFile';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import { openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
@@ -211,6 +212,12 @@ const MessageItem = ({
           {renderRepliedMessage()}
           {renderForwardedMessage()}
           {renderMessageContent()}
+          {isOwn && (
+            <div className="message-meta">
+              <span className="message-time">{formatTime(message.createdAt)}</span>
+              <MessageStatusIndicator status={message.status || MessageStatus.SENT} />
+            </div>
+          )}
         </div>
       </div>
       

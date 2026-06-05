@@ -79,7 +79,8 @@ public class GroupChatHub : Hub
                 }
 
                 _logger.LogInformation($"Parsed chatId: {parsedChatId}");
-                var query = new GetMessagesQuery(parsedChatId);
+                var userId = GetCurrentUserId();
+                var query = new GetMessagesQuery(parsedChatId, userId);
                 var result = await _mediator.Send(query);
 
                 if (result.Success)
@@ -373,7 +374,8 @@ public class GroupChatHub : Hub
 
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
                         new { 
-                            messageId = result.MessageId, 
+                            messageId = result.MessageId,
+                            senderId = userId.Value,
                             content = message, 
                             username = username,
                             chatId = parsedChatId,
@@ -381,7 +383,8 @@ public class GroupChatHub : Hub
                             avatarColor = avatarColor,
                             repliedMessage = repliedMessage,
                             forwardedMessage = (object?)null, // TODO: Implement forwarded message info
-                            mediaFiles = mediaFiles
+                            mediaFiles = mediaFiles,
+                            status = MessageStatusHelper.Sent
                         });
 
                     // Отправляем ChatUpdated событие для обновления списка чатов
@@ -518,11 +521,46 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                await Clients.Group(chatId.ToString()).SendAsync("MessageRead", messageId, userId, DateTimeOffset.UtcNow);
+                var wasMarked = await _messageRepository.MarkMessageReadAsync(messageId, userId.Value);
+                if (!wasMarked)
+                {
+                    return;
+                }
+
+                var readAt = DateTimeOffset.UtcNow;
+                await Clients.Group(chatId.ToString()).SendAsync("MessageRead", messageId, userId, readAt);
+                await BroadcastMessageStatusAsync(messageId, chatId);
             }
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("Error", $"Ошибка при отметке сообщения как прочитанного: {ex.Message}");
+            }
+        }
+
+        public async Task AcknowledgeDelivery(Guid messageId, Guid chatId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var wasMarked = await _messageRepository.MarkMessageDeliveredAsync(messageId, userId.Value);
+                if (!wasMarked)
+                {
+                    return;
+                }
+
+                var deliveredAt = DateTimeOffset.UtcNow;
+                await Clients.Group(chatId.ToString()).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
+                await BroadcastMessageStatusAsync(messageId, chatId);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при подтверждении доставки: {ex.Message}");
             }
         }
 
@@ -584,7 +622,8 @@ public class GroupChatHub : Hub
                     // Уведомляем всех участников чата о новом медиафайле
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
                         new { 
-                            messageId = result.MessageId, 
+                            messageId = result.MessageId,
+                            senderId = userId.Value,
                             content = mediaUrl, 
                             username = username,
                             chatId = parsedChatId,
@@ -592,7 +631,8 @@ public class GroupChatHub : Hub
                             avatarColor = avatarColor,
                             repliedMessage = (object?)null,
                             forwardedMessage = (object?)null,
-                            mediaFiles = mediaFiles
+                            mediaFiles = mediaFiles,
+                            status = MessageStatusHelper.Sent
                         });
 
                     // Отправляем ChatUpdated событие для обновления списка чатов
@@ -728,6 +768,34 @@ public class GroupChatHub : Hub
             Console.Error.WriteLine($"Error sending call notification: {ex.Message}");
         }
     }
+
+        private async Task BroadcastMessageStatusAsync(Guid messageId, Guid chatId)
+        {
+            var message = await _messageRepository.GetByIdAsync(messageId);
+            if (message == null)
+            {
+                return;
+            }
+
+            var chatMembers = await _chatRepository.GetChatMembersAsync(chatId);
+            var recipientCount = Math.Max(0, chatMembers.Count - 1);
+            if (recipientCount <= 0)
+            {
+                return;
+            }
+
+            var status = await _messageRepository.GetMessageStatusAsync(
+                messageId,
+                message.UserId,
+                recipientCount);
+
+            if (string.IsNullOrEmpty(status))
+            {
+                return;
+            }
+
+            await Clients.Group(chatId.ToString()).SendAsync("MessageStatusChanged", messageId, status);
+        }
 
         // Вспомогательный метод для получения текущего пользователя
         private Guid? GetCurrentUserId()

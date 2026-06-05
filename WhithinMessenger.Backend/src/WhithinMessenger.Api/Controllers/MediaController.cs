@@ -7,6 +7,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Media.GetMediaFiles;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -98,6 +99,7 @@ public class MediaController : ControllerBase
                     await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId,  // Используем MessageId для корректного удаления
+                            senderId = userId.Value,
                             content = caption ?? string.Empty, 
                             username = username ?? "Unknown",
                             chatId = chatId,
@@ -105,7 +107,8 @@ public class MediaController : ControllerBase
                             avatarColor = avatarColor,
                             repliedMessage = (object?)null,
                             forwardedMessage = (object?)null,
-                            mediaFiles = mediaFiles
+                            mediaFiles = mediaFiles,
+                            status = MessageStatusHelper.Sent
                         });
                 }
                 catch (Exception ex)

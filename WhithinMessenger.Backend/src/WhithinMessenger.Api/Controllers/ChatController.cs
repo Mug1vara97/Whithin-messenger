@@ -117,7 +117,8 @@ namespace WhithinMessenger.Api.Controllers
         {
             try
             {
-                var query = new GetMessagesQuery(chatId);
+                var userId = (Guid)HttpContext.Items["UserId"]!;
+                var query = new GetMessagesQuery(chatId, userId);
                 var result = await _mediator.Send(query);
 
                 if (!result.Success)

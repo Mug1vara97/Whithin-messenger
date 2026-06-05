@@ -20,17 +20,23 @@ public class NotificationController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IMessageRepository _messageRepository;
     private readonly IHubContext<ChatListHub> _chatListHub;
+    private readonly IHubContext<GroupChatHub> _groupChatHub;
+    private readonly IChatRepository _chatRepository;
     private readonly WhithinMessenger.Application.Services.IUserPushTokenStore _userPushTokenStore;
 
     public NotificationController(
         IMediator mediator,
         IMessageRepository messageRepository,
         IHubContext<ChatListHub> chatListHub,
+        IHubContext<GroupChatHub> groupChatHub,
+        IChatRepository chatRepository,
         WhithinMessenger.Application.Services.IUserPushTokenStore userPushTokenStore)
     {
         _mediator = mediator;
         _messageRepository = messageRepository;
         _chatListHub = chatListHub;
+        _groupChatHub = groupChatHub;
+        _chatRepository = chatRepository;
         _userPushTokenStore = userPushTokenStore;
     }
 
@@ -139,6 +145,45 @@ public class NotificationController : ControllerBase
         var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, userId.Value);
         await _chatListHub.Clients.Group($"user-{userId.Value}")
             .SendAsync("chatunreadupdated", chatId, unreadCount);
+
+        if (result.MarkedMessages.Count > 0)
+        {
+            var chatMembers = await _chatRepository.GetChatMembersAsync(chatId);
+            var recipientCount = Math.Max(0, chatMembers.Count - 1);
+            var readAt = DateTimeOffset.UtcNow;
+            var senderIds = result.MarkedMessages
+                .Select(receipt => receipt.SenderUserId)
+                .Distinct()
+                .ToList();
+
+            foreach (var receipt in result.MarkedMessages)
+            {
+                await _groupChatHub.Clients.Group(chatId.ToString())
+                    .SendAsync("MessageRead", receipt.MessageId, userId.Value, readAt);
+            }
+
+            if (recipientCount > 0)
+            {
+                foreach (var senderId in senderIds)
+                {
+                    var ownMessageIds = result.MarkedMessages
+                        .Where(receipt => receipt.SenderUserId == senderId)
+                        .Select(receipt => receipt.MessageId)
+                        .ToList();
+
+                    var statuses = await _messageRepository.GetMessageStatusesAsync(
+                        senderId,
+                        ownMessageIds,
+                        recipientCount);
+
+                    foreach (var (messageId, status) in statuses)
+                    {
+                        await _groupChatHub.Clients.Group(chatId.ToString())
+                            .SendAsync("MessageStatusChanged", messageId, status);
+                    }
+                }
+            }
+        }
 
         return Ok(new { message = $"Marked {result.MarkedCount} notifications as read" });
     }

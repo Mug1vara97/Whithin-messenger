@@ -3,9 +3,11 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 public class MessageDto
 {
     public Guid MessageId { get; set; }
+    public Guid SenderId { get; set; }
     public string Content { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
     public string SenderUsername { get; set; } = string.Empty;
+    public string? Status { get; set; }
     public string? AvatarUrl { get; set; }
     public string AvatarColor { get; set; } = string.Empty;
     public ReplyMessageDto? RepliedMessage { get; set; }

@@ -40,5 +40,7 @@ public class Message
 
     public ICollection<MessageRead> MessageReads { get; set; } = new List<MessageRead>();
 
+    public ICollection<MessageDelivery> MessageDeliveries { get; set; } = new List<MessageDelivery>();
+
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
 }

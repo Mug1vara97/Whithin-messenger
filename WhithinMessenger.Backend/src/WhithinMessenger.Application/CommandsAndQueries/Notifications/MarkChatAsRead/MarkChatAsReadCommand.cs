@@ -11,6 +11,7 @@ public record MarkChatAsReadResult
 {
     public bool Success { get; init; }
     public int MarkedCount { get; init; }
+    public IReadOnlyList<Domain.Interfaces.MarkedMessageReadReceipt> MarkedMessages { get; init; } = [];
     public string? ErrorMessage { get; init; }
 }
 

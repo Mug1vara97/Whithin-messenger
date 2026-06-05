@@ -14,7 +14,8 @@ import {
   useMessageForward 
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
-import { MessageInput, MessageItem } from '../../../shared/ui';
+import { MessageInput, MessageItem, MessageStatusIndicator } from '../../../shared/ui';
+import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
@@ -875,12 +876,20 @@ const ChatRoom = ({
         )}
 
         {messages.map((msg) => {
-          
+          const isOwn = msg.senderUsername === username;
+          const formatMessageTime = (dateString) => {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          };
+
           return (
             <div
               key={msg.messageId}
               id={`message-${msg.messageId}`}
-              className={`message ${msg.senderUsername === username ? 'my-message' : 'user-message'} ${
+              className={`message ${isOwn ? 'my-message' : 'user-message'} ${
                 highlightedMessageId === msg.messageId ? 'highlighted' : ''
               }`}
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
@@ -941,6 +950,13 @@ const ChatRoom = ({
                         canDelete={false}
                       />
                     ))}
+                  </div>
+                )}
+
+                {isOwn && (
+                  <div className="message-meta">
+                    <span className="message-meta-time">{formatMessageTime(msg.createdAt)}</span>
+                    <MessageStatusIndicator status={msg.status || MessageStatus.SENT} />
                   </div>
                 )}
               </div>

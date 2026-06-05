@@ -1,0 +1,44 @@
+.message-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  margin-left: 6px;
+  letter-spacing: -1px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.message-status--sent {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.message-status--delivered {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-status--read {
+  color: #8be9ff;
+}
+
+.message-status--sending {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+}
+
+.message-status--failed {
+  color: #ed4245;
+  font-weight: 700;
+}
+
+.user-message .message-status--sent,
+.user-message .message-status--delivered,
+.user-message .message-status--read,
+.user-message .message-status--sending {
+  color: var(--text-muted, #8e9297);
+}
+
+.user-message .message-status--read {
+  color: var(--primary, #5865f2);
+}

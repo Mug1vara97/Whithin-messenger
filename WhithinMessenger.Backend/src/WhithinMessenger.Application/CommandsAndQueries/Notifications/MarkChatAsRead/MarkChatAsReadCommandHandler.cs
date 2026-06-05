@@ -28,12 +28,9 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
     {
         try
         {
-            var unreadBefore = await _messageRepository.GetUnreadCountByChatAsync(request.ChatId, request.UserId, cancellationToken);
-            await _messageRepository.MarkChatAsReadAsync(request.ChatId, request.UserId, cancellationToken);
+            var markedMessages = await _messageRepository.MarkChatAsReadAsync(request.ChatId, request.UserId, cancellationToken);
 
             await _notificationRepository.MarkChatAsReadAsync(request.ChatId, request.UserId, cancellationToken);
-
-            var unreadAfter = await _messageRepository.GetUnreadCountByChatAsync(request.ChatId, request.UserId, cancellationToken);
 
             var notificationUnreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString())
@@ -42,7 +39,8 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
             return new MarkChatAsReadResult
             {
                 Success = true,
-                MarkedCount = Math.Max(0, unreadBefore - unreadAfter)
+                MarkedCount = markedMessages.Count,
+                MarkedMessages = markedMessages
             };
         }
         catch (Exception ex)
@@ -55,4 +53,3 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
         }
     }
 }
-

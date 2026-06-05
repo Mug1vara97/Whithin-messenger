@@ -3,7 +3,7 @@ using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 
-public record GetMessagesQuery(Guid ChatId) : IRequest<GetMessagesResult>;
+public record GetMessagesQuery(Guid ChatId, Guid? UserId = null) : IRequest<GetMessagesResult>;
 
 public record GetMessagesResult
 {

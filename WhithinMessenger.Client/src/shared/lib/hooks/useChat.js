@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
+import { MessageStatus } from '../../../entities/message/model/types';
+import {
+  isOwnMessage,
+  normalizeMessageStatus,
+  pickHigherMessageStatus,
+} from '../utils/messageStatus';
 
 const TYPING_IDLE_MS = 3000;
 /** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
@@ -123,10 +129,22 @@ export const useChat = (chatId, username, userId) => {
     notifyTyping();
   }, [notifyStopTyping, notifyTyping]);
 
-  const normalizeMessage = useCallback((msg) => {
+  const acknowledgedDeliveriesRef = useRef(new Set());
+  const pendingOptimisticIdRef = useRef(null);
+
+  const normalizeMessage = useCallback((msg, defaultStatus) => {
     if (!msg) return null;
+    const senderId = msg.senderId ?? msg.SenderId ?? msg.userId ?? msg.UserId ?? null;
+    const rawStatus = msg.status ?? msg.Status ?? defaultStatus;
+    const own = isOwnMessage(
+      { senderId, senderUsername: msg.senderUsername ?? msg.SenderUsername ?? msg.username ?? msg.UserName },
+      userId,
+      username,
+    );
+
     return {
       messageId: msg.messageId ?? msg.MessageId ?? msg.id ?? msg.Id,
+      senderId,
       senderUsername: msg.senderUsername ?? msg.SenderUsername ?? msg.username ?? msg.UserName ?? '',
       content: msg.content ?? msg.Content ?? '',
       avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
@@ -134,8 +152,47 @@ export const useChat = (chatId, username, userId) => {
       repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
       forwardedMessage: msg.forwardedMessage ?? msg.ForwardedMessage ?? null,
       createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
-      mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? []
+      mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? [],
+      status: own
+        ? normalizeMessageStatus(rawStatus ?? MessageStatus.SENT)
+        : null,
     };
+  }, [userId, username]);
+
+  const acknowledgeIncomingDelivery = useCallback(async (message) => {
+    if (!connectionRef.current || !chatId || !message?.messageId) return;
+    if (isOwnMessage(message, userId, username)) return;
+
+    const deliveryKey = String(message.messageId);
+    if (acknowledgedDeliveriesRef.current.has(deliveryKey)) return;
+
+    acknowledgedDeliveriesRef.current.add(deliveryKey);
+    try {
+      await connectionRef.current.invoke('AcknowledgeDelivery', message.messageId, chatId);
+    } catch (err) {
+      acknowledgedDeliveriesRef.current.delete(deliveryKey);
+      console.warn('AcknowledgeDelivery failed:', err);
+    }
+  }, [chatId, userId, username]);
+
+  const acknowledgeIncomingMessages = useCallback(async (incomingMessages) => {
+    if (!Array.isArray(incomingMessages)) return;
+    for (const message of incomingMessages) {
+      if (!isOwnMessage(message, userId, username)) {
+        await acknowledgeIncomingDelivery(message);
+      }
+    }
+  }, [acknowledgeIncomingDelivery, userId, username]);
+
+  const updateMessageStatus = useCallback((messageId, nextStatus) => {
+    const id = String(messageId);
+    setMessages((prev) => prev.map((msg) => {
+      if (String(msg.messageId) !== id) return msg;
+      return {
+        ...msg,
+        status: pickHigherMessageStatus(msg.status, nextStatus),
+      };
+    }));
   }, []);
 
   useEffect(() => {
@@ -153,6 +210,7 @@ export const useChat = (chatId, username, userId) => {
       clearTypingExpiryTimers();
       clearTypingHeartbeat();
       lastTypingSentRef.current = false;
+      acknowledgedDeliveriesRef.current.clear();
       if (typingIdleTimerRef.current) {
         clearTimeout(typingIdleTimerRef.current);
         typingIdleTimerRef.current = null;
@@ -172,10 +230,11 @@ export const useChat = (chatId, username, userId) => {
         newConnection.on('ReceiveMessages', (messages) => {
           const source = Array.isArray(messages) ? messages : [];
           const processedMessages = source
-            .map(normalizeMessage)
+            .map((msg) => normalizeMessage(msg))
             .filter(Boolean);
 
           setMessages(processedMessages);
+          acknowledgeIncomingMessages(processedMessages);
         });
 
         newConnection.on('UserTyping', (eventChatId, typingUserId, typingUsername) => {
@@ -234,6 +293,9 @@ export const useChat = (chatId, username, userId) => {
             connectionRef.current.off('MessageSent');
             connectionRef.current.off('MessageEdited');
             connectionRef.current.off('MessageDeleted');
+            connectionRef.current.off('MessageStatusChanged');
+            connectionRef.current.off('MessageDelivered');
+            connectionRef.current.off('MessageRead');
             connectionRef.current.off('ReceiveMessages');
             connectionRef.current.off('UserTyping');
             connectionRef.current.off('UserStoppedTyping');
@@ -259,15 +321,41 @@ export const useChat = (chatId, username, userId) => {
       
       cleanup();
     };
-  }, [chatId, userId, addTypingUser, clearTypingExpiryTimers, normalizeMessage, removeTypingUser]);
+  }, [chatId, userId, addTypingUser, acknowledgeIncomingMessages, clearTypingExpiryTimers, normalizeMessage, removeTypingUser]);
 
   useEffect(() => {
     if (connection) {
       const receiveMessageHandler = async (messageData) => {
         const newMessage = normalizeMessage(messageData);
         if (!newMessage) return;
+        const own = isOwnMessage(newMessage, userId, username);
 
-        setMessages(prev => [...prev, newMessage]);
+        setMessages((prev) => {
+          const exists = prev.some((msg) => String(msg.messageId) === String(newMessage.messageId));
+          if (exists) {
+            return prev.map((msg) => (
+              String(msg.messageId) === String(newMessage.messageId)
+                ? { ...msg, ...newMessage, status: pickHigherMessageStatus(msg.status, newMessage.status) }
+                : msg
+            ));
+          }
+
+          const pendingId = pendingOptimisticIdRef.current;
+          if (own && pendingId) {
+            pendingOptimisticIdRef.current = null;
+            return prev.map((msg) => (
+              String(msg.messageId) === pendingId
+                ? { ...newMessage, status: pickHigherMessageStatus(MessageStatus.SENT, newMessage.status) }
+                : msg
+            ));
+          }
+
+          return [...prev, newMessage];
+        });
+
+        if (!own) {
+          await acknowledgeIncomingDelivery(newMessage);
+        }
       };
 
       const messageEditedHandler = (messageId, newContent) => {
@@ -283,19 +371,22 @@ export const useChat = (chatId, username, userId) => {
       connection.on('MessageSent', receiveMessageHandler);
       connection.on('MessageEdited', messageEditedHandler);
       connection.on('MessageDeleted', messageDeletedHandler);
-      connection.on('MessageRead', (messageId, readByUserId, readAt) => {
-        console.log(`Message ${messageId} read by user ${readByUserId} at ${readAt}`);
-      });
+      const messageStatusChangedHandler = (messageId, status) => {
+        updateMessageStatus(messageId, status);
+      };
+
+      connection.on('MessageStatusChanged', messageStatusChangedHandler);
 
       return () => {
         connection.off('MessageSent', receiveMessageHandler);
         connection.off('MessageEdited', messageEditedHandler);
         connection.off('MessageDeleted', messageDeletedHandler);
+        connection.off('MessageStatusChanged', messageStatusChangedHandler);
         connection.off('ReceiveMessages');
         connection.off('Error');
       };
     }
-  }, [connection, normalizeMessage]);
+  }, [acknowledgeIncomingDelivery, connection, normalizeMessage, updateMessageStatus, userId, username]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -320,6 +411,21 @@ export const useChat = (chatId, username, userId) => {
   const sendMessage = useCallback(async (content, repliedMessageId = null, forwardedMessage = null) => {
     if (!content.trim() || !connection) return;
 
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = normalizeMessage({
+      messageId: tempId,
+      senderId: userId,
+      senderUsername: username,
+      content,
+      createdAt: new Date().toISOString(),
+      status: MessageStatus.SENDING,
+    });
+
+    if (optimisticMessage) {
+      pendingOptimisticIdRef.current = tempId;
+      setMessages((prev) => [...prev, optimisticMessage]);
+    }
+
     try {
       if (typingIdleTimerRef.current) {
         clearTimeout(typingIdleTimerRef.current);
@@ -336,10 +442,15 @@ export const useChat = (chatId, username, userId) => {
       return true;
     } catch (error) {
       console.error('Error sending message:', error);
+      setMessages((prev) => prev.map((msg) => (
+        String(msg.messageId) === tempId
+          ? { ...msg, status: MessageStatus.FAILED }
+          : msg
+      )));
       setError('Ошибка отправки сообщения');
       return false;
     }
-  }, [connection, username, chatId, notifyStopTyping]);
+  }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId]);
 
   const editMessage = useCallback(async (messageId, newContent) => {
     if (!connection) return;
