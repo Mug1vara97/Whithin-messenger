@@ -318,14 +318,45 @@
   background-color: var(--border);
 }
 
-.chat-typing-indicator {
+.chat-composer-area {
   flex: 0 0 auto;
-  padding: 4px 16px 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bottom);
+}
+
+.chat-typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 8px 16px 2px;
   color: #b5bac1;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.3;
-  background: var(--background);
-  border-bottom: 1px solid var(--borderBottom);
+  background: var(--bottom);
+  border-top: 1px solid var(--border);
+  user-select: none;
+}
+
+.chat-typing-indicator__dots {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary, #5865f2);
+  flex-shrink: 0;
+  animation: chat-typing-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes chat-typing-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .header-left {
@@ -802,6 +833,10 @@
   border-top: 1px solid rgba(var(--primary-rgb), 0.2);
   color: var(--textMuted);
   font-size: 0.9em;
+}
+
+.chat-typing-indicator + .input-container {
+  border-top: none;
 }
 
 .input-container {

@@ -779,10 +779,6 @@ const ChatRoom = ({
         </div>
       </div>
 
-      {typingLabel && (
-        <div className="chat-typing-indicator">{typingLabel}</div>
-      )}
-
       {!isServerChat && isCallActiveInThisChat && (
         <ChatVoiceCall
           chatId={chatId}
@@ -1037,6 +1033,14 @@ const ChatRoom = ({
         <div ref={messagesEndRef} />
       </div>
 
+      <div className="chat-composer-area">
+        {typingLabel && (
+          <div className="chat-typing-indicator" aria-live="polite">
+            <span className="chat-typing-indicator__dots" aria-hidden="true" />
+            <span>{typingLabel}</span>
+          </div>
+        )}
+
       <form className={`input-container ${replyingToMessage ? 'replying' : ''}`} onSubmit={handleSendMessage}>
         {editingMessageId && (
           <div className="editing-notice">
@@ -1168,8 +1172,8 @@ const ChatRoom = ({
           </>
         )}
       </form>
-      
-      
+      </div>
+
       <ForwardModal />
 
       {showCallTypeSelector && (
