@@ -37,15 +37,47 @@ function collectHexes(str) {
   return [...m].map((x) => expandHex(`#${x[1]}`));
 }
 
-/** Угол (deg) и два цвета из linear-gradient. Поддержка Ndeg и to top/right/... */
-function parseLinearGradientUi(raw) {
-  const s = (raw || '').trim();
-  const open = /^linear-gradient\s*\(\s*(.*)\)$/i.exec(s);
-  if (!open) return null;
-  const inner = open[1];
-  const hexes = collectHexes(inner);
-  if (hexes.length < 2) return null;
+const GRADIENT_STOP_COUNT = 6;
 
+function stopPositionPercent(index) {
+  if (GRADIENT_STOP_COUNT <= 1) return 0;
+  return Math.round((index / (GRADIENT_STOP_COUNT - 1)) * 100);
+}
+
+function interpolateHex(c1, c2, t) {
+  const parse = (hex) => {
+    const n = parseInt(expandHex(hex).slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [r1, g1, b1] = parse(c1);
+  const [r2, g2, b2] = parse(c2);
+  const ratio = Math.min(1, Math.max(0, t));
+  const r = Math.round(r1 + (r2 - r1) * ratio);
+  const g = Math.round(g1 + (g2 - g1) * ratio);
+  const b = Math.round(b1 + (b2 - b1) * ratio);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+/** Дополняет до 6 стопов, равномерно распределяя имеющиеся цвета. */
+function expandToSixStops(hexes, fallbackHex) {
+  const source = (hexes?.length ? hexes : [fallbackHex]).map(expandHex);
+  if (source.length >= GRADIENT_STOP_COUNT) {
+    return source.slice(0, GRADIENT_STOP_COUNT);
+  }
+  if (source.length === 1) {
+    return Array.from({ length: GRADIENT_STOP_COUNT }, () => source[0]);
+  }
+  return Array.from({ length: GRADIENT_STOP_COUNT }, (_, index) => {
+    const t = index / (GRADIENT_STOP_COUNT - 1);
+    const srcIndex = t * (source.length - 1);
+    const lo = Math.floor(srcIndex);
+    const hi = Math.min(source.length - 1, Math.ceil(srcIndex));
+    if (lo === hi) return source[lo];
+    return interpolateHex(source[lo], source[hi], srcIndex - lo);
+  });
+}
+
+function parseLinearGradientAngle(inner) {
   let angle = 180;
   const degM = inner.match(/^(-?\d+(?:\.\d+)?)deg\s*,/i);
   if (degM) {
@@ -65,13 +97,30 @@ function parseLinearGradientUi(raw) {
       if (anyDeg) angle = Math.round(parseFloat(anyDeg[1])) % 360;
     }
   }
-  const a = ((angle % 360) + 360) % 360;
-  return { angle: a, c1: hexes[0], c2: hexes[1] };
+  return ((angle % 360) + 360) % 360;
 }
 
-function buildLinearGradient(angle, c1, c2) {
+/** Угол (deg) и до 6 цветов из linear-gradient. Поддержка Ndeg и to top/right/... */
+function parseLinearGradientUi(raw) {
+  const s = (raw || '').trim();
+  const open = /^linear-gradient\s*\(\s*(.*)\)$/i.exec(s);
+  if (!open) return null;
+  const inner = open[1];
+  const hexes = collectHexes(inner);
+  if (hexes.length < 2) return null;
+
+  return {
+    angle: parseLinearGradientAngle(inner),
+    stops: expandToSixStops(hexes, hexes[0]),
+  };
+}
+
+function buildLinearGradient(angle, stops) {
   const a = ((Math.round(Number(angle)) % 360) + 360) % 360;
-  return `linear-gradient(${a}deg, ${expandHex(c1)}, ${expandHex(c2)})`;
+  const list = Array.isArray(stops) ? stops : [stops].filter(Boolean);
+  const colors = expandToSixStops(list, list[0] || '#36393f');
+  const parts = colors.map((color, index) => `${expandHex(color)} ${stopPositionPercent(index)}%`);
+  return `linear-gradient(${a}deg, ${parts.join(', ')})`;
 }
 
 function isAdvancedPaint(raw) {
@@ -113,16 +162,23 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
 
   const linearState = parsedLinear || {
     angle: 135,
-    c1: expandHex(extractFirstHexFromThemeValue(raw) || fallbackHex),
-    c2: expandHex(fallbackHex)
+    stops: expandToSixStops(
+      [
+        expandHex(extractFirstHexFromThemeValue(raw) || fallbackHex),
+        expandHex(fallbackHex),
+      ],
+      fallbackHex
+    ),
   };
 
   const setSolid = (hex) => onChange(expandHex(hex));
   const setLinearPart = (next) => {
     const angle = next.angle ?? linearState.angle;
-    const c1 = next.c1 ?? linearState.c1;
-    const c2 = next.c2 ?? linearState.c2;
-    onChange(buildLinearGradient(angle, c1, c2));
+    const stops = [...linearState.stops];
+    if (typeof next.stopIndex === 'number' && next.color) {
+      stops[next.stopIndex] = expandHex(next.color);
+    }
+    onChange(buildLinearGradient(angle, stops));
   };
 
   const simplifyToLinear = () => {
@@ -132,7 +188,7 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
     if (c1 === c2) c2 = adjustHue(c1);
     const p = parseLinearGradientUi(raw);
     const angle = p ? p.angle : 135;
-    onChange(buildLinearGradient(angle, c1, c2));
+    onChange(buildLinearGradient(angle, expandToSixStops(hexes.length ? hexes : [c1, c2], fallbackHex)));
     setTab('gradient');
   };
 
@@ -166,7 +222,7 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
               const end = expandHex(fallbackHex);
               const start = solidHex;
               const c2 = start === end ? adjustHue(start) : end;
-              onChange(buildLinearGradient(135, start, c2));
+              onChange(buildLinearGradient(135, expandToSixStops([start, c2], fallbackHex)));
             } else if (!parseLinearGradientUi(raw)) {
               simplifyToLinear();
             }
@@ -201,25 +257,19 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
 
       {tab === 'gradient' && (
         <div className={styles.gradientPanel}>
-          <div className={styles.gradientColors}>
-            <label className={styles.miniLabel}>
-              От
-              <input
-                type="color"
-                className={styles.colorInput}
-                value={expandHex(linearState.c1)}
-                onChange={(e) => setLinearPart({ c1: e.target.value })}
-              />
-            </label>
-            <label className={styles.miniLabel}>
-              До
-              <input
-                type="color"
-                className={styles.colorInput}
-                value={expandHex(linearState.c2)}
-                onChange={(e) => setLinearPart({ c2: e.target.value })}
-              />
-            </label>
+          <div className={styles.gradientStopsGrid}>
+            {linearState.stops.map((stopColor, index) => (
+              <label key={index} className={styles.miniLabel}>
+                Точка {index + 1} ({stopPositionPercent(index)}%)
+                <input
+                  type="color"
+                  className={styles.colorInput}
+                  value={expandHex(stopColor)}
+                  onChange={(e) => setLinearPart({ stopIndex: index, color: e.target.value })}
+                  aria-label={`${label}: точка градиента ${index + 1}`}
+                />
+              </label>
+            ))}
           </div>
           <div className={styles.angleRow}>
             <span className={styles.angleLabel}>Угол</span>
