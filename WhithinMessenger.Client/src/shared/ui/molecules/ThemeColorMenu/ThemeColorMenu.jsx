@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DEFAULT_THEME,
   THEME_COLOR_FIELDS,
+  THEME_WINDOW_MESSAGE,
   getMergedTheme,
   persistTheme,
   resetTheme,
   applyThemeToRoot,
-  extractFirstHexFromThemeValue
+  broadcastThemePreview,
+  clearThemePreview,
+  extractFirstHexFromThemeValue,
+  notifyOpenerThemeMessage,
 } from '../../../lib/theme/appTheme';
 import {
   GRADIENT_STOP_COUNT,
@@ -371,54 +376,68 @@ function GradientFieldEditor({ label, raw, fallbackHex, onChange }) {
   );
 }
 
-const ThemeColorMenu = ({ open, onClose }) => {
+export function ThemeColorEditor({ standalone = false }) {
+  const navigate = useNavigate();
   const [draft, setDraft] = useState(() => ({ ...DEFAULT_THEME }));
+  const isPopup = typeof window !== 'undefined' && !!window.opener && !window.opener.closed;
 
   useEffect(() => {
-    if (open) {
-      setDraft(getMergedTheme());
-    }
-  }, [open]);
+    setDraft(getMergedTheme());
+  }, []);
 
-  if (!open) return null;
+  const closeEditor = () => {
+    if (isPopup) {
+      window.close();
+      return;
+    }
+    if (standalone) {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate('/');
+      }
+    }
+  };
 
   const handleChange = (key, value) => {
     setDraft((prev) => {
       const next = { ...prev, [key]: value };
       applyThemeToRoot(next);
+      broadcastThemePreview(next);
       return next;
     });
   };
 
   const handleSave = () => {
     persistTheme(draft);
-    onClose();
+    clearThemePreview();
+    notifyOpenerThemeMessage(THEME_WINDOW_MESSAGE.SAVED);
+    closeEditor();
   };
 
   const handleReset = () => {
     resetTheme();
     setDraft({ ...DEFAULT_THEME });
-    onClose();
+    notifyOpenerThemeMessage(THEME_WINDOW_MESSAGE.RESET);
+    closeEditor();
   };
 
   const handleCancel = () => {
+    clearThemePreview();
     applyThemeToRoot(getMergedTheme());
-    onClose();
+    notifyOpenerThemeMessage(THEME_WINDOW_MESSAGE.CANCEL);
+    closeEditor();
   };
 
+  const panelClass = standalone ? styles.standalonePanel : styles.modal;
+
   return (
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="theme-color-menu-title"
-      onClick={(e) => e.target === e.currentTarget && handleCancel()}
-    >
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={standalone ? styles.standalonePage : styles.overlay}>
+      <div className={panelClass}>
         <div className={styles.header}>
-          <h2 id="theme-color-menu-title" className={styles.title}>
+          <h1 id="theme-color-menu-title" className={styles.title}>
             Цвета интерфейса
-          </h2>
+          </h1>
           <button type="button" className={styles.closeBtn} onClick={handleCancel} aria-label="Закрыть">
             ×
           </button>
@@ -470,6 +489,6 @@ const ThemeColorMenu = ({ open, onClose }) => {
       </div>
     </div>
   );
-};
+}
 
-export default ThemeColorMenu;
+export default ThemeColorEditor;

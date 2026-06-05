@@ -1,0 +1,5 @@
+.theme-colors-page {
+  min-height: 100vh;
+  background: var(--background, #36393f);
+  color: var(--text, #dcddde);
+}

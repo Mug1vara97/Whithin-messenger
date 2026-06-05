@@ -5,15 +5,22 @@ import { LoginPage } from '../../pages/login/ui';
 import { RegisterPage } from '../../pages/register/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
+import { ThemeColorsPage } from '../../pages/theme-colors/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
+
+const isThemeEditorWindow =
+  typeof window !== 'undefined' &&
+  (window.location.pathname === '/theme-colors' || window.name === 'whithin-theme-colors');
 
 const AppRouter = () => {
   const { isAuthenticated, isLoading } = useAuthContext();
-  const [isMinBootTimePassed, setIsMinBootTimePassed] = useState(false);
+  const [isMinBootTimePassed, setIsMinBootTimePassed] = useState(isThemeEditorWindow);
   const [isBootExiting, setIsBootExiting] = useState(false);
-  const [isBootCompleted, setIsBootCompleted] = useState(false);
+  const [isBootCompleted, setIsBootCompleted] = useState(isThemeEditorWindow);
 
   useEffect(() => {
+    if (isThemeEditorWindow) return undefined;
+
     const minDisplayTimer = window.setTimeout(() => {
       setIsMinBootTimePassed(true);
     }, 10000);
@@ -107,6 +114,12 @@ const AppRouter = () => {
             element={
               isAuthenticated ? <ServerSettingsPage /> : <Navigate to="/login" replace />
             } 
+          />
+          <Route
+            path="/theme-colors"
+            element={
+              isAuthenticated ? <ThemeColorsPage /> : <Navigate to="/login" replace />
+            }
           />
           <Route 
             path="*" 

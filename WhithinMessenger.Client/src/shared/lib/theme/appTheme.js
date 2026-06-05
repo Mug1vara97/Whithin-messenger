@@ -1,4 +1,11 @@
 const STORAGE_KEY = 'whithin-app-theme';
+const PREVIEW_KEY = 'whithin-app-theme-preview';
+
+export const THEME_WINDOW_MESSAGE = {
+  SAVED: 'whithin-theme-saved',
+  CANCEL: 'whithin-theme-cancel',
+  RESET: 'whithin-theme-reset',
+};
 
 /** Базовая тема (совпадает с :root в index.css). Для ключей с acceptsGradient допускается linear-gradient(...). */
 export const DEFAULT_THEME = {
@@ -105,10 +112,84 @@ export function applySavedTheme() {
 export function persistTheme(partial) {
   const next = { ...getMergedTheme(), ...partial };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  clearThemePreview();
   applyThemeToRoot(next);
 }
 
 export function resetTheme() {
   localStorage.removeItem(STORAGE_KEY);
+  clearThemePreview();
   applyThemeToRoot(DEFAULT_THEME);
+}
+
+/** Предпросмотр в основном окне, пока редактор открыт в отдельном. */
+export function broadcastThemePreview(theme) {
+  try {
+    localStorage.setItem(
+      PREVIEW_KEY,
+      JSON.stringify({ ...theme, __previewTs: Date.now() }),
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
+export function clearThemePreview() {
+  try {
+    localStorage.removeItem(PREVIEW_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function notifyOpenerThemeMessage(type) {
+  if (!window.opener || window.opener.closed) return;
+  try {
+    window.opener.postMessage({ type }, window.location.origin);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function setupThemeWindowSync() {
+  const onStorage = (event) => {
+    if (event.key === PREVIEW_KEY && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        const { __previewTs, ...theme } = parsed;
+        applyThemeToRoot({ ...DEFAULT_THEME, ...theme });
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    if (event.key === PREVIEW_KEY && !event.newValue) {
+      applyThemeToRoot(getMergedTheme());
+      return;
+    }
+    if (event.key === STORAGE_KEY) {
+      clearThemePreview();
+      applyThemeToRoot(getMergedTheme());
+    }
+  };
+
+  const onMessage = (event) => {
+    if (event.origin !== window.location.origin) return;
+    const { type } = event.data || {};
+    if (
+      type === THEME_WINDOW_MESSAGE.SAVED ||
+      type === THEME_WINDOW_MESSAGE.CANCEL ||
+      type === THEME_WINDOW_MESSAGE.RESET
+    ) {
+      clearThemePreview();
+      applyThemeToRoot(getMergedTheme());
+    }
+  };
+
+  window.addEventListener('storage', onStorage);
+  window.addEventListener('message', onMessage);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener('message', onMessage);
+  };
 }

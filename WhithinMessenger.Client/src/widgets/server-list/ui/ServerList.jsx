@@ -6,7 +6,7 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import compassIcon from '../../../assets/magnifying-glass.png';
 import { Settings, Palette } from '@mui/icons-material';
-import ThemeColorMenu from '../../../shared/ui/molecules/ThemeColorMenu/ThemeColorMenu';
+import { openThemeColorsWindow } from '../../../shared/lib/theme/openThemeColorsWindow';
 import styles from './ServerList.module.css';
 
 /** Ключ слота панели под текущий URL (серверы живут на /server/:id, не на /channels/...). */
@@ -41,8 +41,6 @@ const ServerList = ({
   const [notchTop, setNotchTop] = useState(null);
   const [notchVisible, setNotchVisible] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-
   const activeRailKey = getActiveRailKey(location.pathname);
 
   const updateRailNotch = useCallback(() => {
@@ -348,7 +346,7 @@ const ServerList = ({
               <button
                 type="button"
                 className={`${styles['server-button']} ${styles['theme-paint-button']}`}
-                onClick={() => setThemeMenuOpen(true)}
+                onClick={openThemeColorsWindow}
                 title="Цвета интерфейса"
               >
                 <Palette />
@@ -391,7 +389,6 @@ const ServerList = ({
         </div>
       </DragDropContext>
 
-      <ThemeColorMenu open={themeMenuOpen} onClose={() => setThemeMenuOpen(false)} />
     </div>
   );
 };

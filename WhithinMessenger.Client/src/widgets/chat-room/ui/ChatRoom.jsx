@@ -1030,16 +1030,15 @@ const ChatRoom = ({
           </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="chat-composer-area">
         {typingLabel && (
           <div className="chat-typing-indicator" aria-live="polite">
             <span className="chat-typing-indicator__dots" aria-hidden="true" />
             <span>{typingLabel}</span>
           </div>
         )}
+
+        <div ref={messagesEndRef} />
+      </div>
 
       <form className={`input-container ${replyingToMessage ? 'replying' : ''}`} onSubmit={handleSendMessage}>
         {editingMessageId && (
@@ -1172,7 +1171,6 @@ const ChatRoom = ({
           </>
         )}
       </form>
-      </div>
 
       <ForwardModal />
 

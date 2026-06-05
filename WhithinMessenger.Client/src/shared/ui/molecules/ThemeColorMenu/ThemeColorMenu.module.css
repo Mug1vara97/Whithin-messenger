@@ -1,3 +1,23 @@
+.standalonePage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background, #36393f);
+}
+
+.standalonePanel {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #2f3136);
+  border-left: 1px solid var(--border, #4f545c);
+  border-right: 1px solid var(--border, #4f545c);
+  box-shadow: 0 0 32px rgba(0, 0, 0, 0.22);
+}
+
 .overlay {
   position: fixed;
   inset: 0;
