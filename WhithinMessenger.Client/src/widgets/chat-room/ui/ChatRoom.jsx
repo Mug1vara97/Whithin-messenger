@@ -13,6 +13,7 @@ import {
   useContextMenu, 
   useMessageForward 
 } from '../../../shared/lib/hooks';
+import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
 import { MessageInput, MessageItem } from '../../../shared/ui';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
@@ -54,8 +55,12 @@ const ChatRoom = ({
     editMessage,
     deleteMessage,
     forwardMessage,
-    scrollToBottom
+    scrollToBottom,
+    typingUsers,
+    handleComposerTextChange,
   } = useChat(chatId, username, userId);
+
+  const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
 
   const messagesTailKey = useMemo(() => {
     if (!messages?.length) return '0:';
@@ -747,7 +752,7 @@ const ChatRoom = ({
         </div>
         <div className="header-actions">
 
-          {(isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
+          {!isServerChat && (isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
             <button
               onClick={handleStartCall}
               className="voice-call-button"
@@ -774,7 +779,11 @@ const ChatRoom = ({
         </div>
       </div>
 
-      {isCallActiveInThisChat && (
+      {typingLabel && (
+        <div className="chat-typing-indicator">{typingLabel}</div>
+      )}
+
+      {!isServerChat && isCallActiveInThisChat && (
         <ChatVoiceCall
           chatId={chatId}
           chatName={activeChatCall?.chatName || groupName}
@@ -790,7 +799,7 @@ const ChatRoom = ({
         />
       )}
 
-      {hasJoinableCallInThisChat && primaryJoinParticipant && (
+      {!isServerChat && hasJoinableCallInThisChat && primaryJoinParticipant && (
         <div className="chat-voice-call-join-preview">
           <div className="join-preview-center">
             <div className="join-preview-title">Звонок уже идёт</div>
@@ -1088,7 +1097,11 @@ const ChatRoom = ({
               ref={inputRef}
               type="text"
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setNewMessage(value);
+                handleComposerTextChange(value);
+              }}
               placeholder={
                 editingMessageId 
                   ? "Редактируйте сообщение..." 

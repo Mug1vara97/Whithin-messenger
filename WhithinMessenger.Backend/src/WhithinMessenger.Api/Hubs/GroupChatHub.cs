@@ -642,6 +642,60 @@ public class GroupChatHub : Hub
             }
         }
 
+        public async Task NotifyTyping(string chatId, string username)
+        {
+            try
+            {
+                if (!Guid.TryParse(chatId, out Guid parsedChatId))
+                {
+                    return;
+                }
+
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return;
+                }
+
+                var displayName = string.IsNullOrWhiteSpace(username) ? "Пользователь" : username.Trim();
+                await Clients.OthersInGroup(parsedChatId.ToString()).SendAsync(
+                    "UserTyping",
+                    parsedChatId.ToString(),
+                    userId.Value.ToString(),
+                    displayName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error notifying typing for chat {ChatId}", chatId);
+            }
+        }
+
+        public async Task NotifyStopTyping(string chatId)
+        {
+            try
+            {
+                if (!Guid.TryParse(chatId, out Guid parsedChatId))
+                {
+                    return;
+                }
+
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return;
+                }
+
+                await Clients.OthersInGroup(parsedChatId.ToString()).SendAsync(
+                    "UserStoppedTyping",
+                    parsedChatId.ToString(),
+                    userId.Value.ToString());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error notifying stop typing for chat {ChatId}", chatId);
+            }
+        }
+
     public async Task SendCallNotification(Guid chatId, string caller, Guid callerId)
     {
         try

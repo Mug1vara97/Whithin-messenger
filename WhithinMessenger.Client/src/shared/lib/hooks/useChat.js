@@ -2,16 +2,104 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 
+const TYPING_IDLE_MS = 3000;
+const TYPING_EXPIRE_MS = 5000;
+
+export const formatTypingLabel = (users) => {
+  if (!users?.length) return null;
+  if (users.length === 1) return `${users[0].username} печатает…`;
+  if (users.length === 2) return `${users[0].username} и ${users[1].username} печатают…`;
+  return `${users.length} человек печатают…`;
+};
+
 export const useChat = (chatId, username, userId) => {
   const [messages, setMessages] = useState([]);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [typingUsers, setTypingUsers] = useState([]);
   
   const connectionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const currentChatIdRef = useRef(null);
+  const typingExpiryTimersRef = useRef(new Map());
+  const typingIdleTimerRef = useRef(null);
+  const lastTypingSentRef = useRef(false);
+
+  const clearTypingExpiryTimers = useCallback(() => {
+    typingExpiryTimersRef.current.forEach((timer) => clearTimeout(timer));
+    typingExpiryTimersRef.current.clear();
+  }, []);
+
+  const removeTypingUser = useCallback((typingUserId) => {
+    const id = String(typingUserId);
+    const timer = typingExpiryTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      typingExpiryTimersRef.current.delete(id);
+    }
+    setTypingUsers((prev) => prev.filter((user) => user.userId !== id));
+  }, []);
+
+  const addTypingUser = useCallback((typingUserId, typingUsername) => {
+    const id = String(typingUserId);
+    if (!id || id === String(userId)) return;
+
+    setTypingUsers((prev) => {
+      const filtered = prev.filter((user) => user.userId !== id);
+      return [...filtered, { userId: id, username: typingUsername || 'Пользователь' }];
+    });
+
+    const existingTimer = typingExpiryTimersRef.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    typingExpiryTimersRef.current.set(
+      id,
+      setTimeout(() => removeTypingUser(id), TYPING_EXPIRE_MS),
+    );
+  }, [removeTypingUser, userId]);
+
+  const notifyStopTyping = useCallback(async () => {
+    if (!connectionRef.current || !chatId || !lastTypingSentRef.current) return;
+    try {
+      await connectionRef.current.invoke('NotifyStopTyping', chatId);
+    } catch (err) {
+      console.warn('NotifyStopTyping failed:', err);
+    } finally {
+      lastTypingSentRef.current = false;
+    }
+  }, [chatId]);
+
+  const notifyTyping = useCallback(() => {
+    if (!connectionRef.current || !chatId || !username) return;
+
+    if (!lastTypingSentRef.current) {
+      connectionRef.current.invoke('NotifyTyping', chatId, username).catch((err) => {
+        console.warn('NotifyTyping failed:', err);
+      });
+      lastTypingSentRef.current = true;
+    }
+
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+    }
+    typingIdleTimerRef.current = setTimeout(() => {
+      notifyStopTyping();
+    }, TYPING_IDLE_MS);
+  }, [chatId, username, notifyStopTyping]);
+
+  const handleComposerTextChange = useCallback((text) => {
+    if (!text?.trim()) {
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+      notifyStopTyping();
+      return;
+    }
+    notifyTyping();
+  }, [notifyStopTyping, notifyTyping]);
 
   const normalizeMessage = useCallback((msg) => {
     if (!msg) return null;
@@ -39,6 +127,13 @@ export const useChat = (chatId, username, userId) => {
 
       setIsLoading(true);
       setError(null);
+      setTypingUsers([]);
+      clearTypingExpiryTimers();
+      lastTypingSentRef.current = false;
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
 
       const newConnection = new HubConnectionBuilder()
         .withUrl(`${BASE_URL}/groupchathub?userId=${userId}`)
@@ -58,6 +153,16 @@ export const useChat = (chatId, username, userId) => {
             .filter(Boolean);
 
           setMessages(processedMessages);
+        });
+
+        newConnection.on('UserTyping', (eventChatId, typingUserId, typingUsername) => {
+          if (String(eventChatId) !== chatIdStr) return;
+          addTypingUser(typingUserId, typingUsername);
+        });
+
+        newConnection.on('UserStoppedTyping', (eventChatId, typingUserId) => {
+          if (String(eventChatId) !== chatIdStr) return;
+          removeTypingUser(typingUserId);
         });
 
         newConnection.on('Error', (errorMessage) => {
@@ -88,12 +193,26 @@ export const useChat = (chatId, username, userId) => {
 
     return () => {
       const cleanup = async () => {
+        if (typingIdleTimerRef.current) {
+          clearTimeout(typingIdleTimerRef.current);
+          typingIdleTimerRef.current = null;
+        }
+        clearTypingExpiryTimers();
+        const shouldStopTyping = lastTypingSentRef.current;
+        lastTypingSentRef.current = false;
+        setTypingUsers([]);
+
         if (connectionRef.current) {
           try {
+            if (connectionRef.current.state === 'Connected' && chatId && shouldStopTyping) {
+              await connectionRef.current.invoke('NotifyStopTyping', chatId);
+            }
             connectionRef.current.off('MessageSent');
             connectionRef.current.off('MessageEdited');
             connectionRef.current.off('MessageDeleted');
             connectionRef.current.off('ReceiveMessages');
+            connectionRef.current.off('UserTyping');
+            connectionRef.current.off('UserStoppedTyping');
             connectionRef.current.off('Error');
             
             if (connectionRef.current.state === 'Connected' && chatId) {
@@ -116,7 +235,7 @@ export const useChat = (chatId, username, userId) => {
       
       cleanup();
     };
-  }, [chatId, userId]);
+  }, [chatId, userId, addTypingUser, clearTypingExpiryTimers, normalizeMessage, removeTypingUser]);
 
   useEffect(() => {
     if (connection) {
@@ -178,6 +297,11 @@ export const useChat = (chatId, username, userId) => {
     if (!content.trim() || !connection) return;
 
     try {
+      if (typingIdleTimerRef.current) {
+        clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+      await notifyStopTyping();
       await connection.invoke('SendMessage', 
         content, 
         username, 
@@ -191,7 +315,7 @@ export const useChat = (chatId, username, userId) => {
       setError('Ошибка отправки сообщения');
       return false;
     }
-  }, [connection, username, chatId]);
+  }, [connection, username, chatId, notifyStopTyping]);
 
   const editMessage = useCallback(async (messageId, newContent) => {
     if (!connection) return;
@@ -245,6 +369,9 @@ export const useChat = (chatId, username, userId) => {
     isLoading,
     error,
     messagesEndRef,
+    typingUsers,
+    handleComposerTextChange,
+    notifyStopTyping,
     sendMessage,
     editMessage,
     deleteMessage,
