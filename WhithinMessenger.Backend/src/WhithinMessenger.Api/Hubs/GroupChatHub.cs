@@ -549,13 +549,13 @@ public class GroupChatHub : Hub
                 }
 
                 var wasMarked = await _messageRepository.MarkMessageDeliveredAsync(messageId, userId.Value);
-                if (!wasMarked)
+
+                if (wasMarked)
                 {
-                    return;
+                    var deliveredAt = DateTimeOffset.UtcNow;
+                    await Clients.Group(chatId.ToString()).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
                 }
 
-                var deliveredAt = DateTimeOffset.UtcNow;
-                await Clients.Group(chatId.ToString()).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
                 await BroadcastMessageStatusAsync(messageId, chatId);
             }
             catch (Exception ex)
