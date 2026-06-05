@@ -4,6 +4,8 @@ namespace WhithinMessenger.Domain.Interfaces
 {
     public record MarkedMessageReadReceipt(Guid MessageId, Guid SenderUserId);
 
+    public record MessageDeliveryReceipt(Guid ChatId, Guid MessageId);
+
     public interface IMessageRepository
     {
         Task<Message?> GetByIdAsync(Guid messageId, CancellationToken cancellationToken = default);
@@ -14,6 +16,9 @@ namespace WhithinMessenger.Domain.Interfaces
         Task<int> GetUnreadCountByChatAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default);
         Task<List<MarkedMessageReadReceipt>> MarkChatAsReadAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default);
         Task<bool> MarkMessageDeliveredAsync(Guid messageId, Guid userId, CancellationToken cancellationToken = default);
+        Task<List<MessageDeliveryReceipt>> AcknowledgePendingDeliveriesForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default);
         Task<bool> MarkMessageReadAsync(Guid messageId, Guid userId, CancellationToken cancellationToken = default);
         Task<string?> GetMessageStatusAsync(Guid messageId, Guid senderUserId, int recipientCount, CancellationToken cancellationToken = default);
         Task<Dictionary<Guid, string>> GetMessageStatusesAsync(

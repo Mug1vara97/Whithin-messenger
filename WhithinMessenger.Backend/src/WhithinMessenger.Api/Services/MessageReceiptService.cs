@@ -17,6 +17,10 @@ public interface IMessageReceiptService
         Guid chatId,
         Guid messageId,
         CancellationToken cancellationToken = default);
+
+    Task AcknowledgePendingDeliveriesForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }
 
 public class MessageReceiptService : IMessageReceiptService
@@ -58,6 +62,17 @@ public class MessageReceiptService : IMessageReceiptService
         await BroadcastMessageStatusAsync(chatId, messageId, cancellationToken);
     }
 
+    public async Task AcknowledgePendingDeliveriesForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var receipts = await _messageRepository.AcknowledgePendingDeliveriesForUserAsync(userId, cancellationToken);
+        foreach (var receipt in receipts)
+        {
+            await BroadcastMessageStatusAsync(receipt.ChatId, receipt.MessageId, cancellationToken);
+        }
+    }
+
     public async Task BroadcastMessageStatusAsync(
         Guid chatId,
         Guid messageId,
@@ -93,7 +108,7 @@ public class MessageReceiptService : IMessageReceiptService
 
     private async Task<bool> IsRecipientReachableAsync(Guid userId, CancellationToken cancellationToken)
     {
-        if (NotificationHub.HasActiveConnection(userId))
+        if (NotificationHub.HasActiveConnection(userId) || GroupChatHub.HasActiveConnection(userId))
         {
             return true;
         }

@@ -17,6 +17,7 @@ using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Api.Services;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Linq;
 
@@ -24,6 +25,10 @@ namespace WhithinMessenger.Api.Hubs
 {
 public class GroupChatHub : Hub
 {
+    private static readonly ConcurrentDictionary<Guid, int> ActiveConnections = new();
+
+    public static bool HasActiveConnection(Guid userId) =>
+        ActiveConnections.TryGetValue(userId, out var count) && count > 0;
     private readonly IMediator _mediator;
     private readonly IHubContext<ChatListHub> _chatListHubContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -573,6 +578,25 @@ public class GroupChatHub : Hub
             }
         }
 
+        public async Task AcknowledgePendingDeliveries()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                await _messageReceiptService.AcknowledgePendingDeliveriesForUserAsync(userId.Value);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при подтверждении доставки: {ex.Message}");
+            }
+        }
+
         public async Task SendMediaMessage(string username, string mediaUrl, string chatId)
         {
             try
@@ -826,7 +850,17 @@ public class GroupChatHub : Hub
             var userId = GetCurrentUserId();
             if (userId.HasValue)
             {
+                ActiveConnections.AddOrUpdate(userId.Value, 1, (_, current) => current + 1);
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
+
+                try
+                {
+                    await _messageReceiptService.AcknowledgePendingDeliveriesForUserAsync(userId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to acknowledge pending deliveries for user {UserId}", userId);
+                }
             }
             await base.OnConnectedAsync();
         }
@@ -836,9 +870,26 @@ public class GroupChatHub : Hub
             var userId = GetCurrentUserId();
             if (userId.HasValue)
             {
+                DecrementConnectionCount(userId.Value);
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user-{userId}");
             }
             await base.OnDisconnectedAsync(exception);
+        }
+
+        private static void DecrementConnectionCount(Guid userId)
+        {
+            if (!ActiveConnections.TryGetValue(userId, out var current))
+            {
+                return;
+            }
+
+            if (current <= 1)
+            {
+                ActiveConnections.TryRemove(userId, out _);
+                return;
+            }
+
+            ActiveConnections.TryUpdate(userId, current - 1, current);
         }
 
         public async Task GetChatInfo(Guid chatId)

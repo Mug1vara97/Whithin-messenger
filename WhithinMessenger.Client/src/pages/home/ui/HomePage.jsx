@@ -272,6 +272,12 @@ const HomePage = () => {
           console.warn('HomePage: failed to join chat group for incoming calls:', chatIdValue, error);
         });
     });
+
+    groupChatConnection
+      .invoke('AcknowledgePendingDeliveries')
+      .catch((error) => {
+        console.warn('HomePage: AcknowledgePendingDeliveries failed:', error);
+      });
   }, [chats, groupChatConnection]);
 
   const activeIncomingCallKey = incomingCall

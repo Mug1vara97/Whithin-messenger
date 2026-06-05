@@ -135,6 +135,53 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .ToList();
         }
 
+        public async Task<List<MessageDeliveryReceipt>> AcknowledgePendingDeliveriesForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            var chatIds = await _context.Members
+                .AsNoTracking()
+                .Where(m => m.UserId == userId)
+                .Select(m => m.ChatId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (chatIds.Count == 0)
+            {
+                return [];
+            }
+
+            var pendingMessages = await _context.Messages
+                .AsNoTracking()
+                .Where(m => chatIds.Contains(m.ChatId) && m.UserId != userId)
+                .Where(m => !_context.MessageDeliveries.Any(md => md.MessageId == m.Id && md.UserId == userId))
+                .Select(m => new { m.Id, m.ChatId })
+                .ToListAsync(cancellationToken);
+
+            if (pendingMessages.Count == 0)
+            {
+                return [];
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var deliveries = pendingMessages.Select(m => new MessageDelivery
+            {
+                Id = Guid.NewGuid(),
+                MessageId = m.Id,
+                UserId = userId,
+                DeliveredAt = now,
+                Message = null!,
+                User = null!
+            }).ToList();
+
+            await _context.MessageDeliveries.AddRangeAsync(deliveries, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return pendingMessages
+                .Select(m => new MessageDeliveryReceipt(m.ChatId, m.Id))
+                .ToList();
+        }
+
         public async Task<bool> MarkMessageDeliveredAsync(Guid messageId, Guid userId, CancellationToken cancellationToken = default)
         {
             var message = await _context.Messages

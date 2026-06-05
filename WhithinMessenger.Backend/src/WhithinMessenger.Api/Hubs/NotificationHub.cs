@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
+using WhithinMessenger.Api.Services;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Infrastructure.Database;
 
@@ -13,10 +14,12 @@ public class NotificationHub : Hub
     public static bool HasActiveConnection(Guid userId) =>
         ActiveConnections.TryGetValue(userId, out var count) && count > 0;
     private readonly WithinDbContext _context;
+    private readonly IMessageReceiptService _messageReceiptService;
 
-    public NotificationHub(WithinDbContext context)
+    public NotificationHub(WithinDbContext context, IMessageReceiptService messageReceiptService)
     {
         _context = context;
+        _messageReceiptService = messageReceiptService;
     }
 
     public override async Task OnConnectedAsync()
@@ -27,6 +30,16 @@ public class NotificationHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userIdGuid}");
             ActiveConnections.AddOrUpdate(userIdGuid, 1, (_, current) => current + 1);
             await MarkUserOnlineIfOfflineAsync(userIdGuid);
+
+            try
+            {
+                await _messageReceiptService.AcknowledgePendingDeliveriesForUserAsync(userIdGuid);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to acknowledge pending deliveries for user {userId}: {ex.Message}");
+            }
+
             Console.WriteLine($"User {userId} connected to NotificationHub");
         }
         await base.OnConnectedAsync();
