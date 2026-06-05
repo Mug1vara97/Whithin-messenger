@@ -1,4 +1,4 @@
-const THEME_WINDOW_NAME = 'whithin-theme-colors';
+import { THEME_WINDOW_NAME } from './themeWindow';
 
 let themeColorsWindow = null;
 
