@@ -44,8 +44,16 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var command = new LoginCommand(request.Username, request.Password);
-        var result = await _mediator.Send(command);
+        LoginResult result;
+        try
+        {
+            var command = new LoginCommand(request.Username, request.Password);
+            result = await _mediator.Send(command);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = "Ошибка входа", Details = ex.Message });
+        }
 
         if (result.IsSuccess && result.User != null)
         {

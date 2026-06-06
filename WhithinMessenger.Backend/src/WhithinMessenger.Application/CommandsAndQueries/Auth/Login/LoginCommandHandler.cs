@@ -41,19 +41,28 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
 
     private async Task<bool> IsPasswordValidAsync(ApplicationUser user, string password)
     {
-        if (await _userManager.CheckPasswordAsync(user, password))
+        if (IsLegacyPlainTextPasswordHash(user.PasswordHash))
         {
-            return true;
+            if (user.PasswordHash != password)
+            {
+                return false;
+            }
+
+            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, password);
+            var updateResult = await _userManager.UpdateAsync(user);
+            return updateResult.Succeeded;
         }
 
-        // Legacy accounts created before Identity password hashing.
-        if (user.PasswordHash == password)
+        try
         {
-            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var resetResult = await _userManager.ResetPasswordAsync(user, resetToken, password);
-            return resetResult.Succeeded;
+            return await _userManager.CheckPasswordAsync(user, password);
         }
-
-        return false;
+        catch (Exception)
+        {
+            return false;
+        }
     }
+
+    private static bool IsLegacyPlainTextPasswordHash(string? passwordHash) =>
+        !string.IsNullOrEmpty(passwordHash) && !passwordHash.StartsWith("AQAAAA", StringComparison.Ordinal);
 }
