@@ -646,6 +646,25 @@
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-width: 0;
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.message-header-time {
+  font-size: 12px;
+  color: var(--text-muted, #949ba4);
+}
+
+.message-edited {
+  font-size: 11px;
+  color: var(--text-muted, #949ba4);
 }
 
 .message-meta {
@@ -679,8 +698,9 @@
 
 .message-username {
   color: var(--text);
-  display: block;
-  margin-bottom: 4px;
+  display: inline;
+  margin-bottom: 0;
+  font-size: 17px;
 }
 
 .bot-message {

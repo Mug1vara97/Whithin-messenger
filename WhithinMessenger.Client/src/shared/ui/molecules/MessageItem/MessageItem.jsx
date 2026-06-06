@@ -4,6 +4,7 @@ import { MessageStatus } from '../../../../entities/message/model/types';
 import MediaFile from '../MediaFile/MediaFile';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import { openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
+import { formatDiscordMessageTimestamp } from '../../../lib/utils/messageTime';
 import './MessageItem.css';
 
 const MessageItem = ({ 
@@ -62,11 +63,7 @@ const MessageItem = ({
   }, [message, onForward]);
 
   const formatTime = useCallback((dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('ru-RU', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    return formatDiscordMessageTimestamp(dateString);
   }, []);
 
   const renderMessageContent = () => {
@@ -204,7 +201,18 @@ const MessageItem = ({
         {showAvatar && (
           <div className="message-header">
             <span className="message-username">{message.senderUsername}</span>
-            <span className="message-time">{formatTime(message.createdAt)}</span>
+            {formatTime(message.createdAt) && (
+              <span className="message-time">{formatTime(message.createdAt)}</span>
+            )}
+            {message.isEdited && (
+              <span className="message-edited">ред.</span>
+            )}
+            {isOwn && (
+              <MessageStatusIndicator
+                status={message.status || MessageStatus.SENT}
+                onLightBubble
+              />
+            )}
           </div>
         )}
         
@@ -212,12 +220,6 @@ const MessageItem = ({
           {renderRepliedMessage()}
           {renderForwardedMessage()}
           {renderMessageContent()}
-          {isOwn && (
-            <div className="message-meta">
-              <span className="message-time">{formatTime(message.createdAt)}</span>
-              <MessageStatusIndicator status={message.status || MessageStatus.SENT} />
-            </div>
-          )}
         </div>
       </div>
       

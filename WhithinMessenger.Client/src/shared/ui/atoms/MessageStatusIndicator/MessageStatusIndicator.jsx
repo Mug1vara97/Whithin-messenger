@@ -10,12 +10,20 @@ const STATUS_LABELS = {
   [MessageStatus.FAILED]: 'Ошибка отправки',
 };
 
-const MessageStatusIndicator = ({ status = MessageStatus.SENT }) => {
+const MessageStatusIndicator = ({
+  status = MessageStatus.SENT,
+  onLightBubble = false,
+}) => {
   const label = STATUS_LABELS[status] || STATUS_LABELS[MessageStatus.SENT];
+  const lightClass = onLightBubble ? ' message-status--on-light' : '';
 
   if (status === MessageStatus.SENDING) {
     return (
-      <span className="message-status message-status--sending" title={label} aria-label={label}>
+      <span
+        className={`message-status message-status--sending${lightClass}`}
+        title={label}
+        aria-label={label}
+      >
         ◷
       </span>
     );
@@ -23,7 +31,11 @@ const MessageStatusIndicator = ({ status = MessageStatus.SENT }) => {
 
   if (status === MessageStatus.FAILED) {
     return (
-      <span className="message-status message-status--failed" title={label} aria-label={label}>
+      <span
+        className={`message-status message-status--failed${lightClass}`}
+        title={label}
+        aria-label={label}
+      >
         !
       </span>
     );
@@ -31,7 +43,11 @@ const MessageStatusIndicator = ({ status = MessageStatus.SENT }) => {
 
   if (status === MessageStatus.READ) {
     return (
-      <span className="message-status message-status--read" title={label} aria-label={label}>
+      <span
+        className={`message-status message-status--read${lightClass}`}
+        title={label}
+        aria-label={label}
+      >
         ✓✓
       </span>
     );
@@ -39,14 +55,22 @@ const MessageStatusIndicator = ({ status = MessageStatus.SENT }) => {
 
   if (status === MessageStatus.DELIVERED) {
     return (
-      <span className="message-status message-status--delivered" title={label} aria-label={label}>
+      <span
+        className={`message-status message-status--delivered${lightClass}`}
+        title={label}
+        aria-label={label}
+      >
         ✓✓
       </span>
     );
   }
 
   return (
-    <span className="message-status message-status--sent" title={label} aria-label={label}>
+    <span
+      className={`message-status message-status--sent${lightClass}`}
+      title={label}
+      aria-label={label}
+    >
       ✓
     </span>
   );

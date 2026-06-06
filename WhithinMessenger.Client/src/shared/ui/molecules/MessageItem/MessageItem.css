@@ -48,6 +48,7 @@
 .message-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 4px;
 }
@@ -55,12 +56,17 @@
 .message-username {
   font-weight: 600;
   color: var(--text, #dcddde);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .message-time {
-  color: var(--text-muted, #8e9297);
+  color: var(--text-muted, #949ba4);
   font-size: 12px;
+}
+
+.message-edited {
+  color: var(--text-muted, #949ba4);
+  font-size: 11px;
 }
 
 .message-body {

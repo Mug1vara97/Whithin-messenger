@@ -32,6 +32,26 @@
   font-weight: 700;
 }
 
+.message-status--on-light {
+  margin-left: 4px;
+  font-size: 10px;
+  letter-spacing: -1.2px;
+}
+
+.message-status--on-light.message-status--sent,
+.message-status--on-light.message-status--delivered,
+.message-status--on-light.message-status--sending {
+  color: #949ba4;
+}
+
+.message-status--on-light.message-status--read {
+  color: var(--primary, #5865f2);
+}
+
+.message-status--on-light.message-status--failed {
+  color: #ed4245;
+}
+
 .user-message .message-status--sent,
 .user-message .message-status--delivered,
 .user-message .message-status--read,

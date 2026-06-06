@@ -6,6 +6,7 @@ import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks } from '../../../shared/lib/utils/urlHelpers';
+import { formatDiscordMessageTimestamp } from '../../../shared/lib/utils/messageTime';
 import { 
   useChat, 
   useMessageSearch, 
@@ -14,7 +15,7 @@ import {
   useMessageForward 
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
-import { MessageInput, MessageItem, MessageStatusIndicator } from '../../../shared/ui';
+import { MessageInput, MessageStatusIndicator } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
@@ -877,13 +878,7 @@ const ChatRoom = ({
 
         {messages.map((msg) => {
           const isOwn = msg.senderUsername === username;
-          const formatMessageTime = (dateString) => {
-            const date = new Date(dateString);
-            return date.toLocaleTimeString('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-          };
+          const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
 
           return (
             <div
@@ -900,7 +895,21 @@ const ChatRoom = ({
                 avatarColor={msg.avatarColor}
               />
               <div className="message-content">
-                <strong className="message-username">{msg.senderUsername}</strong>
+                <div className="message-header">
+                  <strong className="message-username">{msg.senderUsername}</strong>
+                  {headerTime && (
+                    <span className="message-header-time">{headerTime}</span>
+                  )}
+                  {msg.isEdited && (
+                    <span className="message-edited">ред.</span>
+                  )}
+                  {isOwn && (
+                    <MessageStatusIndicator
+                      status={msg.status || MessageStatus.SENT}
+                      onLightBubble
+                    />
+                  )}
+                </div>
                 {msg.repliedMessage && (
                   <div className="replied-message" onClick={() => scrollToMessage(msg.repliedMessage.messageId)}>
                     <div className="replied-message-header">
@@ -953,12 +962,6 @@ const ChatRoom = ({
                   </div>
                 )}
 
-                {isOwn && (
-                  <div className="message-meta">
-                    <span className="message-meta-time">{formatMessageTime(msg.createdAt)}</span>
-                    <MessageStatusIndicator status={msg.status || MessageStatus.SENT} />
-                  </div>
-                )}
               </div>
             </div>
           );
