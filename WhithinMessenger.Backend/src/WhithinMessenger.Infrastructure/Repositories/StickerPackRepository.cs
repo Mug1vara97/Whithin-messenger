@@ -54,4 +54,19 @@ public class StickerPackRepository : IStickerPackRepository
         _context.Stickers.AddRange(stickers);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> DeletePackAsync(Guid packId, CancellationToken cancellationToken = default)
+    {
+        var pack = await _context.StickerPacks
+            .Include(p => p.Stickers)
+            .FirstOrDefaultAsync(p => p.Id == packId, cancellationToken);
+        if (pack == null)
+        {
+            return false;
+        }
+
+        _context.StickerPacks.Remove(pack);
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

@@ -10,4 +10,5 @@ public interface IStickerPackRepository
     Task<StickerPack> CreatePackAsync(StickerPack pack, CancellationToken cancellationToken = default);
     Task UpdatePackAsync(StickerPack pack, CancellationToken cancellationToken = default);
     Task AddStickersAsync(IEnumerable<Sticker> stickers, CancellationToken cancellationToken = default);
+    Task<bool> DeletePackAsync(Guid packId, CancellationToken cancellationToken = default);
 }

@@ -12,8 +12,11 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
 {
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".webp", ".png", ".gif", ".jpg", ".jpeg"
+        ".webp", ".png", ".gif", ".jpg", ".jpeg", ".webm"
     };
+
+    private const int MaxImageStickerBytes = 2 * 1024 * 1024;
+    private const int MaxVideoStickerBytes = 5 * 1024 * 1024;
 
     private readonly IStickerPackRepository _stickerPackRepository;
     private readonly IFileService _fileService;
@@ -98,7 +101,10 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 await using var memory = new MemoryStream();
                 await entryStream.CopyToAsync(memory, cancellationToken);
                 var bytes = memory.ToArray();
-                if (bytes.Length == 0 || bytes.Length > 2 * 1024 * 1024)
+                var maxBytes = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+                    ? MaxVideoStickerBytes
+                    : MaxImageStickerBytes;
+                if (bytes.Length == 0 || bytes.Length > maxBytes)
                 {
                     continue;
                 }
@@ -117,6 +123,7 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                     ".png" => "image/png",
                     ".gif" => "image/gif",
                     ".jpg" or ".jpeg" => "image/jpeg",
+                    ".webm" => "video/webm",
                     _ => "application/octet-stream"
                 };
 
@@ -135,11 +142,13 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 return new UploadStickerPackResult
                 {
                     Success = false,
-                    ErrorMessage = "В архиве не найдено изображений (webp, png, gif, jpg)"
+                    ErrorMessage = "В архиве не найдено стикеров (webp, png, gif, jpg, webm)"
                 };
             }
 
-            pack.CoverImagePath = stickers[0].FilePath;
+            pack.CoverImagePath =
+                stickers.FirstOrDefault(s => s.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))?.FilePath
+                ?? stickers[0].FilePath;
             await _stickerPackRepository.AddStickersAsync(stickers, cancellationToken);
             await _stickerPackRepository.UpdatePackAsync(pack, cancellationToken);
 

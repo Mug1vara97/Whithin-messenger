@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Api.Services;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.DeleteStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.SendStickerMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.UploadStickerPack;
@@ -86,6 +87,32 @@ public class StickersController : ControllerBase
         {
             _logger.LogError(ex, "Sticker pack upload failed");
             return StatusCode(500, new { error = "Ошибка при загрузке стикерпака: " + ex.Message });
+        }
+    }
+
+    [HttpDelete("packs/{packId:guid}")]
+    public async Task<IActionResult> DeleteStickerPack(Guid packId)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            if (userId != StickerPackAdmin.AllowedUploaderUserId)
+            {
+                return Forbid();
+            }
+
+            var result = await _mediator.Send(new DeleteStickerPackCommand(userId, packId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sticker pack delete failed");
+            return StatusCode(500, new { error = "Ошибка при удалении стикерпака: " + ex.Message });
         }
     }
 
