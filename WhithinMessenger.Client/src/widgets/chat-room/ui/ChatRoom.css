@@ -714,16 +714,25 @@
 
 .message.message--sticker {
   background: transparent;
-  padding: 4px 8px;
+  padding: 0;
   box-shadow: none;
 }
 
 .message.message--sticker .message-content {
-  gap: 2px;
+  gap: 0;
 }
 
 .message.message--sticker .message-header {
   margin-bottom: 0;
+}
+
+.message.message--sticker .sticker-message {
+  margin: 0;
+  padding: 0;
+}
+
+.message.message--sticker .sticker-message__media {
+  margin: 0;
 }
 
 .message-username {
