@@ -709,21 +709,35 @@
   background: none;
   border: none;
   padding: 0;
+  margin: 0;
   box-shadow: none;
+}
+
+.message-media .media-file:has(.media-video-note-shell) {
+  margin: 0;
 }
 
 .message.message--sticker {
   background: transparent;
   padding: 0;
+  margin-bottom: 8px;
   box-shadow: none;
+  max-width: none;
+  align-items: flex-start;
 }
 
 .message.message--sticker .message-content {
   gap: 0;
+  flex: 0 1 auto;
 }
 
 .message.message--sticker .message-header {
-  margin-bottom: 0;
+  margin-bottom: 2px;
+}
+
+.message.message--sticker .message-media--sticker {
+  margin-top: 0;
+  gap: 0;
 }
 
 .message.message--sticker .sticker-message {
@@ -733,6 +747,7 @@
 
 .message.message--sticker .sticker-message__media {
   margin: 0;
+  padding: 0;
 }
 
 .message-username {

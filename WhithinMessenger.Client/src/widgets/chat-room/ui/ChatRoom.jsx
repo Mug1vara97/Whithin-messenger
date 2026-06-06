@@ -993,7 +993,9 @@ const ChatRoom = ({
                   </>
                 )}
                 {isStickerMessage && (
-                  <StickerMessage sticker={msg.sticker} />
+                  <div className="message-media message-media--sticker">
+                    <StickerMessage sticker={msg.sticker} />
+                  </div>
                 )}
 
                 {!msg.forwardedMessage && !isStickerMessage && (

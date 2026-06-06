@@ -11,6 +11,8 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Stickers.UploadSticker
 
 public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPackCommand, UploadStickerPackResult>
 {
+    private static readonly SemaphoreSlim UploadSemaphore = new(1, 1);
+
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".webp", ".png", ".gif", ".jpg", ".jpeg", ".webm"
@@ -37,6 +39,21 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
     }
 
     public async Task<UploadStickerPackResult> Handle(UploadStickerPackCommand request, CancellationToken cancellationToken)
+    {
+        await UploadSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            return await HandleCoreAsync(request, cancellationToken);
+        }
+        finally
+        {
+            UploadSemaphore.Release();
+        }
+    }
+
+    private async Task<UploadStickerPackResult> HandleCoreAsync(
+        UploadStickerPackCommand request,
+        CancellationToken cancellationToken)
     {
         try
         {
