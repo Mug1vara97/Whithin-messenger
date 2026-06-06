@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, FormField } from '../../atoms';
 import GhostBackground from '../../atoms/GhostBackground';
 import { validateRegister } from '../../../lib/validation';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
+import { authApi } from '../../../lib/api/authApi';
 import './AuthForms.css';
 
 const RegisterForm = () => {
@@ -14,6 +16,10 @@ const RegisterForm = () => {
     confirmPassword: ''
   });
   const [errors, setErrors] = useState({});
+  const [registrationDone, setRegistrationDone] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [resendMessage, setResendMessage] = useState('');
+  const [isResending, setIsResending] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -21,7 +27,7 @@ const RegisterForm = () => {
       ...prev,
       [name]: value
     }));
-    
+
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -32,15 +38,66 @@ const RegisterForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const validation = validateRegister(formData);
     if (!validation.isValid) {
       setErrors(validation.errors);
       return;
     }
 
-    await register(formData);
+    const result = await register(formData);
+    if (result?.success) {
+      setRegistrationDone(true);
+      setRegisteredEmail(result.email || formData.email);
+    }
   };
+
+  const handleResend = async () => {
+    if (!registeredEmail) return;
+    try {
+      setIsResending(true);
+      setResendMessage('');
+      const response = await authApi.resendConfirmation(registeredEmail);
+      setResendMessage(response?.message || 'Письмо отправлено повторно.');
+    } catch (err) {
+      setResendMessage(err.message || 'Не удалось отправить письмо.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  if (registrationDone) {
+    return (
+      <div className="auth-container">
+        <GhostBackground />
+        <div className="auth-box">
+          <div className="auth-header">
+            <h2>Проверьте почту</h2>
+            <p>Мы отправили письмо на {registeredEmail}</p>
+          </div>
+          <div className="auth-form">
+            <div className="auth-success">
+              Подтвердите email по ссылке из письма, затем войдите в аккаунт.
+            </div>
+            {resendMessage && <div className="auth-info">{resendMessage}</div>}
+            <Button
+              type="button"
+              variant="secondary"
+              size="large"
+              disabled={isResending}
+              className="auth-submit"
+              onClick={handleResend}
+            >
+              {isResending ? 'Отправка...' : 'Отправить письмо ещё раз'}
+            </Button>
+            <p className="auth-link">
+              <Link to="/login">Перейти ко входу</Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-container">
@@ -126,7 +183,7 @@ const RegisterForm = () => {
         </form>
 
         <p className="auth-link">
-          Already have an account? <a href="/login">Login</a>
+          Already have an account? <Link to="/login">Login</Link>
         </p>
       </div>
     </div>

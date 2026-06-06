@@ -22,7 +22,13 @@ export const authApi = {
       return response.data;
     } catch (error) {
       console.error('Login error details:', error);
-      throw new Error(error.response?.data?.error || 'Login failed');
+      const payload = error.response?.data ?? {};
+      const authError = new Error(payload.error || payload.Error || 'Login failed');
+      authError.requiresEmailConfirmation = !!(
+        payload.requiresEmailConfirmation ?? payload.RequiresEmailConfirmation
+      );
+      authError.email = payload.email ?? payload.Email ?? null;
+      throw authError;
     }
   },
 
@@ -31,7 +37,25 @@ export const authApi = {
       const response = await apiClient.post('/auth/register', userData);
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Registration failed');
+    }
+  },
+
+  async confirmEmail({ userId, token }) {
+    try {
+      const response = await apiClient.post('/auth/confirm-email', { userId, token });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Email confirmation failed');
+    }
+  },
+
+  async resendConfirmation(email) {
+    try {
+      const response = await apiClient.post('/auth/resend-confirmation', { email });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Failed to resend confirmation email');
     }
   },
 

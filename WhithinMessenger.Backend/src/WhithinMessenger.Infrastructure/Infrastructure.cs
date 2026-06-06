@@ -21,8 +21,19 @@ public static class Infrastructure
 
         services.AddDbContext<WithinDbContext>(opts => opts.UseNpgsql(connectionString));
 
-        services.AddIdentityCore<ApplicationUser>(options => { options.Password.RequireDigit = false; })
-            .AddEntityFrameworkStores<WithinDbContext>();
+        services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
+
+        services.AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.Password.RequireDigit = false;
+                options.User.RequireUniqueEmail = true;
+                options.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
+            })
+            .AddEntityFrameworkStores<WithinDbContext>()
+            .AddDefaultTokenProviders();
+
+        services.AddScoped<IEmailSender, MailKitEmailSender>();
+        services.AddScoped<IEmailConfirmationService, EmailConfirmationService>();
 
         services.AddScoped<IChatRepository, ChatRepository>();
         services.AddScoped<IChatRepositoryExtensions, ChatRepository>();

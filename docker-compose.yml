@@ -34,6 +34,14 @@ services:
     networks:
       - app-network
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+    networks:
+      - app-network
+    restart: unless-stopped
+
   backend:
     build:
       context: ./WhithinMessenger.Backend
@@ -48,6 +56,15 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=1000-7
+      - Email__Enabled=true
+      - Email__SmtpHost=smtp-relay.brevo.com
+      - Email__SmtpPort=587
+      - Email__SmtpUser=adc521001@smtp-brevo.com
+      - Email__SmtpPassword=bsk4jkwSEUedUxF
+      - Email__UseSsl=true
+      - Email__FromAddress=noreply@whithin.ru
+      - Email__FromName=Whithin
+      - Email__FrontendBaseUrl=https://whithin.ru
     depends_on:
       db:
         condition: service_healthy

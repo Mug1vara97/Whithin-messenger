@@ -99,9 +99,11 @@ export const useAuth = () => {
       console.error('Login error:', error);
       const errorMessage = error.message || 'Login failed';
       setError(errorMessage);
-      return { 
-        success: false, 
-        error: errorMessage
+      return {
+        success: false,
+        error: errorMessage,
+        requiresEmailConfirmation: !!error.requiresEmailConfirmation,
+        email: error.email || null,
       };
     } finally {
       setIsAuthLoading(false);
@@ -150,20 +152,17 @@ export const useAuth = () => {
       console.log('Register response in useAuth:', response);
       
       if (response && response.userId) {
-        const loginResponse = await authApi.login({
-          username: userData.username,
-          password: userData.password
-        });
-        
-        if (loginResponse && loginResponse.user) {
-          localStorage.setItem('user', JSON.stringify(loginResponse.user));
-          updateUser(loginResponse.user);
-          return { success: true };
-        }
-      } else {
-        console.error('Invalid response structure:', response);
-        throw new Error('Invalid response from server');
+        return {
+          success: true,
+          requiresEmailConfirmation: !!(
+            response.requiresEmailConfirmation ?? response.RequiresEmailConfirmation
+          ),
+          email: response.email ?? response.Email ?? userData.email,
+        };
       }
+
+      console.error('Invalid response structure:', response);
+      throw new Error('Invalid response from server');
     } catch (error) {
       console.error('Registration error:', error);
       const errorMessage = error.message || 'Registration failed';

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuthContext } from '../../shared/lib/contexts/AuthContext';
 import { LoginPage } from '../../pages/login/ui';
 import { RegisterPage } from '../../pages/register/ui';
+import { ConfirmEmailPage } from '../../pages/confirm-email/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
@@ -59,6 +60,10 @@ const AppRouter = () => {
             element={
               isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />
             } 
+          />
+          <Route
+            path="/confirm-email"
+            element={<ConfirmEmailPage />}
           />
           <Route 
             path="/" 

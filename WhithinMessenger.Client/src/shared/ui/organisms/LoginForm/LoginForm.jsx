@@ -20,6 +20,9 @@ const LoginForm = () => {
   const [qrImage, setQrImage] = useState('');
   const [qrError, setQrError] = useState('');
   const [qrHint, setQrHint] = useState('Откройте камеру на Android и сканируйте код');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resendMessage, setResendMessage] = useState('');
+  const [isResending, setIsResending] = useState(false);
   const qrFlowDismissedRef = useRef(false);
 
   const closeQrOverlay = useCallback(() => {
@@ -55,7 +58,26 @@ const LoginForm = () => {
       return;
     }
 
-    await login(formData);
+    setPendingEmail('');
+    setResendMessage('');
+    const result = await login(formData);
+    if (result?.requiresEmailConfirmation) {
+      setPendingEmail(result.email || formData.username);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingEmail) return;
+    try {
+      setIsResending(true);
+      setResendMessage('');
+      const response = await authApi.resendConfirmation(pendingEmail);
+      setResendMessage(response?.message || 'Письмо отправлено повторно.');
+    } catch (err) {
+      setResendMessage(err.message || 'Не удалось отправить письмо.');
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const createQrSession = async () => {
@@ -206,6 +228,22 @@ const LoginForm = () => {
           {error && (
             <div className="auth-error">
               {error}
+            </div>
+          )}
+
+          {pendingEmail && (
+            <div className="auth-form" style={{ gap: '12px' }}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="large"
+                disabled={isResending}
+                className="auth-submit"
+                onClick={handleResendConfirmation}
+              >
+                {isResending ? 'Отправка...' : 'Отправить письмо подтверждения ещё раз'}
+              </Button>
+              {resendMessage && <div className="auth-info">{resendMessage}</div>}
             </div>
           )}
 

@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmEmail;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Register;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ResendEmailConfirmation;
 using WhithinMessenger.Application.Options;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Application.Services;
@@ -65,12 +67,18 @@ public class AuthController : ControllerBase
                 User = new {
                     Id = result.User.Id,
                     Username = result.User.UserName,
-                    Email = result.User.Email
+                    Email = result.User.Email,
+                    EmailConfirmed = result.User.EmailConfirmed,
                 }
             });
         }
 
-        return BadRequest(new { Error = result.ErrorMessage });
+        return BadRequest(new
+        {
+            Error = result.ErrorMessage,
+            RequiresEmailConfirmation = result.RequiresEmailConfirmation,
+            Email = result.Email,
+        });
     }
 
     [HttpPost("register")]
@@ -81,7 +89,47 @@ public class AuthController : ControllerBase
 
         if (result.IsSuccess)
         {
-            return Ok(new { UserId = result.UserId, Message = "Пользователь успешно зарегистрирован" });
+            return Ok(new
+            {
+                UserId = result.UserId,
+                Message = "Письмо с подтверждением отправлено на ваш email",
+                RequiresEmailConfirmation = result.RequiresEmailConfirmation,
+                Email = result.Email,
+            });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("confirm-email")]
+    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request)
+    {
+        if (!Guid.TryParse(request.UserId, out var userId))
+        {
+            return BadRequest(new { Error = "Некорректный идентификатор пользователя" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { Error = "Токен подтверждения обязателен" });
+        }
+
+        var result = await _mediator.Send(new ConfirmEmailCommand(userId, request.Token));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Email успешно подтверждён" });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("resend-confirmation")]
+    public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequest request)
+    {
+        var result = await _mediator.Send(new ResendEmailConfirmationCommand(request.Email));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Если аккаунт существует и email не подтверждён, письмо отправлено" });
         }
 
         return BadRequest(new { Error = result.ErrorMessage });
@@ -373,3 +421,5 @@ public record RegisterRequest(string Username, string Password, string Email);
 public record RefreshTokenRequest(string RefreshToken);
 public record LogoutRequest(string? RefreshToken);
 public record ApproveQrLoginRequest(string SessionId);
+public record ConfirmEmailRequest(string UserId, string Token);
+public record ResendConfirmationRequest(string Email);
