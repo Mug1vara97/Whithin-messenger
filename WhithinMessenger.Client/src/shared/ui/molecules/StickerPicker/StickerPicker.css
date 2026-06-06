@@ -1,0 +1,211 @@
+.sticker-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  z-index: 1200;
+}
+
+.sticker-picker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1201;
+  background: #202226;
+  border-radius: 22px 22px 0 0;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+  max-height: 52vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sticker-picker__handle {
+  width: 44px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 auto 4px;
+}
+
+.sticker-picker__packs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 4px;
+}
+
+.sticker-picker__pack-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #2b2d31;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sticker-picker__pack-btn.is-selected {
+  box-shadow: inset 0 0 0 2px rgba(88, 101, 242, 0.65);
+  background: rgba(88, 101, 242, 0.22);
+}
+
+.sticker-picker__pack-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sticker-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+
+.sticker-picker__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.sticker-picker__close {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+}
+
+.sticker-picker__error {
+  color: #e57373;
+  font-size: 13px;
+  padding: 0 6px;
+}
+
+.sticker-picker__grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sticker-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 4px 4px;
+}
+
+.sticker-picker__cell {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sticker-picker__cell:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sticker-picker__empty {
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  padding: 28px 16px;
+  font-size: 14px;
+}
+
+.sticker-catalog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.sticker-catalog {
+  width: min(420px, 100%);
+  max-height: 70vh;
+  background: #2b2d31;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sticker-catalog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.sticker-catalog__header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.sticker-catalog__header button {
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.sticker-catalog__list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sticker-catalog__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #1a1c1f;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #fff;
+}
+
+.sticker-catalog__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sticker-catalog__info span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sticker-catalog__item button {
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.sticker-catalog__item button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

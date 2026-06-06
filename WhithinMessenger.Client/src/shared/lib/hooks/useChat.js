@@ -132,6 +132,17 @@ export const useChat = (chatId, username, userId) => {
   const acknowledgedDeliveriesRef = useRef(new Set());
   const pendingOptimisticIdRef = useRef(null);
 
+  const normalizeSticker = useCallback((raw) => {
+    if (!raw) return null;
+    return {
+      id: raw.id ?? raw.Id ?? null,
+      stickerPackId: raw.stickerPackId ?? raw.StickerPackId ?? null,
+      filePath: raw.filePath ?? raw.FilePath ?? '',
+      contentType: raw.contentType ?? raw.ContentType ?? 'image/webp',
+      sortOrder: raw.sortOrder ?? raw.SortOrder ?? 0,
+    };
+  }, []);
+
   const normalizeMessage = useCallback((msg, defaultStatus) => {
     if (!msg) return null;
     const senderId = msg.senderId ?? msg.SenderId ?? msg.userId ?? msg.UserId ?? null;
@@ -147,17 +158,20 @@ export const useChat = (chatId, username, userId) => {
       senderId,
       senderUsername: msg.senderUsername ?? msg.SenderUsername ?? msg.username ?? msg.UserName ?? '',
       content: msg.content ?? msg.Content ?? '',
+      contentType: msg.contentType ?? msg.ContentType ?? null,
+      sticker: normalizeSticker(msg.sticker ?? msg.Sticker),
       avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
       avatarColor: msg.avatarColor ?? msg.AvatarColor ?? null,
       repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
       forwardedMessage: msg.forwardedMessage ?? msg.ForwardedMessage ?? null,
       createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
       mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? [],
+      isEdited: msg.isEdited ?? msg.IsEdited ?? false,
       status: own
         ? normalizeMessageStatus(rawStatus ?? MessageStatus.SENT)
         : null,
     };
-  }, [userId, username]);
+  }, [normalizeSticker, userId, username]);
 
   const isPersistedMessageId = useCallback((messageId) => (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(messageId ?? ''))

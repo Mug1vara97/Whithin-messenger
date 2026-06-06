@@ -20,11 +20,14 @@ import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
+import StickerMessage from '../../../shared/ui/molecules/StickerMessage/StickerMessage';
+import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPicker';
+import { stickerApi } from '../../../entities/sticker/api';
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile } from '@mui/icons-material';
+import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile, EmojiEmotions } from '@mui/icons-material';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -131,6 +134,8 @@ const ChatRoom = ({
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [chatUserProfile, setChatUserProfile] = useState(null);
   const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const [isSendingSticker, setIsSendingSticker] = useState(false);
   const notificationConnectionRef = useRef(null);
 
   const inputRef = useRef(null);
@@ -451,7 +456,24 @@ const ChatRoom = ({
       setReplyingToMessage(null);
       setNewMessage('');
     }
-  }, [newMessage, replyingToMessage, editingMessageId]);
+  }, [newMessage, replyingToMessage, editingMessageId, editMessage, sendMessage]);
+
+  const handleSendSticker = useCallback(async (sticker) => {
+    if (!chatId || !sticker?.id || isSendingSticker) return;
+    setIsSendingSticker(true);
+    try {
+      await stickerApi.sendSticker(chatId, sticker.id, {
+        repliedToMessageId: replyingToMessage?.messageId || null,
+      });
+      setReplyingToMessage(null);
+      setStickerPickerOpen(false);
+    } catch (err) {
+      console.error('Failed to send sticker:', err);
+      alert(err?.response?.data?.message || err?.message || 'Не удалось отправить стикер');
+    } finally {
+      setIsSendingSticker(false);
+    }
+  }, [chatId, isSendingSticker, replyingToMessage]);
 
   const handleEditMessage = (messageId, currentContent) => {
     setEditingMessageId(messageId);
@@ -879,12 +901,15 @@ const ChatRoom = ({
         {messages.map((msg) => {
           const isOwn = msg.senderUsername === username;
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
+          const isStickerMessage = msg.contentType === 'sticker' && msg.sticker;
 
           return (
             <div
               key={msg.messageId}
               id={`message-${msg.messageId}`}
               className={`message ${isOwn ? 'my-message' : 'user-message'} ${
+                isStickerMessage ? 'message--sticker' : ''
+              } ${
                 highlightedMessageId === msg.messageId ? 'highlighted' : ''
               }`}
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
@@ -943,7 +968,11 @@ const ChatRoom = ({
                     )}
                   </>
                 )}
-                {!msg.forwardedMessage && (
+                {isStickerMessage && (
+                  <StickerMessage sticker={msg.sticker} />
+                )}
+
+                {!msg.forwardedMessage && !isStickerMessage && (
                   <div className="message-text">
                     {renderTextWithLinks(msg.content, `${msg.messageId}-content`)}
                   </div>
@@ -988,18 +1017,22 @@ const ChatRoom = ({
             >
               Переслать
             </button>
-            {contextMenu.isOwnMessage && (
-              <button 
-                onClick={() => {
-                  const message = messages.find(m => m.messageId === contextMenu.messageId);
-                  handleEditMessage(contextMenu.messageId, message?.content);
-                  closeContextMenu();
-                }}
-                className="context-menu-button"
-              >
-                Редактировать
-              </button>
-            )}
+            {contextMenu.isOwnMessage && (() => {
+              const message = messages.find(m => m.messageId === contextMenu.messageId);
+              const isSticker = message?.contentType === 'sticker' && message?.sticker;
+              if (isSticker) return null;
+              return (
+                <button
+                  onClick={() => {
+                    handleEditMessage(contextMenu.messageId, message?.content);
+                    closeContextMenu();
+                  }}
+                  className="context-menu-button"
+                >
+                  Редактировать
+                </button>
+              );
+            })()}
             {contextMenu.canDelete && (
               <button 
                 onClick={() => {
@@ -1083,7 +1116,11 @@ const ChatRoom = ({
                 <span>Ответ на сообщение</span>
               </div>
               <div className="reply-content">
-                {replyingToMessage.content}
+                {replyingToMessage.contentType === 'sticker' && replyingToMessage.sticker ? (
+                  <StickerMessage sticker={replyingToMessage.sticker} size={48} />
+                ) : (
+                  replyingToMessage.content
+                )}
               </div>
             </div>
             <button 
@@ -1187,9 +1224,24 @@ const ChatRoom = ({
             >
               <AttachFile />
             </button>
+            <button
+              type="button"
+              onClick={() => setStickerPickerOpen((open) => !open)}
+              className={`media-button ${stickerPickerOpen ? 'active' : ''}`}
+              title="Стикеры"
+              disabled={isSendingSticker}
+            >
+              <EmojiEmotions />
+            </button>
           </>
         )}
       </form>
+
+      <StickerPicker
+        open={stickerPickerOpen && !editingMessageId}
+        onClose={() => setStickerPickerOpen(false)}
+        onStickerSelect={handleSendSticker}
+      />
 
       <ForwardModal />
 

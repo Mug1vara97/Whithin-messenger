@@ -696,6 +696,20 @@
   box-shadow: none;
 }
 
+.message.message--sticker {
+  background: transparent;
+  padding: 4px 8px;
+  box-shadow: none;
+}
+
+.message.message--sticker .message-content {
+  gap: 2px;
+}
+
+.message.message--sticker .message-header {
+  margin-bottom: 0;
+}
+
 .message-username {
   color: var(--text);
   display: inline;

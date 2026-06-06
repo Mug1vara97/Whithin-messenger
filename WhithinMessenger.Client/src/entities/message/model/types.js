@@ -4,7 +4,8 @@ export const MessageType = {
   IMAGE: 'image',
   FILE: 'file',
   VOICE: 'voice',
-  VIDEO: 'video'
+  VIDEO: 'video',
+  STICKER: 'sticker',
 };
 
 export const MessageStatus = {

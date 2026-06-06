@@ -1,0 +1,29 @@
+.sticker-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.sticker-message__media {
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sticker-message__media--180 {
+  width: 180px;
+  height: 180px;
+  max-width: min(180px, 100%);
+}
+
+.sticker-message__media--64 {
+  width: 64px;
+  height: 64px;
+}
+
+.sticker-message__media--48 {
+  width: 48px;
+  height: 48px;
+}
