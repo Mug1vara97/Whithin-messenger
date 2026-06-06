@@ -30,6 +30,23 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .FirstOrDefaultAsync(u => u.UserName == username, cancellationToken);
         }
 
+        public async Task<bool> UpdatePasswordHashAsync(
+            Guid userId,
+            string passwordHash,
+            string securityStamp,
+            CancellationToken cancellationToken = default)
+        {
+            var updated = await _context.Users
+                .Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(u => u.PasswordHash, passwordHash)
+                        .SetProperty(u => u.SecurityStamp, securityStamp),
+                    cancellationToken);
+
+            return updated == 1;
+        }
+
         public async Task<List<UserSearchInfo>> SearchUsersAsync(Guid currentUserId, string searchTerm, CancellationToken cancellationToken = default)
         {
             var normalizedName = searchTerm.Trim().ToLower();

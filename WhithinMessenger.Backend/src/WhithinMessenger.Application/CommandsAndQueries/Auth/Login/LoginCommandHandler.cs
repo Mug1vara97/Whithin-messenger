@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Identity;
+using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
@@ -7,10 +8,17 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IUserRepository _userRepository;
 
-    public LoginCommandHandler(UserManager<ApplicationUser> userManager)
+    public LoginCommandHandler(
+        UserManager<ApplicationUser> userManager,
+        IPasswordHasher<ApplicationUser> passwordHasher,
+        IUserRepository userRepository)
     {
         _userManager = userManager;
+        _passwordHasher = passwordHasher;
+        _userRepository = userRepository;
     }
 
     public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -22,7 +30,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
             return new LoginResult(false, ErrorMessage: "Пользователь не найден");
         }
 
-        if (!await IsPasswordValidAsync(user, request.Password))
+        if (!await IsPasswordValidAsync(user, request.Password, cancellationToken))
         {
             return new LoginResult(false, ErrorMessage: "Неверный пароль");
         }
@@ -39,7 +47,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
         return new LoginResult(true, User: user);
     }
 
-    private async Task<bool> IsPasswordValidAsync(ApplicationUser user, string password)
+    private async Task<bool> IsPasswordValidAsync(
+        ApplicationUser user,
+        string password,
+        CancellationToken cancellationToken)
     {
         if (IsLegacyPlainTextPasswordHash(user.PasswordHash))
         {
@@ -48,9 +59,21 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
                 return false;
             }
 
-            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, password);
-            var updateResult = await _userManager.UpdateAsync(user);
-            return updateResult.Succeeded;
+            var passwordHash = _passwordHasher.HashPassword(user, password);
+            var securityStamp = Guid.NewGuid().ToString();
+            var migrated = await _userRepository.UpdatePasswordHashAsync(
+                user.Id,
+                passwordHash,
+                securityStamp,
+                cancellationToken);
+
+            if (migrated)
+            {
+                user.PasswordHash = passwordHash;
+                user.SecurityStamp = securityStamp;
+            }
+
+            return migrated;
         }
 
         try
