@@ -54,6 +54,67 @@ public class VideoConverterService : IVideoConverterService
         }
     }
 
+    private const int MaxAnimatedWebpBytes = 2 * 1024 * 1024;
+
+    public async Task<StickerConvertedMedia?> TryConvertWebmToAnimatedWebpAsync(
+        byte[] webmBytes,
+        CancellationToken cancellationToken = default)
+    {
+        if (webmBytes.Length == 0)
+        {
+            return null;
+        }
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "whithin-stickers", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        var inputPath = Path.Combine(tempDir, "input.webm");
+        var outputPath = Path.Combine(tempDir, "output.webp");
+
+        try
+        {
+            await File.WriteAllBytesAsync(inputPath, webmBytes, cancellationToken);
+
+            var conversionTask = FFMpegArguments
+                .FromFileInput(inputPath)
+                .OutputToFile(outputPath, overwrite: true, options => options
+                    .WithVideoCodec("libwebp")
+                    .WithCustomArgument("-an")
+                    .WithCustomArgument("-vsync 0")
+                    .WithCustomArgument("-loop 0")
+                    .WithCustomArgument("-vf fps=20,scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease")
+                    .WithCustomArgument("-lossless 0")
+                    .WithCustomArgument("-compression_level 4")
+                    .WithCustomArgument("-q:v 80")
+                    .ForceFormat("webp"))
+                .ProcessAsynchronously(true);
+
+            await conversionTask.WaitAsync(cancellationToken);
+
+            if (!File.Exists(outputPath))
+            {
+                return null;
+            }
+
+            var converted = await File.ReadAllBytesAsync(outputPath, cancellationToken);
+            if (converted.Length == 0 || converted.Length > MaxAnimatedWebpBytes)
+            {
+                return null;
+            }
+
+            return new StickerConvertedMedia(converted, ".webp", "image/webp");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to convert sticker webm to animated webp");
+            return null;
+        }
+        finally
+        {
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
     public async Task<string?> ConvertVideoToH264Async(string inputFilePath, string outputFolderPath, CancellationToken cancellationToken = default)
     {
         try
@@ -104,6 +165,21 @@ public class VideoConverterService : IVideoConverterService
         {
             _logger.LogError(ex, "Error converting video: {InputFile}", inputFilePath);
             return null;
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup for temp conversion files.
         }
     }
 }

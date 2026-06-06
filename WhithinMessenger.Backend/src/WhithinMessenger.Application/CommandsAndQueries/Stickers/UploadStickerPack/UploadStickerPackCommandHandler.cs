@@ -20,13 +20,16 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
 
     private readonly IStickerPackRepository _stickerPackRepository;
     private readonly IFileService _fileService;
+    private readonly IVideoConverterService _videoConverterService;
 
     public UploadStickerPackCommandHandler(
         IStickerPackRepository stickerPackRepository,
-        IFileService fileService)
+        IFileService fileService,
+        IVideoConverterService videoConverterService)
     {
         _stickerPackRepository = stickerPackRepository;
         _fileService = fileService;
+        _videoConverterService = videoConverterService;
     }
 
     public async Task<UploadStickerPackResult> Handle(UploadStickerPackCommand request, CancellationToken cancellationToken)
@@ -109,6 +112,18 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                     continue;
                 }
 
+                if (extension.Equals(".webm", StringComparison.OrdinalIgnoreCase))
+                {
+                    var converted = await _videoConverterService.TryConvertWebmToAnimatedWebpAsync(
+                        bytes,
+                        cancellationToken);
+                    if (converted != null)
+                    {
+                        bytes = converted.Bytes;
+                        extension = converted.Extension;
+                    }
+                }
+
                 var fileName = $"{Guid.NewGuid()}{extension.ToLowerInvariant()}";
                 var folderPath = $"stickers/{pack.Id}";
                 var uploadsPath = Path.Combine(_fileService.GetFullPathForFolder(folderPath));
@@ -126,6 +141,11 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                     ".webm" => "video/webm",
                     _ => "application/octet-stream"
                 };
+
+                if (bytes.Length > MaxImageStickerBytes)
+                {
+                    continue;
+                }
 
                 stickers.Add(new Sticker
                 {
