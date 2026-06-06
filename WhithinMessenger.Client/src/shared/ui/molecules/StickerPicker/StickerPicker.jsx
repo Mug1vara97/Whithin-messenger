@@ -18,7 +18,14 @@ const normalizePack = (pack) => ({
   })),
 });
 
-const StickerPicker = ({ open, onClose, onStickerSelect, onInstallPack }) => {
+const StickerPicker = ({
+  open,
+  width,
+  onResizeStart,
+  onClose,
+  onStickerSelect,
+  onInstallPack,
+}) => {
   const [packs, setPacks] = useState([]);
   const [availablePacks, setAvailablePacks] = useState([]);
   const [selectedPackId, setSelectedPackId] = useState(null);
@@ -95,7 +102,20 @@ const StickerPicker = ({ open, onClose, onStickerSelect, onInstallPack }) => {
 
   return (
     <>
-      <aside className="sticker-picker" role="complementary" aria-label="Выбор стикеров">
+      <aside
+        className="sticker-picker"
+        role="complementary"
+        aria-label="Выбор стикеров"
+        style={width ? { width, flexBasis: width } : undefined}
+      >
+        <div
+          className="sticker-picker__resize-handle"
+          onMouseDown={onResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панели стикеров"
+          title="Потяните, чтобы изменить ширину"
+        />
         <div className="sticker-picker__header">
           <span className="sticker-picker__title">
             {selectedPack?.title ?? 'Стикеры'}

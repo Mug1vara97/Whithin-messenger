@@ -6,6 +6,7 @@
   background: var(--background);
   color: var(--text);
   overflow: hidden;
+  position: relative;
 }
 
 .chat-room-main {
@@ -15,6 +16,8 @@
   min-width: 0;
   height: 100%;
   overflow: hidden;
+  padding-top: 52px;
+  box-sizing: border-box;
 }
 
 /* Chat Voice Call Integration */
@@ -314,7 +317,11 @@
   height: 52px;
   min-height: 52px;
   box-sizing: border-box;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
 }
 
 .chat-header::after {

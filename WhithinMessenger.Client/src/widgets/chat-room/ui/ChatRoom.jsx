@@ -135,6 +135,7 @@ const ChatRoom = ({
   const [chatUserProfile, setChatUserProfile] = useState(null);
   const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const [stickerPanelWidth, setStickerPanelWidth] = useState(380);
   const [isSendingSticker, setIsSendingSticker] = useState(false);
   const notificationConnectionRef = useRef(null);
 
@@ -473,6 +474,29 @@ const ChatRoom = ({
       setIsSendingSticker(false);
     }
   }, [chatId, isSendingSticker, replyingToMessage]);
+
+  const handleStickerPanelResizeStart = useCallback((event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = stickerPanelWidth;
+    const minWidth = 280;
+    const maxWidth = Math.min(560, Math.max(320, window.innerWidth - 420));
+
+    const handleMouseMove = (moveEvent) => {
+      const nextWidth = startWidth + startX - moveEvent.clientX;
+      setStickerPanelWidth(Math.min(maxWidth, Math.max(minWidth, nextWidth)));
+    };
+
+    const handleMouseUp = () => {
+      document.body.classList.remove('is-resizing-sticker-panel');
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.body.classList.add('is-resizing-sticker-panel');
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [stickerPanelWidth]);
 
   const handleEditMessage = (messageId, currentContent) => {
     setEditingMessageId(messageId);
@@ -1240,6 +1264,8 @@ const ChatRoom = ({
 
       <StickerPicker
         open={stickerPickerOpen && !editingMessageId}
+        width={stickerPanelWidth}
+        onResizeStart={handleStickerPanelResizeStart}
         onClose={() => setStickerPickerOpen(false)}
         onStickerSelect={handleSendSticker}
       />
