@@ -1,45 +1,99 @@
-.sticker-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.28);
-  z-index: 1200;
-}
-
 .sticker-picker {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1201;
-  background: #202226;
-  border-radius: 22px 22px 0 0;
-  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
-  max-height: 52vh;
+  flex: 0 0 320px;
+  width: 320px;
+  min-width: 280px;
+  max-width: 360px;
+  height: 100%;
+  background: #1e1f22;
+  border-left: 1px solid #2d2f34;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.sticker-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 12px 10px;
+  border-bottom: 1px solid #2d2f34;
+  flex-shrink: 0;
+}
+
+.sticker-picker__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f2f3f5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sticker-picker__close {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.sticker-picker__close:hover {
+  color: #fff;
+}
+
+.sticker-picker__error {
+  color: #e57373;
+  font-size: 13px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+.sticker-picker__grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.sticker-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
-.sticker-picker__handle {
-  width: 44px;
-  height: 4px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.22);
-  margin: 0 auto 4px;
+.sticker-picker__cell {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+}
+
+.sticker-picker__cell:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .sticker-picker__packs {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 0 4px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid #2d2f34;
+  flex-shrink: 0;
+  background: #18191c;
 }
 
 .sticker-picker__pack-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   border: none;
   background: #2b2d31;
   color: #fff;
@@ -52,70 +106,14 @@
 }
 
 .sticker-picker__pack-btn.is-selected {
-  box-shadow: inset 0 0 0 2px rgba(88, 101, 242, 0.65);
-  background: rgba(88, 101, 242, 0.22);
+  box-shadow: inset 0 0 0 2px rgba(88, 101, 242, 0.75);
+  background: rgba(88, 101, 242, 0.2);
 }
 
 .sticker-picker__pack-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.sticker-picker__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px;
-}
-
-.sticker-picker__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.sticker-picker__close {
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  display: inline-flex;
-  padding: 4px;
-}
-
-.sticker-picker__error {
-  color: #e57373;
-  font-size: 13px;
-  padding: 0 6px;
-}
-
-.sticker-picker__grid-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.sticker-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  padding: 0 4px 4px;
-}
-
-.sticker-picker__cell {
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sticker-picker__cell:hover {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .sticker-picker__empty {
@@ -208,4 +206,16 @@
 .sticker-catalog__item button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+@media (max-width: 900px) {
+  .sticker-picker {
+    flex-basis: 280px;
+    width: 280px;
+    min-width: 240px;
+  }
+
+  .sticker-picker__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

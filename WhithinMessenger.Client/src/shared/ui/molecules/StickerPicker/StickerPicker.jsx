@@ -95,40 +95,7 @@ const StickerPicker = ({ open, onClose, onStickerSelect, onInstallPack }) => {
 
   return (
     <>
-      <div className="sticker-picker-backdrop" onClick={onClose} aria-hidden="true" />
-      <div className="sticker-picker" role="dialog" aria-label="Выбор стикеров">
-        <div className="sticker-picker__handle" />
-
-        <div className="sticker-picker__packs">
-          <button
-            type="button"
-            className="sticker-picker__pack-btn"
-            onClick={openCatalog}
-            title="Добавить стикерпак"
-          >
-            <Add fontSize="small" />
-          </button>
-          {packs.map((pack) => {
-            const coverUrl = pack.coverImagePath ? buildMediaUrl(pack.coverImagePath) : null;
-            const isSelected = pack.id === selectedPackId;
-            return (
-              <button
-                key={pack.id}
-                type="button"
-                className={`sticker-picker__pack-btn ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => setSelectedPackId(pack.id)}
-                title={pack.title}
-              >
-                {coverUrl ? (
-                  <img src={coverUrl} alt="" className="sticker-picker__pack-cover" />
-                ) : (
-                  <History fontSize="small" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
+      <aside className="sticker-picker" role="complementary" aria-label="Выбор стикеров">
         <div className="sticker-picker__header">
           <span className="sticker-picker__title">
             {selectedPack?.title ?? 'Стикеры'}
@@ -165,7 +132,37 @@ const StickerPicker = ({ open, onClose, onStickerSelect, onInstallPack }) => {
             </div>
           )}
         </div>
-      </div>
+
+        <div className="sticker-picker__packs">
+          <button
+            type="button"
+            className="sticker-picker__pack-btn"
+            onClick={openCatalog}
+            title="Добавить стикерпак"
+          >
+            <Add fontSize="small" />
+          </button>
+          {packs.map((pack) => {
+            const coverUrl = pack.coverImagePath ? buildMediaUrl(pack.coverImagePath) : null;
+            const isSelected = pack.id === selectedPackId;
+            return (
+              <button
+                key={pack.id}
+                type="button"
+                className={`sticker-picker__pack-btn ${isSelected ? 'is-selected' : ''}`}
+                onClick={() => setSelectedPackId(pack.id)}
+                title={pack.title}
+              >
+                {coverUrl ? (
+                  <img src={coverUrl} alt="" className="sticker-picker__pack-cover" />
+                ) : (
+                  <History fontSize="small" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
 
       {isCatalogOpen && (
         <div className="sticker-catalog-overlay" onClick={() => setIsCatalogOpen(false)}>

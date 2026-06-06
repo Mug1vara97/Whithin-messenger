@@ -466,7 +466,6 @@ const ChatRoom = ({
         repliedToMessageId: replyingToMessage?.messageId || null,
       });
       setReplyingToMessage(null);
-      setStickerPickerOpen(false);
     } catch (err) {
       console.error('Failed to send sticker:', err);
       alert(err?.response?.data?.message || err?.message || 'Не удалось отправить стикер');
@@ -764,10 +763,11 @@ const ChatRoom = ({
 
   return (
     <div
-      className="group-chat-container"
+      className={`group-chat-container ${stickerPickerOpen && !editingMessageId ? 'has-sticker-panel' : ''}`}
       tabIndex={0}
       style={{ outline: 'none' }}
     >
+      <div className="chat-room-main">
       <div className="chat-header">
         <div className="header-left">
           <div className="user-info" onClick={() => setShowChatInfo(true)}>
@@ -1236,6 +1236,7 @@ const ChatRoom = ({
           </>
         )}
       </form>
+      </div>
 
       <StickerPicker
         open={stickerPickerOpen && !editingMessageId}
