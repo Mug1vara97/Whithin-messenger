@@ -4,6 +4,8 @@ import { useAuthContext } from '../../shared/lib/contexts/AuthContext';
 import { LoginPage } from '../../pages/login/ui';
 import { RegisterPage } from '../../pages/register/ui';
 import { ConfirmEmailPage } from '../../pages/confirm-email/ui';
+import { ConfirmEmailChangePage } from '../../pages/confirm-email-change/ui';
+import { ConfirmPasswordChangePage } from '../../pages/confirm-password-change/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
@@ -64,6 +66,14 @@ const AppRouter = () => {
           <Route
             path="/confirm-email"
             element={<ConfirmEmailPage />}
+          />
+          <Route
+            path="/confirm-email-change"
+            element={<ConfirmEmailChangePage />}
+          />
+          <Route
+            path="/confirm-password-change"
+            element={<ConfirmPasswordChangePage />}
           />
           <Route 
             path="/" 

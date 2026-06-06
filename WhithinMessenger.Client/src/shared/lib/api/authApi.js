@@ -50,6 +50,31 @@ export const authApi = {
     }
   },
 
+  async confirmPasswordChange({ userId, token }) {
+    try {
+      const response = await apiClient.post('/auth/confirm-password-change', {
+        userId,
+        token,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось подтвердить смену пароля');
+    }
+  },
+
+  async confirmEmailChange({ userId, newEmail, token }) {
+    try {
+      const response = await apiClient.post('/auth/confirm-email-change', {
+        userId,
+        newEmail,
+        token,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось подтвердить смену email');
+    }
+  },
+
   async resendConfirmation(email) {
     try {
       const response = await apiClient.post('/auth/resend-confirmation', { email });

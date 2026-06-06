@@ -36,7 +36,31 @@ export const userApi = {
   async searchUsers(query) {
     const response = await apiClient.get(`/user/search?name=${encodeURIComponent(query)}`);
     return response.data;
-  }
+  },
+
+  async changePassword({ currentPassword, newPassword }) {
+    try {
+      const response = await apiClient.post('/user/change-password', {
+        currentPassword,
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось сменить пароль');
+    }
+  },
+
+  async changeEmail({ newEmail, currentPassword }) {
+    try {
+      const response = await apiClient.post('/user/change-email', {
+        newEmail,
+        currentPassword,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось сменить email');
+    }
+  },
 };
 
 

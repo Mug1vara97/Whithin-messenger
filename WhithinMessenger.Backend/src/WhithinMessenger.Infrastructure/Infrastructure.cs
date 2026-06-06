@@ -38,6 +38,7 @@ public static class Infrastructure
         services.AddScoped<IChatRepository, ChatRepository>();
         services.AddScoped<IChatRepositoryExtensions, ChatRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IPendingPasswordChangeRepository, PendingPasswordChangeRepository>();
         services.AddScoped<IUserRepositoryExtensions, UserRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();

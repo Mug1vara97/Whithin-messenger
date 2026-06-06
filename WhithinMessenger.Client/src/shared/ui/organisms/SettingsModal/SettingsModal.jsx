@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
+import { useAuthContext } from '../../../lib/contexts/AuthContext';
+import { userApi } from '../../../../entities/user/api/userApi';
 import './SettingsModal.css';
 
 const SettingsModal = ({ isOpen, onClose }) => {
+  const { user } = useAuthContext();
   const [noiseSuppression, setNoiseSuppression] = useState(() => {
     const saved = localStorage.getItem('noiseSuppression');
     return saved ? JSON.parse(saved) : false;
@@ -15,6 +18,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const saved = localStorage.getItem('soundNotificationsEnabled');
     return saved == null ? true : JSON.parse(saved);
   });
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -119,6 +135,80 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const resetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    setPasswordError('');
+
+    if (newPassword.length < 6) {
+      setPasswordError('Новый пароль должен быть не короче 6 символов');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Пароли не совпадают');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await userApi.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      const confirmationEmail =
+        response?.confirmationEmail ||
+        response?.ConfirmationEmail ||
+        user?.email ||
+        user?.Email;
+      setPasswordMessage(
+        response?.message ||
+          `Письмо с подтверждением отправлено на ${confirmationEmail || 'ваш email'}`
+      );
+      resetPasswordForm();
+    } catch (error) {
+      setPasswordError(error.message || 'Не удалось сменить пароль');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleChangeEmail = async (e) => {
+    e.preventDefault();
+    setEmailMessage('');
+    setEmailError('');
+
+    if (!newEmail.trim()) {
+      setEmailError('Укажите новый email');
+      return;
+    }
+
+    setIsChangingEmail(true);
+    try {
+      const response = await userApi.changeEmail({
+        newEmail: newEmail.trim(),
+        currentPassword: emailPassword,
+      });
+      const pendingEmail = response?.pendingEmail || response?.PendingEmail || newEmail.trim();
+      setEmailMessage(
+        response?.message ||
+          `Письмо с подтверждением отправлено на ${pendingEmail}`
+      );
+      setNewEmail('');
+      setEmailPassword('');
+    } catch (error) {
+      setEmailError(error.message || 'Не удалось сменить email');
+    } finally {
+      setIsChangingEmail(false);
+    }
+  };
+
   const getActionName = (action) => {
     const actionNames = {
       toggleMic: 'Переключить микрофон',
@@ -140,6 +230,94 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </div>
         
         <div className="settings-content">
+          <div className="setting-section">
+            <h3>Аккаунт</h3>
+
+            <div className="setting-item account-info">
+              <span className="setting-text">Текущий email</span>
+              <span className="account-email-value">{user?.email || user?.Email || '—'}</span>
+            </div>
+
+            <form className="account-form" onSubmit={handleChangeEmail}>
+              <p className="setting-description account-form-title">Смена email</p>
+              <label className="account-field">
+                <span>Новый email</span>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="new@example.com"
+                  autoComplete="email"
+                />
+              </label>
+              <label className="account-field">
+                <span>Текущий пароль</span>
+                <input
+                  type="password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  placeholder="Подтвердите паролем"
+                  autoComplete="current-password"
+                />
+              </label>
+              {emailError && <div className="account-error">{emailError}</div>}
+              {emailMessage && <div className="account-success">{emailMessage}</div>}
+              <button
+                type="submit"
+                className="account-submit-btn"
+                disabled={isChangingEmail}
+              >
+                {isChangingEmail ? 'Отправка...' : 'Сменить email'}
+              </button>
+              <p className="setting-description">
+                На новый адрес придёт письмо — email изменится после подтверждения по ссылке.
+              </p>
+            </form>
+
+            <form className="account-form" onSubmit={handleChangePassword}>
+              <p className="setting-description account-form-title">Смена пароля</p>
+              <label className="account-field">
+                <span>Текущий пароль</span>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </label>
+              <label className="account-field">
+                <span>Новый пароль</span>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="account-field">
+                <span>Повторите новый пароль</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              {passwordError && <div className="account-error">{passwordError}</div>}
+              {passwordMessage && <div className="account-success">{passwordMessage}</div>}
+              <button
+                type="submit"
+                className="account-submit-btn"
+                disabled={isChangingPassword}
+              >
+                {isChangingPassword ? 'Отправка...' : 'Сменить пароль'}
+              </button>
+              <p className="setting-description">
+                На ваш email придёт письмо — пароль изменится после подтверждения по ссылке.
+              </p>
+            </form>
+          </div>
+
           <div className="setting-section">
             <h3>Аудио</h3>
             <div className="setting-item">

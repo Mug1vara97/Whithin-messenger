@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmEmail;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmEmailChange;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmPasswordChange;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Register;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ResendEmailConfirmation;
@@ -126,6 +128,50 @@ public class AuthController : ControllerBase
         if (result.IsSuccess)
         {
             return Ok(new { Message = "Email успешно подтверждён" });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("confirm-email-change")]
+    public async Task<IActionResult> ConfirmEmailChange([FromBody] ConfirmEmailChangeRequest request)
+    {
+        if (!Guid.TryParse(request.UserId, out var userId))
+        {
+            return BadRequest(new { Error = "Некорректный идентификатор пользователя" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewEmail) || string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { Error = "Email и токен обязательны" });
+        }
+
+        var result = await _mediator.Send(new ConfirmEmailChangeCommand(userId, request.NewEmail, request.Token));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Email успешно изменён", Email = result.Email });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("confirm-password-change")]
+    public async Task<IActionResult> ConfirmPasswordChange([FromBody] ConfirmPasswordChangeRequest request)
+    {
+        if (!Guid.TryParse(request.UserId, out var userId))
+        {
+            return BadRequest(new { Error = "Некорректный идентификатор пользователя" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { Error = "Токен подтверждения обязателен" });
+        }
+
+        var result = await _mediator.Send(new ConfirmPasswordChangeCommand(userId, request.Token));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Пароль успешно изменён" });
         }
 
         return BadRequest(new { Error = result.ErrorMessage });
@@ -431,3 +477,5 @@ public record LogoutRequest(string? RefreshToken);
 public record ApproveQrLoginRequest(string SessionId);
 public record ConfirmEmailRequest(string UserId, string Token);
 public record ResendConfirmationRequest(string Email);
+public record ConfirmEmailChangeRequest(string UserId, string NewEmail, string Token);
+public record ConfirmPasswordChangeRequest(string UserId, string Token);

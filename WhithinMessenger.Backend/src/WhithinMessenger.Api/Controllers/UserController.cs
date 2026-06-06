@@ -7,6 +7,8 @@ using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Infrastructure.Database;
 using MediatR;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangeEmail;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangePassword;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using WhithinMessenger.Application.Interfaces;
 
@@ -48,6 +50,58 @@ public class UserController : ControllerBase
             Email = user.Email,
             CreatedAt = user.CreatedAt
         });
+    }
+
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = HttpContext.Items["UserId"] as Guid?;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new { Error = "Пользователь не авторизован" });
+        }
+
+        var result = await _mediator.Send(new ChangePasswordCommand(
+            userId.Value,
+            request.CurrentPassword,
+            request.NewPassword));
+
+        if (result.IsSuccess)
+        {
+            return Ok(new
+            {
+                Message = "Письмо с подтверждением отправлено на ваш email",
+                ConfirmationEmail = result.ConfirmationEmail,
+            });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("change-email")]
+    public async Task<IActionResult> ChangeEmail([FromBody] ChangeEmailRequest request)
+    {
+        var userId = HttpContext.Items["UserId"] as Guid?;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new { Error = "Пользователь не авторизован" });
+        }
+
+        var result = await _mediator.Send(new ChangeEmailCommand(
+            userId.Value,
+            request.NewEmail,
+            request.CurrentPassword));
+
+        if (result.IsSuccess)
+        {
+            return Ok(new
+            {
+                Message = "Письмо с подтверждением отправлено на новый email",
+                PendingEmail = result.PendingEmail,
+            });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
     }
 
     [HttpGet("protected")]
@@ -184,4 +238,16 @@ public class UserController : ControllerBase
 public class UpdateUserStatusRequest
 {
     public string Status { get; set; } = string.Empty;
+}
+
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class ChangeEmailRequest
+{
+    public string NewEmail { get; set; } = string.Empty;
+    public string CurrentPassword { get; set; } = string.Empty;
 }

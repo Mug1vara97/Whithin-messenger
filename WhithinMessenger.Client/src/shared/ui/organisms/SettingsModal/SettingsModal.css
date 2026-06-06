@@ -278,6 +278,88 @@
   border-color: var(--primary, #5865f2);
 }
 
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-email-value {
+  color: var(--text-secondary, #8e9297);
+  font-size: 14px;
+}
+
+.account-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #4f545c);
+}
+
+.account-form-title {
+  margin: 0 0 12px 0 !important;
+  font-weight: 500;
+  color: var(--text, #dcddde) !important;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.account-field span {
+  font-size: 14px;
+  color: var(--text-secondary, #8e9297);
+}
+
+.account-field input {
+  background: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+  border: 1px solid var(--border, #4f545c);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.account-field input:focus {
+  outline: none;
+  border-color: var(--primary, #5865f2);
+}
+
+.account-submit-btn {
+  background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.account-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6875F5 0%, #5865F2 100%);
+}
+
+.account-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.account-error {
+  color: #f04747;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.account-success {
+  color: #43b581;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
 @media (max-width: 768px) {
   .settings-modal {
     width: 95%;
