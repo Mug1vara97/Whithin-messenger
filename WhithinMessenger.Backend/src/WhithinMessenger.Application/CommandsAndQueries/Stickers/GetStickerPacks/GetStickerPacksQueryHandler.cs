@@ -16,7 +16,7 @@ public class GetStickerPacksQueryHandler : IRequestHandler<GetStickerPacksQuery,
     {
         try
         {
-            var packs = await _stickerPackRepository.GetAllWithStickersAsync(cancellationToken);
+            var packs = await _stickerPackRepository.GetInstalledPacksForUserAsync(request.UserId, cancellationToken);
             var dtos = packs.Select(p => new StickerPackDto
             {
                 Id = p.Id,

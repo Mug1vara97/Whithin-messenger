@@ -991,6 +991,33 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("UserServerRoles");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserStickerPack", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("InstalledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("StickerPackId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StickerPackId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "StickerPackId")
+                        .IsUnique();
+
+                    b.ToTable("UserStickerPacks");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
@@ -1410,6 +1437,25 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("Server");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserStickerPack", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.StickerPack", "StickerPack")
+                        .WithMany()
+                        .HasForeignKey("StickerPackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StickerPack");
 
                     b.Navigation("User");
                 });

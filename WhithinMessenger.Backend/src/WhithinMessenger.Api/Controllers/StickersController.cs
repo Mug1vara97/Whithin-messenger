@@ -5,7 +5,9 @@ using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Api.Services;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.DeleteStickerPack;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetAvailableStickerPacks;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.InstallStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.SendStickerMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.UploadStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
@@ -45,7 +47,8 @@ public class StickersController : ControllerBase
     {
         try
         {
-            var result = await _mediator.Send(new GetStickerPacksQuery());
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new GetStickerPacksQuery(userId));
             if (!result.Success)
             {
                 return BadRequest(new { error = result.ErrorMessage });
@@ -56,6 +59,46 @@ public class StickersController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = "Ошибка при получении стикерпаков: " + ex.Message });
+        }
+    }
+
+    [HttpGet("packs/available")]
+    public async Task<IActionResult> GetAvailableStickerPacks()
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new GetAvailableStickerPacksQuery(userId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(result.Packs);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при получении каталога стикеров: " + ex.Message });
+        }
+    }
+
+    [HttpPost("packs/{packId:guid}/install")]
+    public async Task<IActionResult> InstallStickerPack(Guid packId)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new InstallStickerPackCommand(userId, packId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при добавлении стикерпака: " + ex.Message });
         }
     }
 

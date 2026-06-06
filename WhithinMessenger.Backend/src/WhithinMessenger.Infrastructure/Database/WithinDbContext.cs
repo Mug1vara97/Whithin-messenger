@@ -32,6 +32,7 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<Friendship> Friendships { get; set; }
     public DbSet<StickerPack> StickerPacks { get; set; }
     public DbSet<Sticker> Stickers { get; set; }
+    public DbSet<UserStickerPack> UserStickerPacks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

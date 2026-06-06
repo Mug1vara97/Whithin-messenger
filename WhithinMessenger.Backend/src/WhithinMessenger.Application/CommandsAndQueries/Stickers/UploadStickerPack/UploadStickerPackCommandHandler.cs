@@ -151,6 +151,7 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 ?? stickers[0].FilePath;
             await _stickerPackRepository.AddStickersAsync(stickers, cancellationToken);
             await _stickerPackRepository.UpdatePackAsync(pack, cancellationToken);
+            await _stickerPackRepository.InstallPackForUserAsync(request.UserId, pack.Id, cancellationToken);
 
             var created = await _stickerPackRepository.GetByIdWithStickersAsync(pack.Id, cancellationToken);
             if (created == null)

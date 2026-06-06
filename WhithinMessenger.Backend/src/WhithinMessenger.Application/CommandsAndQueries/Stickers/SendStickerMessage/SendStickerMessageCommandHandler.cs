@@ -58,6 +58,19 @@ public class SendStickerMessageCommandHandler : IRequestHandler<SendStickerMessa
                 };
             }
 
+            var hasPack = await _stickerPackRepository.IsPackInstalledForUserAsync(
+                request.UserId,
+                sticker.StickerPackId,
+                cancellationToken);
+            if (!hasPack)
+            {
+                return new SendStickerMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = "Добавьте стикерпак в свою коллекцию"
+                };
+            }
+
             var message = new Message
             {
                 Id = Guid.NewGuid(),

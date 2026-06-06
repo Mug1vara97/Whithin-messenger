@@ -2,7 +2,7 @@ using MediatR;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
 
-public record GetStickerPacksQuery : IRequest<GetStickerPacksResult>;
+public record GetStickerPacksQuery(Guid UserId) : IRequest<GetStickerPacksResult>;
 
 public record GetStickerPacksResult
 {

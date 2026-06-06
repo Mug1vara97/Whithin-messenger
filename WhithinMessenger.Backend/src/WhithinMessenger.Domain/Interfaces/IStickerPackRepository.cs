@@ -5,6 +5,11 @@ namespace WhithinMessenger.Domain.Interfaces;
 public interface IStickerPackRepository
 {
     Task<List<StickerPack>> GetAllWithStickersAsync(CancellationToken cancellationToken = default);
+    Task<List<StickerPack>> GetInstalledPacksForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<List<StickerPack>> GetAvailablePacksForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<bool> InstallPackForUserAsync(Guid userId, Guid packId, CancellationToken cancellationToken = default);
+    Task<bool> UninstallPackForUserAsync(Guid userId, Guid packId, CancellationToken cancellationToken = default);
+    Task<bool> IsPackInstalledForUserAsync(Guid userId, Guid packId, CancellationToken cancellationToken = default);
     Task<StickerPack?> GetByIdWithStickersAsync(Guid packId, CancellationToken cancellationToken = default);
     Task<Sticker?> GetStickerByIdAsync(Guid stickerId, CancellationToken cancellationToken = default);
     Task<StickerPack> CreatePackAsync(StickerPack pack, CancellationToken cancellationToken = default);
