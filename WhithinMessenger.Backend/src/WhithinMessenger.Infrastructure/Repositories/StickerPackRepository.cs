@@ -99,6 +99,7 @@ public class StickerPackRepository : IStickerPackRepository
     public async Task<StickerPack?> GetByIdWithStickersAsync(Guid packId, CancellationToken cancellationToken = default)
     {
         return await _context.StickerPacks
+            .AsNoTracking()
             .Include(p => p.Stickers.OrderBy(s => s.SortOrder))
             .FirstOrDefaultAsync(p => p.Id == packId, cancellationToken);
     }

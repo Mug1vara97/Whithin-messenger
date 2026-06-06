@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Application.Stickers;
@@ -21,15 +22,18 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
     private readonly IStickerPackRepository _stickerPackRepository;
     private readonly IFileService _fileService;
     private readonly IVideoConverterService _videoConverterService;
+    private readonly ILogger<UploadStickerPackCommandHandler> _logger;
 
     public UploadStickerPackCommandHandler(
         IStickerPackRepository stickerPackRepository,
         IFileService fileService,
-        IVideoConverterService videoConverterService)
+        IVideoConverterService videoConverterService,
+        ILogger<UploadStickerPackCommandHandler> logger)
     {
         _stickerPackRepository = stickerPackRepository;
         _fileService = fileService;
         _videoConverterService = videoConverterService;
+        _logger = logger;
     }
 
     public async Task<UploadStickerPackResult> Handle(UploadStickerPackCommand request, CancellationToken cancellationToken)
@@ -64,13 +68,25 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 };
             }
 
-            var archiveName = request.Archive.FileName ?? string.Empty;
-            if (!archiveName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            _logger.LogInformation(
+                "Sticker pack upload started. Title={Title}, Archive={ArchiveName}, Size={ArchiveSize}",
+                title,
+                request.Archive.FileName,
+                request.Archive.Length);
+
+            await using var archiveStream = request.Archive.OpenReadStream();
+            var preparedStickers = await ExtractStickersFromArchiveAsync(archiveStream, cancellationToken);
+
+            if (preparedStickers.Count == 0)
             {
+                _logger.LogWarning(
+                    "Sticker pack upload rejected: no valid stickers in archive {ArchiveName}",
+                    request.Archive.FileName);
+
                 return new UploadStickerPackResult
                 {
                     Success = false,
-                    ErrorMessage = "Поддерживаются только ZIP-архивы"
+                    ErrorMessage = "В архиве не найдено стикеров (webp, png, gif, jpg, webm). Проверьте формат и размер файлов."
                 };
             }
 
@@ -82,93 +98,40 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            await _stickerPackRepository.CreatePackAsync(pack, cancellationToken);
+            var folderPath = $"stickers/{pack.Id}";
+            var uploadsPath = Path.Combine(_fileService.GetFullPathForFolder(folderPath));
+            Directory.CreateDirectory(uploadsPath);
 
             var stickers = new List<Sticker>();
-            var sortOrder = 0;
-
-            await using var archiveStream = request.Archive.OpenReadStream();
-            using var zip = new ZipArchive(archiveStream, ZipArchiveMode.Read);
-
-            foreach (var entry in zip.Entries
-                         .Where(e => !e.FullName.EndsWith('/') && !string.IsNullOrWhiteSpace(e.Name))
-                         .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase))
+            for (var i = 0; i < preparedStickers.Count; i++)
             {
-                var extension = Path.GetExtension(entry.Name);
-                if (!AllowedExtensions.Contains(extension))
-                {
-                    continue;
-                }
-
-                await using var entryStream = entry.Open();
-                await using var memory = new MemoryStream();
-                await entryStream.CopyToAsync(memory, cancellationToken);
-                var bytes = memory.ToArray();
-                var maxBytes = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase)
-                    ? MaxVideoStickerBytes
-                    : MaxImageStickerBytes;
-                if (bytes.Length == 0 || bytes.Length > maxBytes)
-                {
-                    continue;
-                }
-
-                if (extension.Equals(".webm", StringComparison.OrdinalIgnoreCase))
-                {
-                    var converted = await _videoConverterService.TryConvertWebmToAnimatedWebpAsync(
-                        bytes,
-                        cancellationToken);
-                    if (converted != null)
-                    {
-                        bytes = converted.Bytes;
-                        extension = converted.Extension;
-                    }
-                }
-
-                var fileName = $"{Guid.NewGuid()}{extension.ToLowerInvariant()}";
-                var folderPath = $"stickers/{pack.Id}";
-                var uploadsPath = Path.Combine(_fileService.GetFullPathForFolder(folderPath));
-                Directory.CreateDirectory(uploadsPath);
+                var prepared = preparedStickers[i];
+                var fileName = $"{Guid.NewGuid()}{prepared.Extension}";
                 var absolutePath = Path.Combine(uploadsPath, fileName);
-                await File.WriteAllBytesAsync(absolutePath, bytes, cancellationToken);
+                await File.WriteAllBytesAsync(absolutePath, prepared.Bytes, cancellationToken);
 
                 var relativePath = Path.Combine("uploads", folderPath, fileName).Replace("\\", "/");
-                var contentType = extension.ToLowerInvariant() switch
-                {
-                    ".webp" => "image/webp",
-                    ".png" => "image/png",
-                    ".gif" => "image/gif",
-                    ".jpg" or ".jpeg" => "image/jpeg",
-                    ".webm" => "video/webm",
-                    _ => "application/octet-stream"
-                };
-
-                if (bytes.Length > MaxImageStickerBytes)
-                {
-                    continue;
-                }
-
                 stickers.Add(new Sticker
                 {
                     Id = Guid.NewGuid(),
                     StickerPackId = pack.Id,
                     FilePath = relativePath,
-                    ContentType = contentType,
-                    SortOrder = sortOrder++
+                    ContentType = prepared.ContentType,
+                    SortOrder = i
                 });
-            }
 
-            if (stickers.Count == 0)
-            {
-                return new UploadStickerPackResult
-                {
-                    Success = false,
-                    ErrorMessage = "В архиве не найдено стикеров (webp, png, gif, jpg, webm)"
-                };
+                _logger.LogInformation(
+                    "Saved sticker {EntryName} -> {RelativePath} ({SizeBytes} bytes)",
+                    prepared.EntryName,
+                    relativePath,
+                    prepared.Bytes.Length);
             }
 
             pack.CoverImagePath =
                 stickers.FirstOrDefault(s => s.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))?.FilePath
                 ?? stickers[0].FilePath;
+
+            await _stickerPackRepository.CreatePackAsync(pack, cancellationToken);
             await _stickerPackRepository.AddStickersAsync(stickers, cancellationToken);
             await _stickerPackRepository.UpdatePackAsync(pack, cancellationToken);
             await _stickerPackRepository.InstallPackForUserAsync(request.UserId, pack.Id, cancellationToken);
@@ -183,8 +146,11 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 };
             }
 
-            created.CoverImagePath = pack.CoverImagePath;
-            // Cover path is set on entity before stickers; reload includes stickers.
+            _logger.LogInformation(
+                "Sticker pack upload completed. PackId={PackId}, Title={Title}, Stickers={StickerCount}",
+                created.Id,
+                created.Title,
+                created.Stickers.Count);
 
             return new UploadStickerPackResult
             {
@@ -194,12 +160,97 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Sticker pack upload failed");
             return new UploadStickerPackResult
             {
                 Success = false,
                 ErrorMessage = ex.Message
             };
         }
+    }
+
+    private async Task<List<PreparedStickerFile>> ExtractStickersFromArchiveAsync(
+        Stream archiveStream,
+        CancellationToken cancellationToken)
+    {
+        var prepared = new List<PreparedStickerFile>();
+
+        using var zip = new ZipArchive(archiveStream, ZipArchiveMode.Read);
+        foreach (var entry in zip.Entries
+                     .Where(e => !e.FullName.EndsWith('/') && !string.IsNullOrWhiteSpace(e.Name))
+                     .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase))
+        {
+            var extension = Path.GetExtension(entry.Name);
+            if (!AllowedExtensions.Contains(extension))
+            {
+                _logger.LogDebug("Skipping archive entry {EntryName}: unsupported extension", entry.FullName);
+                continue;
+            }
+
+            await using var entryStream = entry.Open();
+            await using var memory = new MemoryStream();
+            await entryStream.CopyToAsync(memory, cancellationToken);
+            var bytes = memory.ToArray();
+
+            var isWebm = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase);
+            var maxBytes = isWebm ? MaxVideoStickerBytes : MaxImageStickerBytes;
+            if (bytes.Length == 0 || bytes.Length > maxBytes)
+            {
+                _logger.LogWarning(
+                    "Skipping archive entry {EntryName}: invalid size {SizeBytes} (max {MaxBytes})",
+                    entry.FullName,
+                    bytes.Length,
+                    maxBytes);
+                continue;
+            }
+
+            if (isWebm)
+            {
+                var converted = await _videoConverterService.TryConvertWebmToAnimatedWebpAsync(bytes, cancellationToken);
+                if (converted != null)
+                {
+                    bytes = converted.Bytes;
+                    extension = converted.Extension;
+                    _logger.LogInformation(
+                        "Converted sticker {EntryName} to animated webp ({SizeBytes} bytes)",
+                        entry.FullName,
+                        bytes.Length);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Webm conversion failed for {EntryName}, keeping original webm",
+                        entry.FullName);
+                }
+            }
+
+            var maxStoredBytes = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+                ? MaxVideoStickerBytes
+                : MaxImageStickerBytes;
+            if (bytes.Length == 0 || bytes.Length > maxStoredBytes)
+            {
+                _logger.LogWarning(
+                    "Skipping archive entry {EntryName} after processing: size {SizeBytes} exceeds {MaxBytes}",
+                    entry.FullName,
+                    bytes.Length,
+                    maxStoredBytes);
+                continue;
+            }
+
+            var contentType = extension.ToLowerInvariant() switch
+            {
+                ".webp" => "image/webp",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".webm" => "video/webm",
+                _ => "application/octet-stream"
+            };
+
+            prepared.Add(new PreparedStickerFile(entry.FullName, bytes, extension.ToLowerInvariant(), contentType));
+        }
+
+        return prepared;
     }
 
     private static StickerPackDto MapPack(StickerPack pack) =>
@@ -221,4 +272,10 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 })
                 .ToList()
         };
+
+    private sealed record PreparedStickerFile(
+        string EntryName,
+        byte[] Bytes,
+        string Extension,
+        string ContentType);
 }
