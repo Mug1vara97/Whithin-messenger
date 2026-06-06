@@ -44,6 +44,7 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
                     MessageId = m.Id,
                     SenderId = m.UserId,
                     Content = m.Content,
+                    ContentType = m.ContentType,
                     CreatedAt = m.CreatedAt,
                     SenderUsername = m.User.UserName ?? "Unknown",
                     AvatarUrl = m.User.UserProfile?.Avatar,
@@ -84,6 +85,15 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
                             ForwardedMessageContent = m.ForwardedMessageContent ?? ""
                         }
                         : null,
+                    Sticker = m.Sticker == null
+                        ? null
+                        : new StickerMessageDto
+                        {
+                            Id = m.Sticker.Id,
+                            StickerPackId = m.Sticker.StickerPackId,
+                            FilePath = m.Sticker.FilePath,
+                            ContentType = m.Sticker.ContentType
+                        },
                     MediaFiles = m.MediaFiles?.Select(mf => new MediaFileDto
                     {
                         Id = mf.Id,

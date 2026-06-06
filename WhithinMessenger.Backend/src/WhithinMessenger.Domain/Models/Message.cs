@@ -1,4 +1,4 @@
-﻿namespace WhithinMessenger.Domain.Models;
+namespace WhithinMessenger.Domain.Models;
 
 public class Message
 {
@@ -41,6 +41,10 @@ public class Message
     public ICollection<MessageRead> MessageReads { get; set; } = new List<MessageRead>();
 
     public ICollection<MessageDelivery> MessageDeliveries { get; set; } = new List<MessageDelivery>();
+
+    public Guid? StickerId { get; set; }
+
+    public Sticker? Sticker { get; set; }
 
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
 }

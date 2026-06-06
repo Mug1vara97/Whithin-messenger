@@ -26,6 +26,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Include(m => m.RepliedToMessage)
                     .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
+                .Include(m => m.Sticker)
                 .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
         }
 
@@ -42,6 +43,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Include(m => m.RepliedToMessage)
                     .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
+                .Include(m => m.Sticker)
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync(cancellationToken);
         }

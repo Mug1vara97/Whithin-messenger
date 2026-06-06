@@ -12,7 +12,17 @@ public class MessageDto
     public string AvatarColor { get; set; } = string.Empty;
     public ReplyMessageDto? RepliedMessage { get; set; }
     public ForwardedMessageDto? ForwardedMessage { get; set; }
+    public string? ContentType { get; set; }
+    public StickerMessageDto? Sticker { get; set; }
     public List<MediaFileDto> MediaFiles { get; set; } = new();
+}
+
+public class StickerMessageDto
+{
+    public Guid Id { get; set; }
+    public Guid StickerPackId { get; set; }
+    public string FilePath { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
 }
 
 public class MediaFileDto

@@ -38,6 +38,7 @@ public static class Infrastructure
         services.AddScoped<IServerMemberRepository, ServerMemberRepository>();
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
+        services.AddScoped<IStickerPackRepository, StickerPackRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUserPushTokenStore, UserPushTokenStore>();
         

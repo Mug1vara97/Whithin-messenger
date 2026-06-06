@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WhithinMessenger.Domain.Models;
 
@@ -52,6 +52,12 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasOne(d => d.ForwardedByUser)
             .WithMany()
             .HasForeignKey(d => d.ForwardedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder
+            .HasOne(d => d.Sticker)
+            .WithMany()
+            .HasForeignKey(d => d.StickerId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

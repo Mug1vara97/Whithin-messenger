@@ -550,6 +550,9 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Property<Guid?>("RepliedToMessageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("StickerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -564,6 +567,8 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.HasIndex("ForwardedFromMessageId");
 
                     b.HasIndex("RepliedToMessageId");
+
+                    b.HasIndex("StickerId");
 
                     b.HasIndex("UserId");
 
@@ -841,6 +846,67 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("ServerRoles");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.Sticker", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StickerPackId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StickerPackId");
+
+                    b.HasIndex("StickerPackId", "SortOrder");
+
+                    b.ToTable("Stickers");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.StickerPack", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CoverImagePath")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("StickerPacks");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1108,6 +1174,11 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .HasForeignKey("RepliedToMessageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("WhithinMessenger.Domain.Models.Sticker", "Sticker")
+                        .WithMany()
+                        .HasForeignKey("StickerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
                         .WithMany("Messages")
                         .HasForeignKey("UserId")
@@ -1123,6 +1194,8 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("ForwardedFromMessage");
 
                     b.Navigation("RepliedToMessage");
+
+                    b.Navigation("Sticker");
 
                     b.Navigation("User");
                 });
@@ -1262,6 +1335,28 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("Server");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.Sticker", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.StickerPack", "StickerPack")
+                        .WithMany("Stickers")
+                        .HasForeignKey("StickerPackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StickerPack");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.StickerPack", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserProfile", b =>
                 {
                     b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
@@ -1396,6 +1491,11 @@ namespace WhithinMessenger.Infrastructure.Migrations
             modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerRole", b =>
                 {
                     b.Navigation("UserServerRoles");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.StickerPack", b =>
+                {
+                    b.Navigation("Stickers");
                 });
 #pragma warning restore 612, 618
         }
