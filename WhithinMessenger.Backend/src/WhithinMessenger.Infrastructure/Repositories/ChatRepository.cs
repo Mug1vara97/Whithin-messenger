@@ -218,6 +218,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         Username = m.User.UserName,
                         AvatarUrl = m.User.UserProfile.Avatar,
                         AvatarColor = m.User.UserProfile.AvatarColor,
+                        Banner = m.User.UserProfile.Banner,
                         UserStatus = m.User.Status.ToString().ToLower(),
                         LastSeen = m.User.LastSeen
                     })
@@ -269,6 +270,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                             Type = "private",
                             Avatar = otherMember.User.UserProfile?.Avatar,
                             AvatarColor = otherMember.User.UserProfile?.AvatarColor,
+                            Banner = otherMember.User.UserProfile?.Banner,
                             OtherUserId = otherMember.UserId
                         };
                     }

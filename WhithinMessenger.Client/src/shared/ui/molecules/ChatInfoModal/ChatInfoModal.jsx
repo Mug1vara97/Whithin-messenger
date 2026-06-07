@@ -21,6 +21,60 @@ import {
 } from '@mui/icons-material';
 import './ChatInfoModal.css';
 
+const isBannerImage = (banner) => {
+  if (!banner || typeof banner !== 'string') return false;
+  if (banner.startsWith('#')) return false;
+
+  const lowerBanner = banner.toLowerCase();
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+  if (imageExtensions.some((ext) => lowerBanner.includes(ext))) return true;
+
+  return (
+    banner.startsWith('http://') ||
+    banner.startsWith('https://') ||
+    banner.startsWith('/uploads/') ||
+    banner.startsWith('uploads/') ||
+    banner.startsWith('/api/') ||
+    banner.startsWith('api/')
+  );
+};
+
+const resolveBannerImageUrl = (banner) => {
+  if (!isBannerImage(banner)) return null;
+  if (banner.startsWith('http://') || banner.startsWith('https://')) return banner;
+  if (banner.startsWith('/uploads/')) return `${BASE_URL}${banner}`;
+  return buildMediaUrl(banner);
+};
+
+const getBannerStyle = (banner, fallbackColor = '#5865F2') => {
+  if (!banner) {
+    return {
+      backgroundColor: fallbackColor,
+      backgroundImage: 'none',
+    };
+  }
+
+  const imageUrl = resolveBannerImageUrl(banner);
+  if (imageUrl) {
+    return {
+      backgroundColor: 'transparent',
+      backgroundImage: `url(${imageUrl})`,
+    };
+  }
+
+  if (banner.startsWith('#')) {
+    return {
+      backgroundColor: banner,
+      backgroundImage: 'none',
+    };
+  }
+
+  return {
+    backgroundColor: banner,
+    backgroundImage: 'none',
+  };
+};
+
 const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoading = false, participants = [], onParticipantsUpdated, connection }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState(null);
@@ -204,8 +258,14 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
             {/* Левая панель с информацией о чате */}
             <div className="chat-info-user-panel">
               <div className="chat-info-user-content">
+                {chatInfo?.type === 'private' && (
+                  <div
+                    className="chat-info-user-banner"
+                    style={getBannerStyle(chatInfo?.banner || chatInfo?.Banner, chatInfo?.avatarColor || '#5865F2')}
+                  />
+                )}
                 {/* Аватар с красивой рамкой */}
-                <div className="chat-info-avatar-container">
+                <div className={`chat-info-avatar-container${chatInfo?.type === 'private' ? ' with-banner' : ''}`}>
                   <div 
                     className="chat-info-user-avatar"
                     style={{
@@ -269,6 +329,13 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
                           console.log('ChatInfoModal - Full avatar URL:', participant.avatarUrl ? `${BASE_URL}${participant.avatarUrl}` : 'No avatar');
                           return (
                           <div key={participant.userId} className="chat-info-participant-item">
+                            {(participant.banner || participant.Banner) && (
+                              <div
+                                className="chat-info-participant-banner"
+                                style={getBannerStyle(participant.banner || participant.Banner, participant.avatarColor || '#5865F2')}
+                              />
+                            )}
+                            <div className="chat-info-participant-body">
                             <div 
                               className="chat-info-participant-avatar"
                               style={{
@@ -292,6 +359,7 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
                               {getUserStatusLabel(participant.userStatus)}
                             </span>
                           </div>
+                            </div>
                         </div>
                         );
                         })

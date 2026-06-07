@@ -217,7 +217,8 @@ const ChatRoom = ({
           console.log('ChatRoom - Loaded chat info via API:', chatInfo);
           setChatUserProfile({
             avatar: chatInfo.type === 'group' ? chatInfo.chatAvatar : chatInfo.avatar,
-            avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor
+            avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor,
+            banner: chatInfo.banner ?? chatInfo.Banner ?? null,
           });
         })
         .catch(apiError => {
@@ -281,7 +282,8 @@ const ChatRoom = ({
       console.log('ChatRoom - Chat info received:', chatInfo);
       setChatUserProfile({
         avatar: chatInfo.type === 'group' ? chatInfo.chatAvatar : chatInfo.avatar,
-        avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor
+        avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor,
+        banner: chatInfo.banner ?? chatInfo.Banner ?? null,
       });
     };
 
@@ -1419,6 +1421,7 @@ const ChatRoom = ({
           type: isPrivateChat ? 'private' : 'group',
           avatar: chatUserProfile?.avatar,
           avatarColor: chatUserProfile?.avatarColor || '#5865F2',
+          banner: chatUserProfile?.banner ?? null,
           chatAvatar: chatUserProfile?.avatar,
           chatAvatarColor: chatUserProfile?.avatarColor
         }}

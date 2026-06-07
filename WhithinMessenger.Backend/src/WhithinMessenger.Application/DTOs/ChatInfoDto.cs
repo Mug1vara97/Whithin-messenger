@@ -7,6 +7,7 @@ namespace WhithinMessenger.Application.DTOs
         public string Type { get; init; } = string.Empty;
         public string? Avatar { get; init; }
         public string? AvatarColor { get; init; }
+        public string? Banner { get; init; }
         public string? ChatAvatar { get; init; }
         public string? ChatAvatarColor { get; init; }
         public Guid? OtherUserId { get; init; }
