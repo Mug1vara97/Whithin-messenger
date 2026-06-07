@@ -953,8 +953,9 @@ const ChatRoom = ({
         {!isLoading && messages.map((msg) => {
           const isOwn = msg.senderUsername === username;
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
-          const isStickerMessage = msg.contentType === 'sticker' && msg.sticker;
+          const isStickerMessage = !msg.forwardedMessage && msg.contentType === 'sticker' && msg.sticker;
           const hasTextContent = Boolean(msg.content?.trim());
+          const isForwardedSticker = msg.forwardedMessage?.contentType === 'sticker' && msg.forwardedMessage?.sticker;
           const hasMedia = Boolean(msg.mediaFiles?.length);
           const isMediaOnly = hasMedia && !hasTextContent && !msg.repliedMessage && !msg.forwardedMessage && !isStickerMessage;
 
@@ -1013,10 +1014,33 @@ const ChatRoom = ({
                         <strong>{msg.forwardedMessage.originalChatName}</strong>
                       </div>
                       <div className="forwarded-message-content">
-                        {msg.forwardedMessage.content}
+                        {isForwardedSticker ? (
+                          <div className="forwarded-message-media">
+                            <StickerMessage sticker={msg.forwardedMessage.sticker} />
+                          </div>
+                        ) : (
+                          <>
+                            {msg.forwardedMessage.content && (
+                              <div className="forwarded-message-text">
+                                {renderTextWithLinks(msg.forwardedMessage.content, `${msg.messageId}-forwarded-source`)}
+                              </div>
+                            )}
+                            {msg.forwardedMessage.mediaFiles?.length > 0 && (
+                              <div className="forwarded-message-media">
+                                {msg.forwardedMessage.mediaFiles.map((mediaFile) => (
+                                  <MediaFile
+                                    key={mediaFile.id}
+                                    mediaFile={mediaFile}
+                                    canDelete={false}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
-                    {msg.content && (
+                    {hasTextContent && (
                       <div className="message-text">
                         {renderTextWithLinks(msg.content, `${msg.messageId}-forwarded-content`)}
                       </div>
@@ -1036,7 +1060,7 @@ const ChatRoom = ({
                 )}
                 
                 {/* Добавляем отображение медиафайлов */}
-                {msg.mediaFiles && msg.mediaFiles.length > 0 && (
+                {!msg.forwardedMessage && msg.mediaFiles && msg.mediaFiles.length > 0 && (
                   <div className="message-media">
                     {msg.mediaFiles.map((mediaFile) => (
                       <MediaFile

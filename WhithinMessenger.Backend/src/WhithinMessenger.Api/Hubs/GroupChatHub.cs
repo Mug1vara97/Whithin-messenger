@@ -1054,13 +1054,36 @@ public class GroupChatHub : Hub
                 return null;
             }
 
+            var source = message.ForwardedFromMessage;
             return new
             {
-                messageId = message.ForwardedFromMessage.Id,
-                content = message.ForwardedFromMessage.Content ?? string.Empty,
-                senderUsername = message.ForwardedFromMessage.User?.UserName ?? "Unknown",
+                messageId = source.Id,
+                content = source.Content ?? string.Empty,
+                senderUsername = source.User?.UserName ?? "Unknown",
                 originalChatName = message.ForwardedFromChat?.Name ?? "Unknown Chat",
-                forwardedMessageContent = message.ForwardedMessageContent ?? string.Empty
+                forwardedMessageContent = message.ForwardedMessageContent ?? string.Empty,
+                contentType = source.ContentType,
+                sticker = source.Sticker == null
+                    ? null
+                    : new
+                    {
+                        id = source.Sticker.Id,
+                        stickerPackId = source.Sticker.StickerPackId,
+                        filePath = source.Sticker.FilePath,
+                        contentType = source.Sticker.ContentType
+                    },
+                mediaFiles = source.MediaFiles?.Select(mf => new
+                {
+                    id = mf.Id,
+                    fileName = mf.FileName,
+                    originalFileName = mf.OriginalFileName,
+                    filePath = mf.FilePath,
+                    contentType = mf.ContentType,
+                    fileSize = mf.FileSize,
+                    thumbnailPath = mf.ThumbnailPath,
+                    createdAt = mf.CreatedAt,
+                    isVideoNote = mf.IsVideoNote
+                }).ToList()
             };
         }
     }

@@ -3,6 +3,7 @@ import { UserAvatar, MessageStatusIndicator } from '../../atoms';
 import { MessageStatus } from '../../../../entities/message/model/types';
 import MediaFile from '../MediaFile/MediaFile';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
+import StickerMessage from '../StickerMessage/StickerMessage';
 import { openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import { formatDiscordMessageTimestamp } from '../../../lib/utils/messageTime';
 import './MessageItem.css';
@@ -128,7 +129,7 @@ const MessageItem = ({
             )}
           </div>
         )}
-        {message.mediaFiles && message.mediaFiles.length > 0 && (
+        {!message.forwardedMessage && message.mediaFiles && message.mediaFiles.length > 0 && (
           <div className="message-media">
             {console.log('🎯 MessageItem - рендерим медиафайлы:', message.mediaFiles)}
             {message.mediaFiles.map((mediaFile) => (
@@ -167,14 +168,40 @@ const MessageItem = ({
 
   const renderForwardedMessage = () => {
     if (!message.forwardedMessage) return null;
-    
+
+    const forwarded = message.forwardedMessage;
+    const isForwardedSticker = forwarded.contentType === 'sticker' && forwarded.sticker;
+
     return (
       <div className="forwarded-message">
         <div className="forwarded-message-header">
-          <span>↱ Переслано из {message.forwardedMessage.originalChatName}</span>
+          <span>↱ Переслано от {forwarded.senderUsername} из {forwarded.originalChatName}</span>
         </div>
         <div className="forwarded-message-content">
-          <strong>{message.forwardedMessage.senderUsername}:</strong> {message.forwardedMessage.content}
+          {isForwardedSticker ? (
+            <div className="forwarded-message-media">
+              <StickerMessage sticker={forwarded.sticker} />
+            </div>
+          ) : (
+            <>
+              {forwarded.content && (
+                <div className="forwarded-message-text">
+                  <RepliedMedia content={forwarded.content} mediaFiles={[]} />
+                </div>
+              )}
+              {forwarded.mediaFiles?.length > 0 && (
+                <div className="forwarded-message-media">
+                  {forwarded.mediaFiles.map((mediaFile) => (
+                    <MediaFile
+                      key={mediaFile.id}
+                      mediaFile={mediaFile}
+                      canDelete={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     );

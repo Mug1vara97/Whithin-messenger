@@ -54,6 +54,9 @@ public class ForwardedMessageDto
     public string OriginalChatName { get; set; } = string.Empty;
     public string ForwardedByUsername { get; set; } = string.Empty;
     public string ForwardedMessageContent { get; set; } = string.Empty;
+    public string? ContentType { get; set; }
+    public StickerMessageDto? Sticker { get; set; }
+    public List<MediaFileDto> MediaFiles { get; set; } = new();
 }
 
 

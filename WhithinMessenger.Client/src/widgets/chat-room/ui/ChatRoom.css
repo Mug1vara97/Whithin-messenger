@@ -950,6 +950,18 @@
   line-height: 1.4;
 }
 
+.forwarded-message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.forwarded-message-media {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .forwarded-message-additional {
   margin-top: 8px;
   padding-top: 8px;

@@ -49,6 +49,9 @@ export const ForwardedMessage = {
   messageType: MessageType.TEXT,
   originalChatId: null,
   originalChatName: '',
+  contentType: null,
+  sticker: null,
+  mediaFiles: [],
   createdAt: null
 };
 

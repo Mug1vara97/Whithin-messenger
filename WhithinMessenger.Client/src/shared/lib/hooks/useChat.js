@@ -150,6 +150,19 @@ export const useChat = (chatId, username, userId) => {
     };
   }, []);
 
+  const normalizeForwardedMessage = useCallback((raw) => {
+    if (!raw) return null;
+    return {
+      messageId: raw.messageId ?? raw.MessageId ?? null,
+      senderUsername: raw.senderUsername ?? raw.SenderUsername ?? '',
+      content: raw.content ?? raw.Content ?? raw.forwardedMessageContent ?? raw.ForwardedMessageContent ?? '',
+      originalChatName: raw.originalChatName ?? raw.OriginalChatName ?? '',
+      contentType: raw.contentType ?? raw.ContentType ?? null,
+      sticker: normalizeSticker(raw.sticker ?? raw.Sticker),
+      mediaFiles: raw.mediaFiles ?? raw.MediaFiles ?? [],
+    };
+  }, [normalizeSticker]);
+
   const normalizeMessage = useCallback((msg, defaultStatus) => {
     if (!msg) return null;
     const senderId = msg.senderId ?? msg.SenderId ?? msg.userId ?? msg.UserId ?? null;
@@ -170,7 +183,7 @@ export const useChat = (chatId, username, userId) => {
       avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
       avatarColor: msg.avatarColor ?? msg.AvatarColor ?? null,
       repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
-      forwardedMessage: msg.forwardedMessage ?? msg.ForwardedMessage ?? null,
+      forwardedMessage: normalizeForwardedMessage(msg.forwardedMessage ?? msg.ForwardedMessage),
       createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
       mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? [],
       isEdited: msg.isEdited ?? msg.IsEdited ?? false,
@@ -178,7 +191,7 @@ export const useChat = (chatId, username, userId) => {
         ? normalizeMessageStatus(rawStatus ?? MessageStatus.SENT)
         : null,
     };
-  }, [normalizeSticker, userId, username]);
+  }, [normalizeForwardedMessage, normalizeSticker, userId, username]);
 
   const isPersistedMessageId = useCallback((messageId) => (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(messageId ?? ''))

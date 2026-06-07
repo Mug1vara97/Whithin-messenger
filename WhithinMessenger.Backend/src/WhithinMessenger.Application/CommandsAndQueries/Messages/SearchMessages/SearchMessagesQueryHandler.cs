@@ -57,16 +57,12 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                             }).ToList() ?? new List<MediaFileDto>()
                         }
                         : null,
-                    ForwardedMessage = m.ForwardedFromMessageId != null && m.ForwardedFromMessage != null
-                        ? new ForwardedMessageDto
-                        {
-                            MessageId = m.ForwardedFromMessage.Id,
-                            Content = m.ForwardedFromMessage.Content,
-                            SenderUsername = m.ForwardedFromMessage.User?.UserName ?? "Unknown",
-                            OriginalChatName = m.ForwardedFromChat?.Name ?? "Unknown Chat",
-                            ForwardedByUsername = m.ForwardedByUser?.UserName ?? "Unknown",
-                            ForwardedMessageContent = m.ForwardedMessageContent ?? ""
-                        }
+                    ForwardedMessage = m.ForwardedFromMessageId != null
+                        ? ForwardedMessageDtoMapper.Map(
+                            m.ForwardedFromMessage,
+                            m.ForwardedFromChat?.Name,
+                            m.ForwardedByUser?.UserName,
+                            m.ForwardedMessageContent)
                         : null,
                     MediaFiles = m.MediaFiles?.Select(mf => new MediaFileDto
                     {
