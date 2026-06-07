@@ -322,6 +322,11 @@
   line-height: 1.3;
 }
 
+.forwarded-message-media {
+  width: fit-content;
+  max-width: 100%;
+}
+
 /* Context menu styles */
 .context-menu {
   background: var(--surface);
