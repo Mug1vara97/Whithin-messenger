@@ -6,6 +6,8 @@ import { RegisterPage } from '../../pages/register/ui';
 import { ConfirmEmailPage } from '../../pages/confirm-email/ui';
 import { ConfirmEmailChangePage } from '../../pages/confirm-email-change/ui';
 import { ConfirmPasswordChangePage } from '../../pages/confirm-password-change/ui';
+import { ForgotPasswordPage } from '../../pages/forgot-password/ui';
+import { ResetPasswordPage } from '../../pages/reset-password/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
@@ -74,6 +76,18 @@ const AppRouter = () => {
           <Route
             path="/confirm-password-change"
             element={<ConfirmPasswordChangePage />}
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />
+            }
           />
           <Route 
             path="/" 

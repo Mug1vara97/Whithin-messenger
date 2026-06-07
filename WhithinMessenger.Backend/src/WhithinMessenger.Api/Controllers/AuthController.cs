@@ -7,6 +7,8 @@ using System.Collections.Concurrent;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmEmail;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmEmailChange;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ConfirmPasswordChange;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ForgotPassword;
+using WhithinMessenger.Application.CommandsAndQueries.Auth.ResetPassword;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Login;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.Register;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ResendEmailConfirmation;
@@ -184,6 +186,40 @@ public class AuthController : ControllerBase
         if (result.IsSuccess)
         {
             return Ok(new { Message = "Если аккаунт существует и email не подтверждён, письмо отправлено" });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var result = await _mediator.Send(new ForgotPasswordCommand(request.Email));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Если аккаунт с этим email существует, письмо для сброса пароля отправлено" });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (!Guid.TryParse(request.UserId, out var userId))
+        {
+            return BadRequest(new { Error = "Некорректный идентификатор пользователя" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return BadRequest(new { Error = "Токен сброса обязателен" });
+        }
+
+        var result = await _mediator.Send(new ResetPasswordCommand(userId, request.Token, request.NewPassword));
+        if (result.IsSuccess)
+        {
+            return Ok(new { Message = "Пароль успешно изменён" });
         }
 
         return BadRequest(new { Error = result.ErrorMessage });
@@ -479,3 +515,5 @@ public record ConfirmEmailRequest(string UserId, string Token);
 public record ResendConfirmationRequest(string Email);
 public record ConfirmEmailChangeRequest(string UserId, string NewEmail, string Token);
 public record ConfirmPasswordChangeRequest(string UserId, string Token);
+public record ForgotPasswordRequest(string Email);
+public record ResetPasswordRequest(string UserId, string Token, string NewPassword);

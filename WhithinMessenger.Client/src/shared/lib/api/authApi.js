@@ -84,6 +84,28 @@ export const authApi = {
     }
   },
 
+  async forgotPassword(email) {
+    try {
+      const response = await apiClient.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось отправить письмо для сброса пароля');
+    }
+  },
+
+  async resetPassword({ userId, token, newPassword }) {
+    try {
+      const response = await apiClient.post('/auth/reset-password', {
+        userId,
+        token,
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось сбросить пароль');
+    }
+  },
+
   async logout() {
     try {
       const refreshToken = tokenManager.getRefreshToken();

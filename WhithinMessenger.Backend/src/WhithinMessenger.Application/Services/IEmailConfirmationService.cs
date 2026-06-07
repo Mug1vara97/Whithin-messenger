@@ -13,4 +13,8 @@ public interface IEmailConfirmationService
         ApplicationUser user,
         string confirmationToken,
         CancellationToken cancellationToken = default);
+    Task SendPasswordResetEmailAsync(
+        ApplicationUser user,
+        string resetToken,
+        CancellationToken cancellationToken = default);
 }

@@ -158,4 +158,49 @@ public class EmailConfirmationService : IEmailConfirmationService
             throw;
         }
     }
+
+    public async Task SendPasswordResetEmailAsync(
+        ApplicationUser user,
+        string resetToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(user.Email))
+        {
+            throw new InvalidOperationException("User email is required for password reset.");
+        }
+
+        var baseUrl = _settings.FrontendBaseUrl.TrimEnd('/');
+        var link =
+            $"{baseUrl}/reset-password?userId={user.Id}&token={Uri.EscapeDataString(resetToken)}";
+
+        var html = $"""
+            <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#dcddde;background:#36393f;padding:24px;">
+              <h2 style="color:#fff;margin:0 0 12px;">Сброс пароля в Whithin</h2>
+              <p>Здравствуйте, <strong>{user.UserName}</strong>!</p>
+              <p>Вы запросили сброс пароля для аккаунта <strong>{user.Email}</strong>.</p>
+              <p>Нажмите кнопку ниже, чтобы задать новый пароль.</p>
+              <p style="margin:24px 0;">
+                <a href="{link}" style="background:#5865f2;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;">
+                  Сбросить пароль
+                </a>
+              </p>
+              <p style="font-size:13px;color:#949ba4;">Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
+              <p style="font-size:13px;word-break:break-all;"><a href="{link}" style="color:#66b3ff;">{link}</a></p>
+            </div>
+            """;
+
+        try
+        {
+            await _emailSender.SendAsync(
+                user.Email,
+                "Сброс пароля — Whithin",
+                html,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+            throw;
+        }
+    }
 }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Button, FormField } from '../../atoms';
 import GhostBackground from '../../atoms/GhostBackground';
@@ -274,6 +275,10 @@ const LoginForm = () => {
             disabled={isLoading}
             autoComplete="current-password"
           />
+
+          <p className="auth-link" style={{ marginTop: '-4px', textAlign: 'right' }}>
+            <Link to="/forgot-password">Забыли пароль?</Link>
+          </p>
 
           <Button
             type="submit"
