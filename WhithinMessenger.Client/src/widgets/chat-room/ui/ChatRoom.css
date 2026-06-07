@@ -642,27 +642,10 @@
   border-radius: 0;
   position: relative;
   word-break: break-word;
-  margin: 0;
+  margin-bottom: 8px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
-}
-
-.message--group-start {
-  margin-top: 17px;
-}
-
-.message--group-start:first-child {
-  margin-top: 0;
-}
-
-.message--grouped {
-  margin-top: 2px;
-}
-
-.message-avatar-gutter {
-  width: 40px;
-  flex-shrink: 0;
 }
 
 .my-message {
@@ -687,7 +670,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 0;
+  margin-bottom: 4px;
   line-height: 1.375rem;
 }
 

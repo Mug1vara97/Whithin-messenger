@@ -922,12 +922,10 @@ const ChatRoom = ({
           </div>
         )}
 
-        {!isLoading && messages.map((msg, index) => {
+        {!isLoading && messages.map((msg) => {
           const isOwn = msg.senderUsername === username;
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
           const isStickerMessage = msg.contentType === 'sticker' && msg.sticker;
-          const prevMsg = index > 0 ? messages[index - 1] : null;
-          const isGrouped = prevMsg?.senderUsername === msg.senderUsername;
           const hasTextContent = Boolean(msg.content?.trim());
           const hasMedia = Boolean(msg.mediaFiles?.length);
           const isMediaOnly = hasMedia && !hasTextContent && !msg.repliedMessage && !msg.forwardedMessage && !isStickerMessage;
@@ -938,41 +936,32 @@ const ChatRoom = ({
               id={`message-${msg.messageId}`}
               className={`message ${isOwn ? 'my-message' : 'user-message'} ${
                 isStickerMessage ? 'message--sticker' : ''
-              } ${isGrouped ? 'message--grouped' : 'message--group-start'} ${
-                isMediaOnly ? 'message--media-only' : ''
-              } ${
+              } ${isMediaOnly ? 'message--media-only' : ''} ${
                 highlightedMessageId === msg.messageId ? 'highlighted' : ''
               }`}
-              title={isGrouped && headerTime ? headerTime : undefined}
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
             >
-              {isGrouped ? (
-                <div className="message-avatar-gutter" aria-hidden="true" />
-              ) : (
-                <UserAvatar
-                  username={msg.senderUsername}
-                  avatarUrl={msg.avatarUrl}
-                  avatarColor={msg.avatarColor}
-                />
-              )}
+              <UserAvatar
+                username={msg.senderUsername}
+                avatarUrl={msg.avatarUrl}
+                avatarColor={msg.avatarColor}
+              />
               <div className="message-content">
-                {!isGrouped && (
-                  <div className="message-header">
-                    <strong className="message-username">{msg.senderUsername}</strong>
-                    {headerTime && (
-                      <span className="message-header-time">{headerTime}</span>
-                    )}
-                    {msg.isEdited && (
-                      <span className="message-edited">ред.</span>
-                    )}
-                    {isOwn && (
-                      <MessageStatusIndicator
-                        status={msg.status || MessageStatus.SENT}
-                        onLightBubble
-                      />
-                    )}
-                  </div>
-                )}
+                <div className="message-header">
+                  <strong className="message-username">{msg.senderUsername}</strong>
+                  {headerTime && (
+                    <span className="message-header-time">{headerTime}</span>
+                  )}
+                  {msg.isEdited && (
+                    <span className="message-edited">ред.</span>
+                  )}
+                  {isOwn && (
+                    <MessageStatusIndicator
+                      status={msg.status || MessageStatus.SENT}
+                      onLightBubble
+                    />
+                  )}
+                </div>
                 {msg.repliedMessage && (
                   <div className="replied-message" onClick={() => scrollToMessage(msg.repliedMessage.messageId)}>
                     <div className="replied-message-header">
