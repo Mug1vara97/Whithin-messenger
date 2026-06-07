@@ -327,6 +327,27 @@
   max-width: 100%;
 }
 
+.forwarded-message-image {
+  display: block;
+  max-width: min(320px, 100%);
+  width: auto;
+  height: auto;
+  border: none;
+  border-radius: 8px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  object-fit: contain;
+}
+
+.forwarded-message-media .media-file {
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* Context menu styles */
 .context-menu {
   background: var(--surface);

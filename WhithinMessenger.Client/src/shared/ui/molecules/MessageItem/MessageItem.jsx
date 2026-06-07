@@ -4,7 +4,7 @@ import { MessageStatus } from '../../../../entities/message/model/types';
 import MediaFile from '../MediaFile/MediaFile';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import StickerMessage from '../StickerMessage/StickerMessage';
-import { openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import { formatDiscordMessageTimestamp } from '../../../lib/utils/messageTime';
 import './MessageItem.css';
 
@@ -191,13 +191,26 @@ const MessageItem = ({
               )}
               {forwarded.mediaFiles?.length > 0 && (
                 <div className="forwarded-message-media">
-                  {forwarded.mediaFiles.map((mediaFile) => (
-                    <MediaFile
-                      key={mediaFile.id}
-                      mediaFile={mediaFile}
-                      canDelete={false}
-                    />
-                  ))}
+                  {forwarded.mediaFiles.map((mediaFile) => {
+                    if (mediaFile.contentType?.startsWith('image/')) {
+                      return (
+                        <img
+                          key={mediaFile.id}
+                          src={buildMediaUrl(mediaFile.filePath)}
+                          alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
+                          className="forwarded-message-image"
+                        />
+                      );
+                    }
+
+                    return (
+                      <MediaFile
+                        key={mediaFile.id}
+                        mediaFile={mediaFile}
+                        canDelete={false}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </>

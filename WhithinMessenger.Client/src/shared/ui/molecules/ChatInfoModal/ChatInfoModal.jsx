@@ -21,7 +21,7 @@ import {
 } from '@mui/icons-material';
 import './ChatInfoModal.css';
 
-const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants = [], onParticipantsUpdated, connection }) => {
+const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoading = false, participants = [], onParticipantsUpdated, connection }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [chatAvatar, setChatAvatar] = useState(chatInfo?.chatAvatar);
@@ -140,14 +140,13 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
 
 
   // Группируем медиафайлы по типу
-  const images = mediaFiles.filter(file => file.contentType.startsWith('image/'));
-  const videos = mediaFiles.filter(file => file.contentType.startsWith('video/'));
-  const audios = mediaFiles.filter(file => file.contentType.startsWith('audio/'));
-  const documents = mediaFiles.filter(file => 
-    !file.contentType.startsWith('image/') && 
-    !file.contentType.startsWith('video/') && 
-    !file.contentType.startsWith('audio/')
-  );
+  const images = mediaFiles.filter(file => file.contentType?.startsWith('image/'));
+  const videos = mediaFiles.filter(file => file.contentType?.startsWith('video/'));
+  const audios = mediaFiles.filter(file => file.contentType?.startsWith('audio/'));
+  const documents = mediaFiles.filter(file => {
+    const type = file.contentType || '';
+    return !type.startsWith('image/') && !type.startsWith('video/') && !type.startsWith('audio/');
+  });
 
   const renderMediaGrid = (files, type) => (
     <div className="chat-info-media-grid">
@@ -355,7 +354,11 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                 {/* Таб фотографий */}
                 {activeTab === 0 && (
                   <div className="chat-info-media-section">
-                    {images.length > 0 ? (
+                    {mediaFilesLoading ? (
+                      <div className="chat-info-empty-state">
+                        <p className="chat-info-empty-description">Загрузка медиа…</p>
+                      </div>
+                    ) : images.length > 0 ? (
                       renderMediaGrid(images, 'image')
                     ) : (
                       <div className="chat-info-empty-state">
@@ -372,7 +375,11 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                 {/* Таб видео */}
                 {activeTab === 1 && (
                   <div className="chat-info-media-section">
-                    {videos.length > 0 ? (
+                    {mediaFilesLoading ? (
+                      <div className="chat-info-empty-state">
+                        <p className="chat-info-empty-description">Загрузка медиа…</p>
+                      </div>
+                    ) : videos.length > 0 ? (
                       renderMediaGrid(videos, 'video')
                     ) : (
                       <div className="chat-info-empty-state">
@@ -389,7 +396,11 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                 {/* Таб аудио */}
                 {activeTab === 2 && (
                   <div className="chat-info-media-section">
-                    {audios.length > 0 ? (
+                    {mediaFilesLoading ? (
+                      <div className="chat-info-empty-state">
+                        <p className="chat-info-empty-description">Загрузка медиа…</p>
+                      </div>
+                    ) : audios.length > 0 ? (
                       renderMediaGrid(audios, 'audio')
                     ) : (
                       <div className="chat-info-empty-state">
@@ -406,7 +417,11 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], participants 
                 {/* Таб файлов */}
                 {activeTab === 3 && (
                   <div className="chat-info-media-section">
-                    {documents.length > 0 ? (
+                    {mediaFilesLoading ? (
+                      <div className="chat-info-empty-state">
+                        <p className="chat-info-empty-description">Загрузка медиа…</p>
+                      </div>
+                    ) : documents.length > 0 ? (
                       renderMediaGrid(documents, 'document')
                     ) : (
                       <div className="chat-info-empty-state">

@@ -5,7 +5,8 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import { openExternalUrl, splitTextWithLinks } from '../../../shared/lib/utils/urlHelpers';
+import { openExternalUrl, splitTextWithLinks, buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
+import { fetchAllChatMediaFiles } from '../../../shared/lib/utils/fetchChatMedia';
 import { formatDiscordMessageTimestamp } from '../../../shared/lib/utils/messageTime';
 import { 
   useChat, 
@@ -134,6 +135,8 @@ const ChatRoom = ({
   const [isPrivateChat, setIsPrivateChat] = useState(false);
   const [otherUserInCall] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(false);
+  const [chatInfoMediaFiles, setChatInfoMediaFiles] = useState([]);
+  const [chatInfoMediaLoading, setChatInfoMediaLoading] = useState(false);
   const [chatParticipants, setChatParticipants] = useState([]);
   const [existingCallParticipants, setExistingCallParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -335,6 +338,37 @@ const ChatRoom = ({
       });
     }
   }, [showChatInfo, chatId, connection]);
+
+  useEffect(() => {
+    if (!showChatInfo || !chatId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setChatInfoMediaLoading(true);
+
+    fetchAllChatMediaFiles(chatId)
+      .then((files) => {
+        if (!cancelled) {
+          setChatInfoMediaFiles(files);
+        }
+      })
+      .catch((error) => {
+        console.error('ChatRoom - failed to load chat media for info:', error);
+        if (!cancelled) {
+          setChatInfoMediaFiles([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setChatInfoMediaLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showChatInfo, chatId]);
 
   useEffect(() => {
     if (!userId || !getConnection) return undefined;
@@ -1027,13 +1061,26 @@ const ChatRoom = ({
                             )}
                             {msg.forwardedMessage.mediaFiles?.length > 0 && (
                               <div className="forwarded-message-media">
-                                {msg.forwardedMessage.mediaFiles.map((mediaFile) => (
-                                  <MediaFile
-                                    key={mediaFile.id}
-                                    mediaFile={mediaFile}
-                                    canDelete={false}
-                                  />
-                                ))}
+                                {msg.forwardedMessage.mediaFiles.map((mediaFile) => {
+                                  if (mediaFile.contentType?.startsWith('image/')) {
+                                    return (
+                                      <img
+                                        key={mediaFile.id}
+                                        src={buildMediaUrl(mediaFile.filePath)}
+                                        alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
+                                        className="forwarded-message-image"
+                                      />
+                                    );
+                                  }
+
+                                  return (
+                                    <MediaFile
+                                      key={mediaFile.id}
+                                      mediaFile={mediaFile}
+                                      canDelete={false}
+                                    />
+                                  );
+                                })}
                               </div>
                             )}
                           </>
@@ -1375,7 +1422,8 @@ const ChatRoom = ({
           chatAvatar: chatUserProfile?.avatar,
           chatAvatarColor: chatUserProfile?.avatarColor
         }}
-        mediaFiles={messages.flatMap(msg => msg.mediaFiles || [])}
+        mediaFiles={chatInfoMediaFiles}
+        mediaFilesLoading={chatInfoMediaLoading}
         participants={chatParticipants}
         onParticipantsUpdated={loadChatParticipants}
         connection={connection}
