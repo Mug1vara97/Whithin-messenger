@@ -25,13 +25,19 @@ export const useChat = (chatId, username, userId) => {
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const [error, setError] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
   
   const connectionRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const currentChatIdRef = useRef(null);
   const loadGenerationRef = useRef(0);
+  const loadingOlderRef = useRef(false);
+  const skipAutoScrollRef = useRef(false);
+  const olderScrollSnapshotRef = useRef(null);
   const typingExpiryTimersRef = useRef(new Map());
   const typingIdleTimerRef = useRef(null);
   const typingHeartbeatRef = useRef(null);
@@ -228,9 +234,14 @@ export const useChat = (chatId, username, userId) => {
 
     setMessages([]);
     setIsLoading(true);
+    setIsLoadingOlder(false);
+    setHasMoreOlder(false);
     setError(null);
     setIsConnected(false);
     setTypingUsers([]);
+    loadingOlderRef.current = false;
+    skipAutoScrollRef.current = false;
+    olderScrollSnapshotRef.current = null;
     clearTypingExpiryTimers();
     clearTypingHeartbeat();
     lastTypingSentRef.current = false;
@@ -249,6 +260,7 @@ export const useChat = (chatId, username, userId) => {
       conn.off('MessageDelivered');
       conn.off('MessageRead');
       conn.off('ReceiveMessages');
+      conn.off('ReceiveMessagesMeta');
       conn.off('UserTyping');
       conn.off('UserStoppedTyping');
       conn.off('Error');
@@ -351,6 +363,14 @@ export const useChat = (chatId, username, userId) => {
           updateMessageStatus(messageId, status);
         };
 
+        newConnection.on('ReceiveMessagesMeta', (meta) => {
+          if (loadGenerationRef.current !== loadGen) return;
+          const hasMore = meta?.hasMoreOlder ?? meta?.HasMoreOlder ?? false;
+          setHasMoreOlder(Boolean(hasMore));
+          setIsLoadingOlder(false);
+          loadingOlderRef.current = false;
+        });
+
         newConnection.on('ReceiveMessages', (messages) => {
           if (loadGenerationRef.current !== loadGen) return;
           const source = Array.isArray(messages) ? messages : [];
@@ -358,7 +378,20 @@ export const useChat = (chatId, username, userId) => {
             .map((msg) => normalizeMessage(msg))
             .filter(Boolean);
 
-          setMessages(processedMessages);
+          if (loadingOlderRef.current) {
+            skipAutoScrollRef.current = true;
+            setMessages((prev) => {
+              const incomingIds = new Set(
+                processedMessages.map((msg) => String(msg.messageId)),
+              );
+              const rest = prev.filter((msg) => !incomingIds.has(String(msg.messageId)));
+              return [...rest, ...processedMessages].sort(
+                (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+              );
+            });
+          } else {
+            setMessages(processedMessages);
+          }
           acknowledgeIncomingMessages(processedMessages);
         });
 
@@ -445,14 +478,30 @@ export const useChat = (chatId, username, userId) => {
   }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, normalizeMessage, removeTypingUser, updateMessageStatus]);
 
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ 
-          behavior: "auto",
-          block: "end"
-        });
-      }, 100);
+    if (messages.length === 0) return;
+
+    const container = messagesContainerRef.current;
+    const snapshot = olderScrollSnapshotRef.current;
+
+    if (snapshot && container) {
+      const heightDelta = container.scrollHeight - snapshot.scrollHeight;
+      container.scrollTop = snapshot.scrollTop + heightDelta;
+      olderScrollSnapshotRef.current = null;
+      skipAutoScrollRef.current = false;
+      return;
     }
+
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false;
+      return;
+    }
+
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: 'auto',
+        block: 'end',
+      });
+    }, 100);
   }, [messages.length]);
 
   const scrollToBottom = useCallback(() => {
@@ -463,6 +512,51 @@ export const useChat = (chatId, username, userId) => {
       });
     }
   }, []);
+
+  const loadOlderMessages = useCallback(async () => {
+    const conn = connectionRef.current;
+    if (!conn || !chatId || !hasMoreOlder || isLoadingOlder || loadingOlderRef.current) {
+      return;
+    }
+
+    const persisted = messages.filter((msg) => isPersistedMessageId(msg.messageId));
+    if (persisted.length === 0) return;
+
+    const oldest = persisted.reduce((min, msg) => {
+      const minTime = new Date(min.createdAt).getTime();
+      const msgTime = new Date(msg.createdAt).getTime();
+      if (msgTime < minTime) return msg;
+      if (msgTime > minTime) return min;
+      return String(msg.messageId) < String(min.messageId) ? msg : min;
+    });
+
+    const container = messagesContainerRef.current;
+    if (container) {
+      olderScrollSnapshotRef.current = {
+        scrollHeight: container.scrollHeight,
+        scrollTop: container.scrollTop,
+      };
+    }
+
+    loadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+    try {
+      await conn.invoke('GetMessages', chatId, 50, String(oldest.messageId));
+    } catch (err) {
+      console.warn('GetMessages (older) failed:', err);
+      loadingOlderRef.current = false;
+      setIsLoadingOlder(false);
+      olderScrollSnapshotRef.current = null;
+    }
+  }, [chatId, hasMoreOlder, isLoadingOlder, isPersistedMessageId, messages]);
+
+  const handleMessagesScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container || isLoadingOlder || !hasMoreOlder) return;
+    if (container.scrollTop <= 120) {
+      loadOlderMessages();
+    }
+  }, [hasMoreOlder, isLoadingOlder, loadOlderMessages]);
 
   const sendMessage = useCallback(async (content, repliedMessageId = null, forwardedMessage = null) => {
     if (!content.trim() || !connection) return;
@@ -558,10 +652,15 @@ export const useChat = (chatId, username, userId) => {
     connection,
     isConnected,
     isLoading,
+    isLoadingOlder,
+    hasMoreOlder,
     error,
     messagesEndRef,
+    messagesContainerRef,
     typingUsers,
     handleComposerTextChange,
+    handleMessagesScroll,
+    loadOlderMessages,
     notifyStopTyping,
     sendMessage,
     editMessage,

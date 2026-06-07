@@ -54,8 +54,11 @@ const ChatRoom = ({
     messages,
     connection,
     isLoading,
+    isLoadingOlder,
+    hasMoreOlder,
     error,
     messagesEndRef,
+    messagesContainerRef,
     sendMessage,
     editMessage,
     deleteMessage,
@@ -63,6 +66,8 @@ const ChatRoom = ({
     scrollToBottom,
     typingUsers,
     handleComposerTextChange,
+    handleMessagesScroll,
+    loadOlderMessages,
   } = useChat(chatId, username, userId);
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
@@ -902,7 +907,30 @@ const ChatRoom = ({
         </div>
       )}
 
-      <div className="messages">
+      <div
+        className="messages"
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+      >
+        {!isLoading && (isLoadingOlder || hasMoreOlder) && (
+          <div className="chat-older-loader">
+            {isLoadingOlder ? (
+              <>
+                <div className="loading-spinner" />
+                <span>Загрузка истории…</span>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="chat-load-older-btn"
+                onClick={loadOlderMessages}
+              >
+                Загрузить ещё 50 сообщений
+              </button>
+            )}
+          </div>
+        )}
+
         {isLoading && (
           <div className="chat-loading">
             <div className="loading-spinner"></div>
