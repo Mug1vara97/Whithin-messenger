@@ -10,6 +10,9 @@ public interface INotificationService
         string content,
         Guid? serverId = null,
         string? chatDisplayName = null,
+        string? pushMessageType = null,
+        string? pushPreviewText = null,
+        string? pushThumbnailUrl = null,
         CancellationToken cancellationToken = default);
     Task<int> GetUnreadCountForUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task SendIncomingCallPushAsync(Guid userId, Guid chatId, Guid callerId, string callerName, CancellationToken cancellationToken = default);

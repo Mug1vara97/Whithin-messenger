@@ -38,6 +38,7 @@ public class GroupChatHub : Hub
     private readonly INotificationService _notificationService;
     private readonly IChatRepository _chatRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly IMessageReceiptService _messageReceiptService;
 
     public GroupChatHub(
@@ -48,6 +49,7 @@ public class GroupChatHub : Hub
         INotificationService notificationService,
         IChatRepository chatRepository,
         IMessageRepository messageRepository,
+        ChatMessageNotificationService chatMessageNotificationService,
         IMessageReceiptService messageReceiptService)
     {
         _mediator = mediator;
@@ -57,6 +59,7 @@ public class GroupChatHub : Hub
         _notificationService = notificationService;
         _chatRepository = chatRepository;
         _messageRepository = messageRepository;
+        _chatMessageNotificationService = chatMessageNotificationService;
         _messageReceiptService = messageReceiptService;
     }
 
@@ -421,10 +424,7 @@ public class GroupChatHub : Hub
                             status = MessageStatusHelper.Sent
                         });
 
-                    // Отправляем ChatUpdated событие для обновления списка чатов
-                    await _chatListHubContext.Clients.All.SendAsync("chatupdated", parsedChatId, message, DateTimeOffset.UtcNow);
-
-                    await CreateNotificationsForChatMessage(
+                    await _chatMessageNotificationService.NotifyTextMessageAsync(
                         parsedChatId,
                         userId.Value,
                         username,
@@ -695,15 +695,20 @@ public class GroupChatHub : Hub
                             status = MessageStatusHelper.Sent
                         });
 
-                    // Отправляем ChatUpdated событие для обновления списка чатов
-                    await _chatListHubContext.Clients.All.SendAsync("chatupdated", parsedChatId, mediaUrl, DateTimeOffset.UtcNow);
+                    var firstMedia = messageResult.Success
+                        ? messageResult.Message?.MediaFiles?.FirstOrDefault()
+                        : null;
 
-                    await CreateNotificationsForChatMessage(
+                    await _chatMessageNotificationService.NotifyMediaMessageAsync(
                         parsedChatId,
                         userId.Value,
                         username,
                         result.MessageId,
-                        "Отправил медиафайл"
+                        caption: messageResult.Message?.Content,
+                        mediaContentType: firstMedia?.ContentType ?? "application/octet-stream",
+                        isVideoNote: firstMedia?.IsVideoNote ?? false,
+                        thumbnailPath: firstMedia?.ThumbnailPath,
+                        filePath: firstMedia?.FilePath
                     );
 
                     await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
@@ -953,61 +958,6 @@ public class GroupChatHub : Hub
             string[] colors = { "#5865F2", "#EB459E", "#ED4245", "#FEE75C", "#57F287", "#FAA61A" };
             int index = Math.Abs(userId.GetHashCode()) % colors.Length;
             return colors[index];
-        }
-
-        private async Task CreateNotificationsForChatMessage(
-            Guid chatId,
-            Guid senderId,
-            string senderUsername,
-            Guid? messageId,
-            string previewText
-        )
-        {
-            try
-            {
-                var chat = await _chatRepository.GetByIdAsync(chatId);
-                if (chat == null) return;
-
-                var chatMembers = await _chatRepository.GetChatMembersAsync(chatId);
-                var notificationMembers = chatMembers.Where(m => m != senderId).ToList();
-                if (!notificationMembers.Any()) return;
-
-                var isGroupChat = chat.Type?.TypeName == "Group";
-                var notificationType = isGroupChat ? "group_message" : "direct_message";
-                var chatName = string.IsNullOrWhiteSpace(chat.Name) ? senderUsername : chat.Name;
-                var cleanPreview = string.IsNullOrWhiteSpace(previewText) ? "Новое сообщение" : previewText;
-                var truncatedPreview = cleanPreview.Length > 140 ? cleanPreview[..140] : cleanPreview;
-                var notificationContent = isGroupChat
-                    ? $"{senderUsername} в {chatName}: {truncatedPreview}"
-                    : $"{senderUsername}: {truncatedPreview}";
-
-                foreach (var memberId in notificationMembers)
-                {
-                    var pushChatTitle = chatName;
-                    if (!isGroupChat && chat.Type?.TypeName == "Private")
-                    {
-                        pushChatTitle = senderUsername;
-                    }
-
-                    await _notificationService.CreateNotificationAsync(
-                        memberId,
-                        chatId,
-                        messageId,
-                        notificationType,
-                        notificationContent,
-                        chat.ServerId,
-                        pushChatTitle
-                    );
-
-                    var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, memberId);
-                    await _chatListHubContext.Clients.Group($"user-{memberId}")
-                        .SendAsync("chatunreadupdated", chatId, unreadCount);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating notifications for chat message");
-            }
         }
 
         public async Task LeaveGroupChat(Guid chatId)

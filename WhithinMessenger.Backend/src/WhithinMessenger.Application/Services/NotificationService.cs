@@ -32,6 +32,9 @@ public class NotificationService : INotificationService
         string content,
         Guid? serverId = null,
         string? chatDisplayName = null,
+        string? pushMessageType = null,
+        string? pushPreviewText = null,
+        string? pushThumbnailUrl = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -71,6 +74,9 @@ public class NotificationService : INotificationService
                 type: type,
                 content: content,
                 chatDisplayName: chatDisplayName,
+                pushMessageType: pushMessageType,
+                pushPreviewText: pushPreviewText,
+                pushThumbnailUrl: pushThumbnailUrl,
                 cancellationToken: cancellationToken
             );
 
@@ -157,6 +163,9 @@ public class NotificationService : INotificationService
         string type,
         string content,
         string? chatDisplayName,
+        string? pushMessageType,
+        string? pushPreviewText,
+        string? pushThumbnailUrl,
         CancellationToken cancellationToken
     )
     {
@@ -184,6 +193,9 @@ public class NotificationService : INotificationService
                     chatId: chatId,
                     title: resolvedChatTitle,
                     message: content,
+                    messageType: pushMessageType,
+                    previewText: pushPreviewText,
+                    thumbnailUrl: pushThumbnailUrl,
                     cancellationToken: cancellationToken
                 );
             }

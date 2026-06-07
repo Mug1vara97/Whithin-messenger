@@ -26,6 +26,7 @@ public class StickersController : ControllerBase
     private readonly IHubContext<GroupChatHub> _hubContext;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly IMessageRepository _messageRepository;
+    private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly ILogger<StickersController> _logger;
 
     public StickersController(
@@ -33,12 +34,14 @@ public class StickersController : ControllerBase
         IHubContext<GroupChatHub> hubContext,
         IMessageReceiptService messageReceiptService,
         IMessageRepository messageRepository,
+        ChatMessageNotificationService chatMessageNotificationService,
         ILogger<StickersController> logger)
     {
         _mediator = mediator;
         _hubContext = hubContext;
         _messageReceiptService = messageReceiptService;
         _messageRepository = messageRepository;
+        _chatMessageNotificationService = chatMessageNotificationService;
         _logger = logger;
     }
 
@@ -238,6 +241,13 @@ public class StickersController : ControllerBase
                         result.MessageId.Value,
                         userId);
                 }
+
+                await _chatMessageNotificationService.NotifyStickerMessageAsync(
+                    chatId,
+                    userId,
+                    username,
+                    result.MessageId,
+                    result.Sticker?.FilePath);
             }
             catch (Exception ex)
             {

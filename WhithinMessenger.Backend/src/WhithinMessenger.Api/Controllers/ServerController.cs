@@ -235,6 +235,52 @@ public class ServerController : ControllerBase
         }
     }
 
+    [HttpPut("{serverId}/banner")]
+    public async Task<IActionResult> UpdateServerBanner(Guid serverId, [FromBody] UpdateServerBannerRequest request)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+
+            var server = await _serverRepository.GetByIdAsync(serverId);
+            if (server == null)
+            {
+                return NotFound(new { error = "Сервер не найден" });
+            }
+
+            if (server.OwnerId != userId)
+            {
+                return Forbid("Только владелец сервера может изменять баннер");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Banner))
+            {
+                server.Banner = request.Banner.Trim();
+            }
+
+            if (request.BannerColor != null || request.ResetBannerColor)
+            {
+                server.BannerColor = request.ResetBannerColor ? null : request.BannerColor?.Trim();
+            }
+
+            await _serverRepository.UpdateAsync(server);
+
+            return Ok(new
+            {
+                serverId = server.Id,
+                name = server.Name,
+                ownerId = server.OwnerId,
+                avatar = server.Avatar,
+                banner = server.Banner,
+                bannerColor = server.BannerColor
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка при обновлении баннера: " + ex.Message });
+        }
+    }
+
     [HttpDelete("{serverId}/banner")]
     public async Task<IActionResult> DeleteServerBanner(Guid serverId)
     {
@@ -499,6 +545,13 @@ public class ServerController : ControllerBase
             return StatusCode(500, new { error = "Произошла ошибка: " + ex.Message });
         }
     }
+}
+
+public class UpdateServerBannerRequest
+{
+    public string? Banner { get; set; }
+    public string? BannerColor { get; set; }
+    public bool ResetBannerColor { get; set; }
 }
 
 public class AddMemberRequest

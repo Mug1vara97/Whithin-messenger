@@ -7,6 +7,9 @@ public interface IFirebasePushSender
         Guid chatId,
         string title,
         string message,
+        string? messageType = null,
+        string? previewText = null,
+        string? thumbnailUrl = null,
         CancellationToken cancellationToken = default
     );
 

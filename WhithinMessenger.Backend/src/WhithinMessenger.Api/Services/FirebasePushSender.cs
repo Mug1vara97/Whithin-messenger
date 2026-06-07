@@ -32,21 +32,37 @@ public class FirebasePushSender : IFirebasePushSender
         Guid chatId,
         string title,
         string message,
+        string? messageType = null,
+        string? previewText = null,
+        string? thumbnailUrl = null,
         CancellationToken cancellationToken = default
     )
     {
-        await SendDataPushAsync(
-            deviceToken,
-            new Dictionary<string, string>
-            {
-                ["chat_id"] = chatId.ToString(),
-                ["chat_title"] = title,
-                ["title"] = title,
-                ["message"] = message,
-                ["type"] = "chat_message"
-            },
-            cancellationToken
-        );
+        var data = new Dictionary<string, string>
+        {
+            ["chat_id"] = chatId.ToString(),
+            ["chat_title"] = title,
+            ["title"] = title,
+            ["message"] = message,
+            ["type"] = "chat_message"
+        };
+
+        if (!string.IsNullOrWhiteSpace(messageType))
+        {
+            data["message_type"] = messageType.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(previewText))
+        {
+            data["preview_text"] = previewText.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(thumbnailUrl))
+        {
+            data["thumbnail_url"] = thumbnailUrl.Trim();
+        }
+
+        await SendDataPushAsync(deviceToken, data, cancellationToken);
     }
 
     public async Task SendIncomingCallNotificationAsync(

@@ -20,6 +20,7 @@ public class MediaController : ControllerBase
     private readonly IFileService _fileService;
     private readonly IHubContext<GroupChatHub> _hubContext;
     private readonly IMessageReceiptService _messageReceiptService;
+    private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly ILogger<MediaController> _logger;
 
     public MediaController(
@@ -27,12 +28,14 @@ public class MediaController : ControllerBase
         IFileService fileService,
         IHubContext<GroupChatHub> hubContext,
         IMessageReceiptService messageReceiptService,
+        ChatMessageNotificationService chatMessageNotificationService,
         ILogger<MediaController> logger)
     {
         _mediator = mediator;
         _fileService = fileService;
         _hubContext = hubContext;
         _messageReceiptService = messageReceiptService;
+        _chatMessageNotificationService = chatMessageNotificationService;
         _logger = logger;
     }
 
@@ -122,6 +125,17 @@ public class MediaController : ControllerBase
                             result.MessageId.Value,
                             userId.Value);
                     }
+
+                    await _chatMessageNotificationService.NotifyMediaMessageAsync(
+                        chatId,
+                        userId.Value,
+                        username ?? "Unknown",
+                        result.MessageId,
+                        caption,
+                        file.ContentType ?? "application/octet-stream",
+                        result.IsVideoNote,
+                        result.ThumbnailPath,
+                        result.FilePath);
                 }
                 catch (Exception ex)
                 {
