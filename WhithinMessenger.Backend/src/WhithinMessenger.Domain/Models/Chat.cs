@@ -22,6 +22,8 @@ public class Chat
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    public Guid? CreatedByUserId { get; set; }
+
     public int? ChatOrder { get; set; }
 
     public ChatCategory? Category { get; set; }

@@ -274,6 +274,8 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     }
                 }
 
+                var creatorUserId = await GetGroupCreatorUserIdAsync(chat.Id, cancellationToken);
+
                 return new ChatInfoDto
                 {
                     ChatId = chat.Id,
@@ -283,7 +285,8 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarColor = null,
                     ChatAvatar = chat.Avatar,
                     ChatAvatarColor = chat.AvatarColor,
-                    OtherUserId = null
+                    OtherUserId = null,
+                    CreatorUserId = creatorUserId
                 };
             }
             catch (Exception ex)
@@ -416,6 +419,57 @@ namespace WhithinMessenger.Infrastructure.Repositories
             catch (Exception ex)
             {
                 Console.WriteLine($"ChatRepository - Error adding user to group: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<Guid?> GetGroupCreatorUserIdAsync(Guid chatId, CancellationToken cancellationToken = default)
+        {
+            var chat = await _context.Chats
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == chatId, cancellationToken);
+
+            if (chat?.CreatedByUserId != null)
+            {
+                return chat.CreatedByUserId;
+            }
+
+            return await _context.Members
+                .Where(m => m.ChatId == chatId)
+                .OrderBy(m => m.JoinedAt)
+                .ThenBy(m => m.UserId)
+                .Select(m => (Guid?)m.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<bool> RemoveMemberFromGroupAsync(Guid groupChatId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var chat = await _context.Chats
+                    .Include(c => c.Type)
+                    .FirstOrDefaultAsync(c => c.Id == groupChatId, cancellationToken);
+
+                if (chat == null || chat.Type.TypeName != "Group")
+                {
+                    return false;
+                }
+
+                var member = await _context.Members
+                    .FirstOrDefaultAsync(m => m.ChatId == groupChatId && m.UserId == userId, cancellationToken);
+
+                if (member == null)
+                {
+                    return false;
+                }
+
+                _context.Members.Remove(member);
+                await _context.SaveChangesAsync(cancellationToken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ChatRepository - Error removing member from group: {ex.Message}");
                 throw;
             }
         }

@@ -11,6 +11,8 @@ namespace WhithinMessenger.Domain.Interfaces
         Task<List<ChatParticipantInfo>> GetChatParticipantsAsync(Guid chatId, CancellationToken cancellationToken = default);
         Task<List<AvailableUserInfo>> GetAvailableUsersForGroupAsync(Guid currentUserId, Guid groupChatId, CancellationToken cancellationToken = default);
         Task<bool> AddUserToGroupAsync(Guid groupChatId, Guid userId, CancellationToken cancellationToken = default);
+        Task<bool> RemoveMemberFromGroupAsync(Guid groupChatId, Guid userId, CancellationToken cancellationToken = default);
+        Task<Guid?> GetGroupCreatorUserIdAsync(Guid chatId, CancellationToken cancellationToken = default);
         Task<List<Chat>> GetByServerIdAsync(Guid serverId, CancellationToken cancellationToken = default);
         Task CreateAsync(Chat chat, CancellationToken cancellationToken = default);
         Task UpdateAsync(Chat chat, CancellationToken cancellationToken = default);

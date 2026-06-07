@@ -53,6 +53,7 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
                 TypeId = groupChatType.Id,
                 IsPrivate = false,
                 CreatedAt = DateTimeOffset.UtcNow,
+                CreatedByUserId = request.CreatorId,
                 ServerId = null
             };
 

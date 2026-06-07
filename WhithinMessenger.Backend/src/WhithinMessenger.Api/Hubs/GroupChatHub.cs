@@ -10,6 +10,8 @@ using WhithinMessenger.Application.CommandsAndQueries.Messages.SearchMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipants;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetAvailableUsers;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.AddUserToGroup;
+using WhithinMessenger.Application.CommandsAndQueries.Chats.DeleteGroupChat;
+using WhithinMessenger.Application.CommandsAndQueries.Chats.LeaveGroupChat;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatInfo;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.DeletePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
@@ -1005,6 +1007,72 @@ public class GroupChatHub : Hub
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating notifications for chat message");
+            }
+        }
+
+        public async Task LeaveGroupChat(Guid chatId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new LeaveGroupChatCommand(chatId, userId.Value));
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                    return;
+                }
+
+                await Clients.Caller.SendAsync("LeftGroupChat", chatId);
+                await Clients.Caller.SendAsync("chatdeleted", new
+                {
+                    chatId = chatId,
+                    deletedBy = userId.Value
+                });
+
+                await Clients.Group(chatId.ToString()).SendAsync("GroupUpdated", "user_left", userId.Value);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при выходе из группы: {ex.Message}");
+            }
+        }
+
+        public async Task DeleteGroupChat(Guid chatId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new DeleteGroupChatCommand(chatId, userId.Value));
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                    return;
+                }
+
+                var payload = new
+                {
+                    chatId = chatId,
+                    deletedBy = userId.Value
+                };
+
+                await Clients.Group(chatId.ToString()).SendAsync("chatdeleted", payload);
+                await _chatListHubContext.Clients.All.SendAsync("chatdeleted", payload);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при удалении группы: {ex.Message}");
             }
         }
 
