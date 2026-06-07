@@ -329,13 +329,6 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
                           console.log('ChatInfoModal - Full avatar URL:', participant.avatarUrl ? `${BASE_URL}${participant.avatarUrl}` : 'No avatar');
                           return (
                           <div key={participant.userId} className="chat-info-participant-item">
-                            {(participant.banner || participant.Banner) && (
-                              <div
-                                className="chat-info-participant-banner"
-                                style={getBannerStyle(participant.banner || participant.Banner, participant.avatarColor || '#5865F2')}
-                              />
-                            )}
-                            <div className="chat-info-participant-body">
                             <div 
                               className="chat-info-participant-avatar"
                               style={{
@@ -359,7 +352,6 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
                               {getUserStatusLabel(participant.userStatus)}
                             </span>
                           </div>
-                            </div>
                         </div>
                         );
                         })

@@ -577,30 +577,13 @@
 
 .chat-info-participant-item {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   transition: all 0.2s ease;
   min-height: 70px;
-  overflow: hidden;
-}
-
-.chat-info-participant-banner {
-  width: 100%;
-  height: 48px;
-  background-size: cover;
-  background-position: center;
-  flex-shrink: 0;
-}
-
-.chat-info-participant-body {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
 }
 
 .chat-info-participant-item:hover {
