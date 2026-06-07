@@ -324,7 +324,7 @@ export const useChat = (chatId, username, userId) => {
         });
 
         await newConnection.invoke('JoinGroup', chatId);
-        await newConnection.invoke('GetMessages', chatId);
+        await newConnection.invoke('GetMessages', chatId, 50);
         
         currentChatIdRef.current = chatIdStr;
         

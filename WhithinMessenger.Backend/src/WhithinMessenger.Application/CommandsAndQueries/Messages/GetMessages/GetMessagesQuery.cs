@@ -3,12 +3,17 @@ using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 
-public record GetMessagesQuery(Guid ChatId, Guid? UserId = null) : IRequest<GetMessagesResult>;
+public record GetMessagesQuery(
+    Guid ChatId,
+    Guid? UserId = null,
+    int Limit = 0,
+    Guid? BeforeMessageId = null) : IRequest<GetMessagesResult>;
 
 public record GetMessagesResult
 {
     public bool Success { get; init; }
     public List<MessageDto> Messages { get; init; } = new();
+    public bool HasMoreOlder { get; init; }
     public string? ErrorMessage { get; init; }
 }
 

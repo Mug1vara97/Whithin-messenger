@@ -113,17 +113,29 @@ namespace WhithinMessenger.Api.Controllers
 
 
         [HttpGet("{chatId}/messages")]
-        public async Task<IActionResult> GetMessages(Guid chatId)
+        public async Task<IActionResult> GetMessages(
+            Guid chatId,
+            [FromQuery] int limit = 0,
+            [FromQuery] Guid? beforeMessageId = null)
         {
             try
             {
                 var userId = (Guid)HttpContext.Items["UserId"]!;
-                var query = new GetMessagesQuery(chatId, userId);
+                var query = new GetMessagesQuery(chatId, userId, limit, beforeMessageId);
                 var result = await _mediator.Send(query);
 
                 if (!result.Success)
                 {
                     return BadRequest(new { error = result.ErrorMessage });
+                }
+
+                if (limit > 0 || beforeMessageId.HasValue)
+                {
+                    return Ok(new
+                    {
+                        messages = result.Messages,
+                        hasMoreOlder = result.HasMoreOlder,
+                    });
                 }
 
                 return Ok(result.Messages);

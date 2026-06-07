@@ -32,8 +32,68 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         public async Task<List<Message>> GetByChatIdAsync(Guid chatId, CancellationToken cancellationToken = default)
         {
-            return await _context.Messages
-                .Where(m => m.ChatId == chatId)
+            return await ApplyMessageIncludes(_context.Messages.Where(m => m.ChatId == chatId))
+                .OrderBy(m => m.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<Message>> GetByChatIdPageAsync(
+            Guid chatId,
+            int limit,
+            Guid? beforeMessageId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var query = _context.Messages.Where(m => m.ChatId == chatId);
+
+            if (beforeMessageId.HasValue)
+            {
+                var cursor = await _context.Messages
+                    .Where(m => m.Id == beforeMessageId.Value && m.ChatId == chatId)
+                    .Select(m => new { m.CreatedAt, m.Id })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (cursor != null)
+                {
+                    query = query.Where(m =>
+                        m.CreatedAt < cursor.CreatedAt ||
+                        (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
+                }
+            }
+
+            var page = await ApplyMessageIncludes(query)
+                .OrderByDescending(m => m.CreatedAt)
+                .ThenByDescending(m => m.Id)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+            page.Reverse();
+            return page;
+        }
+
+        public async Task<bool> HasOlderMessagesAsync(
+            Guid chatId,
+            Guid messageId,
+            CancellationToken cancellationToken = default)
+        {
+            var cursor = await _context.Messages
+                .Where(m => m.Id == messageId && m.ChatId == chatId)
+                .Select(m => new { m.CreatedAt, m.Id })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (cursor == null)
+            {
+                return false;
+            }
+
+            return await _context.Messages.AnyAsync(
+                m => m.ChatId == chatId &&
+                     (m.CreatedAt < cursor.CreatedAt ||
+                      (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id)),
+                cancellationToken);
+        }
+
+        private static IQueryable<Message> ApplyMessageIncludes(IQueryable<Message> query) =>
+            query
                 .Include(m => m.User)
                     .ThenInclude(u => u.UserProfile)
                 .Include(m => m.ForwardedFromMessage)
@@ -43,10 +103,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Include(m => m.RepliedToMessage)
                     .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
-                .Include(m => m.Sticker)
-                .OrderBy(m => m.CreatedAt)
-                .ToListAsync(cancellationToken);
-        }
+                .Include(m => m.Sticker);
 
         public async Task<Message> AddAsync(Message message, CancellationToken cancellationToken = default)
         {

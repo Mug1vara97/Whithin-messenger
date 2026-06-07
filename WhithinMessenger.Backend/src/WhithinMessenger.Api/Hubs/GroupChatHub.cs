@@ -74,11 +74,11 @@ public class GroupChatHub : Hub
             }
         }
 
-        public async Task GetMessages(string chatId)
+        public async Task GetMessages(string chatId, int limit = 0, string? beforeMessageId = null)
         {
             try
             {
-                _logger.LogInformation($"GetMessages called with chatId: {chatId}");
+                _logger.LogInformation($"GetMessages called with chatId: {chatId}, limit: {limit}");
                 
                 if (!Guid.TryParse(chatId, out Guid parsedChatId))
                 {
@@ -87,14 +87,35 @@ public class GroupChatHub : Hub
                     return;
                 }
 
+                Guid? parsedBeforeMessageId = null;
+                if (!string.IsNullOrWhiteSpace(beforeMessageId))
+                {
+                    if (!Guid.TryParse(beforeMessageId, out var beforeId))
+                    {
+                        await Clients.Caller.SendAsync("Error", $"Invalid beforeMessageId format: {beforeMessageId}");
+                        return;
+                    }
+
+                    parsedBeforeMessageId = beforeId;
+                }
+
                 _logger.LogInformation($"Parsed chatId: {parsedChatId}");
                 var userId = GetCurrentUserId();
-                var query = new GetMessagesQuery(parsedChatId, userId);
+                var query = new GetMessagesQuery(parsedChatId, userId, limit, parsedBeforeMessageId);
                 var result = await _mediator.Send(query);
 
                 if (result.Success)
                 {
                     await Clients.Caller.SendAsync("ReceiveMessages", result.Messages);
+                    if (limit > 0)
+                    {
+                        await Clients.Caller.SendAsync("ReceiveMessagesMeta", new
+                        {
+                            HasMoreOlder = result.HasMoreOlder,
+                            Limit = limit,
+                            BeforeMessageId = beforeMessageId,
+                        });
+                    }
                 }
                 else
                 {

@@ -18,7 +18,24 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
     {
         try
         {
-            var messages = await _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
+            var limit = request.Limit > 0 ? request.Limit : 0;
+            var messages = limit > 0
+                ? await _messageRepository.GetByChatIdPageAsync(
+                    request.ChatId,
+                    limit,
+                    request.BeforeMessageId,
+                    cancellationToken)
+                : await _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
+
+            var hasMoreOlder = false;
+            if (limit > 0 && messages.Count == limit)
+            {
+                hasMoreOlder = await _messageRepository.HasOlderMessagesAsync(
+                    request.ChatId,
+                    messages[0].Id,
+                    cancellationToken);
+            }
+
             var chatMembers = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
             var recipientCount = Math.Max(0, chatMembers.Count - 1);
 
@@ -114,7 +131,8 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
             return new GetMessagesResult
             {
                 Success = true,
-                Messages = messageDtos
+                Messages = messageDtos,
+                HasMoreOlder = hasMoreOlder,
             };
         }
         catch (Exception ex)
