@@ -6,7 +6,7 @@ import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks, buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
-import { fetchAllChatMediaFiles } from '../../../shared/lib/utils/fetchChatMedia';
+import { fetchAllChatMediaFiles, collectMediaFromMessages } from '../../../shared/lib/utils/fetchChatMedia';
 import { formatDiscordMessageTimestamp } from '../../../shared/lib/utils/messageTime';
 import { 
   useChat, 
@@ -350,13 +350,13 @@ const ChatRoom = ({
     fetchAllChatMediaFiles(chatId)
       .then((files) => {
         if (!cancelled) {
-          setChatInfoMediaFiles(files);
+          setChatInfoMediaFiles(files.length > 0 ? files : collectMediaFromMessages(messages));
         }
       })
       .catch((error) => {
         console.error('ChatRoom - failed to load chat media for info:', error);
         if (!cancelled) {
-          setChatInfoMediaFiles([]);
+          setChatInfoMediaFiles(collectMediaFromMessages(messages));
         }
       })
       .finally(() => {

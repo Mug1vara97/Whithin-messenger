@@ -58,6 +58,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             return await _context.MediaFiles
                 .Include(mf => mf.Message)
+                    .ThenInclude(m => m.User)
                 .Where(mf => mf.Message.ChatId == chatId && !mf.IsDeleted)
                 .OrderByDescending(mf => mf.CreatedAt)
                 .ToListAsync(cancellationToken);

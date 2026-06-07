@@ -43,8 +43,8 @@ public class GetMediaFilesQueryHandler : IRequestHandler<GetMediaFilesQuery, Get
                 FileSize = mf.FileSize,
                 ThumbnailPath = mf.ThumbnailPath,
                 CreatedAt = mf.CreatedAt,
-                SenderUsername = mf.Message.User.UserName ?? "Unknown",
-                Caption = mf.Message.Content,
+                SenderUsername = mf.Message?.User?.UserName ?? "Unknown",
+                Caption = mf.Message?.Content,
                 IsVideoNote = mf.IsVideoNote
             })
             .ToList();
