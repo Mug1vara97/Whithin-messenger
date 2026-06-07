@@ -2,12 +2,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  line-height: 1;
   margin-left: 6px;
-  letter-spacing: -1px;
   user-select: none;
   flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .message-status--sent {
@@ -34,8 +32,6 @@
 
 .message-status--on-light {
   margin-left: 4px;
-  font-size: 10px;
-  letter-spacing: -1.2px;
 }
 
 .message-status--on-light.message-status--sent,

@@ -412,7 +412,9 @@ public class GroupChatHub : Hub
                             avatarUrl = avatarUrl,
                             avatarColor = avatarColor,
                             repliedMessage = repliedMessage,
-                            forwardedMessage = (object?)null, // TODO: Implement forwarded message info
+                            forwardedMessage = messageResult.Success
+                                ? BuildForwardedMessagePayload(messageResult.Message)
+                                : null,
                             mediaFiles = mediaFiles,
                             status = MessageStatusHelper.Sent
                         });
@@ -684,7 +686,9 @@ public class GroupChatHub : Hub
                             avatarUrl = avatarUrl,
                             avatarColor = avatarColor,
                             repliedMessage = (object?)null,
-                            forwardedMessage = (object?)null,
+                            forwardedMessage = messageResult.Success
+                                ? BuildForwardedMessagePayload(messageResult.Message)
+                                : null,
                             mediaFiles = mediaFiles,
                             status = MessageStatusHelper.Sent
                         });
@@ -1041,6 +1045,23 @@ public class GroupChatHub : Hub
             {
                 await Clients.Caller.SendAsync("Error", $"Ошибка при удалении чата: {ex.Message}");
             }
+        }
+
+        private static object? BuildForwardedMessagePayload(Domain.Models.Message? message)
+        {
+            if (message?.ForwardedFromMessageId == null || message.ForwardedFromMessage == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                messageId = message.ForwardedFromMessage.Id,
+                content = message.ForwardedFromMessage.Content ?? string.Empty,
+                senderUsername = message.ForwardedFromMessage.User?.UserName ?? "Unknown",
+                originalChatName = message.ForwardedFromChat?.Name ?? "Unknown Chat",
+                forwardedMessageContent = message.ForwardedMessageContent ?? string.Empty
+            };
         }
     }
 }
