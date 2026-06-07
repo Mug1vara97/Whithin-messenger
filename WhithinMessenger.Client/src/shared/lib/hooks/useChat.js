@@ -31,6 +31,7 @@ export const useChat = (chatId, username, userId) => {
   const connectionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const currentChatIdRef = useRef(null);
+  const loadGenerationRef = useRef(0);
   const typingExpiryTimersRef = useRef(new Map());
   const typingIdleTimerRef = useRef(null);
   const typingHeartbeatRef = useRef(null);
@@ -215,25 +216,73 @@ export const useChat = (chatId, username, userId) => {
   }, []);
 
   useEffect(() => {
+    if (!chatId || !userId) {
+      setMessages([]);
+      setIsConnected(false);
+      setIsLoading(false);
+      return undefined;
+    }
+
+    const chatIdStr = String(chatId);
+    const loadGen = ++loadGenerationRef.current;
+
+    setMessages([]);
+    setIsLoading(true);
+    setError(null);
+    setIsConnected(false);
+    setTypingUsers([]);
+    clearTypingExpiryTimers();
+    clearTypingHeartbeat();
+    lastTypingSentRef.current = false;
+    acknowledgedDeliveriesRef.current.clear();
+    if (typingIdleTimerRef.current) {
+      clearTimeout(typingIdleTimerRef.current);
+      typingIdleTimerRef.current = null;
+    }
+
+    const detachHandlers = (conn) => {
+      if (!conn) return;
+      conn.off('MessageSent');
+      conn.off('MessageEdited');
+      conn.off('MessageDeleted');
+      conn.off('MessageStatusChanged');
+      conn.off('MessageDelivered');
+      conn.off('MessageRead');
+      conn.off('ReceiveMessages');
+      conn.off('UserTyping');
+      conn.off('UserStoppedTyping');
+      conn.off('Error');
+    };
+
+    const stopConnection = async (conn, leaveChatId) => {
+      if (!conn) return;
+      detachHandlers(conn);
+      try {
+        if (conn.state === 'Connected' && leaveChatId) {
+          await conn.invoke('LeaveGroup', leaveChatId);
+        }
+        if (conn.state !== 'Disconnected') {
+          await conn.stop();
+        }
+      } catch (err) {
+        console.warn('stopConnection:', err);
+      }
+    };
+
     const connect = async () => {
-      if (!chatId || !userId) return;
-      
-      const chatIdStr = String(chatId);
-      if (connectionRef.current && currentChatIdRef.current === chatIdStr) {
-        return;
+      if (loadGenerationRef.current !== loadGen) return;
+
+      const previousChatId = currentChatIdRef.current;
+      const existingConnection = connectionRef.current;
+      if (existingConnection) {
+        connectionRef.current = null;
+        currentChatIdRef.current = null;
+        setConnection(null);
+        setIsConnected(false);
+        await stopConnection(existingConnection, previousChatId);
       }
 
-      setIsLoading(true);
-      setError(null);
-      setTypingUsers([]);
-      clearTypingExpiryTimers();
-      clearTypingHeartbeat();
-      lastTypingSentRef.current = false;
-      acknowledgedDeliveriesRef.current.clear();
-      if (typingIdleTimerRef.current) {
-        clearTimeout(typingIdleTimerRef.current);
-        typingIdleTimerRef.current = null;
-      }
+      if (loadGenerationRef.current !== loadGen) return;
 
       const newConnection = new HubConnectionBuilder()
         .withUrl(`${BASE_URL}/groupchathub?userId=${userId}`)
@@ -242,11 +291,17 @@ export const useChat = (chatId, username, userId) => {
 
       try {
         await newConnection.start();
+        if (loadGenerationRef.current !== loadGen) {
+          await stopConnection(newConnection, null);
+          return;
+        }
+
         connectionRef.current = newConnection;
         setConnection(newConnection);
         setIsConnected(true);
 
         const receiveMessageHandler = async (messageData) => {
+          if (loadGenerationRef.current !== loadGen) return;
           const newMessage = normalizeMessage(messageData);
           if (!newMessage) return;
           const own = isOwnMessage(newMessage, userId, username);
@@ -280,20 +335,24 @@ export const useChat = (chatId, username, userId) => {
         };
 
         const messageEditedHandler = (messageId, newContent) => {
+          if (loadGenerationRef.current !== loadGen) return;
           setMessages((prev) => prev.map((msg) => (
             String(msg.messageId) === String(messageId) ? { ...msg, content: newContent } : msg
           )));
         };
 
         const messageDeletedHandler = (messageId) => {
+          if (loadGenerationRef.current !== loadGen) return;
           setMessages((prev) => prev.filter((msg) => String(msg.messageId) !== String(messageId)));
         };
 
         const messageStatusChangedHandler = (messageId, status) => {
+          if (loadGenerationRef.current !== loadGen) return;
           updateMessageStatus(messageId, status);
         };
 
         newConnection.on('ReceiveMessages', (messages) => {
+          if (loadGenerationRef.current !== loadGen) return;
           const source = Array.isArray(messages) ? messages : [];
           const processedMessages = source
             .map((msg) => normalizeMessage(msg))
@@ -324,27 +383,33 @@ export const useChat = (chatId, username, userId) => {
         });
 
         await newConnection.invoke('JoinGroup', chatId);
-        await newConnection.invoke('GetMessages', chatId, 50, null);
-        
+        await newConnection.invoke('GetMessages', chatId, 50, '');
+
+        if (loadGenerationRef.current !== loadGen) return;
+
         currentChatIdRef.current = chatIdStr;
-        
+
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ 
-            behavior: "auto",
-            block: "end"
+          messagesEndRef.current?.scrollIntoView({
+            behavior: 'auto',
+            block: 'end',
           });
         }, 100);
       } catch (error) {
+        if (loadGenerationRef.current !== loadGen) return;
         console.error('Connection failed: ', error);
         setError('Ошибка подключения к чату: ' + error.message);
       } finally {
-        setIsLoading(false);
+        if (loadGenerationRef.current === loadGen) {
+          setIsLoading(false);
+        }
       }
     };
 
     connect();
 
     return () => {
+      loadGenerationRef.current += 1;
       const cleanup = async () => {
         if (typingIdleTimerRef.current) {
           clearTimeout(typingIdleTimerRef.current);
@@ -356,43 +421,28 @@ export const useChat = (chatId, username, userId) => {
         lastTypingSentRef.current = false;
         setTypingUsers([]);
 
-        if (connectionRef.current) {
+        const conn = connectionRef.current;
+        const activeChatId = currentChatIdRef.current;
+        connectionRef.current = null;
+        currentChatIdRef.current = null;
+        setConnection(null);
+        setIsConnected(false);
+
+        if (conn) {
           try {
-            if (connectionRef.current.state === 'Connected' && chatId && shouldStopTyping) {
-              await connectionRef.current.invoke('NotifyStopTyping', chatId);
+            if (conn.state === 'Connected' && chatId && shouldStopTyping) {
+              await conn.invoke('NotifyStopTyping', chatId);
             }
-            connectionRef.current.off('MessageSent');
-            connectionRef.current.off('MessageEdited');
-            connectionRef.current.off('MessageDeleted');
-            connectionRef.current.off('MessageStatusChanged');
-            connectionRef.current.off('MessageDelivered');
-            connectionRef.current.off('MessageRead');
-            connectionRef.current.off('ReceiveMessages');
-            connectionRef.current.off('UserTyping');
-            connectionRef.current.off('UserStoppedTyping');
-            connectionRef.current.off('Error');
-            
-            if (connectionRef.current.state === 'Connected' && chatId) {
-              await connectionRef.current.invoke('LeaveGroup', chatId);
-            }
-            
-            if (connectionRef.current.state !== 'Disconnected') {
-              await connectionRef.current.stop();
-            }
+            await stopConnection(conn, activeChatId || chatId);
           } catch (err) {
             console.error('Cleanup error:', err);
-          } finally {
-            connectionRef.current = null;
-            currentChatIdRef.current = null;
-            setConnection(null);
-            setIsConnected(false);
           }
         }
       };
-      
+
       cleanup();
     };
-  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, normalizeMessage, removeTypingUser, updateMessageStatus]);
+  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, normalizeMessage, removeTypingUser, updateMessageStatus]);
 
   useEffect(() => {
     if (messages.length > 0) {

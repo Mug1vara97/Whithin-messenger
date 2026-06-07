@@ -852,6 +852,7 @@ const HomePage = () => {
                     />
                   ) : (
                     <ChatRoom
+                      key={selectedChat.chatId || selectedChat.chat_id}
                       chatId={selectedChat.chatId || selectedChat.chat_id}
                       groupName={selectedChat.groupName || selectedChat.username}
                       isGroupChat={selectedChat.isGroupChat}
