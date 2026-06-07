@@ -353,7 +353,7 @@ const UserPanel = ({
                                     }}
                                 />
                             ) : (
-                                username.charAt(0).toUpperCase()
+                                (username?.charAt(0) || 'U').toUpperCase()
                             )}
                         </div>
                         <button
@@ -370,7 +370,7 @@ const UserPanel = ({
                     </div>
                     
                     <div className={styles['user-info']}>
-                        <span className={styles.username}>{username}</span>
+                        <span className={styles.username}>{username || 'Пользователь'}</span>
                         <div className={styles['status-control']} ref={statusMenuRef}>
                             <button
                                 className={styles['status-button']}

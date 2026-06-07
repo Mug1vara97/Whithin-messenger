@@ -2,6 +2,7 @@
 .chat-list-wrapper {
   display: flex;
   height: 100%;
+  min-height: 0;
 }
 
 .chat-sidebar {
@@ -11,19 +12,17 @@
   flex-direction: column;
   border-right: 1px solid var(--border, #4f545c);
   height: 100%;
+  min-height: 0;
   overflow: hidden;
-}
-
-.chat-sidebar .user-panel {
-  margin-top: auto;
 }
 
 /* Контейнер списка чатов */
 .chat-list-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   background: var(--surface, #2f3136);
 }
 
@@ -322,6 +321,7 @@
   margin: 10px;
   border-radius: 5px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
