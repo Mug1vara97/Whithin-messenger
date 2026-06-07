@@ -41,7 +41,7 @@ export const useChatRoom = (chatId, userId) => {
 
         await newConnection.invoke('JoinGroup', parseInt(chatId));
         
-        const messages = await newConnection.invoke('GetMessages', parseInt(chatId), 50);
+        const messages = await newConnection.invoke('GetMessages', parseInt(chatId), 50, null);
         const formattedMessages = messages.map(msg => ({
           messageId: msg.messageId,
           chatId: parseInt(chatId),

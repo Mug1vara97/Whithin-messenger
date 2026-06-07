@@ -74,7 +74,10 @@ public class GroupChatHub : Hub
             }
         }
 
-        public async Task GetMessages(string chatId, int limit = 0, string? beforeMessageId = null)
+        public Task GetMessages(string chatId) =>
+            GetMessages(chatId, 0, null);
+
+        public async Task GetMessages(string chatId, int limit, string? beforeMessageId)
         {
             try
             {
