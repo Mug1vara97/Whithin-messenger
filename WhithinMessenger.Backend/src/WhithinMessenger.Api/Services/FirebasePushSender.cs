@@ -57,7 +57,8 @@ public class FirebasePushSender : IFirebasePushSender
 
         if (!string.IsNullOrWhiteSpace(messageType))
         {
-            data["message_type"] = messageType.Trim();
+            // FCM rejects reserved/invalid data keys like "message_type".
+            data["msg_type"] = messageType.Trim();
         }
 
         if (!string.IsNullOrWhiteSpace(previewText))
