@@ -1,11 +1,14 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { UserAvatar, MessageStatusIndicator } from '../../atoms';
 import { MessageStatus } from '../../../../entities/message/model/types';
+import MessageMediaContent from '../MessageMediaContent/MessageMediaContent';
+import MessageMediaAlbum from '../MessageMediaAlbum/MessageMediaAlbum';
 import MediaFile from '../MediaFile/MediaFile';
+import { categorizeMessageMedia } from '../../../lib/utils/messageMediaHelpers';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import StickerMessage from '../StickerMessage/StickerMessage';
 import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
-import { formatDiscordMessageTimestamp } from '../../../lib/utils/messageTime';
+import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../lib/utils/messageTime';
 import './MessageItem.css';
 
 const MessageItem = ({ 
@@ -68,78 +71,52 @@ const MessageItem = ({
   }, []);
 
   const renderMessageContent = () => {
-    console.log('🎨 MessageItem renderMessageContent - рендерим сообщение:', {
-      messageId: message.messageId,
-      content: message.content,
-      senderUsername: message.senderUsername,
-      mediaFilesCount: message.mediaFiles?.length || 0,
-      mediaFiles: message.mediaFiles
-    });
-    
-    if (message.mediaFiles && message.mediaFiles.length > 0) {
-      console.log('🖼️ MessageItem - в сообщении есть медиафайлы для отображения:', message.mediaFiles);
-      message.mediaFiles.forEach((mediaFile, index) => {
-        console.log(`📎 MessageItem - медиафайл ${index + 1}:`, {
-          id: mediaFile.id,
-          fileName: mediaFile.fileName,
-          originalFileName: mediaFile.originalFileName,
-          filePath: mediaFile.filePath,
-          contentType: mediaFile.contentType,
-          fileSize: mediaFile.fileSize,
-          thumbnailPath: mediaFile.thumbnailPath
-        });
-      });
-    } else {
-      console.log('❌ MessageItem - в сообщении нет медиафайлов для отображения');
-    }
-    
     const messageParts = splitTextWithLinks(message.content);
+    const hasTextContent = Boolean(message.content?.trim());
+    const renderCaption = () => (
+      <div className="message-text">
+        {messageParts.length > 0 ? (
+          messageParts.map((part, index) => {
+            if (part.type === 'link') {
+              return (
+                <a
+                  key={`${message.messageId}-link-${index}`}
+                  href={part.href}
+                  className="message-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalUrl(part.href);
+                  }}
+                >
+                  {part.value}
+                </a>
+              );
+            }
+
+            return (
+              <React.Fragment key={`${message.messageId}-text-${index}`}>
+                {part.value}
+              </React.Fragment>
+            );
+          })
+        ) : (
+          message.content
+        )}
+      </div>
+    );
 
     return (
       <div className="message-content">
-        {message.content && (
-          <div className="message-text">
-            {messageParts.length > 0 ? (
-              messageParts.map((part, index) => {
-                if (part.type === 'link') {
-                  return (
-                    <a
-                      key={`${message.messageId}-link-${index}`}
-                      href={part.href}
-                      className="message-link"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openExternalUrl(part.href);
-                      }}
-                    >
-                      {part.value}
-                    </a>
-                  );
-                }
-
-                return (
-                  <React.Fragment key={`${message.messageId}-text-${index}`}>
-                    {part.value}
-                  </React.Fragment>
-                );
-              })
-            ) : (
-              message.content
-            )}
-          </div>
-        )}
-        {!message.forwardedMessage && message.mediaFiles && message.mediaFiles.length > 0 && (
-          <div className="message-media">
-            {console.log('🎯 MessageItem - рендерим медиафайлы:', message.mediaFiles)}
-            {message.mediaFiles.map((mediaFile) => (
-              <MediaFile
-                key={mediaFile.id}
-                mediaFile={mediaFile}
-                canDelete={false}
-              />
-            ))}
-          </div>
+        {!message.forwardedMessage && message.mediaFiles?.length > 0 ? (
+          <MessageMediaContent
+            mediaFiles={message.mediaFiles}
+            timestamp={formatShortMessageTime(message.createdAt)}
+            onVideoClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+            renderCaption={hasTextContent ? renderCaption : null}
+          />
+        ) : (
+          hasTextContent && renderCaption()
         )}
       </div>
     );
@@ -189,30 +166,40 @@ const MessageItem = ({
                   <RepliedMedia content={forwarded.content} mediaFiles={[]} />
                 </div>
               )}
-              {forwarded.mediaFiles?.length > 0 && (
-                <div className="forwarded-message-media">
-                  {forwarded.mediaFiles.map((mediaFile) => {
-                    if (mediaFile.contentType?.startsWith('image/')) {
-                      return (
-                        <img
-                          key={mediaFile.id}
-                          src={buildMediaUrl(mediaFile.filePath)}
-                          alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
-                          className="forwarded-message-image"
+              {forwarded.mediaFiles?.length > 0 && (() => {
+                const { visualMedia, voiceMedia, fileMedia } = categorizeMessageMedia(forwarded.mediaFiles);
+                return (
+                  <>
+                    {visualMedia.length >= 2 ? (
+                      <div className="forwarded-message-media">
+                        <MessageMediaAlbum
+                          mediaFiles={visualMedia}
+                          showTimeBadge={false}
+                          onVideoClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
                         />
-                      );
-                    }
-
-                    return (
-                      <MediaFile
-                        key={mediaFile.id}
-                        mediaFile={mediaFile}
-                        canDelete={false}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+                      </div>
+                    ) : (
+                      visualMedia.length > 0 && (
+                        <div className="forwarded-message-media">
+                          {visualMedia.map((mediaFile) => (
+                            <img
+                              key={mediaFile.id}
+                              src={buildMediaUrl(mediaFile.filePath)}
+                              alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
+                              className="forwarded-message-image"
+                            />
+                          ))}
+                        </div>
+                      )
+                    )}
+                    {[...voiceMedia, ...fileMedia].map((mediaFile) => (
+                      <div key={mediaFile.id} className="forwarded-message-media">
+                        <MediaFile mediaFile={mediaFile} canDelete={false} />
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             </>
           )}
         </div>

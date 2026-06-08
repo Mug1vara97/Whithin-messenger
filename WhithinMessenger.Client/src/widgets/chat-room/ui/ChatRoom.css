@@ -731,6 +731,11 @@
   gap: 8px;
 }
 
+.message-media--album {
+  display: block;
+  gap: 0;
+}
+
 .message--media-only .message-media {
   margin-top: 0;
 }

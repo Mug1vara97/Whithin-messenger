@@ -7,7 +7,7 @@ import { voiceChannelService } from '../../../shared/lib/services/voiceChannelSe
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks, buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
 import { fetchAllChatMediaFiles, collectMediaFromMessages } from '../../../shared/lib/utils/fetchChatMedia';
-import { formatDiscordMessageTimestamp } from '../../../shared/lib/utils/messageTime';
+import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../shared/lib/utils/messageTime';
 import { 
   useChat, 
   useMessageSearch, 
@@ -20,6 +20,9 @@ import { MessageInput, MessageStatusIndicator } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
+import MessageMediaContent from '../../../shared/ui/molecules/MessageMediaContent/MessageMediaContent';
+import MessageMediaAlbum from '../../../shared/ui/molecules/MessageMediaAlbum/MessageMediaAlbum';
+import { categorizeMessageMedia } from '../../../shared/lib/utils/messageMediaHelpers';
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
 import StickerMessage from '../../../shared/ui/molecules/StickerMessage/StickerMessage';
 import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPicker';
@@ -1061,30 +1064,42 @@ const ChatRoom = ({
                                 {renderTextWithLinks(msg.forwardedMessage.content, `${msg.messageId}-forwarded-source`)}
                               </div>
                             )}
-                            {msg.forwardedMessage.mediaFiles?.length > 0 && (
-                              <div className="forwarded-message-media">
-                                {msg.forwardedMessage.mediaFiles.map((mediaFile) => {
-                                  if (mediaFile.contentType?.startsWith('image/')) {
-                                    return (
-                                      <img
-                                        key={mediaFile.id}
-                                        src={buildMediaUrl(mediaFile.filePath)}
-                                        alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
-                                        className="forwarded-message-image"
+                            {msg.forwardedMessage.mediaFiles?.length > 0 && (() => {
+                              const { visualMedia, voiceMedia, fileMedia } = categorizeMessageMedia(
+                                msg.forwardedMessage.mediaFiles
+                              );
+                              return (
+                                <>
+                                  {visualMedia.length >= 2 ? (
+                                    <div className="forwarded-message-media">
+                                      <MessageMediaAlbum
+                                        mediaFiles={visualMedia}
+                                        showTimeBadge={false}
+                                        onVideoClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
                                       />
-                                    );
-                                  }
-
-                                  return (
-                                    <MediaFile
-                                      key={mediaFile.id}
-                                      mediaFile={mediaFile}
-                                      canDelete={false}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
+                                    </div>
+                                  ) : (
+                                    visualMedia.length > 0 && (
+                                      <div className="forwarded-message-media">
+                                        {visualMedia.map((mediaFile) => (
+                                          <img
+                                            key={mediaFile.id}
+                                            src={buildMediaUrl(mediaFile.filePath)}
+                                            alt={mediaFile.originalFileName || mediaFile.fileName || 'Image'}
+                                            className="forwarded-message-image"
+                                          />
+                                        ))}
+                                      </div>
+                                    )
+                                  )}
+                                  {[...voiceMedia, ...fileMedia].map((mediaFile) => (
+                                    <div key={mediaFile.id} className="forwarded-message-media">
+                                      <MediaFile mediaFile={mediaFile} canDelete={false} />
+                                    </div>
+                                  ))}
+                                </>
+                              );
+                            })()}
                           </>
                         )}
                       </div>
@@ -1102,23 +1117,23 @@ const ChatRoom = ({
                   </div>
                 )}
 
-                {!msg.forwardedMessage && !isStickerMessage && hasTextContent && (
+                {!msg.forwardedMessage && !isStickerMessage && !msg.mediaFiles?.length && hasTextContent && (
                   <div className="message-text">
                     {renderTextWithLinks(msg.content, `${msg.messageId}-content`)}
                   </div>
                 )}
                 
-                {/* Добавляем отображение медиафайлов */}
-                {!msg.forwardedMessage && msg.mediaFiles && msg.mediaFiles.length > 0 && (
-                  <div className="message-media">
-                    {msg.mediaFiles.map((mediaFile) => (
-                      <MediaFile
-                        key={mediaFile.id}
-                        mediaFile={mediaFile}
-                        canDelete={false}
-                      />
-                    ))}
-                  </div>
+                {!msg.forwardedMessage && !isStickerMessage && msg.mediaFiles?.length > 0 && (
+                  <MessageMediaContent
+                    mediaFiles={msg.mediaFiles}
+                    timestamp={formatShortMessageTime(msg.createdAt)}
+                    onVideoClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+                    renderCaption={
+                      hasTextContent
+                        ? () => renderTextWithLinks(msg.content, `${msg.messageId}-content`)
+                        : null
+                    }
+                  />
                 )}
 
               </div>
