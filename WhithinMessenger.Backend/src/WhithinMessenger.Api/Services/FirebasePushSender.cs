@@ -41,9 +41,9 @@ public class FirebasePushSender : IFirebasePushSender
         var data = new Dictionary<string, string>
         {
             ["chat_id"] = chatId.ToString(),
-            ["chat_title"] = title,
-            ["title"] = title,
-            ["message"] = message,
+            ["chat_title"] = TruncateDataValue(title),
+            ["title"] = TruncateDataValue(title),
+            ["message"] = TruncateDataValue(message),
             ["type"] = "chat_message"
         };
 
@@ -54,15 +54,27 @@ public class FirebasePushSender : IFirebasePushSender
 
         if (!string.IsNullOrWhiteSpace(previewText))
         {
-            data["preview_text"] = previewText.Trim();
+            data["preview_text"] = TruncateDataValue(previewText.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(thumbnailUrl))
         {
-            data["thumbnail_url"] = thumbnailUrl.Trim();
+            data["thumbnail_url"] = TruncateDataValue(thumbnailUrl.Trim());
         }
 
-        await SendDataPushAsync(deviceToken, data, cancellationToken);
+        var displayBody = !string.IsNullOrWhiteSpace(previewText)
+            ? previewText.Trim()
+            : message;
+        displayBody = TruncateDataValue(displayBody);
+
+        await SendPushAsync(
+            deviceToken,
+            data,
+            notificationTitle: title,
+            notificationBody: displayBody,
+            androidNotificationChannelId: ChatNotificationChannelId,
+            cancellationToken
+        );
     }
 
     public async Task SendIncomingCallNotificationAsync(
@@ -73,7 +85,7 @@ public class FirebasePushSender : IFirebasePushSender
         CancellationToken cancellationToken = default
     )
     {
-        await SendDataPushAsync(
+        await SendDataOnlyPushAsync(
             deviceToken,
             new Dictionary<string, string>
             {
@@ -101,7 +113,7 @@ public class FirebasePushSender : IFirebasePushSender
         var title = "Запрос в друзья";
         var message = $"{displayName} хочет добавить вас в друзья";
 
-        await SendDataPushAsync(
+        await SendPushAsync(
             deviceToken,
             new Dictionary<string, string>
             {
@@ -112,13 +124,44 @@ public class FirebasePushSender : IFirebasePushSender
                 ["title"] = title,
                 ["message"] = message
             },
+            notificationTitle: title,
+            notificationBody: message,
+            androidNotificationChannelId: FriendRequestNotificationChannelId,
             cancellationToken
         );
     }
 
-    private async Task SendDataPushAsync(
+    private const string ChatNotificationChannelId = "chat_messages_v3";
+    private const string FriendRequestNotificationChannelId = "friend_requests_v1";
+
+    /// <summary>
+    /// Data-only push — used for incoming calls (custom full-screen UI on Android).
+    /// </summary>
+    private async Task SendDataOnlyPushAsync(
         string deviceToken,
         Dictionary<string, string> data,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await SendPushAsync(
+            deviceToken,
+            data,
+            notificationTitle: null,
+            notificationBody: null,
+            androidNotificationChannelId: null,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Notification + data push — system tray when app is killed/background; data for in-app handling.
+    /// </summary>
+    private async Task SendPushAsync(
+        string deviceToken,
+        Dictionary<string, string> data,
+        string? notificationTitle,
+        string? notificationBody,
+        string? androidNotificationChannelId,
         CancellationToken cancellationToken = default
     )
     {
@@ -136,23 +179,50 @@ public class FirebasePushSender : IFirebasePushSender
         var client = _httpClientFactory.CreateClient(nameof(FirebasePushSender));
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        // Data-only pushes so Android always invokes onMessageReceived (incl. when app is killed).
-        // Notification+data would bypass our ChatNotificationManager in background.
+        var hasNotification =
+            !string.IsNullOrWhiteSpace(notificationTitle) &&
+            !string.IsNullOrWhiteSpace(androidNotificationChannelId);
+
+        object messagePayload = hasNotification
+            ? new
+            {
+                token = deviceToken,
+                notification = new
+                {
+                    title = notificationTitle,
+                    body = notificationBody ?? string.Empty,
+                },
+                data,
+                android = new
+                {
+                    priority = "high",
+                    direct_boot_ok = true,
+                    notification = new
+                    {
+                        channel_id = androidNotificationChannelId,
+                        sound = "default",
+                        notification_priority = "PRIORITY_HIGH",
+                        default_vibrate_timings = true,
+                        default_sound = true,
+                    },
+                },
+            }
+            : new
+            {
+                token = deviceToken,
+                data,
+                android = new
+                {
+                    priority = "high",
+                    direct_boot_ok = true,
+                },
+            };
+
+        // Chat/friend: notification+data so Android shows tray notification when app is killed.
+        // Calls stay data-only for custom IncomingCallActivity / full-screen intent.
         var response = await client.PostAsJsonAsync(
             $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send",
-            new
-            {
-                message = new
-                {
-                    token = deviceToken,
-                    data,
-                    android = new
-                    {
-                        priority = "high",
-                        direct_boot_ok = true,
-                    }
-                }
-            },
+            new { message = messagePayload },
             cancellationToken
         );
 
@@ -165,6 +235,17 @@ public class FirebasePushSender : IFirebasePushSender
                 errorBody
             );
         }
+    }
+
+    private static string TruncateDataValue(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
     private void TryInitialize()
