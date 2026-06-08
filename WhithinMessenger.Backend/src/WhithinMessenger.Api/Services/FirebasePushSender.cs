@@ -136,6 +136,8 @@ public class FirebasePushSender : IFirebasePushSender
         var client = _httpClientFactory.CreateClient(nameof(FirebasePushSender));
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
+        // Data-only pushes so Android always invokes onMessageReceived (incl. when app is killed).
+        // Notification+data would bypass our ChatNotificationManager in background.
         var response = await client.PostAsJsonAsync(
             $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send",
             new
@@ -146,7 +148,8 @@ public class FirebasePushSender : IFirebasePushSender
                     data,
                     android = new
                     {
-                        priority = "high"
+                        priority = "high",
+                        direct_boot_ok = true,
                     }
                 }
             },
