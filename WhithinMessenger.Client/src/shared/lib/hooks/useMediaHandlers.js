@@ -3,6 +3,12 @@ import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
 
 const VIDEO_NOTE_MAX_SEC = 60;
+const MAX_BATCH_MEDIA_COUNT = 10;
+
+const filterSendableFiles = (files) =>
+  Array.from(files)
+    .filter((file) => !file.type.startsWith('audio/'))
+    .slice(0, MAX_BATCH_MEDIA_COUNT);
 
 export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -10,7 +16,11 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingMediaSend, setPendingMediaSend] = useState(null);
   const fileInputRef = useRef(null);
+  const uploadProgressSetterRef = useRef(setUploadProgress);
+
+  uploadProgressSetterRef.current = setUploadProgress;
 
   const [isRecordingVideoNote, setIsRecordingVideoNote] = useState(false);
   const [videoNoteRecordingTime, setVideoNoteRecordingTime] = useState(0);
@@ -46,88 +56,124 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     }
   }, [videoNoteRecordingTime, isRecordingVideoNote]);
 
-  const handleSendMedia = useCallback(async (file, options = {}) => {
-    if (!file || !connection) return;
+  const uploadFiles = useCallback(
+    async (files, caption = '', options = {}) => {
+      if (!files?.length || !connection) return false;
 
-    const { isVideoNote = false } = options;
+      const { isVideoNote = false } = options;
+      const fileList = Array.from(files);
 
-    try {
-      setUploadingFile({
-        name: file.name,
-        type: file.type,
-        size: file.size
-      });
-      setUploadProgress(0);
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('chatId', chatId);
-      formData.append('caption', '');
-      formData.append('userId', userId);
-      formData.append('username', username);
-      formData.append('isVideoNote', isVideoNote ? 'true' : 'false');
-
-      const xhr = new XMLHttpRequest();
-
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(percentComplete);
-          }
+      try {
+        setUploadingFile({
+          name:
+            fileList.length === 1
+              ? fileList[0].name
+              : `${fileList.length} файлов`,
+          type: fileList[0].type,
+          size: fileList.reduce((sum, file) => sum + file.size, 0),
         });
+        setUploadProgress(0);
 
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              resolve(result);
-            } catch {
-              reject(new Error('Invalid JSON response'));
+        const formData = new FormData();
+        formData.append('chatId', chatId);
+        formData.append('caption', caption || '');
+        formData.append('userId', userId);
+        formData.append('username', username);
+
+        let uploadUrl = `${BASE_URL}/api/media/upload`;
+
+        if (fileList.length > 1) {
+          uploadUrl = `${BASE_URL}/api/media/upload-batch`;
+          fileList.forEach((file) => formData.append('files', file));
+        } else {
+          formData.append('file', fileList[0]);
+          formData.append('isVideoNote', isVideoNote ? 'true' : 'false');
+        }
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              uploadProgressSetterRef.current(
+                Math.round((event.loaded / event.total) * 100)
+              );
             }
-          } else {
+          });
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(JSON.parse(xhr.responseText));
+              return;
+            }
             try {
-              const errorData = JSON.parse(xhr.responseText);
-              reject(new Error(errorData.error || `HTTP ${xhr.status}`));
+              reject(new Error(JSON.parse(xhr.responseText).error || `HTTP ${xhr.status}`));
             } catch {
               reject(new Error(`Upload failed with status ${xhr.status}`));
             }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Network error occurred')));
+          xhr.open('POST', uploadUrl);
+          xhr.withCredentials = true;
+          const token = tokenManager.getToken();
+          if (token && tokenManager.isTokenValid()) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           }
+          xhr.send(formData);
         });
 
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error occurred'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          reject(new Error('Upload aborted'));
-        });
-      });
-
-      xhr.open('POST', `${BASE_URL}/api/media/upload`);
-      xhr.withCredentials = true;
-      const token = tokenManager.getToken();
-      if (token && tokenManager.isTokenValid()) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        setUploadingFile(null);
+        setUploadProgress(0);
+        return true;
+      } catch (error) {
+        console.error('❌ Ошибка загрузки файла:', error);
+        setUploadingFile(null);
+        setUploadProgress(0);
+        alert(`Ошибка загрузки файла: ${error.message}`);
+        return false;
       }
-      xhr.send(formData);
+    },
+    [connection, chatId, userId, username]
+  );
 
-      await uploadPromise;
+  const handleSendMedia = useCallback(
+    async (file, options = {}) => uploadFiles([file], options.caption || '', options),
+    [uploadFiles]
+  );
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+  const queueMediaSend = useCallback((input) => {
+    const rawFiles =
+      input instanceof FileList
+        ? Array.from(input)
+        : Array.isArray(input)
+          ? input
+          : input instanceof File
+            ? [input]
+            : [];
 
-      setUploadingFile(null);
-      setUploadProgress(0);
-
-      return true;
-    } catch (error) {
-      console.error('❌ Ошибка загрузки файла:', error);
-      setUploadingFile(null);
-      setUploadProgress(0);
-      alert(`Ошибка загрузки файла: ${error.message}`);
+    const files = filterSendableFiles(rawFiles);
+    if (!files.length) {
+      alert('Голосовые сообщения нельзя отправить вместе с файлами');
+      return;
     }
-    return false;
-  }, [connection, chatId, userId, username]);
+    setPendingMediaSend({ files });
+  }, []);
+
+  const cancelMediaSend = useCallback(() => {
+    if (uploadingFile) return;
+    setPendingMediaSend(null);
+  }, [uploadingFile]);
+
+  const confirmMediaSend = useCallback(
+    async (caption) => {
+      const files = pendingMediaSend?.files;
+      if (!files?.length) return;
+      const success = await uploadFiles(files, caption);
+      if (success) {
+        setPendingMediaSend(null);
+      }
+    },
+    [pendingMediaSend, uploadFiles]
+  );
 
   const startRecording = useCallback(async () => {
     try {
@@ -144,7 +190,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       recorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         const audioFile = new File([audioBlob], `audio-message-${Date.now()}.webm`, {
-          type: 'audio/webm'
+          type: 'audio/webm',
         });
 
         await handleSendMedia(audioFile);
@@ -213,7 +259,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
-        audio: true
+        audio: true,
       });
       videoNoteStreamRef.current = stream;
       const chunks = [];
@@ -276,6 +322,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     recordingTime,
     fileInputRef,
     handleSendMedia,
+    queueMediaSend,
+    cancelMediaSend,
+    confirmMediaSend,
+    pendingMediaSend,
     handleAudioRecording,
     formatRecordingTime,
     cancelRecording,
@@ -284,6 +334,6 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     isRecordingVideoNote,
     videoNoteRecordingTime,
     handleVideoNoteRecording,
-    cancelVideoNoteRecording
+    cancelVideoNoteRecording,
   };
 };

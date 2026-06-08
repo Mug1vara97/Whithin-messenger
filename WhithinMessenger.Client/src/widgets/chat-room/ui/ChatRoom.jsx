@@ -22,6 +22,7 @@ import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSea
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
 import MessageMediaContent from '../../../shared/ui/molecules/MessageMediaContent/MessageMediaContent';
 import MessageMediaAlbum from '../../../shared/ui/molecules/MessageMediaAlbum/MessageMediaAlbum';
+import MediaSendOverlay from '../../../shared/ui/molecules/MediaSendOverlay/MediaSendOverlay';
 import { categorizeMessageMedia } from '../../../shared/lib/utils/messageMediaHelpers';
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
 import StickerMessage from '../../../shared/ui/molecules/StickerMessage/StickerMessage';
@@ -102,6 +103,10 @@ const ChatRoom = ({
     recordingTime,
     fileInputRef,
     handleSendMedia,
+    queueMediaSend,
+    cancelMediaSend,
+    confirmMediaSend,
+    pendingMediaSend,
     handleAudioRecording,
     formatRecordingTime,
     cancelRecording,
@@ -687,7 +692,7 @@ const ChatRoom = ({
           e.preventDefault();
           e.stopPropagation();
           console.log('✅ Sending file:', file.name, file.type);
-          await handleSendMedia(file);
+          await queueMediaSend(file);
           console.log('✅ File sent successfully');
           return;
         } else {
@@ -760,7 +765,7 @@ const ChatRoom = ({
       window.removeEventListener('paste', handleGlobalPaste);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [newMessage, handleSendMedia, handleSendMessage, setNewMessage]);
+  }, [newMessage, queueMediaSend, handleSendMessage, setNewMessage]);
 
 
   const ForwardModal = () => {
@@ -1351,12 +1356,9 @@ const ChatRoom = ({
               type="file"
               ref={fileInputRef}
               style={{ display: 'none' }}
-              onChange={async (e) => {
-                const files = e.target.files;
-                if (files?.length) {
-                  for (let i = 0; i < files.length; i++) {
-                    await handleSendMedia(files[i]);
-                  }
+              onChange={(e) => {
+                if (e.target.files?.length) {
+                  queueMediaSend(e.target.files);
                 }
                 e.target.value = '';
               }}
@@ -1392,6 +1394,17 @@ const ChatRoom = ({
       />
 
       <ForwardModal />
+
+      {pendingMediaSend?.files?.length > 0 && (
+        <MediaSendOverlay
+          files={pendingMediaSend.files}
+          chatTitle={groupName}
+          isUploading={Boolean(uploadingFile)}
+          uploadProgress={uploadProgress}
+          onCancel={cancelMediaSend}
+          onSend={confirmMediaSend}
+        />
+      )}
 
       {showCallTypeSelector && (
         <div
