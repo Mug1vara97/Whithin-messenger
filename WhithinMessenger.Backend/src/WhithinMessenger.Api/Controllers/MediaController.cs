@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMedia;
+using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMediaBatch;
 using WhithinMessenger.Application.CommandsAndQueries.Media.DeleteMedia;
 using WhithinMessenger.Application.CommandsAndQueries.Media.GetMediaFiles;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
@@ -157,6 +158,127 @@ public class MediaController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading media file");
+            return StatusCode(500, new { success = false, error = "Внутренняя ошибка сервера" });
+        }
+    }
+
+    [HttpPost("upload-batch")]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = 10737418240)]
+    public async Task<IActionResult> UploadMediaBatch(
+        [FromForm] Guid chatId,
+        [FromForm] List<IFormFile> files,
+        [FromForm] string? caption = null,
+        [FromForm] Guid? userId = null,
+        [FromForm] string? username = null)
+    {
+        try
+        {
+            if (files == null || files.Count == 0)
+            {
+                return BadRequest("Файлы не выбраны");
+            }
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                userId = GetCurrentUserId();
+                if (userId == Guid.Empty)
+                {
+                    return Unauthorized("Пользователь не авторизован");
+                }
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                username = GetCurrentUsername();
+            }
+
+            var command = new UploadMediaBatchCommand(userId.Value, chatId, files, caption, username);
+            var result = await _mediator.Send(command);
+
+            if (!result.Success)
+            {
+                return BadRequest(new { success = false, error = result.ErrorMessage });
+            }
+
+            try
+            {
+                var mediaFiles = result.MediaItems.Select(item => new
+                {
+                    id = item.MediaFileId,
+                    fileName = Path.GetFileName(item.FilePath),
+                    originalFileName = item.OriginalFileName,
+                    filePath = item.FilePath,
+                    contentType = item.ContentType,
+                    fileSize = item.FileSize,
+                    thumbnailPath = item.ThumbnailPath,
+                    createdAt = DateTimeOffset.UtcNow,
+                    isVideoNote = item.IsVideoNote
+                }).ToArray();
+
+                var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
+                string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
+                string? avatarUrl = userProfile?.Avatar;
+
+                await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent",
+                    new
+                    {
+                        messageId = result.MessageId,
+                        senderId = userId.Value,
+                        content = caption ?? string.Empty,
+                        username = username ?? "Unknown",
+                        chatId = chatId,
+                        avatarUrl = avatarUrl,
+                        avatarColor = avatarColor,
+                        repliedMessage = (object?)null,
+                        forwardedMessage = (object?)null,
+                        mediaFiles = mediaFiles,
+                        status = MessageStatusHelper.Sent
+                    });
+
+                if (result.MessageId.HasValue)
+                {
+                    await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+                        chatId,
+                        result.MessageId.Value,
+                        userId.Value);
+                }
+
+                var firstMedia = result.MediaItems.FirstOrDefault();
+                if (firstMedia != null)
+                {
+                    await _chatMessageNotificationService.NotifyMediaMessageAsync(
+                        chatId,
+                        userId.Value,
+                        username ?? "Unknown",
+                        result.MessageId,
+                        caption,
+                        firstMedia.ContentType ?? "application/octet-stream",
+                        firstMedia.IsVideoNote,
+                        firstMedia.ThumbnailPath,
+                        firstMedia.FilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send SignalR notification for batch media upload");
+            }
+
+            return Ok(new
+            {
+                success = true,
+                messageId = result.MessageId,
+                mediaFiles = result.MediaItems.Select(item => new
+                {
+                    mediaFileId = item.MediaFileId,
+                    filePath = item.FilePath,
+                    thumbnailPath = item.ThumbnailPath
+                })
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading media batch");
             return StatusCode(500, new { success = false, error = "Внутренняя ошибка сервера" });
         }
     }
