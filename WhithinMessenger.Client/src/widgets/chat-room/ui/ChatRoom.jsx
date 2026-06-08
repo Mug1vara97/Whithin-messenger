@@ -1398,7 +1398,6 @@ const ChatRoom = ({
       {pendingMediaSend?.files?.length > 0 && (
         <MediaSendOverlay
           files={pendingMediaSend.files}
-          chatTitle={groupName}
           isUploading={Boolean(uploadingFile)}
           uploadProgress={uploadProgress}
           onCancel={cancelMediaSend}

@@ -1,22 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import './MediaSendOverlay.css';
 
 const MAX_BATCH_MEDIA_COUNT = 10;
 
-const pluralFilesLabel = (count) => {
+const pluralize = (count, one, few, many) => {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${count} файл`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} файла`;
-  return `${count} файлов`;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+};
+
+const buildSelectionTitle = (items) => {
+  const count = items.length;
+  const images = items.filter((item) => item.isImage).length;
+  const videos = items.filter((item) => item.isVideo).length;
+
+  if (count === 1) {
+    if (images === 1) return 'Выбрано 1 изображение';
+    if (videos === 1) return 'Выбрано 1 видео';
+    return 'Выбран 1 файл';
+  }
+
+  if (images === count) {
+    return `Выбрано ${count} ${pluralize(count, 'изображение', 'изображения', 'изображений')}`;
+  }
+  if (videos === count) {
+    return `Выбрано ${count} ${pluralize(count, 'видео', 'видео', 'видео')}`;
+  }
+
+  return `Выбрано ${count} ${pluralize(count, 'файл', 'файла', 'файлов')}`;
 };
 
 const MediaSendOverlay = ({
   files = [],
-  chatTitle = '',
   isUploading = false,
   uploadProgress = 0,
   onCancel,
@@ -55,6 +73,7 @@ const MediaSendOverlay = ({
   if (!files.length) return null;
 
   const single = previewItems.length === 1 ? previewItems[0] : null;
+  const title = buildSelectionTitle(previewItems);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -62,110 +81,121 @@ const MediaSendOverlay = ({
     onSend?.(caption.trim());
   };
 
+  const handleBackdropClick = (event) => {
+    if (event.target !== event.currentTarget || isUploading) return;
+    onCancel?.();
+  };
+
+  const renderPreviewItem = (item, compact = false) => {
+    if (item.isImage) {
+      return (
+        <img
+          src={item.url}
+          alt={item.file.name}
+          className={compact ? 'media-send-modal__thumb-image' : 'media-send-modal__single-image'}
+        />
+      );
+    }
+
+    if (item.isVideo) {
+      return (
+        <video
+          src={item.url}
+          className={compact ? 'media-send-modal__thumb-video' : 'media-send-modal__single-video'}
+          controls={!compact}
+          playsInline
+          muted={compact}
+        />
+      );
+    }
+
+    return (
+      <div className="media-send-modal__file-card">
+        <div className="media-send-modal__file-icon">
+          <AttachFileIcon sx={{ fontSize: compact ? 28 : 36 }} />
+        </div>
+        <div className="media-send-modal__file-name">{item.file.name}</div>
+      </div>
+    );
+  };
+
   return (
-    <div className="media-send-overlay" role="dialog" aria-modal="true" aria-label="Отправка медиа">
-      <div className="media-send-overlay__header">
-        <button
-          type="button"
-          className="media-send-overlay__back"
-          onClick={onCancel}
-          disabled={isUploading}
-          aria-label="Назад"
+    <div
+      className="media-send-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Отправка медиа"
+      onClick={handleBackdropClick}
+    >
+      <div className="media-send-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="media-send-modal__header">
+          <h3 className="media-send-modal__title">{title}</h3>
+        </div>
+
+        <div
+          className={`media-send-modal__preview ${
+            previewItems.length > 1 ? 'media-send-modal__preview--stack' : ''
+          }`}
         >
-          <ArrowBackIcon />
-        </button>
-        <div className="media-send-overlay__title-wrap">
-          <div className="media-send-overlay__title">{chatTitle || 'Отправка'}</div>
-          {previewItems.length > 1 && (
-            <div className="media-send-overlay__subtitle">
-              {pluralFilesLabel(previewItems.length)}
+          {single ? (
+            renderPreviewItem(single)
+          ) : (
+            <div className="media-send-modal__stack">
+              {previewItems.map((item) => (
+                <div key={item.url} className="media-send-modal__stack-item">
+                  {renderPreviewItem(item, true)}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </div>
 
-      <div
-        className={`media-send-overlay__preview ${
-          previewItems.length > 1 ? 'media-send-overlay__preview--grid' : ''
-        }`}
-      >
-        {single ? (
-          single.isImage ? (
-            <img
-              src={single.url}
-              alt={single.file.name}
-              className="media-send-overlay__single-image"
-            />
-          ) : single.isVideo ? (
-            <video
-              src={single.url}
-              className="media-send-overlay__single-video"
-              controls
-              playsInline
-            />
-          ) : (
-            <div className="media-send-overlay__file-card">
-              <div className="media-send-overlay__file-icon">
-                <AttachFileIcon sx={{ fontSize: 36 }} />
-              </div>
-              <div className="media-send-overlay__file-name">{single.file.name}</div>
+        {isUploading && (
+          <div className="media-send-modal__progress">
+            Загрузка… {uploadProgress}%
+            <div className="media-send-modal__progress-bar">
+              <div
+                className="media-send-modal__progress-fill"
+                style={{ width: `${uploadProgress}%` }}
+              />
             </div>
-          )
-        ) : (
-          <div className="media-send-overlay__grid">
-            {previewItems.map((item) => (
-              <div key={item.url} className="media-send-overlay__grid-item">
-                {item.isImage ? (
-                  <img src={item.url} alt={item.file.name} />
-                ) : item.isVideo ? (
-                  <>
-                    <video src={item.url} muted playsInline />
-                    <span className="media-send-overlay__grid-badge">Видео</span>
-                  </>
-                ) : (
-                  <div className="media-send-overlay__file-card" style={{ padding: 12 }}>
-                    <AttachFileIcon sx={{ fontSize: 28, color: '#5865f2' }} />
-                    <div className="media-send-overlay__file-name" style={{ fontSize: 11 }}>
-                      {item.file.name}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         )}
-      </div>
 
-      {isUploading && (
-        <div className="media-send-overlay__progress">
-          Загрузка... {uploadProgress}%
-          <div className="media-send-overlay__progress-bar">
-            <div
-              className="media-send-overlay__progress-fill"
-              style={{ width: `${uploadProgress}%` }}
-            />
+        <form className="media-send-modal__body" onSubmit={handleSubmit}>
+          <label className="media-send-modal__caption-label" htmlFor="media-send-caption">
+            Подпись
+          </label>
+          <textarea
+            id="media-send-caption"
+            className="media-send-modal__caption"
+            placeholder=""
+            value={caption}
+            onChange={(event) => setCaption(event.target.value)}
+            rows={2}
+            disabled={isUploading}
+            autoFocus
+          />
+
+          <div className="media-send-modal__actions">
+            <button
+              type="button"
+              className="media-send-modal__action media-send-modal__action--cancel"
+              onClick={onCancel}
+              disabled={isUploading}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="media-send-modal__action media-send-modal__action--send"
+              disabled={isUploading}
+            >
+              Отправить
+            </button>
           </div>
-        </div>
-      )}
-
-      <form className="media-send-overlay__footer" onSubmit={handleSubmit}>
-        <textarea
-          className="media-send-overlay__caption"
-          placeholder="Добавить подпись…"
-          value={caption}
-          onChange={(event) => setCaption(event.target.value)}
-          rows={1}
-          disabled={isUploading}
-        />
-        <button
-          type="submit"
-          className="media-send-overlay__send"
-          disabled={isUploading}
-          aria-label="Отправить"
-        >
-          <SendIcon />
-        </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };
