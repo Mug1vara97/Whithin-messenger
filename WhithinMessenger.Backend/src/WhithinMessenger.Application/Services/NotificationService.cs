@@ -98,6 +98,8 @@ public class NotificationService : INotificationService
         Guid chatId,
         Guid callerId,
         string callerName,
+        string? callerAvatar = null,
+        string? callerAvatarColor = null,
         CancellationToken cancellationToken = default)
     {
         var tokens = await _userPushTokenStore.GetTokensAsync(userId, cancellationToken);
@@ -115,6 +117,8 @@ public class NotificationService : INotificationService
                     chatId: chatId,
                     callerId: callerId,
                     callerName: callerName,
+                    callerAvatar: callerAvatar,
+                    callerAvatarColor: callerAvatarColor,
                     cancellationToken: cancellationToken
                 );
             }

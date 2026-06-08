@@ -91,23 +91,37 @@ public class FirebasePushSender : IFirebasePushSender
         Guid chatId,
         Guid callerId,
         string callerName,
+        string? callerAvatar = null,
+        string? callerAvatarColor = null,
         CancellationToken cancellationToken = default
     )
     {
-        await SendDataOnlyPushAsync(
-            deviceToken,
-            new Dictionary<string, string>
-            {
-                ["type"] = "incoming_call",
-                ["chat_id"] = chatId.ToString(),
-                ["room_id"] = chatId.ToString(),
-                ["caller_id"] = callerId.ToString(),
-                ["caller_name"] = callerName,
-                ["title"] = "Incoming call",
-                ["message"] = $"{callerName} is calling you"
-            },
-            cancellationToken
-        );
+        var displayName = string.IsNullOrWhiteSpace(callerName) ? "Пользователь" : callerName.Trim();
+        var title = "Входящий звонок";
+        var message = $"{displayName} звонит вам";
+
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "incoming_call",
+            ["chat_id"] = chatId.ToString(),
+            ["room_id"] = chatId.ToString(),
+            ["caller_id"] = callerId.ToString(),
+            ["caller_name"] = displayName,
+            ["title"] = title,
+            ["message"] = message,
+        };
+
+        if (!string.IsNullOrWhiteSpace(callerAvatar))
+        {
+            data["caller_avatar"] = callerAvatar.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(callerAvatarColor))
+        {
+            data["caller_avatar_color"] = callerAvatarColor.Trim();
+        }
+
+        await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
     }
 
     public async Task SendFriendRequestNotificationAsync(

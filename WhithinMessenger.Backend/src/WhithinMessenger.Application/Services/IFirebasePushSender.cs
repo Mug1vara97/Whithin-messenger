@@ -18,6 +18,8 @@ public interface IFirebasePushSender
         Guid chatId,
         Guid callerId,
         string callerName,
+        string? callerAvatar = null,
+        string? callerAvatarColor = null,
         CancellationToken cancellationToken = default
     );
 

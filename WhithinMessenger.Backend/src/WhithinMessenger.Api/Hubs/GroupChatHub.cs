@@ -813,6 +813,10 @@ public class GroupChatHub : Hub
             await Clients.Group(chatId.ToString()).SendAsync("IncomingCall",
                 new { chatId, caller, callerId, roomId = chatId.ToString() });
 
+            var callerProfile = await _mediator.Send(new GetUserProfileQuery(callerId));
+            var callerAvatar = callerProfile?.Avatar;
+            var callerAvatarColor = callerProfile?.AvatarColor;
+
             // Also push to mobile devices so Android can show incoming call
             // even when the app process is not active.
             var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
@@ -824,7 +828,9 @@ public class GroupChatHub : Hub
                         userId: participantId,
                         chatId: chatId,
                         callerId: callerId,
-                        callerName: caller
+                        callerName: caller,
+                        callerAvatar: callerAvatar,
+                        callerAvatarColor: callerAvatarColor
                     );
                 }
                 catch (Exception pushEx)
