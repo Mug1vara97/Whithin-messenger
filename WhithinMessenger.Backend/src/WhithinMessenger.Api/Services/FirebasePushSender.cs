@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Google.Apis.Auth.OAuth2;
 using WhithinMessenger.Application.Services;
 
@@ -8,6 +10,12 @@ namespace WhithinMessenger.Api.Services;
 public class FirebasePushSender : IFirebasePushSender
 {
     private static readonly string[] Scopes = ["https://www.googleapis.com/auth/firebase.messaging"];
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = null,
+    };
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
@@ -134,9 +142,6 @@ public class FirebasePushSender : IFirebasePushSender
     private const string ChatNotificationChannelId = "chat_messages_v3";
     private const string FriendRequestNotificationChannelId = "friend_requests_v1";
 
-    /// <summary>
-    /// Data-only push — used for incoming calls (custom full-screen UI on Android).
-    /// </summary>
     private async Task SendDataOnlyPushAsync(
         string deviceToken,
         Dictionary<string, string> data,
@@ -153,9 +158,6 @@ public class FirebasePushSender : IFirebasePushSender
         );
     }
 
-    /// <summary>
-    /// Notification + data push — system tray when app is killed/background; data for in-app handling.
-    /// </summary>
     private async Task SendPushAsync(
         string deviceToken,
         Dictionary<string, string> data,
@@ -183,46 +185,20 @@ public class FirebasePushSender : IFirebasePushSender
             !string.IsNullOrWhiteSpace(notificationTitle) &&
             !string.IsNullOrWhiteSpace(androidNotificationChannelId);
 
-        object messagePayload = hasNotification
-            ? new
-            {
-                token = deviceToken,
-                notification = new
-                {
-                    title = notificationTitle,
-                    body = notificationBody ?? string.Empty,
-                },
-                data,
-                android = new
-                {
-                    priority = "high",
-                    direct_boot_ok = true,
-                    notification = new
-                    {
-                        channel_id = androidNotificationChannelId,
-                        sound = "default",
-                        notification_priority = "PRIORITY_HIGH",
-                        default_vibrate_timings = true,
-                        default_sound = true,
-                    },
-                },
-            }
-            : new
-            {
-                token = deviceToken,
-                data,
-                android = new
-                {
-                    priority = "high",
-                    direct_boot_ok = true,
-                },
-            };
+        FcmMessage messagePayload = hasNotification
+            ? FcmMessage.WithNotification(
+                token: deviceToken,
+                title: notificationTitle!,
+                body: notificationBody ?? string.Empty,
+                data: data,
+                channelId: androidNotificationChannelId!
+            )
+            : FcmMessage.DataOnly(token: deviceToken, data: data);
 
-        // Chat/friend: notification+data so Android shows tray notification when app is killed.
-        // Calls stay data-only for custom IncomingCallActivity / full-screen intent.
         var response = await client.PostAsJsonAsync(
             $"https://fcm.googleapis.com/v1/projects/{_projectId}/messages:send",
-            new { message = messagePayload },
+            new FcmSendRequest { message = messagePayload },
+            JsonOptions,
             cancellationToken
         );
 
@@ -230,9 +206,23 @@ public class FirebasePushSender : IFirebasePushSender
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogWarning(
-                "FCM send failed with status {StatusCode}. Response: {Body}",
+                "FCM send failed. Status={StatusCode}, Type={Type}, HasNotification={HasNotification}, TokenPrefix={TokenPrefix}, Response={Body}",
                 response.StatusCode,
+                data.GetValueOrDefault("type"),
+                hasNotification,
+                TruncateToken(deviceToken),
                 errorBody
+            );
+        }
+        else
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation(
+                "FCM push accepted. Type={Type}, HasNotification={HasNotification}, TokenPrefix={TokenPrefix}, Response={Body}",
+                data.GetValueOrDefault("type"),
+                hasNotification,
+                TruncateToken(deviceToken),
+                responseBody
             );
         }
     }
@@ -246,6 +236,16 @@ public class FirebasePushSender : IFirebasePushSender
 
         var trimmed = value.Trim();
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string TruncateToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return "(empty)";
+        }
+
+        return token.Length <= 12 ? token : token[..12] + "...";
     }
 
     private void TryInitialize()
@@ -275,5 +275,77 @@ public class FirebasePushSender : IFirebasePushSender
         _credential = GoogleCredential
             .FromFile(serviceAccountPath)
             .CreateScoped(Scopes);
+    }
+
+    private sealed class FcmSendRequest
+    {
+        public FcmMessage message { get; init; } = null!;
+    }
+
+    private sealed class FcmMessage
+    {
+        public string token { get; init; } = null!;
+        public FcmNotification? notification { get; init; }
+        public Dictionary<string, string> data { get; init; } = null!;
+        public FcmAndroidConfig? android { get; init; }
+
+        public static FcmMessage WithNotification(
+            string token,
+            string title,
+            string body,
+            Dictionary<string, string> data,
+            string channelId
+        )
+        {
+            return new FcmMessage
+            {
+                token = token,
+                notification = new FcmNotification { title = title, body = body },
+                data = data,
+                android = new FcmAndroidConfig
+                {
+                    priority = "high",
+                    direct_boot_ok = true,
+                    notification = new FcmAndroidNotification
+                    {
+                        channel_id = channelId,
+                        click_action = "com.whithin.voice.OPEN_CHAT",
+                    },
+                },
+            };
+        }
+
+        public static FcmMessage DataOnly(string token, Dictionary<string, string> data)
+        {
+            return new FcmMessage
+            {
+                token = token,
+                data = data,
+                android = new FcmAndroidConfig
+                {
+                    priority = "high",
+                    direct_boot_ok = true,
+                },
+            };
+        }
+    }
+
+    private sealed class FcmNotification
+    {
+        public string title { get; init; } = null!;
+        public string body { get; init; } = null!;
+    }
+
+    private sealed class FcmAndroidConfig
+    {
+        public string priority { get; init; } = null!;
+        public bool direct_boot_ok { get; init; }
+        public FcmAndroidNotification? notification { get; init; }
+    }
+
+    private sealed class FcmAndroidNotification
+    {
+        public string channel_id { get; init; } = null!;
+        public string? click_action { get; init; }
     }
 }
