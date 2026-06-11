@@ -4,6 +4,7 @@ import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { userApi } from '../../../../entities/user/api/userApi';
 import { SoundpadConfigSection } from '../SoundpadConfigSection';
+import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import './SettingsModal.css';
 
 const BASE_TABS = [
@@ -350,6 +351,14 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
                 Автоматически удаляет фоновый шум из микрофона. В режиме VB-Cable отключается —
                 используется поток CABLE Output без дополнительной обработки.
               </p>
+            </div>
+            <div className="setting-item">
+              <h4 className="setting-subheading">Саундпад в звонке</h4>
+              <SoundpadRemotePlaybackSetting
+                checkboxClassName="setting-label"
+                hintClassName="setting-description"
+                labelTextClassName="setting-text"
+              />
             </div>
           </div>
         );

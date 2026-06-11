@@ -4,6 +4,7 @@ import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { findHotkeyConflict } from '../../../lib/soundpad/soundpadHotkeys';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadError } from '../../../lib/soundpad/soundpadLogger';
+import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 
 const SoundpadSoundsModal = ({ isOpen, onClose }) => {
@@ -192,6 +193,10 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
                 disabled={!monitorEnabled}
                 onChange={(e) => handleMonitorVolume(e.target.value)}
               />
+            </div>
+
+            <div className="soundpad-field">
+              <SoundpadRemotePlaybackSetting />
             </div>
 
             <div className="soundpad-upload">

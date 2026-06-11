@@ -3,7 +3,7 @@ import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { audioDeviceStorage } from '../../../lib/soundpad/audioDeviceStorage';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { soundpadLog, soundpadError } from '../../../lib/soundpad/soundpadLogger';
-import { useCallStore } from '../../../lib/stores/callStore';
+import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 
 const VB_CABLE_URL = 'https://vb-audio.com/Cable/';
@@ -20,9 +20,6 @@ const SoundpadConfigSection = ({ active }) => {
   );
   const [monitorVolume, setMonitorVolume] = useState(
     () => soundpadStorage.getConfig().monitorVolume ?? 1
-  );
-  const [remoteSoundpadEnabled, setRemoteSoundpadEnabled] = useState(
-    () => soundpadStorage.getConfig().remoteSoundpadEnabled !== false
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -71,7 +68,6 @@ const SoundpadConfigSection = ({ active }) => {
       setShowPanel(soundpadConfig.showPanel !== false);
       setMonitorEnabled(soundpadConfig.monitorEnabled !== false);
       setMonitorVolume(soundpadConfig.monitorVolume ?? 1);
-      setRemoteSoundpadEnabled(soundpadConfig.remoteSoundpadEnabled !== false);
     };
 
     window.addEventListener('soundpadConfigChanged', onConfigChange);
@@ -207,23 +203,7 @@ const SoundpadConfigSection = ({ active }) => {
 
       <section className="soundpad-section">
         <h3>Саундпад других участников</h3>
-        <p className="soundpad-hint">
-          Отключает только звуки саундпада от других людей в звонке. Голос они по-прежнему слышны.
-          Работает, если у них режим «Физический микрофон». В режиме VB-Cable саундпад смешан с голосом и отключить отдельно нельзя.
-        </p>
-        <label className="soundpad-checkbox">
-          <input
-            type="checkbox"
-            checked={remoteSoundpadEnabled}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setRemoteSoundpadEnabled(next);
-              soundpadStorage.saveConfig({ remoteSoundpadEnabled: next });
-              useCallStore.getState().applyRemoteSoundpadVolumes();
-            }}
-          />
-          <span>Слышать саундпад других участников</span>
-        </label>
+        <SoundpadRemotePlaybackSetting />
       </section>
 
       {config.soundpadMode === 'system' && (
