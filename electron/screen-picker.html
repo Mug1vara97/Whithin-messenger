@@ -129,13 +129,8 @@
         });
       }
 
-      window.screenPickerAPI.onSources((payload) => {
-        const sources = Array.isArray(payload) ? payload : payload?.sources;
+      window.screenPickerAPI.onSources((sources) => {
         allSources = sources || [];
-        const hint = Array.isArray(payload) ? null : payload?.screenShareAudioHint;
-        if (hint) {
-          audioHint.textContent = hint;
-        }
         render();
       });
 

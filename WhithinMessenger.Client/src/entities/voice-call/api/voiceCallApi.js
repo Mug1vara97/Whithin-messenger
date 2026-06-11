@@ -1,6 +1,5 @@
 import { io } from 'socket.io-client';
-import { Room, RoomEvent, Track, TrackPublication, VideoPresets, createLocalScreenTracks, LocalAudioTrack } from 'livekit-client';
-import { screenShareCableAudio } from '../../../shared/lib/soundpad/screenShareCableAudio';
+import { Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -102,59 +101,6 @@ class VoiceCallApi {
     this.eventHandlers = new Map();
     this.hadSocketSession = false;
     this.suppressReconnectEvent = false;
-    this._cableScreenShareActive = false;
-  }
-
-  async stopCableScreenShareAudio() {
-    if (!this._cableScreenShareActive && !screenShareCableAudio.isActive()) {
-      return;
-    }
-    this._cableScreenShareActive = false;
-    await screenShareCableAudio.stop();
-  }
-
-  async setScreenShareEnabledWithCableAudio() {
-    const capture = {
-      audio: false,
-      resolution: VideoPresets.h720.resolution,
-      frameRate: 60,
-    };
-    const publish = {
-      videoCodec: 'vp8',
-      videoEncoding: {
-        ...VideoPresets.h720.encoding,
-        maxBitrate: 2_500_000,
-        maxFramerate: 60,
-      },
-      simulcast: false,
-    };
-
-    await screenShareCableAudio.start();
-
-    try {
-      const tracks = await createLocalScreenTracks(capture);
-      const videoTrack = tracks.find((track) => track.kind === 'video');
-      if (!videoTrack) {
-        throw new Error('No screen video track');
-      }
-
-      const audioMediaTrack = screenShareCableAudio.getMediaStreamTrack();
-      const audioTrack = new LocalAudioTrack(audioMediaTrack, undefined, false);
-
-      await this.room.localParticipant.publishTrack(videoTrack, {
-        ...publish,
-        source: Track.Source.ScreenShare,
-      });
-      await this.room.localParticipant.publishTrack(audioTrack, {
-        source: Track.Source.ScreenShareAudio,
-      });
-
-      this._cableScreenShareActive = true;
-      this.tuneLocalScreenShareAudioTrack();
-    } catch (error) {
-      await screenShareCableAudio.stop();
-      throw error;
-    }
   }
 
   getPublicationMediaType(publication) {
@@ -832,7 +778,7 @@ class VoiceCallApi {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
-    const { includeAudio = true, useCableLoopbackAudio = false } = options;
+    const { includeAudio = true } = options;
 
     if (enabled) {
       // Defensive cleanup for stale publications before enabling a new share.
@@ -857,11 +803,6 @@ class VoiceCallApi {
       // Without this, rapid restart may yield an already-ended incoming track
       // on remote subscribers in some browser/runtime combinations.
       await new Promise((resolve) => setTimeout(resolve, 120));
-
-      if (useCableLoopbackAudio && includeAudio) {
-        await this.setScreenShareEnabledWithCableAudio();
-        return;
-      }
 
       const startProfiles = includeAudio
         ? [
@@ -981,7 +922,6 @@ class VoiceCallApi {
       }
       throw new Error('Failed to start screen sharing');
     } else {
-      await this.stopCableScreenShareAudio();
       await this.room.localParticipant.setScreenShareEnabled(false);
       await this.waitForScreenShareCleared();
     }

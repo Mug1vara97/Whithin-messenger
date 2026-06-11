@@ -585,15 +585,19 @@ async function restoreDefaultCableRender() {
   }
 }
 
-async function activateDefaultCableRender(deviceId = null) {
+async function activateDefaultCableRender(deviceId = null, options = {}) {
   if (process.platform !== 'win32') {
     return { ok: true, skipped: true };
   }
 
+  const enableMonitor = Boolean(options.enableMonitor);
   await ensureBridgeProcess();
-  log('activateDefaultCableRender', { deviceId: deviceId || '(CABLE Input)' });
+  log('activateDefaultCableRender', { deviceId: deviceId || '(CABLE Input)', enableMonitor });
   try {
-    return await bridgeRequest('POST', '/default-render/activate', deviceId ? { deviceId } : {});
+    return await bridgeRequest('POST', '/default-render/activate', {
+      deviceId: deviceId || null,
+      enableMonitor,
+    });
   } catch (error) {
     warn('activateDefaultCableRender failed', error.message);
     return { ok: false, error: error.message };
@@ -670,14 +674,6 @@ async function applySoundpadAudioConfig(config) {
         ? await activateDefaultCableMic(config.cableOutputDeviceId || null)
         : { ok: true, skipped: true };
 
-      let renderResult = { ok: true, skipped: true };
-      try {
-        renderResult = await activateDefaultCableRender(config.cableInputDeviceId || null);
-      } catch (error) {
-        warn('activateDefaultCableRender failed', error.message);
-        renderResult = { ok: false, error: error.message };
-      }
-
       let bridgeResult = { ok: true, skipped: true };
       try {
         bridgeResult = await ensureMixerBridgeStarted(
@@ -689,7 +685,7 @@ async function applySoundpadAudioConfig(config) {
         bridgeResult = { ok: false, error: error.message };
       }
 
-      return { ...micResult, render: renderResult, bridge: bridgeResult };
+      return { ...micResult, bridge: bridgeResult };
     }
 
     const restoreResult = await restoreDefaultCableMic();

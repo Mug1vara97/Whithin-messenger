@@ -196,7 +196,9 @@ public sealed class BridgeHttpServer : IDisposable
                     var payload = string.IsNullOrWhiteSpace(body)
                         ? null
                         : JsonSerializer.Deserialize<ActivateDefaultRenderRequest>(body, JsonOptions);
-                    var result = DefaultRenderDeviceSwitcher.Activate(payload?.DeviceId);
+                    var result = DefaultRenderDeviceSwitcher.Activate(
+                        payload?.DeviceId,
+                        payload?.EnableMonitor == true);
                     if (!result.Ok)
                     {
                         response.StatusCode = 400;
@@ -338,7 +340,7 @@ public sealed class BridgeHttpServer : IDisposable
 
     private sealed record ActivateDefaultCaptureRequest(string? DeviceId);
 
-    private sealed record ActivateDefaultRenderRequest(string? DeviceId);
+    private sealed record ActivateDefaultRenderRequest(string? DeviceId, bool? EnableMonitor);
 
     private sealed record ScreenShareLoopbackRequest(string? RenderDeviceId);
 }

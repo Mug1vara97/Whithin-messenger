@@ -268,6 +268,9 @@ export const soundpadBridge = {
     }
 
     const status = await this.getCallAudioOutputStatus();
+    if (!status?.active) {
+      return { skipped: true, reason: 'render-routing-inactive' };
+    }
     const output = await this.findBrowserOutputDevice(status?.callAudioOutputDeviceName);
     if (!output) {
       soundpadWarn('routeCallAudioElements: physical output not found', status);

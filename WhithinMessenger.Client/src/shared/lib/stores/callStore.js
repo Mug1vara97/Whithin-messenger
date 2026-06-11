@@ -2863,7 +2863,6 @@ export const useCallStore = create(
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
-          let useCableLoopbackAudio = false;
           set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
@@ -2878,23 +2877,12 @@ export const useCallStore = create(
               throw new Error('Screen sharing cancelled by user');
             }
             includeAudio = Boolean(selectedSource.captureAudio);
-            useCableLoopbackAudio =
-              !usesInAppSoundpad() &&
-              includeAudio &&
-              selectedSource.type === 'screen';
           }
 
-          console.log('Starting screen share via LiveKit...', {
-            includeAudio,
-            useCableLoopbackAudio,
-          });
-          
+          console.log('Starting screen share via LiveKit...', { includeAudio });
+
           // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true, { includeAudio, useCableLoopbackAudio });
-
-          if (useCableLoopbackAudio) {
-            await get().routeCallAudioAwayFromCable();
-          }
+          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();

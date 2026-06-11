@@ -23,7 +23,7 @@ public static class DefaultRenderDeviceSwitcher
 
     public static bool IsActive => _isActive || File.Exists(BackupFilePath);
 
-    public static DefaultRenderSwitchResult Activate(string? deviceId = null)
+    public static DefaultRenderSwitchResult Activate(string? deviceId = null, bool enableMonitor = false)
     {
         var target = ResolveTargetDevice(deviceId);
         if (target == null)
@@ -63,19 +63,29 @@ public static class DefaultRenderDeviceSwitcher
             return new DefaultRenderSwitchResult(false, _callAudioOutputId, _callAudioOutputName, target.Id, target.Name, ex.Message);
         }
 
-        try
+        if (enableMonitor)
         {
-            if (!string.IsNullOrWhiteSpace(_callAudioOutputId))
+            try
             {
-                CableInputLoopbackHub.Instance.EnableMonitor(_callAudioOutputId, target.Id);
+                if (!string.IsNullOrWhiteSpace(_callAudioOutputId))
+                {
+                    CableInputLoopbackHub.Instance.EnableMonitor(_callAudioOutputId, target.Id);
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Soundpad] WARNING: CABLE monitor failed: {ex.Message}");
+            }
+
+            Console.WriteLine(
+                $"[Soundpad] Default speakers switched to \"{target.Name}\" with monitor on \"{_callAudioOutputName}\"");
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"[Soundpad] WARNING: CABLE monitor failed: {ex.Message}");
+            Console.WriteLine(
+                $"[Soundpad] Default speakers switched to \"{target.Name}\" (monitor off; call on \"{_callAudioOutputName}\")");
         }
 
-        Console.WriteLine($"[Soundpad] Default speakers switched to \"{target.Name}\" (you hear via monitor on \"{_callAudioOutputName}\", call audio there too)");
         return new DefaultRenderSwitchResult(true, _callAudioOutputId, _callAudioOutputName, target.Id, target.Name, null);
     }
 

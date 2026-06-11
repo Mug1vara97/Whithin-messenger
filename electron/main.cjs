@@ -360,9 +360,6 @@ function openScreenPickerWindow(sources) {
       }
     });
 
-    const soundpadConfig = readSoundpadAudioConfig();
-    const useCableScreenAudio = soundpadConfig?.soundpadMode === 'system';
-
     const payload = sources.map((source) => {
       const sourceNameLower = (source.name || '').toLowerCase();
       const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
@@ -398,12 +395,7 @@ function openScreenPickerWindow(sources) {
 
     pickerWindow.on('closed', () => finalize(null));
     pickerWindow.webContents.on('did-finish-load', () => {
-      pickerWindow.webContents.send('electron:screen-picker-sources', {
-        sources: payload,
-        screenShareAudioHint: useCableScreenAudio
-          ? 'Звук системы автоматически идёт на CABLE Input. Голоса участников звонка воспроизводятся на ваших динамиках и не попадают в демонстрацию.'
-          : null,
-      });
+      pickerWindow.webContents.send('electron:screen-picker-sources', payload);
     });
     pickerWindow.loadFile(path.join(__dirname, 'screen-picker.html'));
   });
@@ -1015,9 +1007,6 @@ if (!gotSingleInstanceLock) {
           return;
         }
 
-        const soundpadConfig = readSoundpadAudioConfig();
-        const useCableScreenAudio = soundpadConfig?.soundpadMode === 'system';
-
         let audioSource = null;
         if (shouldCaptureAudio) {
           if (selectedSourceType === 'window' && !isWhithinWindow) {
@@ -1025,9 +1014,8 @@ if (!gotSingleInstanceLock) {
             // иначе loopback подмешивает весь системный вывод и эхо звонка.
             audioSource = preferredSource;
           } else if (selectedSourceType === 'screen') {
-            // В режиме VB-Cable звук экрана захватывается с CABLE Input (без голосов звонка).
-            // Иначе — полный system loopback.
-            audioSource = useCableScreenAudio ? null : 'loopback';
+            // Для полного экрана нужен loopback, иначе аудио-трек не создаётся.
+            audioSource = 'loopback';
           }
         }
 
