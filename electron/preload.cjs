@@ -47,5 +47,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('global-shortcut-triggered', globalShortcutListener);
       globalShortcutListener = null;
     }
-  }
+  },
+
+  soundpadIsAvailable: () => ipcRenderer.invoke('soundpad:is-available'),
+  soundpadListDevices: () => ipcRenderer.invoke('soundpad:list-devices'),
+  soundpadGetStatus: () => ipcRenderer.invoke('soundpad:get-status'),
+  soundpadStartBridge: (payload) => ipcRenderer.invoke('soundpad:start-bridge', payload),
+  soundpadStopBridge: () => ipcRenderer.invoke('soundpad:stop-bridge'),
+  soundpadPlayBase64: (payload) => ipcRenderer.invoke('soundpad:play-base64', payload),
+  soundpadStopPlayback: () => ipcRenderer.invoke('soundpad:stop-playback'),
+  soundpadSetAutoDefaultMic: (enabled) => ipcRenderer.invoke('soundpad:set-auto-default-mic', enabled),
+  soundpadSyncAudioConfig: (config) => ipcRenderer.invoke('soundpad:sync-audio-config', config),
+  soundpadGetDefaultRenderStatus: () => ipcRenderer.invoke('soundpad:get-default-render-status'),
 });

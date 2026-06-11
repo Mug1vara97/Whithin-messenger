@@ -211,6 +211,16 @@
   transform: scale(1.05);
 }
 
+.soundpad-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.soundpad-button:hover {
+  background-color: #3ba55d !important;
+  transform: scale(1.05);
+}
+
 .notification-button {
   position: relative;
   overflow: visible;

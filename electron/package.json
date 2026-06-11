@@ -11,8 +11,9 @@
     "start": "electron ./main.cjs",
     "dev": "cross-env WEB_CLIENT_URL=http://localhost:5173 electron ./main.cjs",
     "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win nsis"
+    "build:audio-bridge": "dotnet publish Whithin.AudioBridge/Whithin.AudioBridge.csproj -c Release -r win-x64 -o audio-bridge-bin --no-self-contained",
+    "dist": "npm run build:audio-bridge && electron-builder",
+    "dist:win": "npm run build:audio-bridge && electron-builder --win nsis"
   },
   "config": {
     "forge": "./forge.config.cjs"
@@ -42,15 +43,24 @@
     "files": [
       "main.cjs",
       "preload.cjs",
+      "audioBridge.cjs",
       "picker-preload.cjs",
       "screen-picker.html",
       "tray.png",
       "app-icon.png",
       "app-icon.ico",
       "package.json",
+      "audio-bridge-bin/**/*",
       "node_modules/global-mouse-events/**/*",
       "node_modules/bindings/**/*",
       "node_modules/file-uri-to-path/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "audio-bridge-bin",
+        "to": "audio-bridge-bin",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "icon": "app-icon.ico",

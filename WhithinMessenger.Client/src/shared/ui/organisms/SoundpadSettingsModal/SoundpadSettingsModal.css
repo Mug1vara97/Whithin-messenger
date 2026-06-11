@@ -1,0 +1,179 @@
+.soundpad-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.soundpad-modal {
+  width: min(720px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  background: var(--surface, #36393f);
+  border-radius: 8px;
+  color: var(--text, #dcddde);
+}
+
+.soundpad-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border, #4f545c);
+}
+
+.soundpad-modal__header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.soundpad-modal__close {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #8e9297);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.soundpad-modal__content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.soundpad-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.soundpad-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.soundpad-hint {
+  margin: 0;
+  color: var(--text-secondary, #8e9297);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.soundpad-hint a {
+  color: var(--primary, #5865f2);
+}
+
+.soundpad-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-secondary, #8e9297);
+}
+
+.soundpad-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+}
+
+.soundpad-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.soundpad-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.soundpad-btn--primary {
+  background: var(--primary, #5865f2);
+  color: #fff;
+}
+
+.soundpad-btn--secondary {
+  background: var(--background, #2f3136);
+  color: var(--text, #dcddde);
+}
+
+.soundpad-btn--danger {
+  background: #ed4245;
+  color: #fff;
+}
+
+.soundpad-status {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--background, #2f3136);
+  font-size: 13px;
+}
+
+.soundpad-status--ok {
+  border-left: 3px solid #43b581;
+}
+
+.soundpad-status--warn {
+  border-left: 3px solid #faa61a;
+}
+
+.soundpad-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.soundpad-slot {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--background, #2f3136);
+}
+
+.soundpad-slot input[type='text'],
+.soundpad-slot input[type='number'] {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #4f545c);
+  background: var(--surface, #36393f);
+  color: var(--text, #dcddde);
+}
+
+.soundpad-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.soundpad-upload input[type='file'] {
+  max-width: 220px;
+}
+
+.soundpad-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.soundpad-checkbox input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}

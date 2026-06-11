@@ -5,7 +5,7 @@ import { useServerContext } from '../../../shared/lib/contexts/useServerContext'
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import compassIcon from '../../../assets/magnifying-glass.png';
-import { Settings, Palette } from '@mui/icons-material';
+import { Settings, Palette, GraphicEq } from '@mui/icons-material';
 import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import { openThemeColorsWindow } from '../../../shared/lib/theme/openThemeColorsWindow';
 import styles from './ServerList.module.css';
@@ -24,6 +24,7 @@ const ServerList = ({
   onDiscoverClick,
   onCreateServerClick,
   onSettingsClick,
+  onSoundpadClick,
   onNotificationsClick,
   unreadNotificationsCount = 0
 }) => {
@@ -354,6 +355,18 @@ const ServerList = ({
                 <Palette />
               </button>
             </li>
+            {onSoundpadClick && (
+              <li className={styles['server-item']}>
+                <button
+                  type="button"
+                  className={`${styles['server-button']} ${styles['soundpad-button']}`}
+                  onClick={onSoundpadClick}
+                  title="Саундпад (VB-Cable)"
+                >
+                  <GraphicEq />
+                </button>
+              </li>
+            )}
             <li className={styles['server-item']}>
               <button
                 type="button"

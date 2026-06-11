@@ -7,6 +7,9 @@ import { VoiceActivityDetector } from '../utils/voiceActivityDetector';
 import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
+import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
+import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
+import { soundpadBridge } from '../soundpad/soundpadBridge';
 
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
@@ -1049,6 +1052,9 @@ export const useCallStore = create(
               await audioElement.play();
               console.log('🔊✅ callStore: Audio playback started for peer:', targetUserId);
               set({ audioBlocked: false });
+              if (!usesInAppSoundpad()) {
+                get().routeCallAudioAwayFromCable();
+              }
             } catch (error) {
               console.warn('🔊⚠️ callStore: Auto-play blocked, user interaction required:', error);
               set({ audioBlocked: true });
@@ -1661,6 +1667,10 @@ export const useCallStore = create(
               },
             });
 
+            if (!usesInAppSoundpad()) {
+              get().routeCallAudioAwayFromCable().catch(() => {});
+            }
+
             if (response.existingPeers?.length) {
               get().applyExistingPeers(response.existingPeers);
             }
@@ -2045,18 +2055,29 @@ export const useCallStore = create(
           const wantsNoiseSuppression = savedNoiseSuppression
             ? JSON.parse(savedNoiseSuppression)
             : false;
+          const inAppSoundpad = usesInAppSoundpad();
+          const virtualMicDeviceId = inAppSoundpad ? '' : audioDeviceStorage.getVirtualMicDeviceId();
+          const useVirtualMic = Boolean(virtualMicDeviceId);
 
-          if (!stream || wantsNoiseSuppression) {
+          const buildMicConstraints = () => {
+            const audio = {
+              echoCancellation: !useVirtualMic,
+              noiseSuppression: !useVirtualMic,
+              autoGainControl: !useVirtualMic,
+              sampleRate: 48000,
+              channelCount: 1,
+              latency: 0,
+              suppressLocalAudioPlayback: true,
+            };
+            if (virtualMicDeviceId) {
+              audio.deviceId = { exact: virtualMicDeviceId };
+            }
+            return audio;
+          };
+
+          if (useVirtualMic || !stream || wantsNoiseSuppression || inAppSoundpad) {
             const capturedStream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 48000,
-                channelCount: 1,
-                latency: 0,
-                suppressLocalAudioPlayback: true,
-              },
+              audio: buildMicConstraints(),
             });
             stream = capturedStream;
           }
@@ -2077,82 +2098,72 @@ export const useCallStore = create(
             await audioContext.resume();
           }
           
-          // Инициализация шумоподавления
+          const vadSourceStream = stream;
+          let streamForPublish = stream;
+
           const noiseSuppressionManager = new NoiseSuppressionManager();
           await noiseSuppressionManager.initialize(stream, audioContext);
           set({ noiseSuppressionManager });
-          
-          // Инициализация Voice Activity Detection (VAD) для локального пользователя
+
+          if (wantsNoiseSuppression) {
+            await noiseSuppressionManager.enable(state.noiseSuppressionMode || 'rnnoise');
+            set({ isNoiseSuppressed: true });
+            streamForPublish = noiseSuppressionManager.getProcessedStream() || stream;
+          }
+
+          if (inAppSoundpad) {
+            await soundpadInAppMixer.attachMicStream(streamForPublish);
+            soundpadInAppMixer.setMicMuted(state.isMuted);
+            streamForPublish = soundpadInAppMixer.getMixedStream();
+            set({ audioStream: streamForPublish });
+          }
+
           try {
-            await get().initializeLocalVAD(stream, audioContext);
+            await get().initializeLocalVAD(vadSourceStream, audioContext);
           } catch (vadError) {
             console.warn('[VAD] Failed to initialize local VAD:', vadError);
           }
-          
-          // Инициализация слушателя состояния говорения от сервера (для удалённых участников)
+
           try {
             get().initializeSpeakingStateListener();
           } catch (listenerError) {
             console.warn('[VAD] Failed to initialize speaking state listener:', listenerError);
           }
-          
-          // Получаем обработанный трек (с шумоподавлением, если включено)
-          const processedStream = noiseSuppressionManager.getProcessedStream();
-          const audioTrack = processedStream ? processedStream.getAudioTracks()[0] : stream.getAudioTracks()[0];
-          
+
+          const audioTrack = streamForPublish.getAudioTracks()[0];
+
           if (!audioTrack) {
             throw new Error('No audio track in stream');
           }
+
+          const publishMicEnabled = inAppSoundpad ? true : !state.isMuted;
+          audioTrack.enabled = publishMicEnabled;
           
-          // Устанавливаем состояние микрофона
-          audioTrack.enabled = !state.isMuted;
-          
-          if (wantsNoiseSuppression) {
-            await noiseSuppressionManager.enable(state.noiseSuppressionMode || 'rnnoise');
-            set({ isNoiseSuppressed: true });
-            
-            // Публикуем обработанный трек в LiveKit
-            const processedStream = noiseSuppressionManager.getProcessedStream();
-            if (processedStream) {
-              const processedTrack = processedStream.getAudioTracks()[0];
-              if (processedTrack) {
-                try {
-                  // Отключаем автоматически опубликованный микрофон
-                  await room.localParticipant.setMicrophoneEnabled(false);
-                  
-                  // Получаем существующую публикацию микрофона
-                  const microphonePublication = room.localParticipant.getTrackPublication('microphone');
-                  
-                  if (microphonePublication && microphonePublication.track) {
-                    // Используем replaceTrack на существующем треке (предотвращает утечки памяти)
-                    console.log('Replacing existing microphone track with noise suppression using replaceTrack');
-                    await microphonePublication.track.replaceTrack(processedTrack);
-                    console.log('Audio track with noise suppression replaced via LiveKit');
-                  } else {
-                    // Если публикации нет, публикуем новый трек
-                    console.log('No existing microphone publication, publishing new track with noise suppression');
-                    await room.localParticipant.setMicrophoneEnabled(false);
-                    await room.localParticipant.publishTrack(processedTrack, {
-                      source: Track.Source.Microphone,
-                      name: 'microphone'
-                    });
-                    console.log('Audio track with noise suppression published via LiveKit');
-                  }
-                  
-                  // Включаем микрофон с обработанным треком
-                  await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-                } catch (error) {
-                  console.warn('Failed to publish processed track via LiveKit:', error);
-                  // В случае ошибки используем обычный трек
-                  await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-                }
+          const publishTrack = streamForPublish.getAudioTracks()[0];
+          const needsCustomPublish = wantsNoiseSuppression || inAppSoundpad;
+
+          if (needsCustomPublish && publishTrack) {
+            try {
+              await room.localParticipant.setMicrophoneEnabled(false);
+              const microphonePublication = room.localParticipant.getTrackPublication('microphone');
+
+              if (microphonePublication?.track) {
+                await microphonePublication.track.replaceTrack(publishTrack);
+              } else {
+                await room.localParticipant.publishTrack(publishTrack, {
+                  source: Track.Source.Microphone,
+                  name: 'microphone',
+                });
               }
+
+              await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
+            } catch (error) {
+              console.warn('Failed to publish custom audio track via LiveKit:', error);
+              await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
             }
           } else {
-            // Для LiveKit публикуем трек через localParticipant
-            // LiveKit автоматически публикует микрофон при подключении, но мы можем обновить трек
             try {
-              await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+              await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
               console.log('Audio track published via LiveKit');
             } catch (error) {
               console.warn('Failed to publish audio track via LiveKit:', error);
@@ -2173,26 +2184,33 @@ export const useCallStore = create(
         
         // Сохраняем состояние в localStorage
         localStorage.setItem('micMuted', JSON.stringify(newMutedState));
-        console.log('💾 Mic state saved to localStorage:', newMutedState);
+        console.log('Mic state saved to localStorage:', newMutedState);
         
-        // Use LiveKit API to toggle microphone
         try {
-          await voiceCallApi.setMicrophoneEnabled(!newMutedState);
-        } catch (error) {
-          console.warn('Failed to toggle microphone via LiveKit:', error);
-          // Fallback to local track control
-          if (state.noiseSuppressionManager) {
-            const processedStream = state.noiseSuppressionManager.getProcessedStream();
-            const audioTrack = processedStream?.getAudioTracks()[0];
-            if (audioTrack) {
-              audioTrack.enabled = !newMutedState;
+          if (usesInAppSoundpad()) {
+            soundpadInAppMixer.setMicMuted(newMutedState);
+            await voiceCallApi.setMicrophoneEnabled(true);
+            const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
+            if (mixedTrack) {
+              mixedTrack.enabled = true;
             }
-          } else if (state.localStream) {
-            const audioTrack = state.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-              audioTrack.enabled = !newMutedState;
+          } else {
+            await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+            if (state.noiseSuppressionManager) {
+              const processedStream = state.noiseSuppressionManager.getProcessedStream();
+              const audioTrack = processedStream?.getAudioTracks()[0];
+              if (audioTrack) {
+                audioTrack.enabled = !newMutedState;
+              }
+            } else if (state.localStream) {
+              const audioTrack = state.localStream.getAudioTracks()[0];
+              if (audioTrack) {
+                audioTrack.enabled = !newMutedState;
+              }
             }
           }
+        } catch (error) {
+          console.warn('Failed to toggle microphone via LiveKit:', error);
         }
         
         set({ isMuted: newMutedState });
@@ -2815,6 +2833,24 @@ export const useCallStore = create(
         }
       },
       
+      routeCallAudioAwayFromCable: async () => {
+        try {
+          await soundpadBridge.routeCallAudioElements(get().audioElements);
+        } catch (error) {
+          console.warn('routeCallAudioAwayFromCable failed:', error);
+        }
+      },
+
+      restoreCallAudioSink: () => {
+        if (typeof HTMLMediaElement.prototype.setSinkId !== 'function') {
+          return;
+        }
+
+        get().audioElements.forEach((element) => {
+          element.setSinkId('').catch(() => {});
+        });
+      },
+
       // Демонстрация экрана
       startScreenShare: async () => {
         if (get().isScreenShareTransitioning) {
@@ -2827,6 +2863,7 @@ export const useCallStore = create(
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
+          let useCableLoopbackAudio = false;
           set({ screenShareSessionId });
           
           // Останавливаем существующую демонстрацию экрана, если есть
@@ -2841,12 +2878,23 @@ export const useCallStore = create(
               throw new Error('Screen sharing cancelled by user');
             }
             includeAudio = Boolean(selectedSource.captureAudio);
+            useCableLoopbackAudio =
+              !usesInAppSoundpad() &&
+              includeAudio &&
+              selectedSource.type === 'screen';
           }
 
-          console.log('Starting screen share via LiveKit...');
+          console.log('Starting screen share via LiveKit...', {
+            includeAudio,
+            useCableLoopbackAudio,
+          });
           
           // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
+          await voiceCallApi.setScreenShareEnabled(true, { includeAudio, useCableLoopbackAudio });
+
+          if (useCableLoopbackAudio) {
+            await get().routeCallAudioAwayFromCable();
+          }
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
@@ -2952,6 +3000,8 @@ export const useCallStore = create(
             room.off(RoomEvent.LocalTrackPublished, state.localScreenTrackPublishedHandler);
           }
           
+          get().restoreCallAudioSink();
+
           // Use LiveKit API to stop screen share
           await voiceCallApi.setScreenShareEnabled(false);
 
@@ -3298,3 +3348,19 @@ export const useCallStore = create(
     }
   )
 );
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('audioDeviceConfigChanged', (event) => {
+    const config = event.detail;
+    if (config?.soundpadMode !== 'system') {
+      return;
+    }
+
+    const state = useCallStore.getState();
+    if (!state.isInCall) {
+      return;
+    }
+
+    state.routeCallAudioAwayFromCable().catch(() => {});
+  });
+}

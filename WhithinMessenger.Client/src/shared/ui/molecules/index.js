@@ -5,6 +5,7 @@ export * from './MessageItem';
 export * from './MessageSearch';
 export * from './CreateChannelModal';
 export * from './ChannelSettingsModal';
+export * from './SoundpadPanel';
 export * from './CreateCategoryModal';
 export * from './CreateGroupChatModal';
 export * from './ContextMenu';

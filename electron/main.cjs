@@ -12,6 +12,13 @@ const {
   Menu,
   nativeImage
 } = require('electron');
+const {
+  registerAudioBridgeIpc,
+  shutdownBridge,
+  restoreDefaultCableMic,
+  applySoundpadAudioConfig,
+} = require('./audioBridge.cjs');
+const { readSoundpadAudioConfig } = require('./soundpadElectronConfig.cjs');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
@@ -353,6 +360,9 @@ function openScreenPickerWindow(sources) {
       }
     });
 
+    const soundpadConfig = readSoundpadAudioConfig();
+    const useCableScreenAudio = soundpadConfig?.soundpadMode === 'system';
+
     const payload = sources.map((source) => {
       const sourceNameLower = (source.name || '').toLowerCase();
       const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
@@ -388,7 +398,12 @@ function openScreenPickerWindow(sources) {
 
     pickerWindow.on('closed', () => finalize(null));
     pickerWindow.webContents.on('did-finish-load', () => {
-      pickerWindow.webContents.send('electron:screen-picker-sources', payload);
+      pickerWindow.webContents.send('electron:screen-picker-sources', {
+        sources: payload,
+        screenShareAudioHint: useCableScreenAudio
+          ? 'Звук системы автоматически идёт на CABLE Input. Голоса участников звонка воспроизводятся на ваших динамиках и не попадают в демонстрацию.'
+          : null,
+      });
     });
     pickerWindow.loadFile(path.join(__dirname, 'screen-picker.html'));
   });
@@ -1000,6 +1015,9 @@ if (!gotSingleInstanceLock) {
           return;
         }
 
+        const soundpadConfig = readSoundpadAudioConfig();
+        const useCableScreenAudio = soundpadConfig?.soundpadMode === 'system';
+
         let audioSource = null;
         if (shouldCaptureAudio) {
           if (selectedSourceType === 'window' && !isWhithinWindow) {
@@ -1007,8 +1025,9 @@ if (!gotSingleInstanceLock) {
             // иначе loopback подмешивает весь системный вывод и эхо звонка.
             audioSource = preferredSource;
           } else if (selectedSourceType === 'screen') {
-            // Для полного экрана нужен loopback, иначе аудио-трек не создаётся.
-            audioSource = 'loopback';
+            // В режиме VB-Cable звук экрана захватывается с CABLE Input (без голосов звонка).
+            // Иначе — полный system loopback.
+            audioSource = useCableScreenAudio ? null : 'loopback';
           }
         }
 
@@ -1026,6 +1045,13 @@ if (!gotSingleInstanceLock) {
     { useSystemPicker: true }
   );
 
+  const savedSoundpadAudio = readSoundpadAudioConfig();
+  if (savedSoundpadAudio) {
+    applySoundpadAudioConfig(savedSoundpadAudio).catch((error) => {
+      console.warn('[Soundpad:Electron] applySoundpadAudioConfig on startup failed:', error.message);
+    });
+  }
+
   createWindow();
   createTray();
 
@@ -1038,6 +1064,8 @@ if (!gotSingleInstanceLock) {
   });
   });
 }
+
+registerAudioBridgeIpc(ipcMain);
 
 ipcMain.handle('electron:open-external', async (_, url) => {
   await shell.openExternal(url);
@@ -1146,6 +1174,23 @@ ipcMain.on('electron:remove-shortcut-listener', (event) => {
 
 app.on('window-all-closed', () => {
   // Win/Linux: окно скрывается в трей, не выходим из процесса
+});
+
+let audioBridgeShutdownDone = false;
+
+app.on('before-quit', (event) => {
+  if (audioBridgeShutdownDone) {
+    return;
+  }
+  event.preventDefault();
+  Promise.allSettled([restoreDefaultCableMic(), shutdownBridge()])
+    .catch((error) => {
+      console.warn('[Soundpad:Electron] shutdown audio cleanup failed:', error.message);
+    })
+    .finally(() => {
+      audioBridgeShutdownDone = true;
+      app.quit();
+    });
 });
 
 app.on('will-quit', () => {

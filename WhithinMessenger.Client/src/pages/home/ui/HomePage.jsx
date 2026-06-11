@@ -13,7 +13,8 @@ import { useNotifications } from '../../../entities/notification';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { NotificationsModal, SettingsModal } from '../../../shared/ui/organisms';
+import { NotificationsModal, SettingsModal, SoundpadSettingsModal } from '../../../shared/ui/organisms';
+import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
 import { UserAvatar } from '../../../shared/ui';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
@@ -35,6 +36,7 @@ const HomePage = () => {
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showSoundpadModal, setShowSoundpadModal] = useState(false);
   
   const showFriends = location.pathname === '/channels/@me/friends';
 
@@ -148,6 +150,12 @@ const HomePage = () => {
   useEffect(() => {
     chatsRef.current = Array.isArray(chats) ? chats : [];
   }, [chats]);
+
+  useEffect(() => {
+    soundpadBridge.syncAudioConfigToElectron().catch(() => {});
+    soundpadBridge.warmUpInAppMixer().catch(() => {});
+    soundpadBridge.warmUpSystemBridge().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user?.id || !getConnection) return undefined;
@@ -690,6 +698,14 @@ const HomePage = () => {
     setShowNotificationsModal(false);
   }, []);
 
+  const handleSoundpadClick = useCallback(() => {
+    setShowSoundpadModal(true);
+  }, []);
+
+  const handleCloseSoundpadModal = useCallback(() => {
+    setShowSoundpadModal(false);
+  }, []);
+
   const handleOpenNotification = useCallback(async (notification) => {
     const notificationId = notification.id || notification.Id;
     const targetChatId = notification.chatId || notification.ChatId;
@@ -788,6 +804,11 @@ const HomePage = () => {
         setShowNotificationsModal(false);
         return;
       }
+      if (showSoundpadModal) {
+        e.preventDefault();
+        setShowSoundpadModal(false);
+        return;
+      }
 
       if (selectedChat && !showFriends && !showDiscovery) {
         e.preventDefault();
@@ -801,6 +822,7 @@ const HomePage = () => {
     showCreateServerModal,
     showSettingsModal,
     showNotificationsModal,
+    showSoundpadModal,
     selectedChat,
     showFriends,
     showDiscovery,
@@ -817,6 +839,7 @@ const HomePage = () => {
             onDiscoverClick={handleDiscoverClick}
             onCreateServerClick={handleCreateServerClick}
             onSettingsClick={handleSettingsClick}
+            onSoundpadClick={handleSoundpadClick}
             onNotificationsClick={handleNotificationsClick}
             unreadNotificationsCount={unreadCount}
             userId={user?.id}
@@ -939,6 +962,11 @@ const HomePage = () => {
       <SettingsModal 
         isOpen={showSettingsModal} 
         onClose={handleCloseSettingsModal} 
+      />
+
+      <SoundpadSettingsModal
+        isOpen={showSoundpadModal}
+        onClose={handleCloseSoundpadModal}
       />
 
       <NotificationsModal
