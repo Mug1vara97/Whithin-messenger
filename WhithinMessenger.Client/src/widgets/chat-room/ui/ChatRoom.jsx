@@ -12,7 +12,8 @@ import {
   useChat, 
   useMessageSearch, 
   useMediaHandlers, 
-  useContextMenu, 
+  useContextMenu,
+  useClampedMenuPosition,
   useMessageForward 
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
@@ -32,7 +33,24 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
-import { Call, Mic, MicOff, Headset, HeadsetOff, Stop, AttachFile, Image as ImageIcon, Videocam, FolderZip, InsertDriveFile, EmojiEmotions } from '@mui/icons-material';
+import {
+  Call,
+  Mic,
+  MicOff,
+  Headset,
+  HeadsetOff,
+  Stop,
+  AttachFile,
+  Image as ImageIcon,
+  Videocam,
+  FolderZip,
+  InsertDriveFile,
+  EmojiEmotions,
+  ReplyOutlined,
+  ForwardOutlined,
+  EditOutlined,
+  DeleteOutline,
+} from '@mui/icons-material';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -125,6 +143,13 @@ const ChatRoom = ({
     closeContextMenu
   } = useContextMenu();
 
+  const contextMenuRef = useRef(null);
+  const contextMenuPosition = useClampedMenuPosition(
+    contextMenu.visible && contextMenu.type === 'message',
+    { x: contextMenu.x, y: contextMenu.y },
+    contextMenuRef
+  );
+
   const {
     messageToForward,
     forwardModalVisible,
@@ -156,6 +181,72 @@ const ChatRoom = ({
   const notificationConnectionRef = useRef(null);
 
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape') return;
+
+      if (contextMenu.visible) {
+        closeContextMenu();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (forwardModalVisible) {
+        closeForwardModal();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (showChatInfo) {
+        setShowChatInfo(false);
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (showAddUserModal) {
+        setShowAddUserModal(false);
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (showCallTypeSelector) {
+        setShowCallTypeSelector(false);
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (pendingMediaSend?.files?.length > 0) {
+        return;
+      }
+      if (stickerPickerOpen) {
+        setStickerPickerOpen(false);
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (editingMessageId) {
+        setEditingMessageId(null);
+        setNewMessage('');
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (replyingToMessage) {
+        setReplyingToMessage(null);
+        e.stopImmediatePropagation();
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape, true);
+    return () => document.removeEventListener('keydown', handleEscape, true);
+  }, [
+    contextMenu.visible,
+    closeContextMenu,
+    forwardModalVisible,
+    closeForwardModal,
+    showChatInfo,
+    showAddUserModal,
+    showCallTypeSelector,
+    pendingMediaSend,
+    stickerPickerOpen,
+    editingMessageId,
+    replyingToMessage,
+  ]);
 
   const renderTextWithLinks = useCallback((text, keyPrefix) => {
     const parts = splitTextWithLinks(text);
@@ -1148,10 +1239,11 @@ const ChatRoom = ({
 
         {contextMenu.visible && contextMenu.type === 'message' && (
           <div 
+            ref={contextMenuRef}
             className="context-menu"
             style={{
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`
+              left: `${contextMenuPosition.x}px`,
+              top: `${contextMenuPosition.y}px`
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1159,12 +1251,18 @@ const ChatRoom = ({
               onClick={() => handleReplyToMessage(messages.find(m => m.messageId === contextMenu.messageId))}
               className="context-menu-button"
             >
+              <span className="context-menu-button-icon" aria-hidden="true">
+                <ReplyOutlined fontSize="inherit" />
+              </span>
               Ответить
             </button>
             <button 
               onClick={() => handleForwardMessage(messages.find(m => m.messageId === contextMenu.messageId))}
               className="context-menu-button"
             >
+              <span className="context-menu-button-icon" aria-hidden="true">
+                <ForwardOutlined fontSize="inherit" />
+              </span>
               Переслать
             </button>
             {contextMenu.isOwnMessage && (() => {
@@ -1179,6 +1277,9 @@ const ChatRoom = ({
                   }}
                   className="context-menu-button"
                 >
+                  <span className="context-menu-button-icon" aria-hidden="true">
+                    <EditOutlined fontSize="inherit" />
+                  </span>
                   Редактировать
                 </button>
               );
@@ -1189,8 +1290,11 @@ const ChatRoom = ({
                   handleDeleteMessage(contextMenu.messageId);
                   closeContextMenu();
                 }}
-                className="context-menu-button"
+                className="context-menu-button danger"
               >
+                <span className="context-menu-button-icon" aria-hidden="true">
+                  <DeleteOutline fontSize="inherit" />
+                </span>
                 Удалить
               </button>
             )}

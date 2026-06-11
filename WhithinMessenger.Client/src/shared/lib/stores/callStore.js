@@ -37,6 +37,34 @@ const isBannerImage = (banner) => {
   return false;
 };
 
+const normalizeChannelId = (channelId) => (channelId == null ? '' : String(channelId));
+
+let voiceJoinGeneration = 0;
+let voiceJoinChain = Promise.resolve();
+
+const bumpVoiceJoinGeneration = () => {
+  voiceJoinGeneration += 1;
+  return voiceJoinGeneration;
+};
+
+const isVoiceJoinCurrent = (generation) => generation === voiceJoinGeneration;
+
+const enqueueVoiceJoin = (task) => {
+  const run = () => task();
+  const next = voiceJoinChain.then(run, run);
+  voiceJoinChain = next.catch(() => {});
+  return next;
+};
+
+export const isSameVoiceChannel = (left, right) => {
+  const leftId = normalizeChannelId(left);
+  const rightId = normalizeChannelId(right);
+  return leftId !== '' && leftId === rightId;
+};
+
+const resolveParticipantUserId = (participant) =>
+  participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
+
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
   { urls: ['stun:185.119.59.23:3478'] },
@@ -225,14 +253,16 @@ export const useCallStore = create(
       // Voice Activity Detection (VAD) функции
       updateSpeakingState: (userId, isSpeaking) => {
         const state = get();
-        // Не обновляем состояние говорения если микрофон замьючен (для локального пользователя)
-        if (userId === state.currentUserId && state.isMuted && isSpeaking) {
-          return; // Игнорируем speaking=true когда мьют включен
+        const normalizedUserId = String(userId);
+        const currentUserId = String(state.currentUserId || '');
+
+        if (normalizedUserId === currentUserId && state.isMuted && isSpeaking) {
+          return;
         }
-        
+
         set((prevState) => {
           const newSpeakingStates = new Map(prevState.participantSpeakingStates);
-          newSpeakingStates.set(userId, isSpeaking);
+          newSpeakingStates.set(normalizedUserId, isSpeaking);
           return { participantSpeakingStates: newSpeakingStates };
         });
       },
@@ -248,60 +278,118 @@ export const useCallStore = create(
       
       // Управление участниками голосовых каналов (для отображения в списке каналов)
       setVoiceChannelParticipants: (channelId, participants) => {
+        const key = normalizeChannelId(channelId);
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
           if (participants && participants.length > 0) {
-            newMap.set(channelId, participants);
+            newMap.set(key, participants);
           } else {
-            newMap.delete(channelId);
+            newMap.delete(key);
           }
           return { voiceChannelParticipants: newMap };
         });
       },
       
       addVoiceChannelParticipant: (channelId, participant) => {
+        const key = normalizeChannelId(channelId);
+        const participantId = resolveParticipantUserId(participant);
+        if (!participantId) return;
+
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
-          const currentParticipants = newMap.get(channelId) || [];
-          // Проверяем, нет ли уже такого участника (проверяем и odUserId и userId)
-          const participantId = participant.odUserId || participant.userId;
-          if (!currentParticipants.some(p => (p.odUserId === participantId) || (p.userId === participantId))) {
-            newMap.set(channelId, [...currentParticipants, participant]);
+          const currentParticipants = newMap.get(key) || [];
+          const existingIndex = currentParticipants.findIndex(
+            (p) => String(resolveParticipantUserId(p)) === String(participantId)
+          );
+
+          if (existingIndex >= 0) {
+            const updatedParticipants = [...currentParticipants];
+            updatedParticipants[existingIndex] = {
+              ...updatedParticipants[existingIndex],
+              ...participant,
+              odUserId: participant.odUserId || participant.userId || updatedParticipants[existingIndex].odUserId,
+              userId: participant.userId || participant.odUserId || updatedParticipants[existingIndex].userId,
+            };
+            newMap.set(key, updatedParticipants);
+          } else {
+            newMap.set(key, [...currentParticipants, participant]);
           }
+
           return { voiceChannelParticipants: newMap };
         });
       },
       
       removeVoiceChannelParticipant: (channelId, odUserId) => {
+        const key = normalizeChannelId(channelId);
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
-          const currentParticipants = newMap.get(channelId) || [];
-          const filteredParticipants = currentParticipants.filter(p => p.odUserId !== odUserId && p.userId !== odUserId);
+          const currentParticipants = newMap.get(key) || [];
+          const filteredParticipants = currentParticipants.filter(
+            (p) => String(resolveParticipantUserId(p)) !== String(odUserId)
+          );
           if (filteredParticipants.length > 0) {
-            newMap.set(channelId, filteredParticipants);
+            newMap.set(key, filteredParticipants);
           } else {
-            newMap.delete(channelId);
+            newMap.delete(key);
           }
           return { voiceChannelParticipants: newMap };
         });
       },
       
       updateVoiceChannelParticipant: (channelId, odUserId, updates) => {
+        const key = normalizeChannelId(channelId);
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
-          const currentParticipants = newMap.get(channelId) || [];
-          const updatedParticipants = currentParticipants.map(p => 
-            (p.odUserId === odUserId || p.userId === odUserId) ? { ...p, ...updates } : p
+          const currentParticipants = newMap.get(key) || [];
+          const updatedParticipants = currentParticipants.map((p) =>
+            String(resolveParticipantUserId(p)) === String(odUserId) ? { ...p, ...updates } : p
           );
-          newMap.set(channelId, updatedParticipants);
+          newMap.set(key, updatedParticipants);
           return { voiceChannelParticipants: newMap };
         });
       },
+
+      handleVoiceConnectionLost: () => {
+        const state = get();
+        const roomId = state.currentRoomId;
+        if (!roomId) return;
+
+        const remoteParticipants = state.participants.filter(
+          (participant) => String(participant.userId) !== String(state.currentUserId)
+        );
+
+        remoteParticipants.forEach((participant) => {
+          get().cleanupVAD(participant.userId);
+        });
+
+        set({
+          participants: state.participants.filter(
+            (participant) => String(participant.userId) === String(state.currentUserId)
+          ),
+          isConnected: false,
+        });
+
+        get().setVoiceChannelParticipants(
+          roomId,
+          state.currentUserId
+            ? [{
+                odUserId: state.currentUserId,
+                userId: state.currentUserId,
+                userName: state.currentUserName,
+                isMuted: state.isMuted,
+                isGlobalAudioMuted: state.isGlobalAudioMuted || false,
+                isAudioDisabled: state.isGlobalAudioMuted || false,
+                isDeafened: state.isGlobalAudioMuted || false,
+              }]
+            : []
+        );
+      },
       
       clearVoiceChannelParticipants: (channelId) => {
+        const key = normalizeChannelId(channelId);
         set((state) => {
           const newMap = new Map(state.voiceChannelParticipants);
-          newMap.delete(channelId);
+          newMap.delete(key);
           return { voiceChannelParticipants: newMap };
         });
       },
@@ -320,21 +408,19 @@ export const useCallStore = create(
         
         const detector = new VoiceActivityDetector({
           audioContext,
-          threshold: 30, // Увеличен порог для меньшей чувствительности
-          holdTime: 350,
+          threshold: 14,
+          holdTime: 300,
           onSpeakingChange: (isSpeaking) => {
-            // Проверяем состояние мьюта перед обновлением
             const currentState = get();
+            const localUserId = String(currentState.currentUserId || userId);
             if (currentState.isMuted) {
-              // Если замьючен, всегда устанавливаем speaking = false
-              if (currentState.participantSpeakingStates.get(userId)) {
-                get().resetSpeakingState(userId);
+              if (currentState.participantSpeakingStates.get(localUserId)) {
+                get().resetSpeakingState(localUserId);
               }
               return;
             }
-            
-            // Индикатор говорения — только по локальному анализу микрофона, без сети
-            get().updateSpeakingState(userId, isSpeaking);
+
+            get().updateSpeakingState(localUserId, isSpeaking);
           }
         });
         
@@ -458,6 +544,8 @@ export const useCallStore = create(
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
+          voiceCallApi.off('voiceServerDisconnected');
+          voiceCallApi.off('voiceServerReconnected');
           
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
@@ -465,6 +553,27 @@ export const useCallStore = create(
           }
           
           await voiceCallApi.connect(userId, userName);
+
+          voiceCallApi.on('voiceServerDisconnected', () => {
+            console.warn('[callStore] Voice server connection lost');
+            get().handleVoiceConnectionLost();
+          });
+
+          voiceCallApi.on('voiceServerReconnected', async () => {
+            const state = get();
+            if (!state.isInCall || !state.currentRoomId) return;
+
+            console.log('[callStore] Rejoining voice room after reconnect:', state.currentRoomId);
+            set({ isConnected: true });
+            try {
+              await get().joinRoom(
+                state.currentRoomId,
+                state.currentCall?.channelName || state.currentRoomId
+              );
+            } catch (error) {
+              console.error('Failed to rejoin voice room after reconnect:', error);
+            }
+          });
           
           // Устанавливаем isConnected сразу после успешного подключения
           set({ isConnected: true });
@@ -472,6 +581,13 @@ export const useCallStore = create(
           // Регистрируем обработчики событий
           voiceCallApi.on('peerJoined', async (peerData) => {
             console.log('Peer joined:', peerData);
+            const activeRoomId = normalizeChannelId(get().currentRoomId);
+            const apiRoomId = normalizeChannelId(voiceCallApi.roomId);
+            if (activeRoomId && apiRoomId && activeRoomId !== apiRoomId) {
+              console.log('[callStore] peerJoined ignored: room mismatch', { activeRoomId, apiRoomId });
+              return;
+            }
+
             const socketId = peerData.peerId || peerData.id;
             const peerUserId = peerData.userId;
             
@@ -537,6 +653,7 @@ export const useCallStore = create(
             if (currentRoomId) {
               get().addVoiceChannelParticipant(currentRoomId, {
                 odUserId: peerData.userId,
+                userId: peerData.userId,
                 userName: peerData.name || peerData.userName,
                 isMuted: peerData.isMuted || false,
                 isGlobalAudioMuted: peerData.isGlobalAudioMuted || false,
@@ -556,8 +673,19 @@ export const useCallStore = create(
 
           voiceCallApi.on('peerLeft', (peerData) => {
             console.log('Peer left:', peerData);
+            const activeRoomId = normalizeChannelId(get().currentRoomId);
+            const apiRoomId = normalizeChannelId(voiceCallApi.roomId);
+            if (activeRoomId && apiRoomId && activeRoomId !== apiRoomId) {
+              console.log('[callStore] peerLeft ignored: room mismatch', { activeRoomId, apiRoomId });
+              return;
+            }
+
             const socketId = peerData.peerId || peerData.id;
-            const userId = peerData.userId || get().peerIdToUserIdMap.get(socketId);
+            const userId =
+              peerData.userId ||
+              peerData.peerId ||
+              peerData.id ||
+              get().peerIdToUserIdMap.get(socketId);
             
             if (userId) {
               // Очищаем audio element
@@ -1272,201 +1400,326 @@ export const useCallStore = create(
         }
       },
       
-      // Присоединение к комнате
-      joinRoom: async (roomId, channelName = null) => {
+      applyExistingPeers: (existingPeers) => {
+        if (!existingPeers?.length) return;
+
         const state = get();
-        
-        // Проверяем соединение
-        if (!state.isConnected && !voiceCallApi.isConnected) {
-          console.error('joinRoom: Not connected to voice server');
-          throw new Error('Not connected to voice server');
-        }
-        
-        try {
-          console.log('Joining room:', roomId, 'channelName:', channelName);
-          
-          // Получаем профиль пользователя для передачи аватара
-          let userAvatar = null;
-          let userAvatarColor = '#5865f2';
-          try {
-            const profile = await userApi.getProfile(state.currentUserId);
-            if (profile) {
-              userAvatar = profile.avatar || null;
-              userAvatarColor = profile.avatarColor || '#5865f2';
-            }
-          } catch (err) {
-            console.warn('Failed to load profile for joinRoom:', err);
+        const newMap = new Map(state.peerIdToUserIdMap);
+        existingPeers.forEach((peer) => {
+          const socketId = peer.peerId || peer.id;
+          if (socketId && peer.userId) {
+            newMap.set(socketId, peer.userId);
           }
-          
-          const response = await voiceCallApi.joinRoom(
-            roomId, 
-            state.currentUserName, 
-            state.currentUserId, 
-            state.isMuted, 
-            !state.isGlobalAudioMuted,
-            userAvatar,
-            userAvatarColor
-          );
-          
-          // LiveKit doesn't need routerRtpCapabilities or device initialization
-          // Audio/video tracks are managed automatically by LiveKit
-          
-          if (response.existingPeers) {
-            // Сохраняем маппинг для существующих пиров
-            const newMap = new Map(state.peerIdToUserIdMap);
-            response.existingPeers.forEach(peer => {
-              const socketId = peer.peerId || peer.id;
-              if (socketId && peer.userId) {
-                newMap.set(socketId, peer.userId);
-                console.log('[VAD] existingPeers: Added mapping', { socketId, userId: peer.userId });
-              }
-            });
-            console.log('[VAD] existingPeers mappings:', Array.from(newMap.entries()));
-            
-            // Сначала устанавливаем участников без профилей
-            set({
-              peerIdToUserIdMap: newMap,
-              participants: response.existingPeers.map(peer => ({
-                userId: peer.userId,
-                peerId: peer.peerId || peer.id,
-                name: peer.name,
-                isMuted: peer.isMuted || false,
-                isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
-                isGlobalAudioMuted: peer.isGlobalAudioMuted || false, // Добавляем статус глобального звука
-                isSpeaking: false,
-                avatar: null,
-                avatarColor: '#5865f2',
-                banner: null
-              }))
-            });
-            
-            // Затем асинхронно загружаем профили для всех участников
-            Promise.all(response.existingPeers.map(async (peer) => {
-              try {
-                const profile = await userApi.getProfile(peer.userId);
-                if (profile) {
-                  // Определяем, является ли banner изображением или цветом
-                  const bannerIsImage = isBannerImage(profile.banner);
-                  const bannerValue = profile.banner 
-                    ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
-                    : null;
-                  
-                  const profileData = {
-                    avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
-                    avatarColor: profile.avatarColor || '#5865f2',
-                    banner: bannerValue
-                  };
-                  
-                  // Обновляем участника с данными профиля
-                  set((state) => ({
-                    participants: state.participants.map(p => 
-                      p.userId === peer.userId 
-                        ? { ...p, ...profileData }
-                        : p
-                    )
-                  }));
-                }
-              } catch (error) {
-                console.warn('Failed to load profile for existing peer:', peer.userId, error);
-              }
-            })).catch(error => {
-              console.warn('Error loading profiles for existing peers:', error);
-            });
-          }
-          
-          if (response.existingProducers && response.existingProducers.length > 0) {
-            for (const producer of response.existingProducers) {
-              try {
-                await state.handleNewProducer(producer);
-              } catch (error) {
-                console.error('Failed to process existing producer:', error);
-              }
-            }
-          }
-          
-          // Для LiveKit аудио публикуется автоматически при подключении к комнате
-          // Но мы все равно инициализируем локальный поток для шумоподавления
-          await state.createAudioStream();
-          
-          // Отправляем начальное состояние микрофона и наушников на сервер
-          const currentState = get();
-          if (voiceCallApi.socket) {
-            // Отправляем состояние микрофона
-            voiceCallApi.socket.emit('muteState', { isMuted: currentState.isMuted });
-            console.log('📤 Initial mic state sent to server:', currentState.isMuted);
-            
-            // Отправляем состояние наушников
-            voiceCallApi.socket.emit('audioState', { 
-              isEnabled: !currentState.isGlobalAudioMuted,
-              isGlobalAudioMuted: currentState.isGlobalAudioMuted,
-              userId: currentState.currentUserId
-            });
-            console.log('📤 Initial audio state sent to server:', !currentState.isGlobalAudioMuted);
-          }
-          
-          // Используем переданное название канала, иначе используем roomId
-          // НЕ используем старое название из currentCall, чтобы избежать проблем при переключении
-          const finalChannelName = channelName || roomId;
-          console.log('joinRoom: Setting currentCall with channelName:', finalChannelName, 'for roomId:', roomId);
-          set({ 
-            currentRoomId: roomId, 
-            isInCall: true, 
-            currentCall: { 
-              channelId: roomId, 
-              channelName: finalChannelName 
-            } 
-          });
-          
-          // Обновляем voiceChannelParticipants для отображения в списке каналов
-          const afterJoinState = get();
-          const currentUserData = {
-            odUserId: afterJoinState.currentUserId,
-            userName: afterJoinState.currentUserName,
-            isMuted: afterJoinState.isMuted,
-            isGlobalAudioMuted: afterJoinState.isGlobalAudioMuted || false,
-            isAudioDisabled: afterJoinState.isGlobalAudioMuted || false,
-            isDeafened: afterJoinState.isGlobalAudioMuted || false,
+        });
+
+        set({
+          peerIdToUserIdMap: newMap,
+          participants: existingPeers.map((peer) => ({
+            userId: peer.userId,
+            peerId: peer.peerId || peer.id,
+            name: peer.name,
+            isMuted: peer.isMuted || false,
+            isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
+            isGlobalAudioMuted: peer.isGlobalAudioMuted || false,
+            isSpeaking: false,
             avatar: null,
-            avatarColor: '#5865f2'
-          };
-          
-          // Загружаем профиль текущего пользователя
+            avatarColor: '#5865f2',
+            banner: null,
+          })),
+        });
+
+        const applyRoomId = normalizeChannelId(get().currentRoomId);
+
+        Promise.all(existingPeers.map(async (peer) => {
           try {
-            const profile = await userApi.getProfile(afterJoinState.currentUserId);
-            if (profile) {
-              currentUserData.avatar = profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null;
-              currentUserData.avatarColor = profile.avatarColor || '#5865f2';
+            const profile = await userApi.getProfile(peer.userId);
+            if (!profile) return;
+
+            if (normalizeChannelId(get().currentRoomId) !== applyRoomId) {
+              return;
             }
-          } catch (e) {
-            console.warn('Failed to load current user profile for voice channel:', e);
+
+            const bannerIsImage = isBannerImage(profile.banner);
+            const bannerValue = profile.banner
+              ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
+              : null;
+
+            set((currentState) => ({
+              participants: currentState.participants.map((participant) =>
+                participant.userId === peer.userId
+                  ? {
+                      ...participant,
+                      avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
+                      avatarColor: profile.avatarColor || '#5865f2',
+                      banner: bannerValue,
+                    }
+                  : participant
+              ),
+            }));
+          } catch (error) {
+            console.warn('Failed to load profile for existing peer:', peer.userId, error);
           }
-          
-          // Формируем список участников канала
-          const channelParticipants = [
-            currentUserData,
-            ...afterJoinState.participants.map(p => ({
-              odUserId: p.userId,
-              userName: p.name || p.userName,
-              isMuted: p.isMuted,
-              isGlobalAudioMuted: p.isGlobalAudioMuted || false,
-              isAudioDisabled: p.isGlobalAudioMuted || false,
-              isDeafened: p.isGlobalAudioMuted || false,
-              avatar: p.avatar,
-              avatarColor: p.avatarColor || '#5865f2'
-            }))
-          ];
-          
-          get().setVoiceChannelParticipants(roomId, channelParticipants);
-          console.log('📢 Voice channel participants updated:', channelParticipants);
-          
-          // Воспроизводим звук подключения для самого пользователя
-          audioNotificationManager.playUserJoinedSound().catch(error => {
-            console.warn('Failed to play user joined sound for self:', error);
-          });
+        })).catch((error) => {
+          console.warn('Error loading profiles for existing peers:', error);
+        });
+      },
+
+      refreshVoiceChannelParticipantsList: async (roomId) => {
+        const afterJoinState = get();
+        const currentUserData = {
+          odUserId: afterJoinState.currentUserId,
+          userId: afterJoinState.currentUserId,
+          userName: afterJoinState.currentUserName,
+          isMuted: afterJoinState.isMuted,
+          isGlobalAudioMuted: afterJoinState.isGlobalAudioMuted || false,
+          isAudioDisabled: afterJoinState.isGlobalAudioMuted || false,
+          isDeafened: afterJoinState.isGlobalAudioMuted || false,
+          avatar: null,
+          avatarColor: '#5865f2',
+        };
+
+        try {
+          const profile = await userApi.getProfile(afterJoinState.currentUserId);
+          if (profile) {
+            currentUserData.avatar = profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null;
+            currentUserData.avatarColor = profile.avatarColor || '#5865f2';
+          }
         } catch (error) {
-          console.error('Failed to join room:', error);
-          set({ error: error.message });
+          console.warn('Failed to load current user profile for voice channel:', error);
         }
+
+        const channelParticipants = [
+          currentUserData,
+          ...afterJoinState.participants.map((participant) => ({
+            odUserId: participant.userId,
+            userId: participant.userId,
+            userName: participant.name || participant.userName,
+            isMuted: participant.isMuted,
+            isGlobalAudioMuted: participant.isGlobalAudioMuted || false,
+            isAudioDisabled: participant.isGlobalAudioMuted || false,
+            isDeafened: participant.isGlobalAudioMuted || false,
+            avatar: participant.avatar,
+            avatarColor: participant.avatarColor || '#5865f2',
+          })),
+        ];
+
+        get().setVoiceChannelParticipants(normalizeChannelId(roomId), channelParticipants);
+      },
+
+      resyncActiveCall: async (roomId = null) => {
+        const state = get();
+        const targetRoomId = normalizeChannelId(roomId || state.currentRoomId);
+        if (!targetRoomId || !voiceCallApi.room) return;
+
+        console.log('[callStore] Resyncing active call participants for room:', targetRoomId);
+
+        let userAvatar = null;
+        let userAvatarColor = '#5865f2';
+        try {
+          const profile = await userApi.getProfile(state.currentUserId);
+          if (profile) {
+            userAvatar = profile.avatar || null;
+            userAvatarColor = profile.avatarColor || '#5865f2';
+          }
+        } catch (error) {
+          console.warn('Failed to load profile for resyncActiveCall:', error);
+        }
+
+        const response = await voiceCallApi.joinRoom(
+          targetRoomId,
+          state.currentUserName,
+          state.currentUserId,
+          state.isMuted,
+          !state.isGlobalAudioMuted,
+          userAvatar,
+          userAvatarColor
+        );
+
+        if (response?.existingPeers?.length) {
+          get().applyExistingPeers(response.existingPeers);
+        }
+
+        voiceCallApi.syncExistingRemoteTracks();
+        await get().refreshVoiceChannelParticipantsList(targetRoomId);
+
+        const afterResync = get();
+        if (!afterResync.localVoiceActivityDetector) {
+          await get().createAudioStream();
+        }
+
+        try {
+          const { default: voiceChannelService } = await import('../services/voiceChannelService');
+          voiceChannelService.subscribeToChannel(targetRoomId);
+          voiceChannelService.requestChannelParticipants(targetRoomId, true);
+        } catch (error) {
+          console.warn('[callStore] Failed to refresh voice channel service participants:', error);
+        }
+      },
+
+      // Присоединение к комнате (очередь + generation — защита от гонок при быстром переключении каналов)
+      joinRoom: async (roomId, channelName = null) => {
+        const joinGen = bumpVoiceJoinGeneration();
+        const normalizedRoomId = normalizeChannelId(roomId);
+
+        return enqueueVoiceJoin(async () => {
+          const state = get();
+
+          if (
+            state.isInCall &&
+            isSameVoiceChannel(state.currentRoomId, normalizedRoomId) &&
+            voiceCallApi.room
+          ) {
+            const finalChannelName = channelName || state.currentCall?.channelName || normalizedRoomId;
+            if (state.currentCall?.channelName !== finalChannelName) {
+              set({
+                currentCall: {
+                  channelId: normalizedRoomId,
+                  channelName: finalChannelName,
+                },
+              });
+            }
+            console.log('joinRoom: Already in this room, resyncing participants');
+            await get().resyncActiveCall(normalizedRoomId);
+            return;
+          }
+
+          if (!isVoiceJoinCurrent(joinGen)) {
+            console.log('joinRoom: superseded before start');
+            return;
+          }
+
+          if (!state.isConnected && !voiceCallApi.isConnected) {
+            console.error('joinRoom: Not connected to voice server');
+            throw new Error('Not connected to voice server');
+          }
+
+          if (
+            state.isInCall &&
+            state.currentRoomId &&
+            !isSameVoiceChannel(state.currentRoomId, normalizedRoomId)
+          ) {
+            await get()._leaveRoomCore();
+            if (!isVoiceJoinCurrent(joinGen)) {
+              console.log('joinRoom: superseded after leave');
+              return;
+            }
+          }
+
+          try {
+            console.log('Joining room:', normalizedRoomId, 'channelName:', channelName);
+
+            const finalChannelName = channelName || normalizedRoomId;
+
+            set({
+              participants: [],
+              peerIdToUserIdMap: new Map(),
+              participantMuteStates: new Map(),
+              participantAudioStates: new Map(),
+              participantGlobalAudioStates: new Map(),
+              participantVideoStates: new Map(),
+              participantSpeakingStates: new Map(),
+            });
+
+            let userAvatar = null;
+            let userAvatarColor = '#5865f2';
+            try {
+              const profile = await userApi.getProfile(state.currentUserId);
+              if (profile) {
+                userAvatar = profile.avatar || null;
+                userAvatarColor = profile.avatarColor || '#5865f2';
+              }
+            } catch (err) {
+              console.warn('Failed to load profile for joinRoom:', err);
+            }
+
+            if (!isVoiceJoinCurrent(joinGen)) {
+              console.log('joinRoom: superseded after profile load');
+              return;
+            }
+
+            const response = await voiceCallApi.joinRoom(
+              normalizedRoomId,
+              state.currentUserName,
+              state.currentUserId,
+              state.isMuted,
+              !state.isGlobalAudioMuted,
+              userAvatar,
+              userAvatarColor
+            );
+
+            if (!isVoiceJoinCurrent(joinGen)) {
+              console.log('joinRoom: superseded after LiveKit join');
+              return;
+            }
+
+            set({
+              currentRoomId: normalizedRoomId,
+              isInCall: true,
+              currentCall: {
+                channelId: normalizedRoomId,
+                channelName: finalChannelName,
+              },
+            });
+
+            if (response.existingPeers?.length) {
+              get().applyExistingPeers(response.existingPeers);
+            }
+
+            if (!isVoiceJoinCurrent(joinGen)) {
+              return;
+            }
+
+            voiceCallApi.syncExistingRemoteTracks();
+
+            if (response.existingProducers?.length) {
+              for (const producer of response.existingProducers) {
+                if (!isVoiceJoinCurrent(joinGen)) return;
+                try {
+                  await get().handleNewProducer(producer);
+                } catch (error) {
+                  console.error('Failed to process existing producer:', error);
+                }
+              }
+            }
+
+            await get().createAudioStream();
+
+            if (!isVoiceJoinCurrent(joinGen)) {
+              return;
+            }
+
+            const currentState = get();
+            if (voiceCallApi.socket) {
+              voiceCallApi.socket.emit('muteState', { isMuted: currentState.isMuted });
+              voiceCallApi.socket.emit('audioState', {
+                isEnabled: !currentState.isGlobalAudioMuted,
+                isGlobalAudioMuted: currentState.isGlobalAudioMuted,
+                userId: currentState.currentUserId,
+              });
+            }
+
+            await get().refreshVoiceChannelParticipantsList(normalizedRoomId);
+
+            try {
+              const { default: voiceChannelService } = await import('../services/voiceChannelService');
+              voiceChannelService.subscribeToChannel(normalizedRoomId);
+              voiceChannelService.requestChannelParticipants(normalizedRoomId, true);
+            } catch (error) {
+              console.warn('[callStore] Failed to refresh voice channel service on join:', error);
+            }
+
+            if (!response.alreadyJoined) {
+              audioNotificationManager.playUserJoinedSound().catch((error) => {
+                console.warn('Failed to play user joined sound for self:', error);
+              });
+            }
+          } catch (error) {
+            if (isVoiceJoinCurrent(joinGen)) {
+              console.error('Failed to join room:', error);
+              set({ error: error.message });
+            }
+          }
+        });
       },
       
       // Инициализация устройства
@@ -1752,35 +2005,61 @@ export const useCallStore = create(
         try {
           const state = get();
           
-          // Для LiveKit не нужен sendTransport - аудио публикуется автоматически
-          // Проверяем, подключены ли мы к LiveKit комнате
           const room = voiceCallApi.getRoom();
           if (!room) {
             console.warn('No LiveKit room available, skipping audio stream creation');
             return;
           }
           
-          // Останавливаем старый поток если есть
           if (state.localStream) {
-            state.localStream.getTracks().forEach(track => track.stop());
+            state.localStream.getTracks().forEach((track) => {
+              if (track.readyState !== 'ended') {
+                track.stop();
+              }
+            });
           }
           
-          // Очищаем старое шумоподавление (если было инициализировано ранее)
           if (state.noiseSuppressionManager) {
             state.noiseSuppressionManager.cleanup();
           }
-          
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000,
-              channelCount: 1,
-              latency: 0,
-              suppressLocalAudioPlayback: true
+
+          const getLiveKitMicStream = () => {
+            const liveKitTrack = voiceCallApi.getLocalAudioTrack();
+            if (
+              liveKitTrack?.mediaStreamTrack &&
+              liveKitTrack.mediaStreamTrack.readyState !== 'ended'
+            ) {
+              return new MediaStream([liveKitTrack.mediaStreamTrack]);
             }
-          });
+            return null;
+          };
+
+          let stream = getLiveKitMicStream();
+          if (!stream) {
+            await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            stream = getLiveKitMicStream();
+          }
+
+          const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
+          const wantsNoiseSuppression = savedNoiseSuppression
+            ? JSON.parse(savedNoiseSuppression)
+            : false;
+
+          if (!stream || wantsNoiseSuppression) {
+            const capturedStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 48000,
+                channelCount: 1,
+                latency: 0,
+                suppressLocalAudioPlayback: true,
+              },
+            });
+            stream = capturedStream;
+          }
 
           set({ localStream: stream, audioStream: stream });
           
@@ -1828,10 +2107,7 @@ export const useCallStore = create(
           // Устанавливаем состояние микрофона
           audioTrack.enabled = !state.isMuted;
           
-          // Если шумоподавление включено по умолчанию, включаем его
-          const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
-          const isNoiseSuppressed = savedNoiseSuppression ? JSON.parse(savedNoiseSuppression) : false;
-          if (isNoiseSuppressed) {
+          if (wantsNoiseSuppression) {
             await noiseSuppressionManager.enable(state.noiseSuppressionMode || 'rnnoise');
             set({ isNoiseSuppressed: true });
             
@@ -2316,100 +2592,101 @@ export const useCallStore = create(
         }
       },
       
-      // Быстрый выход из комнаты без закрытия соединения (для переключения между каналами)
-      leaveRoom: async () => {
-        try {
-          const state = get();
-          
-          if (!state.currentRoomId) {
-            return;
-          }
-          
-          const roomIdToLeave = state.currentRoomId;
-          console.log('leaveRoom: Leaving room', roomIdToLeave);
-          
-          // Очищаем voiceChannelParticipants для текущего канала
+      _leaveRoomCore: async () => {
+        const state = get();
+
+        if (!state.currentRoomId && !voiceCallApi.room) {
+          return;
+        }
+
+        const roomIdToLeave = state.currentRoomId || voiceCallApi.roomId;
+        console.log('leaveRoom: Leaving room', roomIdToLeave);
+
+        if (roomIdToLeave) {
           get().clearVoiceChannelParticipants(roomIdToLeave);
-          
-          // Удаляем текущего пользователя из списка участников канала
           if (state.currentUserId) {
             get().removeVoiceChannelParticipant(roomIdToLeave, state.currentUserId);
           }
-          
-          // Останавливаем локальные треки
-          if (state.localStream) {
-            state.localStream.getTracks().forEach(track => track.stop());
-          }
-          
-          // Очистка шумоподавления
-          if (state.noiseSuppressionManager) {
-            state.noiseSuppressionManager.cleanup();
-          }
-          
-          // Очистка всех Voice Activity Detectors
-          get().cleanupAllVAD();
-          
-          // Очищаем audio elements и gain nodes
-          state.audioElements.forEach(audioElement => {
-            try {
-              audioElement.pause();
-              audioElement.srcObject = null;
-              if (audioElement.parentNode) {
-                audioElement.parentNode.removeChild(audioElement);
-              }
-            } catch (e) {
-              console.warn('Error removing audio element:', e);
-            }
-          });
-          
-          state.gainNodes.forEach(gainNode => {
-            try {
-              gainNode.disconnect();
-            } catch (e) {
-              console.warn('Error disconnecting gain node:', e);
-            }
-          });
-
-          if (state.audioContext && state.audioContext.state !== 'closed') {
-            await state.audioContext.close();
-          }
-          
-          // Выходим из комнаты LiveKit, но сохраняем соединение
-          await voiceCallApi.leaveRoom();
-          
-          // Очищаем состояние комнаты, но сохраняем соединение
-          set({
-            isInCall: false,
-            currentRoomId: null,
-            currentCall: null,
-            participants: [],
-            participantMuteStates: new Map(),
-            participantAudioStates: new Map(),
-            participantGlobalAudioStates: new Map(),
-            participantVideoStates: new Map(),
-            userVolumes: new Map(),
-            userMutedStates: new Map(),
-            showVolumeSliders: new Map(),
-            gainNodes: new Map(),
-            audioElements: new Map(),
-            previousVolumes: new Map(),
-            peerIdToUserIdMap: new Map(),
-            remoteScreenShares: new Map(),
-            isScreenShareTransitioning: false,
-            screenShareSessionId: 0,
-            localScreenTrackId: null,
-            localScreenTrackPublishedHandler: null,
-            localCameraTrackPublishedHandler: null,
-            localStream: null,
-            noiseSuppressionManager: null,
-            audioContext: null
-          });
-          
-          console.log('leaveRoom: Left room successfully, connection preserved');
-        } catch (error) {
-          console.error('Failed to leave room:', error);
-          throw error;
         }
+
+        if (state.localStream) {
+          state.localStream.getTracks().forEach((track) => track.stop());
+        }
+
+        if (state.noiseSuppressionManager) {
+          state.noiseSuppressionManager.cleanup();
+        }
+
+        get().cleanupAllVAD();
+
+        state.audioElements.forEach((audioElement) => {
+          try {
+            audioElement.pause();
+            audioElement.srcObject = null;
+            if (audioElement.parentNode) {
+              audioElement.parentNode.removeChild(audioElement);
+            }
+          } catch (e) {
+            console.warn('Error removing audio element:', e);
+          }
+        });
+
+        state.gainNodes.forEach((gainNode) => {
+          try {
+            gainNode.disconnect();
+          } catch (e) {
+            console.warn('Error disconnecting gain node:', e);
+          }
+        });
+
+        if (state.audioContext && state.audioContext.state !== 'closed') {
+          await state.audioContext.close();
+        }
+
+        await voiceCallApi.leaveRoom();
+
+        set({
+          isInCall: false,
+          currentRoomId: null,
+          currentCall: null,
+          participants: [],
+          participantMuteStates: new Map(),
+          participantAudioStates: new Map(),
+          participantGlobalAudioStates: new Map(),
+          participantVideoStates: new Map(),
+          participantSpeakingStates: new Map(),
+          userVolumes: new Map(),
+          userMutedStates: new Map(),
+          showVolumeSliders: new Map(),
+          gainNodes: new Map(),
+          audioElements: new Map(),
+          previousVolumes: new Map(),
+          peerIdToUserIdMap: new Map(),
+          remoteScreenShares: new Map(),
+          isScreenShareTransitioning: false,
+          screenShareSessionId: 0,
+          localScreenTrackId: null,
+          localScreenTrackPublishedHandler: null,
+          localCameraTrackPublishedHandler: null,
+          localStream: null,
+          noiseSuppressionManager: null,
+          audioContext: null,
+        });
+
+        console.log('leaveRoom: Left room successfully, connection preserved');
+      },
+
+      // Быстрый выход из комнаты без закрытия соединения (для переключения между каналами)
+      leaveRoom: async () => {
+        bumpVoiceJoinGeneration();
+        return enqueueVoiceJoin(async () => {
+          try {
+            await get()._leaveRoomCore();
+          } catch (error) {
+            console.error('Failed to leave room:', error);
+            throw error;
+          }
+        });
       },
       
       // Завершение звонка
@@ -2433,6 +2710,8 @@ export const useCallStore = create(
           voiceCallApi.off('newProducer');
           voiceCallApi.off('producerClosed');
           voiceCallApi.off('globalAudioStateChanged');
+          voiceCallApi.off('voiceServerDisconnected');
+          voiceCallApi.off('voiceServerReconnected');
           
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {

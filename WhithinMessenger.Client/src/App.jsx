@@ -5,6 +5,7 @@ import ThemeAppRouter from './app/router/ThemeAppRouter';
 import { GlobalCallManager } from './shared/ui/organisms';
 import { ElectronHotkeysBridge } from './shared/lib/hooks/ElectronHotkeysBridge';
 import { useGlobalTextScramble } from './shared/lib/hooks/useGlobalTextScramble';
+import { useAppLifecycleCleanup } from './shared/lib/hooks/useAppLifecycleCleanup';
 import { setupThemeWindowSync } from './shared/lib/theme/appTheme';
 import { isThemeColorsWindow } from './shared/lib/theme/themeWindow';
 import './App.css';
@@ -16,6 +17,7 @@ function MainApp() {
   });
 
   useEffect(() => setupThemeWindowSync(), []);
+  useAppLifecycleCleanup();
 
   return (
     <AppProviders>

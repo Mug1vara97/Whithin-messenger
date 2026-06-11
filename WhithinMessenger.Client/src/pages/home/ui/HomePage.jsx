@@ -13,7 +13,7 @@ import { useNotifications } from '../../../entities/notification';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { SettingsModal } from '../../../shared/ui/organisms';
+import { NotificationsModal, SettingsModal } from '../../../shared/ui/organisms';
 import { UserAvatar } from '../../../shared/ui';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
@@ -48,6 +48,7 @@ const HomePage = () => {
     notifications,
     unreadCount,
     loading: notificationsLoading,
+    error: notificationsError,
     markAsRead,
     markChatAsRead,
     deleteNotification,
@@ -619,6 +620,15 @@ const HomePage = () => {
     }
   };
 
+  const handleCloseSelectedChat = useCallback(() => {
+    setSelectedChat(null);
+    if (selectedServer?.serverId) {
+      navigate(`/server/${selectedServer.serverId}`);
+    } else {
+      navigate('/channels/@me');
+    }
+  }, [selectedServer, navigate]);
+
   const handleServerDataUpdated = useCallback((updatedServerData) => {
     console.log('HomePage: Server data updated from ServerPanel:', updatedServerData);
     console.log('HomePage: Updated categories:', updatedServerData.categories);
@@ -761,22 +771,41 @@ const HomePage = () => {
 
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        if (showCreateServerModal) {
-          setShowCreateServerModal(false);
-        } else if (showSettingsModal) {
-          setShowSettingsModal(false);
-        } else if (showNotificationsModal) {
-          setShowNotificationsModal(false);
-        }
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+
+      if (showCreateServerModal) {
+        e.preventDefault();
+        setShowCreateServerModal(false);
+        return;
+      }
+      if (showSettingsModal) {
+        e.preventDefault();
+        setShowSettingsModal(false);
+        return;
+      }
+      if (showNotificationsModal) {
+        e.preventDefault();
+        setShowNotificationsModal(false);
+        return;
+      }
+
+      if (selectedChat && !showFriends && !showDiscovery) {
+        e.preventDefault();
+        handleCloseSelectedChat();
       }
     };
 
-    if (showCreateServerModal || showSettingsModal || showNotificationsModal) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [showCreateServerModal, showSettingsModal, showNotificationsModal]);
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [
+    showCreateServerModal,
+    showSettingsModal,
+    showNotificationsModal,
+    selectedChat,
+    showFriends,
+    showDiscovery,
+    handleCloseSelectedChat,
+  ]);
 
   return (
     <div className="home-page">
@@ -845,10 +874,7 @@ const HomePage = () => {
                       channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
                       userId={user?.id || user?.userId}
                       userName={user?.username || user?.name}
-                      onClose={() => {
-                        setSelectedChat(null);
-                        navigate(selectedServer ? `/server/${selectedServer.serverId}` : '/channels/@me');
-                      }}
+                      onClose={handleCloseSelectedChat}
                     />
                   ) : (
                     <ChatRoom
@@ -915,78 +941,16 @@ const HomePage = () => {
         onClose={handleCloseSettingsModal} 
       />
 
-      {showNotificationsModal && (
-        <div 
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCloseNotificationsModal();
-            }
-          }}
-        >
-          <div className="notifications-modal">
-            <div className="modal-header">
-              <h3>Уведомления</h3>
-              <button 
-                className="modal-close-button"
-                onClick={handleCloseNotificationsModal}
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <div className="notifications-content">
-              {notificationsLoading ? (
-                <p>Загрузка уведомлений...</p>
-              ) : notifications.length === 0 ? (
-                <p>Нет новых уведомлений</p>
-              ) : (
-                <div className="notifications-list">
-                  {notifications.map((notification) => {
-                    const id = notification.id || notification.Id;
-                    const type = notification.type || notification.Type;
-                    const content = notification.content || notification.Content;
-                    const isRead = notification.isRead ?? notification.IsRead;
-                    const createdAt = notification.createdAt || notification.CreatedAt;
-                    const createdAtLabel = createdAt
-                      ? new Date(createdAt).toLocaleString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          day: '2-digit',
-                          month: '2-digit'
-                        })
-                      : '';
-                    return (
-                      <button
-                        key={id}
-                        className={`notification-item ${isRead ? 'read' : 'unread'}`}
-                        onClick={() => handleOpenNotification(notification)}
-                      >
-                        <div className="notification-item-main">
-                          <div className="notification-item-header">
-                            <span className="notification-item-type">
-                              {type === 'group_message' ? 'Группа' : 'Личное сообщение'}
-                            </span>
-                            <span className="notification-item-time">{createdAtLabel}</span>
-                          </div>
-                          <p className="notification-item-text">{content}</p>
-                        </div>
-                        <span
-                          className="notification-delete"
-                          title="Удалить уведомление"
-                          onClick={(e) => handleDeleteNotification(e, notification)}
-                        >
-                          ×
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <NotificationsModal
+        isOpen={showNotificationsModal}
+        onClose={handleCloseNotificationsModal}
+        notifications={notifications}
+        loading={notificationsLoading}
+        error={notificationsError}
+        unreadCount={unreadCount}
+        onOpenNotification={handleOpenNotification}
+        onDeleteNotification={handleDeleteNotification}
+      />
 
       {incomingCall && (
         <div className="global-incoming-call-overlay">

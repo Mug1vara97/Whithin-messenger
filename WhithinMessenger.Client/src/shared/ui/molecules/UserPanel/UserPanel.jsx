@@ -4,6 +4,7 @@ import { userApi } from '../../../../entities/user/api';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
+import { useCallStore } from '../../../lib/stores/callStore';
 import {
     getUserStatusColor,
     getUserStatusLabel,
@@ -23,7 +24,7 @@ const UserPanel = ({
     isOpen
 }) => {
     // Подключаемся к глобальному состоянию звонка напрямую в компоненте
-    const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio } = useGlobalCall();
+    const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
     
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
@@ -242,6 +243,7 @@ const UserPanel = ({
         const resetIdleTimer = () => {
             if (idleTimerId) {
                 window.clearTimeout(idleTimerId);
+                idleTimerId = null;
             }
 
             if (
@@ -251,7 +253,14 @@ const UserPanel = ({
                 applyStatus(PRESENCE_STATUS.ONLINE);
             }
 
+            if (isInCall || useCallStore.getState().isInCall) {
+                return;
+            }
+
             idleTimerId = window.setTimeout(() => {
+                if (useCallStore.getState().isInCall) {
+                    return;
+                }
                 if (
                     manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
                     currentStatusRef.current === PRESENCE_STATUS.ONLINE
@@ -276,7 +285,18 @@ const UserPanel = ({
                 window.removeEventListener(eventName, resetIdleTimer);
             });
         };
-    }, [isOpen, userId]);
+    }, [isOpen, userId, isInCall]);
+
+    useEffect(() => {
+        if (!isInCall || !userId) return;
+
+        if (
+            manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
+            currentStatusRef.current === PRESENCE_STATUS.INACTIVE
+        ) {
+            applyStatus(PRESENCE_STATUS.ONLINE);
+        }
+    }, [isInCall, userId]);
 
     useEffect(() => {
         if (!isOpen || !userId || !getConnection) return undefined;
@@ -369,37 +389,35 @@ const UserPanel = ({
                         </button>
                     </div>
                     
-                    <div className={styles['user-info']}>
-                        <span className={styles.username}>{username || 'Пользователь'}</span>
-                        <div className={styles['status-control']} ref={statusMenuRef}>
-                            <button
-                                className={styles['status-button']}
-                                onClick={() => setIsStatusMenuOpen((prev) => !prev)}
-                                title="Изменить статус"
-                                type="button"
-                            >
-                                <span className={styles['user-status-text']}>{getUserStatusLabel(currentStatus)}</span>
-                            </button>
+                    <div className={styles['user-identity']} ref={statusMenuRef}>
+                        <button
+                            className={styles['user-identity-button']}
+                            onClick={() => setIsStatusMenuOpen((prev) => !prev)}
+                            title="Изменить статус"
+                            type="button"
+                        >
+                            <span className={styles.username}>{username || 'Пользователь'}</span>
+                            <span className={styles['user-status-text']}>{getUserStatusLabel(currentStatus)}</span>
+                        </button>
 
-                            {isStatusMenuOpen && (
-                                <div className={styles['status-menu']}>
-                                    {getUserStatusOptions().map((statusOption) => (
-                                        <button
-                                            key={statusOption.value}
-                                            className={`${styles['status-menu-item']} ${currentStatus === statusOption.value ? styles['status-menu-item-active'] : ''}`}
-                                            onClick={() => handleStatusChange(statusOption.value)}
-                                            type="button"
-                                        >
-                                            <span
-                                                className={styles['status-dot']}
-                                                style={{ backgroundColor: statusOption.color }}
-                                            />
-                                            <span>{statusOption.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {isStatusMenuOpen && (
+                            <div className={styles['status-menu']}>
+                                {getUserStatusOptions().map((statusOption) => (
+                                    <button
+                                        key={statusOption.value}
+                                        className={`${styles['status-menu-item']} ${currentStatus === statusOption.value ? styles['status-menu-item-active'] : ''}`}
+                                        onClick={() => handleStatusChange(statusOption.value)}
+                                        type="button"
+                                    >
+                                        <span
+                                            className={styles['status-dot']}
+                                            style={{ backgroundColor: statusOption.color }}
+                                        />
+                                        <span>{statusOption.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     
                     <div className={styles['voice-controls']}>

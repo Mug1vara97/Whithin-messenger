@@ -195,6 +195,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             return await _context.Chats
                 .Include(c => c.Type)
+                .Include(c => c.Server)
                 .FirstOrDefaultAsync(c => c.Id == chatId, cancellationToken);
         }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
-import { MEDIA_BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { normalizeFriend } from '../lib/friendHelpers';
 
 export const useFriends = () => {
   const [friends, setFriends] = useState([]);
@@ -40,12 +40,9 @@ export const useFriends = () => {
       }
       const friendsData = await connection.invoke('GetFriends');
 
-      const formattedFriends = friendsData.map(friend => ({
-        ...friend,
-        avatar: friend.avatar
-          ? (friend.avatar.startsWith('http') ? friend.avatar : `${MEDIA_BASE_URL}${friend.avatar}`)
-          : null
-      }));
+      const formattedFriends = (friendsData || [])
+        .map(normalizeFriend)
+        .filter(Boolean);
 
       setFriends(formattedFriends);
     } catch (err) {

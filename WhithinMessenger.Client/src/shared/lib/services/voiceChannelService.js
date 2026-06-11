@@ -1,7 +1,31 @@
 import { io } from 'socket.io-client';
 import { useCallStore } from '../stores/callStore';
+import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
+
+const normalizeChannelId = (channelId) => (channelId == null ? '' : String(channelId));
+
+const resolveParticipantUserId = (participant) =>
+  participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
+
+const participantsListChanged = (next = [], prev = []) => {
+  if (next.length !== prev.length) return true;
+  const prevById = new Map(
+    prev.map((participant) => [String(resolveParticipantUserId(participant)), participant])
+  );
+  return next.some((participant) => {
+    const id = String(resolveParticipantUserId(participant));
+    const current = prevById.get(id);
+    if (!current) return true;
+    return (
+      (participant.userName || participant.name) !== (current.userName || current.name) ||
+      Boolean(participant.isMuted) !== Boolean(current.isMuted) ||
+      Boolean(participant.isSpeaking) !== Boolean(current.isSpeaking) ||
+      Boolean(participant.isAudioDisabled) !== Boolean(current.isAudioDisabled)
+    );
+  });
+};
 
 class VoiceChannelService {
   constructor() {
@@ -10,7 +34,8 @@ class VoiceChannelService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.subscribedChannels = new Set();
-    this.requestedChannels = new Set(); // Каналы для которых уже запрошены участники
+    this.requestedChannels = new Map();
+    this.refreshTimer = null;
   }
 
   connect() {
@@ -20,7 +45,7 @@ class VoiceChannelService {
     }
 
     console.log('[VoiceChannelService] Connecting to voice server for channel updates...');
-    
+
     this.socket = io(VOICE_SERVER_URL, {
       transports: ['websocket'],
       upgrade: false,
@@ -28,20 +53,16 @@ class VoiceChannelService {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
+      reconnectionDelayMax: 5000,
     });
 
     this.socket.on('connect', () => {
       console.log('[VoiceChannelService] Connected to voice server');
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      
-      // Очищаем requestedChannels при переподключении чтобы запросить заново
       this.requestedChannels.clear();
-      
-      // Запрашиваем участников для всех подписанных каналов
-      this.subscribedChannels.forEach(channelId => {
-        this.requestChannelParticipants(channelId);
+      this.subscribedChannels.forEach((channelId) => {
+        this.requestChannelParticipants(channelId, true);
       });
     });
 
@@ -55,121 +76,139 @@ class VoiceChannelService {
       this.reconnectAttempts++;
     });
 
-    // Подписываемся на события обновления участников
     this.socket.on('userJoinedVoiceChannel', (data) => {
       console.log('[VoiceChannelService] User joined voice channel:', data);
-      const { channelId, userId, userName, isMuted, isAudioDisabled, avatar, avatarColor } = data;
-      
-      // Удаляем пользователя из всех других каналов перед добавлением в новый
+      const channelId = normalizeChannelId(data.channelId);
+      const { userId, userName, isMuted, isAudioDisabled, avatar, avatarColor } = data;
+
       const state = useCallStore.getState();
       state.voiceChannelParticipants.forEach((participants, existingChannelId) => {
-        if (existingChannelId !== channelId) {
-          const hasUser = participants.some(p => 
-            (p.odUserId === userId) || (p.userId === userId)
+        if (normalizeChannelId(existingChannelId) !== channelId) {
+          const hasUser = participants.some(
+            (p) => String(resolveParticipantUserId(p)) === String(userId)
           );
           if (hasUser) {
-            console.log(`[VoiceChannelService] Removing user ${userId} from channel ${existingChannelId} before adding to ${channelId}`);
             state.removeVoiceChannelParticipant(existingChannelId, userId);
           }
         }
       });
-      
+
       useCallStore.getState().addVoiceChannelParticipant(channelId, {
         odUserId: userId,
+        userId,
         userName,
         isMuted: isMuted || false,
         isAudioDisabled: isAudioDisabled || false,
         isDeafened: isAudioDisabled || false,
         avatar: avatar || null,
-        avatarColor: avatarColor || '#5865f2'
+        avatarColor: avatarColor || '#5865f2',
       });
     });
 
     this.socket.on('userLeftVoiceChannel', (data) => {
       console.log('[VoiceChannelService] User left voice channel:', data);
-      const { channelId, userId: odUserId } = data;
-      
-      useCallStore.getState().removeVoiceChannelParticipant(channelId, odUserId);
+      const channelId = normalizeChannelId(data.channelId);
+      const userId = data.userId;
+      useCallStore.getState().removeVoiceChannelParticipant(channelId, userId);
     });
 
     this.socket.on('voiceChannelParticipantsUpdate', (data) => {
       console.log('[VoiceChannelService] Voice channel participants update:', data);
-      const { channelId, participants } = data;
-      
-      const formattedParticipants = (participants || []).map(p => ({
+      const channelId = normalizeChannelId(data.channelId);
+      const formattedParticipants = (data.participants || []).map((p) => ({
         odUserId: p.userId,
+        userId: p.userId,
         userName: p.name || p.userName,
         isMuted: p.isMuted || false,
         isSpeaking: p.isSpeaking || false,
         isAudioDisabled: p.isAudioDisabled || false,
         isDeafened: p.isAudioDisabled || false,
         avatar: p.avatar || null,
-        avatarColor: p.avatarColor || '#5865f2'
+        avatarColor: p.avatarColor || '#5865f2',
       }));
-      
-      // Удаляем всех пользователей из этого канала из других каналов
+
       const state = useCallStore.getState();
-      formattedParticipants.forEach(participant => {
-        const userId = participant.odUserId;
+      formattedParticipants.forEach((participant) => {
+        const userId = resolveParticipantUserId(participant);
         state.voiceChannelParticipants.forEach((existingParticipants, existingChannelId) => {
-          if (existingChannelId !== channelId) {
-            const hasUser = existingParticipants.some(p => 
-              (p.odUserId === userId) || (p.userId === userId)
+          if (normalizeChannelId(existingChannelId) !== channelId) {
+            const hasUser = existingParticipants.some(
+              (p) => String(resolveParticipantUserId(p)) === String(userId)
             );
             if (hasUser) {
-              console.log(`[VoiceChannelService] Removing user ${userId} from channel ${existingChannelId} (now in ${channelId})`);
               state.removeVoiceChannelParticipant(existingChannelId, userId);
             }
           }
         });
       });
-      
-      // Проверяем, изменились ли данные перед обновлением
+
+      const isActiveCallChannel =
+        state.isInCall &&
+        normalizeChannelId(state.currentRoomId) === channelId;
+      const liveKitRemoteCount = voiceCallApi?.room?.remoteParticipants?.size || 0;
+      const liveKitRoomMatches =
+        normalizeChannelId(voiceCallApi?.roomId) === channelId;
+
+      if (
+        isActiveCallChannel &&
+        formattedParticipants.length === 0 &&
+        liveKitRoomMatches &&
+        (liveKitRemoteCount > 0 || state.participants.length > 0)
+      ) {
+        console.warn(
+          '[VoiceChannelService] Ignoring empty participant update for active call channel:',
+          channelId
+        );
+        return;
+      }
+
       const currentParticipants = state.voiceChannelParticipants?.get?.(channelId) || [];
-      const hasChanged = formattedParticipants.length !== currentParticipants.length ||
-        formattedParticipants.some((p, i) => {
-          const curr = currentParticipants[i];
-          return !curr || p.odUserId !== curr.odUserId || p.isMuted !== curr.isMuted || 
-                 p.isSpeaking !== curr.isSpeaking || p.isAudioDisabled !== curr.isAudioDisabled;
-        });
-      
-      if (hasChanged) {
+      if (participantsListChanged(formattedParticipants, currentParticipants)) {
         state.setVoiceChannelParticipants(channelId, formattedParticipants);
       }
     });
 
     this.socket.on('voiceChannelParticipantStateChanged', (data) => {
       console.log('[VoiceChannelService] Voice channel participant state changed:', data);
-      const { channelId, userId: odUserId, isMuted, isSpeaking, isAudioDisabled } = data;
-      
-      useCallStore.getState().updateVoiceChannelParticipant(channelId, odUserId, {
+      const channelId = normalizeChannelId(data.channelId);
+      const userId = data.userId;
+      const { isMuted, isSpeaking, isAudioDisabled } = data;
+
+      useCallStore.getState().updateVoiceChannelParticipant(channelId, userId, {
         isMuted,
         isSpeaking,
         isAudioDisabled,
-        isDeafened: isAudioDisabled
+        isDeafened: isAudioDisabled,
       });
     });
 
-    // Обработка глобального изменения состояния наушников
     this.socket.on('globalAudioState', (data) => {
       console.log('[VoiceChannelService] Global audio state changed:', data);
       const { userId, isGlobalAudioMuted } = data;
-      
-      // Находим все каналы, где находится этот пользователь
       const state = useCallStore.getState();
+
       state.voiceChannelParticipants.forEach((participants, channelId) => {
-        const participant = participants.find(p => 
-          (p.odUserId === userId) || (p.userId === userId)
+        const participant = participants.find(
+          (p) => String(resolveParticipantUserId(p)) === String(userId)
         );
         if (participant) {
           useCallStore.getState().updateVoiceChannelParticipant(channelId, userId, {
             isGlobalAudioMuted,
             isAudioDisabled: isGlobalAudioMuted,
-            isDeafened: isGlobalAudioMuted
+            isDeafened: isGlobalAudioMuted,
           });
         }
       });
     });
+
+    if (!this.refreshTimer) {
+      this.refreshTimer = window.setInterval(() => {
+        if (!this.isConnected) return;
+        this.subscribedChannels.forEach((channelId) => {
+          this.requestChannelParticipants(channelId, true);
+        });
+      }, 20000);
+    }
   }
 
   disconnect() {
@@ -181,58 +220,52 @@ class VoiceChannelService {
       this.subscribedChannels.clear();
       this.requestedChannels.clear();
     }
+    if (this.refreshTimer) {
+      window.clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
-  // Подписаться на обновления канала
   subscribeToChannel(channelId) {
-    if (!channelId) return;
-    
-    // Уже подписаны на этот канал
-    if (this.subscribedChannels.has(channelId)) {
-      return;
-    }
-    
-    this.subscribedChannels.add(channelId);
-    
-    // Запрашиваем участников только если ещё не запрашивали
-    if (this.isConnected && !this.requestedChannels.has(channelId)) {
-      this.requestChannelParticipants(channelId);
+    const key = normalizeChannelId(channelId);
+    if (!key) return;
+
+    this.subscribedChannels.add(key);
+
+    if (this.isConnected) {
+      this.requestChannelParticipants(key);
     }
   }
 
-  // Отписаться от обновлений канала
   unsubscribeFromChannel(channelId) {
-    this.subscribedChannels.delete(channelId);
+    this.subscribedChannels.delete(normalizeChannelId(channelId));
   }
 
-  // Запросить участников канала
-  requestChannelParticipants(channelId) {
-    if (!this.socket || !this.isConnected) {
+  requestChannelParticipants(channelId, force = false) {
+    const key = normalizeChannelId(channelId);
+    if (!this.socket || !this.isConnected || !key) {
       console.warn('[VoiceChannelService] Cannot request participants - not connected');
       return;
     }
 
-    // Не запрашиваем повторно
-    if (this.requestedChannels.has(channelId)) {
+    const lastRequestedAt = this.requestedChannels.get(key) || 0;
+    const now = Date.now();
+    if (!force && now - lastRequestedAt < 3000) {
       return;
     }
 
-    console.log('[VoiceChannelService] Requesting participants for channel:', channelId);
-    this.requestedChannels.add(channelId);
-    this.socket.emit('getVoiceChannelParticipants', { channelId });
+    console.log('[VoiceChannelService] Requesting participants for channel:', key);
+    this.requestedChannels.set(key, now);
+    this.socket.emit('getVoiceChannelParticipants', { channelId: key });
   }
 
-  // Запросить участников для нескольких каналов
   requestMultipleChannelParticipants(channelIds) {
     if (!Array.isArray(channelIds)) return;
-    
-    channelIds.forEach(channelId => {
+    channelIds.forEach((channelId) => {
       this.subscribeToChannel(channelId);
     });
   }
 
-  // Админ-действие: переместить пользователя в другой голосовой канал
-  // Работает даже если текущий клиент не в звонке (важно для drag&drop в списке каналов)
   switchUserToChannel(userId, targetChannelId) {
     return new Promise((resolve, reject) => {
       if (!this.socket || !this.isConnected) {

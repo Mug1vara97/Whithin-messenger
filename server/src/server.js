@@ -25,7 +25,9 @@ const io = new Server(server, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    allowEIO3: true
+    allowEIO3: true,
+    pingInterval: 10000,
+    pingTimeout: 25000,
 });
 
 // Configure CORS for Express
@@ -105,54 +107,91 @@ function removeUserVoiceState(userId) {
     }
 }
 
-function getChannelParticipants(channelId) {
-    const participants = [];
-    
-    // Добавляем активных участников из комнаты
-    const room = rooms.get(channelId);
-    if (room) {
-        room.peers.forEach((peer) => {
-            // Используем настоящий userId, а не socket ID
-            const realUserId = peer.userId || peer.id;
-            // Получаем сохраненное состояние пользователя (приоритет для isMuted и isAudioDisabled)
-            const userState = userVoiceStates.get(realUserId) || {};
-            
-            const participant = {
-                userId: realUserId, // Используем настоящий userId
-                name: peer.name,
-                // Приоритизируем сохраненное состояние микрофона и наушников
-                isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.muted,
-                isSpeaking: peer.speaking || false, // Состояние говорения
-                isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.audioEnabled,
-                isActive: true, // Активно в соединении
-                avatar: peer.avatar || userState.avatar || null,
-                avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
-            };
-            participants.push(participant);
-        });
-    }
-    
-    // Добавляем пользователей, которые в канале, но не в активном соединении
+function normalizeChannelId(channelId) {
+    return channelId == null ? '' : String(channelId);
+}
+
+function reconcileUserVoiceStates() {
     for (const [userId, state] of userVoiceStates.entries()) {
-        if (state.channelId === channelId) {
-            // Проверяем, не добавили ли мы уже этого пользователя
-            const alreadyAdded = participants.some(p => p.userId === userId);
-            if (!alreadyAdded) {
-                const participant = {
-                    userId: userId,
-                    name: state.userName,
-                    isMuted: state.isMuted,
-                    isSpeaking: false, // Не в активном соединении
-                    isAudioDisabled: state.isAudioDisabled,
-                    isActive: false, // Не в активном соединении
-                    avatar: state.avatar || null,
-                    avatarColor: state.avatarColor || '#5865f2'
-                };
-                participants.push(participant);
+        if (!state.channelId) continue;
+
+        const room = rooms.get(state.channelId);
+        const hasActivePeer = room && Array.from(room.peers.values()).some(
+            (peer) => String(peer.userId) === String(userId)
+        );
+
+        if (!hasActivePeer) {
+            const channelId = state.channelId;
+            updateUserVoiceState(userId, { channelId: null });
+            io.emit('userLeftVoiceChannel', { channelId, userId });
+            scheduleChannelUpdate(channelId, 100);
+        }
+    }
+}
+
+function evictUserPeersFromRoom(room, userId, exceptSocketId, options = {}) {
+    const { emitLeftEvent = false } = options;
+    if (!room || !userId) return;
+
+    const staleSocketIds = [];
+    room.peers.forEach((existingPeer, existingSocketId) => {
+        if (String(existingPeer.userId) === String(userId) && existingSocketId !== exceptSocketId) {
+            staleSocketIds.push(existingSocketId);
+        }
+    });
+
+    for (const staleSocketId of staleSocketIds) {
+        const stalePeer = room.peers.get(staleSocketId);
+        room.peers.delete(staleSocketId);
+        peers.delete(staleSocketId);
+
+        if (emitLeftEvent && stalePeer?.userId) {
+            io.emit('userLeftVoiceChannel', {
+                channelId: room.id,
+                userId: stalePeer.userId
+            });
+        }
+
+        if (stalePeer?.socket) {
+            try {
+                stalePeer.socket.removeAllListeners('disconnect');
+                stalePeer.socket.disconnect(true);
+            } catch (error) {
+                console.warn('Failed to disconnect stale peer socket:', error);
             }
         }
     }
-    
+
+    if (staleSocketIds.length > 0) {
+        scheduleChannelUpdate(room.id, 100);
+    }
+}
+
+function getChannelParticipants(channelId) {
+    reconcileUserVoiceStates();
+
+    const participants = [];
+    const normalizedChannelId = normalizeChannelId(channelId);
+    const room = rooms.get(channelId) || rooms.get(normalizedChannelId);
+
+    if (room) {
+        room.peers.forEach((peer) => {
+            const realUserId = peer.userId || peer.id;
+            const userState = userVoiceStates.get(realUserId) || {};
+
+            participants.push({
+                userId: realUserId,
+                name: peer.name,
+                isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.muted,
+                isSpeaking: peer.speaking || false,
+                isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.audioEnabled,
+                isActive: true,
+                avatar: peer.avatar || userState.avatar || null,
+                avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
+            });
+        });
+    }
+
     return participants;
 }
 
@@ -306,6 +345,10 @@ io.on('connection', async (socket) => {
                     createdAt: Date.now()
                 };
                 rooms.set(roomId, room);
+            }
+
+            if (userId) {
+                evictUserPeersFromRoom(room, userId, socket.id);
             }
 
             // Create peer with initial states
@@ -887,7 +930,7 @@ io.on('connection', async (socket) => {
             });
         } else {
             // Уведомляем остальных участников о выходе
-            socket.to(room.id).emit('peerLeft', { peerId: socket.id });
+            socket.to(room.id).emit('peerLeft', { peerId: socket.id, userId: peer.userId });
             
             // Отправляем обновленный список участников
             scheduleChannelUpdate(actualRoomId, 100);
@@ -941,7 +984,8 @@ io.on('connection', async (socket) => {
                     });
                 } else {
                     // Уведомляем остальных участников о выходе
-                    socket.to(room.id).emit('peerLeft', { peerId: socket.id });
+                    socket.to(room.id).emit('peerLeft', { peerId: socket.id, userId: peer.userId });
+                    scheduleChannelUpdate(roomId, 100);
                 }
             } else {
                 console.log(`Room ${roomId} not found for peer ${socket.id}`);
@@ -965,6 +1009,15 @@ io.on('connection', async (socket) => {
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
+
+setInterval(() => {
+    reconcileUserVoiceStates();
+    for (const [roomId, room] of rooms.entries()) {
+        if (room.peers.size > 0) {
+            scheduleChannelUpdate(roomId, 0);
+        }
+    }
+}, 15000);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {

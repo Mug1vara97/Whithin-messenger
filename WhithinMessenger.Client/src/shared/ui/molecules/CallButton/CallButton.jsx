@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useAuth } from '../../../lib/hooks/useAuth';
+import { isSameVoiceChannel } from '../../../lib/stores/callStore';
 import PhoneIcon from '@mui/icons-material/Phone';
 import PhoneDisabledIcon from '@mui/icons-material/PhoneDisabled';
 import './CallButton.css';
@@ -18,7 +19,7 @@ const CallButton = ({
 
   // Проверяем, активен ли звонок в этом канале
   const callInfo = getCallInfo();
-  const isCurrentChannelCall = isCallActive && callInfo.roomId === channelId;
+  const isCurrentChannelCall = isCallActive && isSameVoiceChannel(callInfo.roomId, channelId);
 
   const handleCallAction = async () => {
     if (!user) {

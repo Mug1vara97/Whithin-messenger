@@ -6,7 +6,11 @@ const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whith
 const VOICE_SERVER_CONFIG = {
   transports: ['websocket'],
   upgrade: false,
-  rememberUpgrade: false
+  rememberUpgrade: false,
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
 };
 
 // ICE серверы для WebRTC
@@ -95,6 +99,8 @@ class VoiceCallApi {
     this.userId = null;
     this.userName = null;
     this.eventHandlers = new Map();
+    this.hadSocketSession = false;
+    this.suppressReconnectEvent = false;
   }
 
   getPublicationMediaType(publication) {
@@ -181,9 +187,39 @@ class VoiceCallApi {
     this.socket = io(serverUrl, VOICE_SERVER_CONFIG);
 
     // Регистрируем базовые обработчики сразу
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from voice server');
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from voice server:', reason);
       this.isConnected = false;
+      this.emit('voiceServerDisconnected', { reason });
+    });
+
+    this.socket.on('connect', () => {
+      this.isConnected = true;
+      if (this.suppressReconnectEvent) {
+        this.suppressReconnectEvent = false;
+        this.hadSocketSession = false;
+        return;
+      }
+      if (this.hadSocketSession) {
+        this.emit('voiceServerReconnected');
+      }
+      this.hadSocketSession = true;
+    });
+
+    this.socket.on('peerJoined', (data) => {
+      this.emit('peerJoined', {
+        ...data,
+        peerId: data.peerId || data.id,
+        userId: data.userId,
+      });
+    });
+
+    this.socket.on('peerLeft', (data) => {
+      this.emit('peerLeft', {
+        ...data,
+        peerId: data.peerId || data.id,
+        userId: data.userId,
+      });
     });
 
     // Обработчик переключения в другой канал (от сервера)
@@ -292,6 +328,8 @@ class VoiceCallApi {
   }
 
   async disconnect() {
+    this.suppressReconnectEvent = true;
+
     if (this.room) {
       await releaseLiveKitLocalCapture(this.room);
       await this.room.disconnect();
@@ -303,6 +341,7 @@ class VoiceCallApi {
       this.socket = null;
     }
     this.isConnected = false;
+    this.hadSocketSession = false;
     this.roomId = null;
   }
 
@@ -347,7 +386,62 @@ class VoiceCallApi {
     });
   }
 
+  getExistingRemotePeers() {
+    if (!this.room) return [];
+
+    const peers = [];
+    this.room.remoteParticipants.forEach((participant) => {
+      peers.push({
+        userId: participant.identity,
+        peerId: participant.identity,
+        id: participant.identity,
+        name: participant.name || participant.identity,
+        isMuted: false,
+        isAudioEnabled: true,
+        isGlobalAudioMuted: false,
+      });
+    });
+    return peers;
+  }
+
+  syncExistingRemoteTracks() {
+    if (!this.room) return;
+
+    this.room.remoteParticipants.forEach((participant) => {
+      participant.trackPublications.forEach((publication) => {
+        const hasActiveTrack = publication.isSubscribed &&
+          publication.track &&
+          publication.track.mediaStreamTrack &&
+          publication.track.mediaStreamTrack.readyState !== 'ended';
+
+        if (!hasActiveTrack) return;
+
+        this.emit('trackSubscribed', {
+          track: publication.track,
+          publication,
+          participant,
+          trackSid: publication.trackSid,
+          kind: publication.kind,
+          participantIdentity: participant.identity,
+          userId: participant.identity,
+          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' :
+            publication.source === Track.Source.Camera ? 'camera' : 'microphone',
+        });
+      });
+    });
+  }
+
   async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
+    if (this.room && this.roomId != null && String(this.roomId) === String(roomId)) {
+      console.log('joinRoom: Already in this LiveKit room, syncing existing state');
+      this.syncExistingRemoteTracks();
+      return {
+        alreadyJoined: true,
+        existingPeers: this.getExistingRemotePeers(),
+        existingProducers: [],
+      };
+    }
+
     // Если уже есть активная комната, выходим из неё перед присоединением к новой (await — иначе старый захват микрофона может пересекаться с новым)
     if (this.room && this.roomId !== roomId) {
       console.log(`joinRoom: Leaving current room (${this.roomId}) before joining new room (${roomId})`);
@@ -417,49 +511,11 @@ class VoiceCallApi {
           // Setup event listeners
           this.setupRoomEventListeners();
           
-          // Check for existing remote participants and their tracks
-          // Emit events - handlers will process them when registered (callStore or useVoiceCall)
+          // Handlers may register after connect; delay once so trackSubscribed listeners exist.
           setTimeout(() => {
             console.log('🔍 Checking for existing remote participants...');
             console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
-            console.log('🔍 TrackSubscribed handlers count:', this.eventHandlers.get('trackSubscribed')?.length || 0);
-            
-            this.room.remoteParticipants.forEach((participant) => {
-              console.log('🔍 Found existing remote participant:', participant.identity);
-              // Check for existing subscribed tracks
-              participant.trackPublications.forEach((publication) => {
-                const hasActiveTrack = publication.isSubscribed &&
-                  publication.track &&
-                  publication.track.mediaStreamTrack &&
-                  publication.track.mediaStreamTrack.readyState !== 'ended';
-
-                if (hasActiveTrack) {
-                  console.log('🔍 Found existing subscribed track for participant:', participant.identity, publication.kind);
-                  console.log('🔍 Track details:', {
-                    trackSid: publication.trackSid,
-                    hasTrack: !!publication.track,
-                    hasMediaStreamTrack: !!publication.track?.mediaStreamTrack,
-                    trackState: publication.track?.mediaStreamTrack?.readyState
-                  });
-                  
-                  // Emit trackSubscribed event for existing tracks
-                  // Note: This will be handled by callStore.handleNewProducer or useVoiceCall trackSubscribed handler
-                  console.log('🔍 Emitting trackSubscribed event...');
-                  this.emit('trackSubscribed', {
-                    track: publication.track,
-                    publication: publication,
-                    participant: participant,
-                    trackSid: publication.trackSid,
-                    kind: publication.kind,
-                    participantIdentity: participant.identity,
-                    userId: participant.identity,
-                    mediaType: publication.source === Track.Source.ScreenShare ? 'screen' : 
-                               publication.source === Track.Source.Camera ? 'camera' : 'microphone'
-                  });
-                  console.log('🔍 trackSubscribed event emitted');
-                }
-              });
-            });
+            this.syncExistingRemoteTracks();
           }, 500);
 
           resolve({
@@ -621,7 +677,8 @@ class VoiceCallApi {
       
       this.emit('peerLeft', {
         peerId: participant.identity,
-        id: participant.identity
+        id: participant.identity,
+        userId: participant.identity,
       });
     });
 

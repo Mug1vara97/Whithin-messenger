@@ -10,6 +10,9 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { Slider } from '@mui/material';
 import './VideoCallGrid.css';
 
+/** Максимум участников на одной странице сетки (есть CSS для 1–9) */
+const GRID_PAGE_SIZE = 9;
+
 // Компонент для управления video элементом
 const VideoElement = React.memo(({ stream, participantId, isLocal = false }) => {
   const videoRef = useRef(null);
@@ -231,12 +234,75 @@ const VideoCallGrid = ({
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
 
-  // Вычисляемые значения
-  const totalPages = Math.ceil(extendedParticipants.length / 6);
-  const totalBottomPages = Math.ceil(extendedParticipants.length / visibleBottomUsers);
-  
-  // const currentParticipants = extendedParticipants.slice(currentPage * 6, (currentPage + 1) * 6);
+  const totalPages = extendedParticipants.length <= GRID_PAGE_SIZE
+    ? 1
+    : Math.ceil(extendedParticipants.length / GRID_PAGE_SIZE);
 
+  const bottomParticipants = useMemo(
+    () => extendedParticipants.filter((participant) => participant.id !== focusedParticipantId),
+    [extendedParticipants, focusedParticipantId]
+  );
+
+  const totalBottomPages = bottomParticipants.length <= visibleBottomUsers
+    ? 1
+    : Math.ceil(bottomParticipants.length / visibleBottomUsers);
+
+  const currentPageParticipants = useMemo(() => {
+    if (extendedParticipants.length <= GRID_PAGE_SIZE) {
+      return extendedParticipants;
+    }
+    const start = currentPage * GRID_PAGE_SIZE;
+    return extendedParticipants.slice(start, start + GRID_PAGE_SIZE);
+  }, [extendedParticipants, currentPage]);
+
+  const currentBottomParticipants = useMemo(() => {
+    if (bottomParticipants.length <= visibleBottomUsers) {
+      return bottomParticipants;
+    }
+    const start = bottomPage * visibleBottomUsers;
+    return bottomParticipants.slice(start, start + visibleBottomUsers);
+  }, [bottomParticipants, bottomPage, visibleBottomUsers]);
+
+  useEffect(() => {
+    setCurrentPage((page) => {
+      const maxPage = Math.max(0, totalPages - 1);
+      return Math.min(page, maxPage);
+    });
+  }, [totalPages]);
+
+  useEffect(() => {
+    setBottomPage((page) => {
+      const maxPage = Math.max(0, totalBottomPages - 1);
+      return Math.min(page, maxPage);
+    });
+  }, [totalBottomPages]);
+
+  const renderTestControls = () => {
+    if (!testMode) return null;
+
+    return (
+      <div className="test-controls">
+        <button
+          type="button"
+          className="test-btn test-btn-add"
+          onClick={onAddTestParticipant}
+          title="Добавить тестового участника"
+        >
+          + Добавить участника ({extendedParticipants.length})
+        </button>
+        <button
+          type="button"
+          className="test-btn test-btn-remove"
+          onClick={onRemoveTestParticipant}
+          disabled={extendedParticipants.length <= 1}
+          title="Удалить последнего участника"
+        >
+          − Удалить участника
+        </button>
+      </div>
+    );
+  };
+  
   // Действия
   const focusParticipant = useCallback((participantId) => {
     if (focusedParticipantId === participantId) {
@@ -527,7 +593,8 @@ const VideoCallGrid = ({
               <span className="participant-name">{participant.name}</span>
             </div>
             
-            {/* Volume controls */}
+            {/* Volume controls — скрыты для своего тайла (мут только у других участников) */}
+            {(isScreenShare || !participant.isCurrentUser) && (
             <div className="tile-volume-controls">
               {isScreenShare ? (
                 <button
@@ -597,6 +664,7 @@ const VideoCallGrid = ({
                 </>
               )}
             </div>
+            )}
           </div>
         </div>
 
@@ -616,6 +684,7 @@ const VideoCallGrid = ({
     
     return (
       <div className={`video-call-container focused-mode ${className}`}>
+        {renderTestControls()}
         <div className="focused-view">
           <div className="focused-user-wrapper">
             {focusedParticipant && renderParticipantTile(focusedParticipant, false)}
@@ -636,10 +705,7 @@ const VideoCallGrid = ({
               )}
 
               <div className="bottom-users-grid" ref={bottomGridRef}>
-                {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
-                {extendedParticipants
-                  .filter((participant) => participant.id !== focusedParticipantId)
-                  .map((participant) => renderParticipantTile(participant, true))}
+                {currentBottomParticipants.map((participant) => renderParticipantTile(participant, true))}
               </div>
 
               {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
@@ -663,26 +729,7 @@ const VideoCallGrid = ({
   // Обычный режим (сетка)
   return (
     <div className={`video-call-container ${className}`}>
-      {/* Тестовые кнопки для добавления/удаления участников */}
-      {testMode && (
-        <div className="test-controls">
-          <button 
-            className="test-btn test-btn-add"
-            onClick={onAddTestParticipant}
-            title="Добавить тестового участника"
-          >
-            + Добавить участника ({extendedParticipants.length})
-          </button>
-          <button 
-            className="test-btn test-btn-remove"
-            onClick={onRemoveTestParticipant}
-            disabled={extendedParticipants.length <= 1}
-            title="Удалить последнего участника"
-          >
-            − Удалить участника
-          </button>
-        </div>
-      )}
+      {renderTestControls()}
 
       <div className="video-grid-wrapper">
         {totalPages > 1 && currentPage > 0 && (
@@ -697,10 +744,8 @@ const VideoCallGrid = ({
           </button>
         )}
 
-        <div className="video-grid" data-user-count={extendedParticipants.length}>
-          {/* Все участники, включая демонстрации экрана, через extendedParticipants */}
-
-          {extendedParticipants.map((participant) => renderParticipantTile(participant, false))}
+        <div className="video-grid" data-user-count={currentPageParticipants.length}>
+          {currentPageParticipants.map((participant) => renderParticipantTile(participant, false))}
         </div>
 
         {totalPages > 1 && currentPage < totalPages - 1 && (
@@ -727,6 +772,10 @@ const VideoCallGrid = ({
 
 // Мемоизированный компонент с кастомной функцией сравнения
 const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) => {
+  if (prevProps.testMode !== nextProps.testMode) {
+    return false;
+  }
+
   // Сравниваем только критически важные пропсы
   const criticalProps = [
     'participants',

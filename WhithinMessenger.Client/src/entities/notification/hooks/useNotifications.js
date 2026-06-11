@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { notificationApi } from '../api';
+import { normalizeNotification } from '../lib/notificationDisplay';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuth } from '../../../shared/lib/hooks/useAuth';
 
@@ -169,16 +170,7 @@ export const useNotifications = () => {
         connectionRef.current = connection;
 
         const onReceiveNotification = (payload) => {
-          const normalized = {
-            id: payload.notificationId ?? payload.id,
-            chatId: payload.chatId,
-            serverId: payload.serverId,
-            messageId: payload.messageId,
-            type: payload.type,
-            content: payload.content,
-            isRead: payload.isRead ?? false,
-            createdAt: payload.createdAt,
-          };
+          const normalized = normalizeNotification(payload);
           setNotifications((prev) => sortByDate([normalized, ...prev]));
           setUnreadCount((prev) => prev + 1);
           if (soundNotificationsEnabled && !(normalized.isRead ?? false)) {

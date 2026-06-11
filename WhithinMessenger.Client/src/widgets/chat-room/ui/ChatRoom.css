@@ -1311,9 +1311,9 @@
 }
 
 .context-menu-button {
-  display: block;
+  display: flex;
   width: 100%;
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: none;
   border: none;
   color: var(--text);
@@ -1321,9 +1321,19 @@
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s ease;
-  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.context-menu-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  opacity: 0.9;
 }
 
 .context-menu-button:hover {

@@ -27,7 +27,25 @@ const USER_STATUS_OPTIONS = [
 ];
 
 export const normalizeUserStatus = (status) => {
-  if (!status || typeof status !== 'string') {
+  if (status === null || status === undefined) {
+    return PRESENCE_STATUS.OFFLINE;
+  }
+
+  if (typeof status === 'number') {
+    switch (status) {
+      case 0:
+        return PRESENCE_STATUS.ONLINE;
+      case 1:
+        return PRESENCE_STATUS.INACTIVE;
+      case 2:
+        return PRESENCE_STATUS.DO_NOT_DISTURB;
+      case 3:
+      default:
+        return PRESENCE_STATUS.OFFLINE;
+    }
+  }
+
+  if (typeof status !== 'string') {
     return PRESENCE_STATUS.OFFLINE;
   }
 
@@ -45,7 +63,16 @@ export const normalizeUserStatus = (status) => {
     return PRESENCE_STATUS.DO_NOT_DISTURB;
   }
 
+  if (normalized === 'offline') {
+    return PRESENCE_STATUS.OFFLINE;
+  }
+
   return PRESENCE_STATUS.OFFLINE;
+};
+
+export const isUserActiveInFriendsList = (status) => {
+  const normalized = normalizeUserStatus(status);
+  return normalized === PRESENCE_STATUS.ONLINE || normalized === PRESENCE_STATUS.INACTIVE;
 };
 
 export const getUserStatusLabel = (status) => STATUS_LABELS[normalizeUserStatus(status)];

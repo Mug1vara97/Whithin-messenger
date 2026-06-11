@@ -167,6 +167,8 @@ public class ChatMessageNotificationService
                     notificationContent,
                     chat.ServerId,
                     pushChatTitle,
+                    serverDisplayName: chat.Server?.Name,
+                    senderDisplayName: senderUsername,
                     pushMessageType: messageType,
                     pushPreviewText: truncatedPreview,
                     pushThumbnailUrl: string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl,

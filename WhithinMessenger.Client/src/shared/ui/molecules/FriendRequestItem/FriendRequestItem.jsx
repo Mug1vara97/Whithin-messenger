@@ -1,27 +1,30 @@
 import React from 'react';
-import { Check, Close, Person } from '@mui/icons-material';
+import { Check, Close, HourglassEmpty } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
-import { Button } from '../../atoms/Button';
 import './FriendRequestItem.css';
 
-const FriendRequestItem = ({ 
-  request, 
-  onAccept, 
+const FriendRequestItem = ({
+  request,
+  onAccept,
   onDecline,
-  isSent = false 
+  isSent = false,
 }) => {
   const formatDate = (date) => {
+    if (!date) return '';
+
     const requestDate = new Date(date);
+    if (Number.isNaN(requestDate.getTime())) return '';
+
     const now = new Date();
     const diffInHours = (now - requestDate) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 1) {
       return 'только что';
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}ч назад`;
-    } else {
-      return requestDate.toLocaleDateString();
     }
+    if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)} ч. назад`;
+    }
+    return requestDate.toLocaleDateString('ru-RU');
   };
 
   return (
@@ -29,46 +32,42 @@ const FriendRequestItem = ({
       <div className="friend-request-item__avatar">
         <UserAvatar
           username={request.requesterUsername}
-          avatar={request.requesterAvatar}
+          avatarUrl={request.requesterAvatar}
           avatarColor={request.requesterAvatarColor}
           size="medium"
         />
       </div>
-      
+
       <div className="friend-request-item__info">
-        <div className="friend-request-item__name">
-          {request.requesterUsername}
-        </div>
+        <div className="friend-request-item__name">{request.requesterUsername}</div>
         <div className="friend-request-item__time">
-          {isSent ? 'Отправлен' : 'Получен'} {formatDate(request.createdAt)}
+          {isSent ? 'Отправлен' : 'Получен'} · {formatDate(request.createdAt)}
         </div>
       </div>
-      
-      {!isSent && (
+
+      {!isSent ? (
         <div className="friend-request-item__actions">
-          <Button
-            variant="primary"
-            size="small"
+          <button
+            type="button"
+            className="friend-request-item__action friend-request-item__action--accept"
             onClick={() => onAccept?.(request.id)}
-            icon={<Check />}
+            title="Принять"
           >
-            Принять
-          </Button>
-          <Button
-            variant="secondary"
-            size="small"
+            <Check />
+          </button>
+          <button
+            type="button"
+            className="friend-request-item__action friend-request-item__action--decline"
             onClick={() => onDecline?.(request.id)}
-            icon={<Close />}
+            title="Отклонить"
           >
-            Отклонить
-          </Button>
+            <Close />
+          </button>
         </div>
-      )}
-      
-      {isSent && (
+      ) : (
         <div className="friend-request-item__status">
-          <Person className="friend-request-item__status-icon" />
-          <span>Ожидает ответа</span>
+          <HourglassEmpty sx={{ fontSize: 16 }} />
+          <span>Ожидает</span>
         </div>
       )}
     </div>

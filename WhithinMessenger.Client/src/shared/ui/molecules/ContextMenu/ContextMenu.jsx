@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useClampedMenuPosition } from '../../../lib/hooks/useClampedMenuPosition';
 import './ContextMenu.css';
 
 const ContextMenu = ({ 
@@ -8,6 +9,7 @@ const ContextMenu = ({
   items = [] 
 }) => {
   const menuRef = useRef(null);
+  const clampedPosition = useClampedMenuPosition(isOpen, position, menuRef);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -41,8 +43,8 @@ const ContextMenu = ({
       className="context-menu"
       style={{
         position: 'fixed',
-        left: position.x,
-        top: position.y,
+        left: clampedPosition.x,
+        top: clampedPosition.y,
         zIndex: 1000
       }}
     >

@@ -1,5 +1,7 @@
 .friends-page {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   background: #36393f;
 }

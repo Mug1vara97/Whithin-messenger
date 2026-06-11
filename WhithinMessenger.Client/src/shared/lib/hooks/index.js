@@ -5,6 +5,7 @@ export * from './useChat';
 export * from './useMessageSearch';
 export * from './useMediaHandlers';
 export * from './useContextMenu';
+export * from './useClampedMenuPosition';
 export * from './useMessageForward';
 export * from './useGlobalCall';
 export * from './useGlobalHotkeys';

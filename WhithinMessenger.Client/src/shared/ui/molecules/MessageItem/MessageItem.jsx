@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useClampedMenuPosition } from '../../../lib/hooks/useClampedMenuPosition';
 import { UserAvatar, MessageStatusIndicator } from '../../atoms';
 import { MessageStatus } from '../../../../entities/message/model/types';
 import MessageMediaContent from '../MessageMediaContent/MessageMediaContent';
@@ -9,6 +10,7 @@ import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import StickerMessage from '../StickerMessage/StickerMessage';
 import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../lib/utils/messageTime';
+import { ReplyOutlined, ForwardOutlined, EditOutlined, DeleteOutline } from '@mui/icons-material';
 import './MessageItem.css';
 
 const MessageItem = ({ 
@@ -24,6 +26,12 @@ const MessageItem = ({
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const messageRef = useRef(null);
+  const contextMenuRef = useRef(null);
+  const clampedMenuPosition = useClampedMenuPosition(
+    showContextMenu,
+    contextMenuPosition,
+    contextMenuRef
+  );
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -252,28 +260,41 @@ const MessageItem = ({
       
       {showContextMenu && (
         <div 
+          ref={contextMenuRef}
           className="context-menu"
           style={{
             position: 'fixed',
-            left: contextMenuPosition.x,
-            top: contextMenuPosition.y,
+            left: clampedMenuPosition.x,
+            top: clampedMenuPosition.y,
             zIndex: 1000
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <button className="context-menu-item" onClick={handleReply}>
+            <span className="context-menu-item-icon" aria-hidden="true">
+              <ReplyOutlined fontSize="inherit" />
+            </span>
             Ответить
           </button>
           {isOwn && (
             <button className="context-menu-item" onClick={handleEdit}>
+              <span className="context-menu-item-icon" aria-hidden="true">
+                <EditOutlined fontSize="inherit" />
+              </span>
               Редактировать
             </button>
           )}
           <button className="context-menu-item" onClick={handleForward}>
+            <span className="context-menu-item-icon" aria-hidden="true">
+              <ForwardOutlined fontSize="inherit" />
+            </span>
             Переслать
           </button>
           {isOwn && (
             <button className="context-menu-item danger" onClick={handleDelete}>
+              <span className="context-menu-item-icon" aria-hidden="true">
+                <DeleteOutline fontSize="inherit" />
+              </span>
               Удалить
             </button>
           )}

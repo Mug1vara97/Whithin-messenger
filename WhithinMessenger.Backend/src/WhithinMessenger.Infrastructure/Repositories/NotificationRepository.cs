@@ -28,6 +28,7 @@ public class NotificationRepository : INotificationRepository
         IQueryable<Notification> query = _context.Notifications
             .Where(n => n.UserId == userId)
             .Include(n => n.Chat)
+            .ThenInclude(c => c.Server)
             .Include(n => n.Message)
             .ThenInclude(m => m.User);
 
@@ -52,6 +53,7 @@ public class NotificationRepository : INotificationRepository
                 CreatedAt = n.CreatedAt,
                 ReadAt = n.ReadAt,
                 ChatName = n.Chat.Name,
+                ServerName = n.Chat.Server != null ? n.Chat.Server.Name : null,
                 SenderName = n.Message != null ? n.Message.User.UserName : null,
                 MessageContent = n.Message != null ? n.Message.Content : null
             })

@@ -25,6 +25,7 @@ export class NoiseSuppressionManager {
     this.producer = null;
     this.originalStream = null;
     this.processedStream = null;
+    this.stereoMerger = null;
     this._isInitialized = false;
     this.wasmBinaries = {
       speex: null,
@@ -75,7 +76,9 @@ export class NoiseSuppressionManager {
 
       // Создаем destination для обработанного потока
       this.destinationNode = this.audioContext.createMediaStreamDestination();
-      
+      this.stereoMerger = this.audioContext.createChannelMerger(2);
+      this.stereoMerger.connect(this.destinationNode);
+
       const destinationTrack = this.destinationNode.stream.getAudioTracks()[0];
       if (destinationTrack) {
         this.processedStream.addTrack(destinationTrack);
@@ -130,7 +133,7 @@ export class NoiseSuppressionManager {
       // Подключаем source -> highpass -> gain -> destination (без обработки по умолчанию)
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
-      this.gainNode.connect(this.destinationNode);
+      this._connectOutput(this.gainNode);
       console.log('NoiseSuppressionManager: Audio nodes connected: source -> highpass -> gain -> destination');
 
       this._isInitialized = true;
@@ -145,6 +148,12 @@ export class NoiseSuppressionManager {
 
   isInitialized() {
     return this._isInitialized;
+  }
+
+  // Mono graph → stereo MediaStreamDestination leaves only the left channel audible.
+  _connectOutput(fromNode) {
+    fromNode.connect(this.stereoMerger, 0, 0);
+    fromNode.connect(this.stereoMerger, 0, 1);
   }
 
   getProcessedStream() {
@@ -209,7 +218,7 @@ export class NoiseSuppressionManager {
           this.highPassFilter.connect(this.gainNode);
           this.gainNode.connect(this.noiseGateNode);
           this.noiseGateNode.connect(this.rnnWorkletNode);
-          this.rnnWorkletNode.connect(this.destinationNode);
+          this._connectOutput(this.rnnWorkletNode);
           this.currentMode = mode;
           console.log('NoiseSuppressionManager: Enabled in combined mode with high-pass');
           return true;
@@ -221,7 +230,7 @@ export class NoiseSuppressionManager {
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
       this.gainNode.connect(processingNode);
-      processingNode.connect(this.destinationNode);
+      this._connectOutput(processingNode);
       console.log(`NoiseSuppressionManager: Audio chain connected: source -> highpass -> gain -> ${mode} -> destination`);
 
       this.currentMode = mode;
@@ -343,15 +352,15 @@ export class NoiseSuppressionManager {
             
             this.highPassFilter.connect(this.gainNode);
             this.gainNode.connect(processingNode);
-            processingNode.connect(this.destinationNode);
+            this._connectOutput(processingNode);
           } else {
             this.highPassFilter.connect(this.gainNode);
-            this.gainNode.connect(this.destinationNode);
+            this._connectOutput(this.gainNode);
           }
         } else {
           // Нет активной обработки, прямое соединение
           this.highPassFilter.connect(this.gainNode);
-          this.gainNode.connect(this.destinationNode);
+          this._connectOutput(this.gainNode);
         }
         console.log('NoiseSuppressionManager: High-pass filter enabled');
       } else {
@@ -374,14 +383,14 @@ export class NoiseSuppressionManager {
             this.gainNode.disconnect();
             this.sourceNode.connect(this.gainNode);
             this.gainNode.connect(processingNode);
-            processingNode.connect(this.destinationNode);
+            this._connectOutput(processingNode);
           } else {
             this.sourceNode.connect(this.gainNode);
-            this.gainNode.connect(this.destinationNode);
+            this._connectOutput(this.gainNode);
           }
         } else {
           this.sourceNode.connect(this.gainNode);
-          this.gainNode.connect(this.destinationNode);
+          this._connectOutput(this.gainNode);
         }
         console.log('NoiseSuppressionManager: High-pass filter disabled');
       }
@@ -459,7 +468,7 @@ export class NoiseSuppressionManager {
       // Подключаем прямую цепочку без обработки: source -> gain -> destination
       this.sourceNode.connect(this.highPassFilter);
       this.highPassFilter.connect(this.gainNode);
-      this.gainNode.connect(this.destinationNode);
+      this._connectOutput(this.gainNode);
       console.log('NoiseSuppressionManager: Audio chain reconnected (passthrough mode with high-pass)');
 
       this.currentMode = null;
@@ -582,9 +591,16 @@ export class NoiseSuppressionManager {
       // НЕ закрываем аудио контекст - он используется другими компонентами
       // AudioContext будет закрыт в useVoiceCall при disconnect
 
+      try {
+        this.stereoMerger?.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting stereo merger:', e);
+      }
+
       this.audioContext = null;
       this.sourceNode = null;
       this.destinationNode = null;
+      this.stereoMerger = null;
       this.gainNode = null;
       this.rnnWorkletNode = null;
       this.speexWorkletNode = null;

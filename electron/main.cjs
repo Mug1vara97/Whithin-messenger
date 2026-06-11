@@ -100,7 +100,8 @@ let mouseShortcutBindings = [];
 /** Windows: низкоуровневый хук для боковых кнопок (Chromium часто не шлёт X1/X2 в before-input-event). */
 let win32GlobalMouseEvents = null;
 let win32GlobalMouseHookInitialized = false;
-let lastWin32MouseShortcutDispatch = { action: null, at: 0 };
+let lastShortcutDispatch = { action: null, at: 0 };
+const DEFAULT_SHORTCUT_DEDUPE_MS = 200;
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 
@@ -233,17 +234,16 @@ function isMouseShortcutMatch(binding, input) {
 }
 
 function dispatchShortcutAction(action, options = {}) {
-  const dedupeMs = typeof options.dedupeMs === 'number' ? options.dedupeMs : 0;
-  if (dedupeMs > 0) {
-    const now = Date.now();
-    if (
-      lastWin32MouseShortcutDispatch.action === action &&
-      now - lastWin32MouseShortcutDispatch.at < dedupeMs
-    ) {
-      return false;
-    }
-    lastWin32MouseShortcutDispatch = { action, at: now };
+  const dedupeMs =
+    typeof options.dedupeMs === 'number' ? options.dedupeMs : DEFAULT_SHORTCUT_DEDUPE_MS;
+  const now = Date.now();
+  if (
+    lastShortcutDispatch.action === action &&
+    now - lastShortcutDispatch.at < dedupeMs
+  ) {
+    return false;
   }
+  lastShortcutDispatch = { action, at: now };
 
   const target =
     shortcutCallbackWebContents && !shortcutCallbackWebContents.isDestroyed()
@@ -1142,7 +1142,6 @@ ipcMain.on('electron:remove-shortcut-listener', (event) => {
     console.log('[mouse-bind-debug] shortcut listener removed, sender id:', event.sender.id);
     shortcutCallbackWebContents = null;
   }
-  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

@@ -59,10 +59,23 @@ const ChannelItem = ({
     const currentRoomId = state.currentRoomId;
     const isCurrentChannel = currentRoomId === channelId;
     
-    const fromMap = state.voiceChannelParticipants?.get?.(channelId);
+    const normalizedChannelId = String(channelId);
+    const fromMap =
+      state.voiceChannelParticipants?.get?.(channelId) ||
+      state.voiceChannelParticipants?.get?.(normalizedChannelId);
+
     if (fromMap && fromMap.length > 0) {
       return fromMap;
     }
+
+    if (!isCurrentChannel) {
+      for (const [channelKey, participants] of state.voiceChannelParticipants?.entries?.() || []) {
+        if (String(channelKey) === normalizedChannelId && participants?.length > 0) {
+          return participants;
+        }
+      }
+    }
+
     return isCurrentChannel ? state.participants : [];
   }, [isVoiceChannel, channelId]);
 
@@ -79,9 +92,23 @@ const ChannelItem = ({
     // Подписываемся на изменения store
     const unsubscribe = useCallStore.subscribe((state) => {
       // Получаем новых участников
-      const newParticipants = state.voiceChannelParticipants?.get?.(channelId) || [];
+      const normalizedChannelId = String(channelId);
+      let newParticipants = state.voiceChannelParticipants?.get?.(channelId) || [];
+      if (newParticipants.length === 0) {
+        newParticipants = state.voiceChannelParticipants?.get?.(normalizedChannelId) || [];
+      }
+      if (newParticipants.length === 0) {
+        for (const [channelKey, participants] of state.voiceChannelParticipants?.entries?.() || []) {
+          if (String(channelKey) === normalizedChannelId) {
+            newParticipants = participants;
+            break;
+          }
+        }
+      }
+
       const currentRoomId = state.currentRoomId;
-      const isCurrentChannel = currentRoomId === channelId;
+      const isCurrentChannel =
+        currentRoomId === channelId || String(currentRoomId) === normalizedChannelId;
       
       // Если нет участников из Map, используем participants текущего канала
       const participantsToUse = newParticipants.length > 0 
@@ -207,7 +234,8 @@ const ChannelItem = ({
                 >
                   {voiceParticipants.map((participant, participantIndex) => {
                     const odUserId = participant.odUserId || participant.userId;
-                    const isSpeaking = participantSpeakingStates?.get?.(odUserId) || false;
+                    const isSpeaking =
+                      participantSpeakingStates?.get?.(String(odUserId)) || false;
                     const isDeafened = participant.isDeafened || participant.isAudioDisabled || participant.isGlobalAudioMuted;
                     return (
                       <Draggable

@@ -360,9 +360,11 @@
 }
 
 .context-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: none;
   border: none;
   color: var(--text);
@@ -370,6 +372,17 @@
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s ease;
+}
+
+.context-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  opacity: 0.9;
 }
 
 .context-menu-item:hover {

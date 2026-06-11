@@ -6,6 +6,7 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import compassIcon from '../../../assets/magnifying-glass.png';
 import { Settings, Palette } from '@mui/icons-material';
+import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import { openThemeColorsWindow } from '../../../shared/lib/theme/openThemeColorsWindow';
 import styles from './ServerList.module.css';
 
@@ -196,8 +197,9 @@ const ServerList = ({
                   onDiscoverClick && onDiscoverClick(false);
                   onServerSelected && onServerSelected(null);
                 }}
+                title="Чаты"
               >
-                Чаты
+                <ChatOutlinedIcon sx={{ fontSize: 22 }} />
               </NavLink>
             </li>
           </ul>

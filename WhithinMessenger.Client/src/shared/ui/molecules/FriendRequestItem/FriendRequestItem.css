@@ -1,17 +1,28 @@
 .friend-request-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
+  gap: 12px;
+  padding: 8px 12px;
+  margin: 2px 8px;
+  border-radius: 4px;
   transition: background-color 0.2s ease;
 }
 
 .friend-request-item:hover {
-  background-color: #f5f5f5;
+  background-color: #3c3f44;
+}
+
+.friend-request-item:hover .friend-request-item__actions {
+  opacity: 1;
 }
 
 .friend-request-item__avatar {
-  margin-right: 12px;
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .friend-request-item__info {
@@ -20,49 +31,68 @@
 }
 
 .friend-request-item__name {
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
+  font-weight: 500;
+  font-size: 16px;
+  color: #ffffff;
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .friend-request-item__time {
   font-size: 12px;
-  color: #666;
+  color: #8e9297;
+  line-height: 1.2;
 }
 
 .friend-request-item__actions {
   display: flex;
   gap: 8px;
-  margin-left: 12px;
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.friend-request-item__actions .button {
-  min-width: auto;
-  padding: 6px 12px;
-  font-size: 12px;
+.friend-request-item__action {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8e9297;
+  background: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.friend-request-item__action svg {
+  font-size: 18px;
+}
+
+.friend-request-item__action--accept:hover {
+  background-color: #43b581;
+  color: #ffffff;
+}
+
+.friend-request-item__action--decline:hover {
+  background-color: #ed4245;
+  color: #ffffff;
 }
 
 .friend-request-item__status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 12px;
+  margin-left: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
   font-size: 12px;
-  color: #666;
+  color: #b5bac1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
 }
-
-.friend-request-item__status-icon {
-  font-size: 16px;
-}
-
-
-
-
-
-
-
-

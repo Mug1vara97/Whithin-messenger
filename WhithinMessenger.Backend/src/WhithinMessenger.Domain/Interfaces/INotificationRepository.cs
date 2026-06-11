@@ -26,6 +26,7 @@ public class NotificationDto
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? ReadAt { get; init; }
     public string? ChatName { get; init; }
+    public string? ServerName { get; init; }
     public string? SenderName { get; init; }
     public string? MessageContent { get; init; }
 }

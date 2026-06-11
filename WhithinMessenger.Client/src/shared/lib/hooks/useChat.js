@@ -150,6 +150,27 @@ export const useChat = (chatId, username, userId) => {
     };
   }, []);
 
+  const normalizeMediaFile = useCallback((raw) => {
+    if (!raw) return raw;
+    return {
+      ...raw,
+      id: raw.id ?? raw.Id ?? null,
+      filePath: raw.filePath ?? raw.FilePath ?? '',
+      fileName: raw.fileName ?? raw.FileName ?? '',
+      originalFileName: raw.originalFileName ?? raw.OriginalFileName ?? '',
+      contentType: raw.contentType ?? raw.ContentType ?? '',
+      fileSize: raw.fileSize ?? raw.FileSize ?? 0,
+      thumbnailPath: raw.thumbnailPath ?? raw.ThumbnailPath ?? null,
+      isVideoNote: raw.isVideoNote ?? raw.IsVideoNote ?? false,
+      duration:
+        raw.duration ??
+        raw.Duration ??
+        raw.durationSeconds ??
+        raw.DurationSeconds ??
+        null,
+    };
+  }, []);
+
   const normalizeForwardedMessage = useCallback((raw) => {
     if (!raw) return null;
     return {
@@ -159,9 +180,9 @@ export const useChat = (chatId, username, userId) => {
       originalChatName: raw.originalChatName ?? raw.OriginalChatName ?? '',
       contentType: raw.contentType ?? raw.ContentType ?? null,
       sticker: normalizeSticker(raw.sticker ?? raw.Sticker),
-      mediaFiles: raw.mediaFiles ?? raw.MediaFiles ?? [],
+      mediaFiles: (raw.mediaFiles ?? raw.MediaFiles ?? []).map(normalizeMediaFile),
     };
-  }, [normalizeSticker]);
+  }, [normalizeMediaFile, normalizeSticker]);
 
   const normalizeMessage = useCallback((msg, defaultStatus) => {
     if (!msg) return null;
@@ -185,13 +206,13 @@ export const useChat = (chatId, username, userId) => {
       repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
       forwardedMessage: normalizeForwardedMessage(msg.forwardedMessage ?? msg.ForwardedMessage),
       createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
-      mediaFiles: msg.mediaFiles ?? msg.MediaFiles ?? [],
+      mediaFiles: (msg.mediaFiles ?? msg.MediaFiles ?? []).map(normalizeMediaFile),
       isEdited: msg.isEdited ?? msg.IsEdited ?? false,
       status: own
         ? normalizeMessageStatus(rawStatus ?? MessageStatus.SENT)
         : null,
     };
-  }, [normalizeForwardedMessage, normalizeSticker, userId, username]);
+  }, [normalizeForwardedMessage, normalizeMediaFile, normalizeSticker, userId, username]);
 
   const isPersistedMessageId = useCallback((messageId) => (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(messageId ?? ''))

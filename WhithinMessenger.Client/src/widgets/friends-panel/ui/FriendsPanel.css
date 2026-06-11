@@ -1,7 +1,8 @@
 .friends-panel {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   background: #36393f;
   color: #dcddde;
   width: 100%;
@@ -145,6 +146,37 @@
 .friends-panel__tab.active {
   background-color: #3c3f44;
   color: #ffffff;
+}
+
+.friends-panel__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #ed4245;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.friends-panel__pending-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.friends-panel__pending-group-title {
+  padding: 4px 16px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #8e9297;
+  letter-spacing: 0.5px;
 }
 
 .friends-panel__content {

@@ -19,6 +19,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [pendingMediaSend, setPendingMediaSend] = useState(null);
   const fileInputRef = useRef(null);
   const uploadProgressSetterRef = useRef(setUploadProgress);
+  const recordingTimeRef = useRef(0);
 
   uploadProgressSetterRef.current = setUploadProgress;
 
@@ -32,7 +33,11 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     let interval;
     if (isRecording) {
       interval = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          const next = prev + 1;
+          recordingTimeRef.current = next;
+          return next;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -88,6 +93,9 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         } else {
           formData.append('file', fileList[0]);
           formData.append('isVideoNote', isVideoNote ? 'true' : 'false');
+          if (fileList[0].durationSeconds > 0) {
+            formData.append('durationSeconds', String(fileList[0].durationSeconds));
+          }
         }
 
         await new Promise((resolve, reject) => {
@@ -192,6 +200,8 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         const audioFile = new File([audioBlob], `audio-message-${Date.now()}.webm`, {
           type: 'audio/webm',
         });
+        const recordedSeconds = Math.max(1, recordingTimeRef.current || recordingTime);
+        audioFile.durationSeconds = recordedSeconds;
 
         await handleSendMedia(audioFile);
 
@@ -202,6 +212,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       setMediaRecorder(recorder);
       setIsRecording(true);
       setRecordingTime(0);
+      recordingTimeRef.current = 0;
     } catch (error) {
       console.error('Error starting recording:', error);
       alert('Не удалось получить доступ к микрофону');

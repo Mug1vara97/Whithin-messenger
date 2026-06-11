@@ -1,10 +1,31 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import hotkeyStorage from '../utils/hotkeyStorage';
+
+const SHORTCUT_DEDUPE_MS = 200;
+
+const isElectronEnv = () => Boolean(window.electronAPI?.isElectron);
+
+const isEditableTarget = (target) => {
+  if (!target || typeof target !== 'object') return false;
+  const el = target;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+};
 
 export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   const [currentHotkeys, setCurrentHotkeys] = useState(() => hotkeyStorage.getHotkeys());
+  const lastShortcutDispatchRef = useRef({ action: null, at: 0 });
 
   const handleGlobalShortcut = useCallback((shortcut) => {
+    const now = Date.now();
+    if (
+      lastShortcutDispatchRef.current.action === shortcut &&
+      now - lastShortcutDispatchRef.current.at < SHORTCUT_DEDUPE_MS
+    ) {
+      return;
+    }
+    lastShortcutDispatchRef.current = { action: shortcut, at: now };
+
     console.log('🎹 Получена глобальная горячая клавиша:', shortcut);
     
     switch (shortcut) {
@@ -38,28 +59,61 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   }, []);
 
   useEffect(() => {
-    // Проверяем, что мы в Electron
-    if (window.electronAPI && window.electronAPI.onGlobalShortcut) {
-      // Регистрируем слушатель глобальных горячих клавиш
-      window.electronAPI.onGlobalShortcut(handleGlobalShortcut);
-      
-      // Устанавливаем текущие горячие клавиши
-      updateElectronHotkeys(currentHotkeys);
-      
-      console.log('✅ Глобальные горячие клавиши активированы в Electron');
-      
-      // Очистка при размонтировании
-      return () => {
-        if (window.electronAPI && window.electronAPI.removeGlobalShortcutListener) {
-          window.electronAPI.removeGlobalShortcutListener();
-        }
-      };
-    } else {
-      console.log('ℹ️ Приложение запущено в браузере - глобальные горячие клавиши недоступны');
+    if (!window.electronAPI?.onGlobalShortcut) {
+      console.log('ℹ️ Приложение запущено в браузере — горячие клавиши только в окне');
+      return undefined;
     }
-  }, [handleGlobalShortcut, currentHotkeys, updateElectronHotkeys]);
+
+    window.electronAPI.onGlobalShortcut(handleGlobalShortcut);
+    console.log('✅ Слушатель глобальных горячих клавиш Electron зарегистрирован');
+
+    return () => {
+      window.electronAPI.removeGlobalShortcutListener?.();
+    };
+  }, [handleGlobalShortcut]);
 
   useEffect(() => {
+    if (!window.electronAPI?.updateGlobalShortcuts) {
+      return;
+    }
+    updateElectronHotkeys(currentHotkeys);
+  }, [currentHotkeys, updateElectronHotkeys]);
+
+  useEffect(() => {
+    if (isElectronEnv()) {
+      return undefined;
+    }
+
+    const hotkeyToAction = {
+      [currentHotkeys.toggleMic]: 'toggle-mic',
+      [currentHotkeys.toggleAudio]: 'toggle-audio'
+    };
+
+    const handleKeyboardHotkey = (event) => {
+      if (event.repeat || isEditableTarget(event.target)) {
+        return;
+      }
+
+      const keyString = hotkeyStorage.parseKeyEvent(event);
+      const action = hotkeyToAction[keyString];
+      if (!action) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleGlobalShortcut(action);
+    };
+
+    window.addEventListener('keydown', handleKeyboardHotkey, true);
+    return () => window.removeEventListener('keydown', handleKeyboardHotkey, true);
+  }, [currentHotkeys, handleGlobalShortcut]);
+
+  useEffect(() => {
+    if (isElectronEnv()) {
+      return undefined;
+    }
+
     const hotkeyToAction = {
       [currentHotkeys.toggleMic]: 'toggle-mic',
       [currentHotkeys.toggleAudio]: 'toggle-audio'
@@ -124,12 +178,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     };
   }, [updateElectronHotkeys]);
 
-  // Возвращаем функцию для проверки, запущено ли приложение в Electron
-  const isElectron = () => {
-    return window.electronAPI && window.electronAPI.isElectron;
-  };
-
-  return { isElectron };
+  return { isElectron: isElectronEnv };
 };
 
 

@@ -1,5 +1,6 @@
 import { useCall } from '../contexts/CallContext';
 import { useAuth } from './useAuth';
+import { isSameVoiceChannel } from '../stores/callStore';
 
 /**
  * Хук для работы с глобальным состоянием звонков
@@ -21,13 +22,16 @@ export const useGlobalCall = (userId = null, userName = null) => {
     }
 
     try {
+      if (callContext.isInCall && isSameVoiceChannel(callContext.currentRoomId, roomId)) {
+        console.log(`useGlobalCall: Already in room ${roomId}, resyncing call state`);
+        await callContext.joinRoom(roomId, roomName);
+        return true;
+      }
+
       // Проверяем, есть ли активный звонок в другом канале
-      if (callContext.isConnected && callContext.currentRoomId && callContext.currentRoomId !== roomId) {
+      if (callContext.isConnected && callContext.currentRoomId && !isSameVoiceChannel(callContext.currentRoomId, roomId)) {
         console.log(`useGlobalCall: Active call in different channel (${callContext.currentRoomId}), leaving it first before joining ${roomId}`);
-        // Быстро выходим из текущей комнаты, сохраняя соединение
         await callContext.leaveRoom();
-        // Небольшая задержка для завершения выхода из комнаты
-        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       // Инициализируем звонок если еще не подключены

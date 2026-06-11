@@ -1,21 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
+import { isSameVoiceChannel } from '../../../lib/stores/callStore';
+import { useCallGridTestMode } from '../../../lib/hooks/useCallGridTestMode';
 import { createParticipant } from '../../../../entities/video-call/model/types';
 import { userApi } from '../../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { VideoCallGrid } from '../../atoms';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import VideocamOffIcon from '@mui/icons-material/VideocamOff';
-import ScreenShareIcon from '@mui/icons-material/ScreenShare';
-import StopScreenShareIcon from '@mui/icons-material/StopScreenShare';
-import CallEndIcon from '@mui/icons-material/CallEnd';
 import HeadsetIcon from '@mui/icons-material/Headset';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
-import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
-import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
+import {
+  useDismissibleCallBanners,
+  VoiceCallChromeOverlay
+} from '../VoiceCallChrome';
 import styles from './ChatVoiceCall.module.css';
+
+const PANEL_MIN_HEIGHT = 230;
+const PANEL_MAX_HEIGHT_VH = 80;
 
 const ChatVoiceCall = ({
   chatId,
@@ -25,6 +27,42 @@ const ChatVoiceCall = ({
   onClose
 }) => {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [panelHeight, setPanelHeight] = useState(null);
+  const containerRef = useRef(null);
+  const {
+    testMode,
+    handleAddTestParticipant,
+    handleRemoveTestParticipant,
+    appendTestParticipants,
+  } = useCallGridTestMode();
+
+  const handleResizeStart = useCallback((event) => {
+    event.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const startY = event.clientY;
+    const startHeight = container.getBoundingClientRect().height;
+    const maxHeight = (window.innerHeight * PANEL_MAX_HEIGHT_VH) / 100;
+
+    const handleMouseMove = (moveEvent) => {
+      const nextHeight = Math.min(
+        maxHeight,
+        Math.max(PANEL_MIN_HEIGHT, startHeight + (moveEvent.clientY - startY))
+      );
+      setPanelHeight(nextHeight);
+    };
+
+    const handleMouseUp = () => {
+      document.body.classList.remove('is-resizing-chat-voice-call');
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.body.classList.add('is-resizing-chat-voice-call');
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, []);
 
   const toMediaUrl = (value) => {
     if (!value) return null;
@@ -52,7 +90,10 @@ const ChatVoiceCall = ({
     isAudioEnabled,
     participants,
     error,
+    audioBlocked,
     isGlobalAudioMuted,
+    isInCall,
+    currentRoomId,
     currentCall,
     isScreenSharing,
     screenShareStream,
@@ -65,6 +106,8 @@ const ChatVoiceCall = ({
     participantSpeakingStates,
     participantMuteStates,
     participantAudioStates,
+    isNoiseSuppressed,
+    noiseSuppressionMode,
     startCall,
     endCall,
     toggleMute,
@@ -72,10 +115,18 @@ const ChatVoiceCall = ({
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
-    startScreenShare,
-    stopScreenShare,
-    toggleVideo
+    toggleScreenShare,
+    toggleVideo,
+    toggleNoiseSuppression,
+    changeNoiseSuppressionMode
   } = useGlobalCall(userId, userName);
+
+  const {
+    showErrorBanner,
+    showAudioBlockedBanner,
+    setDismissedError,
+    setDismissedAudioBlocked
+  } = useDismissibleCallBanners(error, audioBlocked);
 
   useEffect(() => {
     let mounted = true;
@@ -89,8 +140,8 @@ const ChatVoiceCall = ({
           avatarColor: profile.avatarColor || '#5865f2',
           banner: toBannerValue(profile.banner)
         });
-      } catch (error) {
-        console.warn('ChatVoiceCall: failed to load current user profile', error);
+      } catch (profileError) {
+        console.warn('ChatVoiceCall: failed to load current user profile', profileError);
       }
     };
     loadCurrentUserProfile();
@@ -99,40 +150,36 @@ const ChatVoiceCall = ({
     };
   }, [userId]);
 
-  // Автоматически начинаем звонок при монтировании
   useEffect(() => {
-    console.log('ChatVoiceCall: useEffect triggered with:', { chatId, userId, userName, chatName });
+    if (!chatId || !userId || !userName) return;
 
-    if (chatId && userId && userName) {
-      // Проверяем, не активен ли уже звонок в этом чате
-      if (isConnected && currentCall?.channelId === chatId) {
-        console.log('ChatVoiceCall: Call already active in this chat, skipping start');
-        return;
-      }
+    const alreadyInThisChat =
+      isInCall &&
+      (isSameVoiceChannel(currentRoomId, chatId) ||
+        isSameVoiceChannel(currentCall?.channelId, chatId));
 
-      console.log('ChatVoiceCall: Starting voice call');
+    if (!alreadyInThisChat && isInCall) {
       startCall(chatId, chatName).catch((err) => {
         console.error('Call start error:', err);
       });
-    } else {
-      console.log('ChatVoiceCall: Missing required parameters:', { chatId, userId, userName });
+      return;
+    }
+
+    if (alreadyInThisChat) {
+      startCall(chatId, chatName).catch((err) => {
+        console.error('Call resync error:', err);
+      });
+      return;
+    }
+
+    if (!isInCall) {
+      startCall(chatId, chatName).catch((err) => {
+        console.error('Call start error:', err);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, chatName, userId, userName]);
 
-  // Отладочная информация для демонстрации экрана
-  useEffect(() => {
-    console.log('ChatVoiceCall: Screen sharing state changed:', { 
-      isScreenSharing, 
-      hasScreenShareStream: !!screenShareStream,
-      participants: participants.length,
-      isConnected
-    });
-  }, [isScreenSharing, screenShareStream, participants.length, isConnected]);
-
-  // Автофокус отключен - используем enableAutoFocus={false} в VideoCallGrid
-
-  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       console.log('ChatVoiceCall: Component unmounted, but call continues in background');
@@ -150,82 +197,59 @@ const ChatVoiceCall = ({
     handleClose();
   };
 
-  const handleToggleMute = () => {
-    toggleMute();
-  };
-
-  const handleToggleVideo = async () => {
-    try {
-      console.log('🎥 Video button clicked, isVideoEnabled:', isVideoEnabled);
-      console.log('🎥 toggleVideo function:', typeof toggleVideo);
-      await toggleVideo();
-      console.log('🎥 Video toggle completed');
-    } catch (error) {
-      console.error('🎥 Video toggle error:', error);
-    }
-  };
-
-  const handleScreenShare = async () => {
-    try {
-      console.log('ChatVoiceCall: Screen share button clicked, isScreenSharing:', isScreenSharing);
-      if (isScreenSharing) {
-        await stopScreenShare();
-      } else {
-        await startScreenShare();
-      }
-    } catch (error) {
-      console.error('Screen share error:', error);
-    }
-  };
-
-
-  const handleEndCall = async () => {
-    handleDisconnect();
-  };
-
-  // Создаем участников для отображения, как в VoiceCallView.jsx
   const currentUser = createParticipant(userId, userName || 'You', null, 'online', 'host');
   currentUser.isMuted = isMuted;
   currentUser.isAudioEnabled = isAudioEnabled;
-  currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Используем из глобального состояния
-  currentUser.isSpeaking = !isMuted && (participantSpeakingStates?.get(userId) || false);
+  currentUser.isGlobalAudioMuted = isGlobalAudioMuted;
+  currentUser.isSpeaking =
+    !isMuted && (participantSpeakingStates?.get(String(userId)) || false);
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = cameraStream;
-  currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
+  currentUser.isCurrentUser = true;
   currentUser.avatar = currentUserProfile?.avatar || null;
   currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
   currentUser.banner = currentUserProfile?.banner || null;
-  
-  const displayParticipants = [currentUser];
-  
-  // Добавляем всех остальных участников из глобального состояния
-  participants.forEach(participant => {
-    const pid = participant.userId || participant.id || participant.name;
-    const videoParticipant = createParticipant(
-      pid, 
-      participant.name, 
-      participant.avatar || null, 
-      'online', 
-      'participant'
-    );
-    videoParticipant.isMuted = participantMuteStates?.get(pid) ?? participant.isMuted ?? false;
-    videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
-    videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
-    const remoteAudioOn = participantAudioStates?.get(pid) !== false;
-    videoParticipant.isSpeaking =
-      !videoParticipant.isMuted && remoteAudioOn && (participantSpeakingStates?.get(pid) || false);
-    videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
-    videoParticipant.videoStream = participant.videoStream || null;
-    videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
-    videoParticipant.banner = participant.banner || null;
-    console.log('🎥 Creating display participant:', {
-      id: videoParticipant.id,
-      name: videoParticipant.name,
-      isVideoEnabled: videoParticipant.isVideoEnabled,
-      hasVideoStream: !!videoParticipant.videoStream
+
+  const displayParticipants = useMemo(() => {
+    const list = [currentUser];
+
+    participants.forEach((participant) => {
+      const pid = participant.userId || participant.id || participant.name;
+      if (String(pid) === String(userId)) {
+        return;
+      }
+      const videoParticipant = createParticipant(
+        pid,
+        participant.name,
+        participant.avatar || null,
+        'online',
+        'participant'
+      );
+      videoParticipant.isMuted = participantMuteStates?.get(pid) ?? participant.isMuted ?? false;
+      videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
+      videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
+      const remoteAudioOn = participantAudioStates?.get(pid) !== false;
+      videoParticipant.isSpeaking =
+        !videoParticipant.isMuted &&
+        remoteAudioOn &&
+        (participantSpeakingStates?.get(String(pid)) || false);
+      videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
+      videoParticipant.videoStream = participant.videoStream || null;
+      videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
+      videoParticipant.banner = participant.banner || null;
+      list.push(videoParticipant);
     });
-    displayParticipants.push(videoParticipant);
-  });
+
+    return appendTestParticipants(list);
+  }, [
+    appendTestParticipants,
+    currentUser,
+    participantAudioStates,
+    participantMuteStates,
+    participantSpeakingStates,
+    participants,
+    userId,
+  ]);
 
   if (!isConnected) {
     return null;
@@ -233,19 +257,25 @@ const ChatVoiceCall = ({
 
   const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
   const hasAnyVideo = isVideoEnabled || participants.some((participant) => participant.isVideoEnabled);
-  const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo;
+  const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo || testMode;
   const isOneToOneVoiceMode = !shouldShowVideoGrid && displayParticipants.length <= 2;
 
+  const containerStyle =
+    panelHeight != null
+      ? { height: `${panelHeight}px`, flex: '0 0 auto' }
+      : undefined;
+
   return (
-    <div className={styles.voiceCallContainer}>
-      {/* Основная область участников */}
+    <div
+      ref={containerRef}
+      className={styles.voiceCallContainer}
+      style={containerStyle}
+    >
       <div className={styles.voiceCallWrapper}>
         <div className={`${styles.participantsContainer} ${isOneToOneVoiceMode ? styles.oneToOneParticipants : ''}`}>
-          {console.log('ChatVoiceCall: Rendering participants, isScreenSharing:', isScreenSharing, 'remoteScreenShares:', remoteScreenShares.size, 'isVideoEnabled:', isVideoEnabled)}
           {shouldShowVideoGrid ? (
-            /* При демонстрации экрана или вебкамере используем VideoCallGrid для фокуса */
             <div className={styles.screenShareContainer}>
-              <VideoCallGrid 
+              <VideoCallGrid
                 className="dm-grid-fit"
                 participants={displayParticipants}
                 onParticipantClick={(participant) => {
@@ -259,134 +289,105 @@ const ChatVoiceCall = ({
                 onToggleVolumeSlider={toggleVolumeSlider}
                 screenShareStream={screenShareStream}
                 isScreenSharing={isScreenSharing}
-                screenShareParticipant={isScreenSharing ? {
-                  id: userId,
-                  name: userName,
-                  isScreenSharing: true
-                } : null}
+                screenShareParticipant={
+                  isScreenSharing
+                    ? {
+                        id: userId,
+                        name: userName,
+                        isScreenSharing: true
+                      }
+                    : null
+                }
                 remoteScreenShares={remoteScreenShares}
-                onStopScreenShare={handleScreenShare}
+                onStopScreenShare={toggleScreenShare}
                 forceGridMode={false}
                 hideBottomUsers={displayParticipants.length <= 2}
                 isVideoEnabled={isVideoEnabled}
                 videoStream={cameraStream}
                 enableAutoFocus={false}
+                testMode={testMode}
+                onAddTestParticipant={handleAddTestParticipant}
+                onRemoveTestParticipant={handleRemoveTestParticipant}
               />
             </div>
           ) : (
-            /* Обычное отображение кружков пользователей */
-            displayParticipants.map((participant) => (
-              (() => {
-                const participantIsDeafened = participant.isGlobalAudioMuted || participant.isAudioDisabled || participant.isDeafened;
-                return (
-              <div
-                key={participant.id}
-                className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''} ${
-                  participant.isSpeaking ? styles.participantSpeaking : ''
-                }`}
-              >
-                <div className={styles.participantAvatarContainer}>
-                  <div className={styles.participantAvatar}>
-                    <div
-                      className={styles.avatarCircle}
-                      style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#4e5058' } : undefined}
-                    >
-                      {participant.avatar ? (
-                        <img
-                          src={participant.avatar}
-                          alt={participant.name || 'User'}
-                          className={styles.avatarImage}
-                        />
-                      ) : (
-                        (participant.name || 'U').charAt(0).toUpperCase()
-                      )}
+            displayParticipants.map((participant) => {
+              const participantIsDeafened =
+                participant.isGlobalAudioMuted || participant.isAudioDisabled || participant.isDeafened;
+              return (
+                <div
+                  key={participant.id}
+                  className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''} ${
+                    participant.isSpeaking ? styles.participantSpeaking : ''
+                  }`}
+                >
+                  <div className={styles.participantAvatarContainer}>
+                    <div className={styles.participantAvatar}>
+                      <div
+                        className={styles.avatarCircle}
+                        style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#4e5058' } : undefined}
+                      >
+                        {participant.avatar ? (
+                          <img
+                            src={participant.avatar}
+                            alt={participant.name || 'User'}
+                            className={styles.avatarImage}
+                          />
+                        ) : (
+                          (participant.name || 'U').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
+                  <div className={styles.participantStatusRow}>
+                    <div className={`${styles.participantStatusPill} ${participant.isMuted ? styles.statusOff : styles.statusOn}`}>
+                      {participant.isMuted ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
+                    </div>
+                    <div className={`${styles.participantStatusPill} ${participantIsDeafened ? styles.statusOff : styles.statusOn}`}>
+                      {participantIsDeafened ? <HeadsetOffIcon sx={{ fontSize: 14 }} /> : <HeadsetIcon sx={{ fontSize: 14 }} />}
                     </div>
                   </div>
                 </div>
-                <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
-                <div className={styles.participantStatusRow}>
-                  <div className={`${styles.participantStatusPill} ${participant.isMuted ? styles.statusOff : styles.statusOn}`}>
-                    {participant.isMuted ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
-                  </div>
-                  <div className={`${styles.participantStatusPill} ${participantIsDeafened ? styles.statusOff : styles.statusOn}`}>
-                    {participantIsDeafened ? <HeadsetOffIcon sx={{ fontSize: 14 }} /> : <HeadsetIcon sx={{ fontSize: 14 }} />}
-                  </div>
-                </div>
-              </div>
-                );
-              })()
-            ))
+              );
+            })
           )}
         </div>
       </div>
 
+      <VoiceCallChromeOverlay
+        showHeader={false}
+        compactBanners
+        error={error}
+        showErrorBanner={showErrorBanner}
+        showAudioBlockedBanner={showAudioBlockedBanner}
+        onDismissError={() => setDismissedError(true)}
+        onDismissAudioBlocked={() => setDismissedAudioBlocked(true)}
+        controlProps={{
+          isMuted,
+          onToggleMute: toggleMute,
+          isGlobalAudioMuted,
+          onToggleGlobalAudio: toggleGlobalAudio,
+          isNoiseSuppressed,
+          noiseSuppressionMode,
+          onToggleNoiseSuppression: toggleNoiseSuppression,
+          onNoiseSuppressionModeSelect: changeNoiseSuppressionMode,
+          isVideoEnabled,
+          onToggleVideo: toggleVideo,
+          isScreenSharing,
+          onToggleScreenShare: toggleScreenShare,
+          onDisconnect: handleDisconnect
+        }}
+      />
 
-      {/* Нижняя панель управления */}
-      <div className={styles.bottomControls}>
-        <div className={styles.controlSection}>
-          <div className={styles.mainControls}>
-            {/* Микрофон */}
-            <button 
-              className={`${styles.controlBtn} ${styles.microphoneBtn} ${isMuted ? 'muted' : 'unmuted'}`}
-              onClick={handleToggleMute}
-              title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
-            >
-              {isMuted ? <MicOffIcon /> : <MicIcon />}
-            </button>
-
-            {/* Камера */}
-            <button 
-              className={`${styles.controlBtn} ${styles.cameraBtn} ${isVideoEnabled ? 'active' : ''}`}
-              onClick={handleToggleVideo}
-              title={isVideoEnabled ? 'Выключить камеру' : 'Включить камеру'}
-              style={{ 
-                backgroundColor: isVideoEnabled ? '#5865f2' : '#40444b',
-                color: isVideoEnabled ? '#ffffff' : '#b9bbbe'
-              }}
-            >
-              {isVideoEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
-            </button>
-
-            {/* Демонстрация экрана */}
-            <button 
-              className={`${styles.controlBtn} ${styles.screenShareBtn} ${isScreenSharing ? 'active' : ''}`}
-              onClick={handleScreenShare}
-              title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Начать демонстрацию экрана'}
-              style={{ 
-                backgroundColor: isScreenSharing ? '#5865f2' : '#40444b',
-                color: isScreenSharing ? '#ffffff' : '#b9bbbe'
-              }}
-            >
-              {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
-            </button>
-
-            {/* Глобальный звук */}
-            <button 
-              className={`${styles.controlBtn} ${styles.globalAudioBtn} ${isGlobalAudioMuted ? 'muted' : 'unmuted'}`}
-              onClick={toggleGlobalAudio}
-              title={isGlobalAudioMuted ? 'Включить звук' : 'Выключить звук'}
-            >
-              {isGlobalAudioMuted ? <HeadsetOffIcon /> : <HeadsetIcon />}
-            </button>
-
-            {/* Завершить звонок */}
-            <button 
-              className={`${styles.controlBtn} ${styles.endCallBtn}`}
-              onClick={handleEndCall}
-              title="Завершить звонок"
-            >
-              <CallEndIcon />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Ошибки */}
-      {error && (
-        <div className={styles.errorBanner}>
-          <span>Ошибка: {error}</span>
-        </div>
-      )}
+      <div
+        className={styles.resizeHandle}
+        onMouseDown={handleResizeStart}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Изменить высоту панели звонка"
+        title="Потяните, чтобы изменить высоту"
+      />
     </div>
   );
 };

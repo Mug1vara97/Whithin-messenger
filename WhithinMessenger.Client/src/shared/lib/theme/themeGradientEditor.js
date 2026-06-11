@@ -132,11 +132,44 @@ function parseLinearGradientAngle(inner) {
   return ((angle % 360) + 360) % 360;
 }
 
+function percentToStopIndex(percent) {
+  if (GRADIENT_STOP_COUNT <= 1) return 0;
+  const clamped = Math.min(100, Math.max(0, percent));
+  return Math.round((clamped / 100) * (GRADIENT_STOP_COUNT - 1));
+}
+
 function parseLinearGradientUi(raw, fallbackHex) {
   const s = (raw || '').trim();
   const open = /^linear-gradient\s*\(\s*(.*)\)$/i.exec(s);
   if (!open) return null;
   const inner = open[1];
+
+  const explicitStops = [];
+  const stopRe = /(#[0-9a-f]{3,6})\s+([\d.]+)\s*%/gi;
+  let stopMatch;
+  while ((stopMatch = stopRe.exec(inner)) !== null) {
+    explicitStops.push({
+      color: expandHex(stopMatch[1]),
+      percent: Math.min(100, Math.max(0, parseFloat(stopMatch[2]))),
+    });
+  }
+
+  if (explicitStops.length >= 2) {
+    const stops = createDefaultStops(fallbackHex, explicitStops[0].color).map((stop) => ({
+      ...stop,
+      enabled: false,
+    }));
+    explicitStops.forEach(({ color, percent }) => {
+      const index = percentToStopIndex(percent);
+      stops[index] = { color, enabled: true };
+    });
+    return {
+      kind: 'linear',
+      angle: parseLinearGradientAngle(inner),
+      stops: fillDisabledStopColors(stops, fallbackHex),
+    };
+  }
+
   const hexes = collectHexes(inner);
   if (hexes.length < 2) return null;
 
@@ -209,14 +242,21 @@ export function parseGradientUi(raw, fallbackHex) {
   return parseMeshGradientUi(raw, fallbackHex) || parseLinearGradientUi(raw, fallbackHex);
 }
 
+export function stopIndexToPercent(index) {
+  if (GRADIENT_STOP_COUNT <= 1) return 0;
+  return Math.round((index / (GRADIENT_STOP_COUNT - 1)) * 100);
+}
+
 export function buildLinearGradient(angle, stops) {
-  const active = (stops || []).filter((stop) => stop.enabled);
+  const active = (stops || [])
+    .map((stop, index) => ({ stop, index }))
+    .filter(({ stop }) => stop?.enabled);
   if (!active.length) return expandHex(stops?.[0]?.color || '#36393f');
-  if (active.length === 1) return expandHex(active[0].color);
+  if (active.length === 1) return expandHex(active[0].stop.color);
 
   const a = ((Math.round(Number(angle)) % 360) + 360) % 360;
-  const parts = active.map((stop, index) => {
-    const pct = Math.round((index / (active.length - 1)) * 100);
+  const parts = active.map(({ stop, index }) => {
+    const pct = stopIndexToPercent(index);
     return `${expandHex(stop.color)} ${pct}%`;
   });
   return `linear-gradient(${a}deg, ${parts.join(', ')})`;
@@ -254,8 +294,7 @@ export function isAdvancedPaint(raw) {
 }
 
 export function linearStopLabel(index) {
-  if (GRADIENT_STOP_COUNT <= 1) return '0%';
-  return `${Math.round((index / (GRADIENT_STOP_COUNT - 1)) * 100)}%`;
+  return `${stopIndexToPercent(index)}%`;
 }
 
 export function meshStopLabel(index) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { normalizeFriendRequest } from '../lib/friendHelpers';
 
 export const useFriendRequests = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -38,8 +39,10 @@ export const useFriendRequests = () => {
         return;
       }
       const requestsData = await connection.invoke('GetFriendRequests');
-      setPendingRequests(requestsData.pendingRequests || []);
-      setSentRequests(requestsData.sentRequests || []);
+      const pending = requestsData?.pendingRequests ?? requestsData?.PendingRequests ?? [];
+      const sent = requestsData?.sentRequests ?? requestsData?.SentRequests ?? [];
+      setPendingRequests(pending.map(normalizeFriendRequest).filter(Boolean));
+      setSentRequests(sent.map(normalizeFriendRequest).filter(Boolean));
     } catch (err) {
       setError(err.message || 'Ошибка получения запросов в друзья');
       console.error('Error fetching friend requests:', err);

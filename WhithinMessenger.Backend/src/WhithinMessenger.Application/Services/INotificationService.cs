@@ -10,6 +10,8 @@ public interface INotificationService
         string content,
         Guid? serverId = null,
         string? chatDisplayName = null,
+        string? serverDisplayName = null,
+        string? senderDisplayName = null,
         string? pushMessageType = null,
         string? pushPreviewText = null,
         string? pushThumbnailUrl = null,
