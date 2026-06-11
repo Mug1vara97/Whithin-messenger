@@ -7,6 +7,7 @@ import {
   getSlotIdFromAction,
   isSoundpadAction,
 } from '../soundpad/soundpadHotkeys';
+import { toggleSoundpadPanel } from '../soundpad/soundpadPanelEvents';
 
 const SHORTCUT_DEDUPE_MS = 200;
 
@@ -48,6 +49,10 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
           onToggleAudio();
           console.log('✅ Выполнена команда: переключение наушников');
         }
+        break;
+      case 'toggle-soundpad-panel':
+        toggleSoundpadPanel();
+        console.log('✅ Выполнена команда: панель саундпада');
         break;
       default:
         if (isSoundpadAction(shortcut)) {
@@ -104,6 +109,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     const map = {
       [currentHotkeys.toggleMic]: 'toggle-mic',
       [currentHotkeys.toggleAudio]: 'toggle-audio',
+      [currentHotkeys.toggleSoundpadPanel]: 'toggle-soundpad-panel',
     };
     for (const slot of soundpadSlots) {
       if (slot.hotkey) {

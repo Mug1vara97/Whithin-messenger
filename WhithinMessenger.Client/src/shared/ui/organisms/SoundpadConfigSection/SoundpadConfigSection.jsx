@@ -156,7 +156,7 @@ const SoundpadConfigSection = ({ active }) => {
               soundpadStorage.saveConfig({ showPanel: next });
             }}
           />
-          <span>Показывать панель саундпада в звонке</span>
+          <span>Панель саундпада по горячей клавише (F3)</span>
         </label>
       </section>
 

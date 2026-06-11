@@ -27,6 +27,7 @@ export function buildAllElectronShortcuts() {
   return {
     'toggle-mic': voice.toggleMic,
     'toggle-audio': voice.toggleAudio,
+    'toggle-soundpad-panel': voice.toggleSoundpadPanel,
     ...buildSoundpadShortcutMap(),
   };
 }

@@ -78,8 +78,8 @@ export const isSameVoiceChannel = (left, right) => {
 const resolveParticipantUserId = (participant) =>
   participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
 
-const getVoicePublishTrack = () =>
-  soundpadInAppMixer.getVoiceStream()?.getAudioTracks()[0] ?? null;
+const getMixedPublishTrack = () =>
+  soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0] ?? null;
 
 const getMicStreamForSoundpadMixer = (state, noiseSuppressed) => {
   if (noiseSuppressed && state.noiseSuppressionManager) {
@@ -88,34 +88,33 @@ const getMicStreamForSoundpadMixer = (state, noiseSuppressed) => {
   return state.localStream;
 };
 
-const refreshInAppVoicePublishTrack = async (state, noiseSuppressed) => {
+const refreshInAppMixedPublishTrack = async (state, noiseSuppressed) => {
   const micStream = getMicStreamForSoundpadMixer(state, noiseSuppressed);
   if (!micStream) {
-    return getVoicePublishTrack();
+    return getMixedPublishTrack();
   }
   await soundpadInAppMixer.attachMicStream(micStream);
   soundpadInAppMixer.setMicMuted(state.isMuted);
-  return getVoicePublishTrack();
+  return getMixedPublishTrack();
 };
 
-const publishLocalSoundpadTrack = async (localParticipant) => {
-  const soundpadTrack = soundpadInAppMixer.getSoundpadStream()?.getAudioTracks()[0];
-  if (!soundpadTrack) return;
+const unpublishLegacySoundpadTracks = async (localParticipant) => {
+  if (!localParticipant) return;
 
-  const existingPublication = Array.from(localParticipant.audioTrackPublications.values()).find(
+  const legacyPublications = Array.from(localParticipant.audioTrackPublications.values()).filter(
     (publication) =>
       publication.trackName === SOUNDPAD_TRACK_NAME || publication.name === SOUNDPAD_TRACK_NAME
   );
 
-  if (existingPublication?.track) {
-    await existingPublication.track.replaceTrack(soundpadTrack);
-    return;
+  for (const publication of legacyPublications) {
+    if (publication.track) {
+      try {
+        await localParticipant.unpublishTrack(publication.track, true);
+      } catch (error) {
+        console.warn('Failed to unpublish legacy soundpad track:', error);
+      }
+    }
   }
-
-  await localParticipant.publishTrack(soundpadTrack, {
-    source: Track.Source.Unknown,
-    name: SOUNDPAD_TRACK_NAME,
-  });
 };
 
 // ICE серверы для WebRTC
@@ -1058,6 +1057,11 @@ export const useCallStore = create(
               return;
             }
             
+            // Only the microphone track drives voice playback — never replace it with soundpad/screen.
+            if (mediaType !== 'microphone') {
+              return;
+            }
+
             // Check if we already have an audio element for this user
             if (state.audioElements.has(targetUserId)) {
               console.log('🔊 callStore: Audio element already exists for user:', targetUserId, 'updating...');
@@ -2215,7 +2219,7 @@ export const useCallStore = create(
           if (inAppSoundpad) {
             await soundpadInAppMixer.attachMicStream(streamForPublish);
             soundpadInAppMixer.setMicMuted(state.isMuted);
-            streamForPublish = soundpadInAppMixer.getVoiceStream();
+            streamForPublish = soundpadInAppMixer.getMixedStream();
             set({ audioStream: streamForPublish });
           }
 
@@ -2237,7 +2241,7 @@ export const useCallStore = create(
             throw new Error('No audio track in stream');
           }
 
-          const publishMicEnabled = !state.isMuted;
+          const publishMicEnabled = inAppSoundpad ? true : !state.isMuted;
           audioTrack.enabled = publishMicEnabled;
           
           const publishTrack = streamForPublish.getAudioTracks()[0];
@@ -2245,6 +2249,7 @@ export const useCallStore = create(
 
           if (needsCustomPublish && publishTrack) {
             try {
+              await unpublishLegacySoundpadTracks(room.localParticipant);
               await room.localParticipant.setMicrophoneEnabled(false);
               const microphonePublication = room.localParticipant.getTrackPublication('microphone');
 
@@ -2258,10 +2263,6 @@ export const useCallStore = create(
               }
 
               await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
-
-              if (inAppSoundpad) {
-                await publishLocalSoundpadTrack(room.localParticipant);
-              }
             } catch (error) {
               console.warn('Failed to publish custom audio track via LiveKit:', error);
               await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
@@ -2294,9 +2295,14 @@ export const useCallStore = create(
         try {
           if (usesInAppSoundpad()) {
             soundpadInAppMixer.setMicMuted(newMutedState);
-          }
-          await voiceCallApi.setMicrophoneEnabled(!newMutedState);
-          if (!usesInAppSoundpad()) {
+            const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
+            if (mixedTrack) {
+              mixedTrack.enabled = true;
+            }
+            await voiceCallApi.setMicrophoneEnabled(true);
+            voiceCallApi.broadcastMuteState(newMutedState);
+          } else {
+            await voiceCallApi.setMicrophoneEnabled(!newMutedState);
             if (state.noiseSuppressionManager) {
               const processedStream = state.noiseSuppressionManager.getProcessedStream();
               const audioTrack = processedStream?.getAudioTracks()[0];
@@ -2574,7 +2580,7 @@ export const useCallStore = create(
               let trackToPublish = null;
 
               if (usesInAppSoundpad()) {
-                trackToPublish = await refreshInAppVoicePublishTrack(state, newState);
+                trackToPublish = await refreshInAppMixedPublishTrack(state, newState);
               } else if (newState) {
                 // При включении шумоподавления используем обработанный трек
                 const processedStream = state.noiseSuppressionManager.getProcessedStream();
@@ -2712,7 +2718,7 @@ export const useCallStore = create(
                 const localParticipant = room.localParticipant;
                 let newTrack = null;
                 if (usesInAppSoundpad()) {
-                  newTrack = await refreshInAppVoicePublishTrack(state, true);
+                  newTrack = await refreshInAppMixedPublishTrack(state, true);
                 } else {
                   const processedStream = state.noiseSuppressionManager.getProcessedStream();
                   newTrack = processedStream?.getAudioTracks()[0] ?? null;

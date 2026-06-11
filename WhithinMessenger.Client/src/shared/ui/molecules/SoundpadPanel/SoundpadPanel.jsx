@@ -2,24 +2,57 @@ import React, { useEffect, useState } from 'react';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
+import { SOUNDPAD_PANEL_TOGGLE_EVENT } from '../../../lib/soundpad/soundpadPanelEvents';
 import { soundpadLog, soundpadError } from '../../../lib/soundpad/soundpadLogger';
 import './SoundpadPanel.css';
 
 const SoundpadPanel = () => {
   const [slots, setSlots] = useState(() => soundpadStorage.getConfig().slots);
   const [bridgeRunning, setBridgeRunning] = useState(false);
-  const [visible, setVisible] = useState(() => soundpadStorage.getConfig().showPanel !== false);
+  const [panelEnabled, setPanelEnabled] = useState(() => soundpadStorage.getConfig().showPanel !== false);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     const onConfigChange = () => {
       const config = soundpadStorage.getConfig();
       setSlots(config.slots);
-      setVisible(config.showPanel !== false);
+      setPanelEnabled(config.showPanel !== false);
     };
 
     window.addEventListener('soundpadConfigChanged', onConfigChange);
     return () => window.removeEventListener('soundpadConfigChanged', onConfigChange);
   }, []);
+
+  useEffect(() => {
+    const onToggle = () => {
+      if (soundpadStorage.getConfig().showPanel === false) {
+        return;
+      }
+      setIsOpen((open) => !open);
+    };
+
+    window.addEventListener(SOUNDPAD_PANEL_TOGGLE_EVENT, onToggle);
+    return () => window.removeEventListener(SOUNDPAD_PANEL_TOGGLE_EVENT, onToggle);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +83,12 @@ const SoundpadPanel = () => {
     };
   }, []);
 
-  if (!soundpadBridge.isElectronAvailable() || !visible || slots.length === 0) {
+  if (
+    !isOpen ||
+    !panelEnabled ||
+    !soundpadBridge.isElectronAvailable() ||
+    slots.length === 0
+  ) {
     return null;
   }
 
@@ -59,31 +97,54 @@ const SoundpadPanel = () => {
     return null;
   }
 
+  const panelHotkey = hotkeyStorage.formatKey(hotkeyStorage.getHotkey('toggleSoundpadPanel'));
+
   return (
-    <aside className="soundpad-panel" aria-label="Саундпад">
-      <p className="soundpad-panel__title">Саундпад</p>
-      <div className="soundpad-panel__grid">
-        {slots.map((slot) => {
-          const hotkeyLabel = slot.hotkey ? hotkeyStorage.formatKey(slot.hotkey) : '';
-          return (
-            <button
-              key={slot.id}
-              type="button"
-              className="soundpad-panel__btn"
-              title={hotkeyLabel ? `${slot.label} (${hotkeyLabel})` : slot.label}
-              onClick={() =>
-                soundpadBridge.playSlot(slot.id).catch((err) => {
-                  soundpadError('SoundpadPanel: play failed', slot.id, err);
-                })
-              }
-            >
-              <span className="soundpad-panel__btn-label">{slot.label}</span>
-              {hotkeyLabel ? <span className="soundpad-panel__btn-hotkey">{hotkeyLabel}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-    </aside>
+    <div
+      className="soundpad-panel-overlay"
+      onClick={() => setIsOpen(false)}
+      role="presentation"
+    >
+      <aside
+        className="soundpad-panel"
+        aria-label="Саундпад"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="soundpad-panel__header">
+          <p className="soundpad-panel__title">Саундпад</p>
+          <button
+            type="button"
+            className="soundpad-panel__close"
+            onClick={() => setIsOpen(false)}
+            aria-label="Закрыть"
+            title={panelHotkey ? `Закрыть (${panelHotkey})` : 'Закрыть'}
+          >
+            ×
+          </button>
+        </header>
+        <div className="soundpad-panel__grid">
+          {slots.map((slot) => {
+            const hotkeyLabel = slot.hotkey ? hotkeyStorage.formatKey(slot.hotkey) : '';
+            return (
+              <button
+                key={slot.id}
+                type="button"
+                className="soundpad-panel__btn"
+                title={hotkeyLabel ? `${slot.label} (${hotkeyLabel})` : slot.label}
+                onClick={() =>
+                  soundpadBridge.playSlot(slot.id).catch((err) => {
+                    soundpadError('SoundpadPanel: play failed', slot.id, err);
+                  })
+                }
+              >
+                <span className="soundpad-panel__btn-label">{slot.label}</span>
+                {hotkeyLabel ? <span className="soundpad-panel__btn-hotkey">{hotkeyLabel}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+    </div>
   );
 };
 

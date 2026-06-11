@@ -217,6 +217,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     const actionNames = {
       toggleMic: 'Переключить микрофон',
       toggleAudio: 'Переключить наушники',
+      toggleSoundpadPanel: 'Панель саундпада',
     };
     return actionNames[action] || action;
   };
@@ -411,10 +412,18 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
             <h3>Горячие клавиши</h3>
             {renderHotkeyRow('toggleMic', '🎤 Переключить микрофон', 'Включение/выключение микрофона')}
             {renderHotkeyRow('toggleAudio', '🔊 Переключить наушники', 'Включение/выключение звука в наушниках')}
+            {isElectron &&
+              renderHotkeyRow(
+                'toggleSoundpadPanel',
+                '🎹 Панель саундпада',
+                'Открыть или закрыть окно с кнопками звуков (глобально в десктоп-приложении)'
+              )}
             <div className="setting-item">
               <div className="setting-item-info">
                 <span className="setting-text">🔄 Сбросить горячие клавиши</span>
-                <p className="setting-description">Вернуть F1 и F2 по умолчанию</p>
+                <p className="setting-description">
+                  {isElectron ? 'Вернуть F1, F2 и F3 по умолчанию' : 'Вернуть F1 и F2 по умолчанию'}
+                </p>
               </div>
               <button className="hotkey-reset-btn" type="button" onClick={handleHotkeyReset}>
                 Сбросить
