@@ -217,6 +217,19 @@ coverage/
 
 Whithin-android/
 
+## ВКР (выпускная квалификационная работа)
+
+ВКРПример/
+ВКР/
+**/ВКР*/
+**/*ВКР*
+generate_vkr_docx.py
+Скриншоты/
+
+## Local tools
+
+.tools/
+
 ## Electron 
 
 electron/node_modules/
