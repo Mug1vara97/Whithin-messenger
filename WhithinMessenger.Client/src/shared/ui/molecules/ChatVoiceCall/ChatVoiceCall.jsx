@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import {
+  findChannelParticipant,
   getParticipantIsDeafened,
   getParticipantIsMuted,
   getParticipantIsSpeaking,
+  useActiveVoiceChannelParticipantList,
   useParticipantGlobalAudioStates,
   useParticipantMuteStates,
   useParticipantSpeakingStates,
@@ -136,6 +138,7 @@ const ChatVoiceCall = ({
   const participantSpeakingStatesLive = useParticipantSpeakingStates();
   const participantMuteStatesLive = useParticipantMuteStates();
   const participantGlobalAudioStatesLive = useParticipantGlobalAudioStates();
+  const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
 
   const {
     showErrorBanner,
@@ -337,15 +340,21 @@ const ChatVoiceCall = ({
             </div>
           ) : (
             displayParticipants.map((participant) => {
+              const channelParticipant = findChannelParticipant(
+                activeVoiceChannelParticipants,
+                participant.id
+              );
               const isMutedLive = getParticipantIsMuted(
                 participantMuteStatesLive,
                 participant,
-                isMuted
+                isMuted,
+                channelParticipant
               );
               const participantIsDeafened = getParticipantIsDeafened(
                 participantGlobalAudioStatesLive,
                 participant,
-                isGlobalAudioMuted
+                isGlobalAudioMuted,
+                channelParticipant
               );
               const isSpeakingLive = getParticipantIsSpeaking(
                 participantSpeakingStatesLive,

@@ -92,6 +92,56 @@ export const isSameVoiceChannel = (left, right) => {
 const resolveParticipantUserId = (participant) =>
   participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
 
+/** Keep tile indicators in sync with sidebar voice-channel participant list. */
+const applyVoiceChannelStatesToLiveMaps = (state, channelId, participants, updates = null) => {
+  if (normalizeChannelId(state.currentRoomId) !== normalizeChannelId(channelId)) {
+    return null;
+  }
+
+  const currentUserId = String(state.currentUserId || '');
+  const newMuteStates = new Map(state.participantMuteStates);
+  const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+  let changed = false;
+
+  const applyParticipant = (participant) => {
+    const userId = String(resolveParticipantUserId(participant) || '');
+    if (!userId || userId === currentUserId) return;
+
+    if (participant.isMuted !== undefined) {
+      const nextMuted = Boolean(participant.isMuted);
+      if (newMuteStates.get(userId) !== nextMuted) {
+        newMuteStates.set(userId, nextMuted);
+        changed = true;
+      }
+    }
+
+    const deafened =
+      participant.isGlobalAudioMuted ?? participant.isAudioDisabled ?? participant.isDeafened;
+    if (deafened !== undefined) {
+      const nextDeafened = Boolean(deafened);
+      if (newGlobalAudioStates.get(userId) !== nextDeafened) {
+        newGlobalAudioStates.set(userId, nextDeafened);
+        changed = true;
+      }
+    }
+  };
+
+  if (updates && (updates.isMuted !== undefined || updates.isGlobalAudioMuted !== undefined || updates.isAudioDisabled !== undefined || updates.isDeafened !== undefined)) {
+    const userId = String(updates.userId || '');
+    if (userId && userId !== currentUserId) {
+      applyParticipant({ userId, ...updates });
+    }
+  } else if (Array.isArray(participants)) {
+    participants.forEach(applyParticipant);
+  }
+
+  if (!changed) return null;
+  return {
+    participantMuteStates: newMuteStates,
+    participantGlobalAudioStates: newGlobalAudioStates,
+  };
+};
+
 const getMixedPublishTrack = () =>
   soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0] ?? null;
 
@@ -360,7 +410,15 @@ export const useCallStore = create(
           } else {
             newMap.delete(key);
           }
-          return { voiceChannelParticipants: newMap };
+          const liveStatePatch = applyVoiceChannelStatesToLiveMaps(
+            state,
+            channelId,
+            participants
+          );
+          return {
+            voiceChannelParticipants: newMap,
+            ...(liveStatePatch || {}),
+          };
         });
       },
       
@@ -419,7 +477,14 @@ export const useCallStore = create(
             String(resolveParticipantUserId(p)) === String(odUserId) ? { ...p, ...updates } : p
           );
           newMap.set(key, updatedParticipants);
-          return { voiceChannelParticipants: newMap };
+          const liveStatePatch = applyVoiceChannelStatesToLiveMaps(state, channelId, null, {
+            userId: odUserId,
+            ...updates,
+          });
+          return {
+            voiceChannelParticipants: newMap,
+            ...(liveStatePatch || {}),
+          };
         });
       },
 
@@ -874,8 +939,10 @@ export const useCallStore = create(
             });
           });
 
-          voiceCallApi.on('peerMuteStateChanged', ({ peerId, isMuted }) => {
-            const userId = get().peerIdToUserIdMap.get(peerId) || peerId;
+          voiceCallApi.on('peerMuteStateChanged', ({ peerId, isMuted, userId: eventUserId }) => {
+            const userId = String(
+              eventUserId || get().peerIdToUserIdMap.get(peerId) || peerId
+            );
             const mutedState = Boolean(isMuted);
             
             if (mutedState) {
@@ -896,7 +963,9 @@ export const useCallStore = create(
             // Обновляем участников только если нужно (для совместимости)
             set((state) => ({
               participants: state.participants.map(p => 
-                p.userId === userId ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking } : p
+                String(p.userId) === userId
+                  ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking }
+                  : p
               )
             }));
             

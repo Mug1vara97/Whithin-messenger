@@ -1,9 +1,11 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { useCallStore } from '../../../lib/stores/callStore';
 import {
+  findChannelParticipant,
   getParticipantIsDeafened,
   getParticipantIsMuted,
   getParticipantIsSpeaking,
+  useActiveVoiceChannelParticipantList,
   useParticipantGlobalAudioStates,
   useParticipantMuteStates,
   useParticipantSpeakingStates,
@@ -138,6 +140,7 @@ const VideoCallGrid = ({
   const participantSpeakingStates = useParticipantSpeakingStates();
   const participantMuteStates = useParticipantMuteStates();
   const participantGlobalAudioStates = useParticipantGlobalAudioStates();
+  const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
   const localIsMuted = useCallStore((state) => state.isMuted);
   const localIsGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
 
@@ -419,11 +422,18 @@ const VideoCallGrid = ({
 
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
-    const isMuted = getParticipantIsMuted(participantMuteStates, participant, localIsMuted);
+    const channelParticipant = findChannelParticipant(activeVoiceChannelParticipants, participant.id);
+    const isMuted = getParticipantIsMuted(
+      participantMuteStates,
+      participant,
+      localIsMuted,
+      channelParticipant
+    );
     const isDeafened = getParticipantIsDeafened(
       participantGlobalAudioStates,
       participant,
-      localIsGlobalAudioMuted
+      localIsGlobalAudioMuted,
+      channelParticipant
     );
     const isSpeaking = getParticipantIsSpeaking(participantSpeakingStates, participant.id, {
       isMuted,
