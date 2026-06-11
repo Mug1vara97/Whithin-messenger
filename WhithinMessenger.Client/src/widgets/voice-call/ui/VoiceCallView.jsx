@@ -10,7 +10,6 @@ import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
 } from '../../../shared/ui/molecules/VoiceCallChrome';
-import { SpatialAudioStage } from '../../../shared/ui/molecules/SpatialAudioStage';
 import './VoiceCallView.css';
 
 // Определяет, является ли banner путём к изображению или цветом
@@ -337,8 +336,6 @@ const VoiceCallView = ({
               </div>
             </div>
 
-            <SpatialAudioStage currentUserId={userId} />
-
             <VoiceCallChromeOverlay
               title={currentCall?.channelName || channelName}
               error={error}
@@ -363,6 +360,12 @@ const VoiceCallView = ({
                 showSpatialAudioStage,
                 onToggleSpatialAudioStage: () => toggleSpatialAudioStage(),
                 onToggleSpatialAudio: () => toggleSpatialAudio(),
+                spatialAudioUserId: userId,
+                spatialAudioUserProfile: {
+                  name: userName,
+                  avatar: currentUserProfile?.avatar || null,
+                  avatarColor: currentUserProfile?.avatarColor || '#5865f2',
+                },
                 onDisconnect: async () => {
                   await endCall();
                   handleClose();

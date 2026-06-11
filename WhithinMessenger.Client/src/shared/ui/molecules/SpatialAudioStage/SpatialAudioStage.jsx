@@ -1,14 +1,18 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useCallStore } from '../../../lib/stores/callStore';
+import { DEFAULT_SPATIAL_POSITION } from '../../../lib/utils/spatialAudio';
 import './SpatialAudioStage.css';
 
-const SpatialAudioStage = ({ currentUserId }) => {
+const SpatialAudioStage = ({ currentUserId, currentUserProfile = null, anchored = false }) => {
   const mapRef = useRef(null);
   const [draggingUserId, setDraggingUserId] = useState(null);
 
   const spatialAudioEnabled = useCallStore((s) => s.spatialAudioEnabled);
   const showSpatialAudioStage = useCallStore((s) => s.showSpatialAudioStage);
   const participants = useCallStore((s) => s.participants);
+  const currentUserName = useCallStore((s) => s.currentUserName);
+  const currentRoomId = useCallStore((s) => s.currentRoomId);
+  const voiceChannelParticipants = useCallStore((s) => s.voiceChannelParticipants);
   const spatialPositionsVersion = useCallStore((s) => s.spatialPositionsVersion);
   const participantSpatialPositions = useCallStore((s) => s.participantSpatialPositions);
   const toggleSpatialAudio = useCallStore((s) => s.toggleSpatialAudio);
@@ -18,6 +22,33 @@ const SpatialAudioStage = ({ currentUserId }) => {
   const remoteParticipants = participants.filter(
     (p) => String(p.userId || p.id) !== String(currentUserId)
   );
+
+  const selfFromChannel = useMemo(() => {
+    const targetId = String(currentUserId || '');
+    if (!targetId) return null;
+
+    const lists = [];
+    if (currentRoomId) {
+      lists.push(voiceChannelParticipants.get(currentRoomId));
+      lists.push(voiceChannelParticipants.get(String(currentRoomId)));
+    }
+    voiceChannelParticipants.forEach((list) => lists.push(list));
+
+    for (const list of lists) {
+      const found = list?.find(
+        (p) => String(p.userId || p.odUserId) === targetId
+      );
+      if (found) return found;
+    }
+    return null;
+  }, [currentUserId, currentRoomId, voiceChannelParticipants]);
+
+  const listenerName =
+    currentUserProfile?.name || selfFromChannel?.userName || currentUserName || 'Вы';
+  const listenerAvatar = currentUserProfile?.avatar || selfFromChannel?.avatar || null;
+  const listenerColor =
+    currentUserProfile?.avatarColor || selfFromChannel?.avatarColor || '#5865f2';
+  const listenerInitial = listenerName.charAt(0).toUpperCase();
 
   const updatePositionFromPointer = useCallback(
     (userId, clientX, clientY) => {
@@ -48,7 +79,7 @@ const SpatialAudioStage = ({ currentUserId }) => {
 
   return (
     <div
-      className="spatial-stage"
+      className={`spatial-stage${anchored ? ' spatial-stage--anchored' : ''}`}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerLeave={endDrag}
@@ -57,7 +88,7 @@ const SpatialAudioStage = ({ currentUserId }) => {
         <div>
           <p className="spatial-stage__title">Пространственный звук</p>
           <p className="spatial-stage__hint">
-            Перетащите участников: вверх — дальше, вниз — ближе. Слева/справа — панорама.
+            Вид сверху: вверх — спереди, вниз — сзади, влево/вправо — панорама. Чем дальше от центра — тем тише.
           </p>
         </div>
         <div className="spatial-stage__actions">
@@ -81,12 +112,15 @@ const SpatialAudioStage = ({ currentUserId }) => {
 
       <div className="spatial-stage__map" ref={mapRef}>
         <div className="spatial-stage__grid" aria-hidden />
-        <div className="spatial-stage__depth spatial-stage__depth--far">Далеко</div>
-        <div className="spatial-stage__depth spatial-stage__depth--near">Близко</div>
+        <div className="spatial-stage__axis spatial-stage__axis--front">Спереди</div>
+        <div className="spatial-stage__axis spatial-stage__axis--behind">Сзади</div>
+        <div className="spatial-stage__axis spatial-stage__axis--left">Слева</div>
+        <div className="spatial-stage__axis spatial-stage__axis--right">Справа</div>
+        <div className="spatial-stage__center-ring" aria-hidden />
 
         {remoteParticipants.map((participant) => {
           const userId = participant.userId || participant.id;
-          const pos = participantSpatialPositions.get(userId) || { nx: 0.5, ny: 0.45 };
+          const pos = participantSpatialPositions.get(userId) || DEFAULT_SPATIAL_POSITION;
           const label = participant.name || participant.userName || 'Участник';
           const initial = label.charAt(0).toUpperCase();
 
@@ -120,8 +154,17 @@ const SpatialAudioStage = ({ currentUserId }) => {
           );
         })}
 
-        <div className="spatial-stage__listener" title="Вы">
-          <span>Вы</span>
+        <div className="spatial-stage__listener" title={listenerName}>
+          {listenerAvatar ? (
+            <img src={listenerAvatar} alt="" className="spatial-stage__listener-img" />
+          ) : (
+            <span
+              className="spatial-stage__listener-fallback"
+              style={{ backgroundColor: listenerColor }}
+            >
+              {listenerInitial}
+            </span>
+          )}
         </div>
       </div>
 

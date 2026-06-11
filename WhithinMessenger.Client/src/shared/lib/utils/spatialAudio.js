@@ -1,34 +1,73 @@
 /** Half-width of the virtual room in meters (left ↔ right). */
-export const SPATIAL_WORLD_HALF_WIDTH = 3;
+export const SPATIAL_WORLD_HALF_WIDTH = 4;
 
-/** Closest distance in meters (top of the 2D map). */
-export const SPATIAL_DEPTH_NEAR = 0.6;
+/** Half-depth in meters (front ↔ behind listener). */
+export const SPATIAL_WORLD_HALF_DEPTH = 4;
 
-/** Farthest distance in meters (bottom edge near listener). */
-export const SPATIAL_DEPTH_FAR = 9;
+/** Closest distance to listener in meters. */
+export const SPATIAL_DEPTH_NEAR = 0.8;
 
-export const DEFAULT_SPATIAL_POSITION = { nx: 0.5, ny: 0.45 };
+/** Listener marker on the 2D map (center). */
+export const SPATIAL_MAP_CENTER = { nx: 0.5, ny: 0.5 };
+
+export const DEFAULT_SPATIAL_POSITION = { nx: 0.5, ny: 0.28 };
+
+const MAP_EDGE_MARGIN = 0.08;
+const MAP_MIN_RADIUS = 0.12;
 
 export function clamp01(value) {
   return Math.max(0.05, Math.min(0.95, Number(value) || 0));
 }
 
 /**
- * 2D map: X = left/right, Y = depth (top = far, bottom = near listener).
- * Maps to Web Audio 3D: +X right, -Z forward (toward listener at origin).
+ * Top-down map centered on listener.
+ * nx: left ↔ right, ny: front (top) ↔ behind (bottom).
+ */
+export function clampNormFromCenter(nx, ny) {
+  let cx = Math.max(MAP_EDGE_MARGIN, Math.min(1 - MAP_EDGE_MARGIN, Number(nx) || 0.5));
+  let cy = Math.max(MAP_EDGE_MARGIN, Math.min(1 - MAP_EDGE_MARGIN, Number(ny) || 0.5));
+
+  const dx = cx - SPATIAL_MAP_CENTER.nx;
+  const dy = cy - SPATIAL_MAP_CENTER.ny;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < MAP_MIN_RADIUS) {
+    if (dist < 0.001) {
+      cx = SPATIAL_MAP_CENTER.nx;
+      cy = SPATIAL_MAP_CENTER.ny - MAP_MIN_RADIUS;
+    } else {
+      const scale = MAP_MIN_RADIUS / dist;
+      cx = SPATIAL_MAP_CENTER.nx + dx * scale;
+      cy = SPATIAL_MAP_CENTER.ny + dy * scale;
+    }
+  }
+
+  return { nx: cx, ny: cy };
+}
+
+/**
+ * Maps 2D radar coords to Web Audio 3D: +X right, -Z forward, +Z behind.
  */
 export function mapNormToWorld(nx, ny) {
-  const x = (clamp01(nx) - 0.5) * SPATIAL_WORLD_HALF_WIDTH * 2;
-  const depthT = 1 - clamp01(ny);
-  const z = -(SPATIAL_DEPTH_NEAR + depthT * (SPATIAL_DEPTH_FAR - SPATIAL_DEPTH_NEAR));
+  const { nx: cx, ny: cy } = clampNormFromCenter(nx, ny);
+  const dx = (cx - SPATIAL_MAP_CENTER.nx) * 2;
+  const dy = (cy - SPATIAL_MAP_CENTER.ny) * 2;
+  const x = dx * SPATIAL_WORLD_HALF_WIDTH;
+  const z = dy * SPATIAL_WORLD_HALF_DEPTH;
   return { x, y: 0, z };
+}
+
+export function worldDistanceFromNorm(nx, ny) {
+  const { x, z } = mapNormToWorld(nx, ny);
+  return Math.hypot(x, z);
 }
 
 export function configureSpatialPanner(panner) {
   panner.panningModel = 'HRTF';
   panner.distanceModel = 'inverse';
   panner.refDistance = 1.2;
-  panner.maxDistance = SPATIAL_DEPTH_FAR + 2;
+  panner.maxDistance =
+    Math.hypot(SPATIAL_WORLD_HALF_WIDTH, SPATIAL_WORLD_HALF_DEPTH) * 2 + 2;
   panner.rolloffFactor = 1.15;
   panner.coneInnerAngle = 360;
   panner.coneOuterAngle = 360;
@@ -68,11 +107,14 @@ export function ensureSpatialListener(audioContext) {
 
 export function defaultPositionForIndex(index, total) {
   if (total <= 1) {
-    return { nx: 0.5, ny: 0.42 };
+    return clampNormFromCenter(DEFAULT_SPATIAL_POSITION.nx, DEFAULT_SPATIAL_POSITION.ny);
   }
-  const spread = 0.72;
-  const t = index / (total - 1);
-  const nx = 0.5 + (t - 0.5) * spread;
-  const ny = 0.38 + (index % 2) * 0.08;
-  return { nx: clamp01(nx), ny: clamp01(ny) };
+
+  const spread = Math.PI * 1.35;
+  const startAngle = -spread / 2;
+  const angle = startAngle + (index / Math.max(total - 1, 1)) * spread;
+  const radius = 0.2 + (index % 2) * 0.04;
+  const nx = SPATIAL_MAP_CENTER.nx + Math.sin(angle) * radius;
+  const ny = SPATIAL_MAP_CENTER.ny - Math.cos(angle) * radius;
+  return clampNormFromCenter(nx, ny);
 }

@@ -266,12 +266,14 @@
   padding: 0 20px 22px;
   pointer-events: all;
   z-index: 2;
+  overflow: visible;
 }
 
 .call-control-dock {
   display: flex;
   align-items: center;
   gap: 10px;
+  overflow: visible;
   padding: 10px 12px;
   border-radius: 22px;
   background: rgba(17, 18, 20, 0.82);
@@ -287,10 +289,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: visible;
 }
 
 .attached-button-container {
   position: relative;
+}
+
+.spatial-audio-anchor {
+  overflow: visible;
 }
 
 .control-button .attached-button-container {

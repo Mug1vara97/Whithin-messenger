@@ -11,6 +11,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import SurroundSoundIcon from '@mui/icons-material/SurroundSound';
+import { SpatialAudioStage } from '../SpatialAudioStage';
 import './voiceCallChrome.css';
 
 const noiseMenuPaperSx = {
@@ -54,6 +55,8 @@ export function VoiceCallControlDock({
   showSpatialAudioStage,
   onToggleSpatialAudioStage,
   onToggleSpatialAudio,
+  spatialAudioUserId,
+  spatialAudioUserProfile,
   onDisconnect
 }) {
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
@@ -168,7 +171,14 @@ export function VoiceCallControlDock({
             </div>
 
             {onToggleSpatialAudioStage && (
-              <div className="attached-button-container control-button">
+              <div className="attached-button-container control-button spatial-audio-anchor">
+                {showSpatialAudioStage && spatialAudioUserId && (
+                  <SpatialAudioStage
+                    currentUserId={spatialAudioUserId}
+                    currentUserProfile={spatialAudioUserProfile}
+                    anchored
+                  />
+                )}
                 <button
                   className={`center-button ${showSpatialAudioStage || spatialAudioEnabled ? 'active' : ''}`}
                   type="button"

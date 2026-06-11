@@ -1,6 +1,11 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { useCallStore } from '../../../lib/stores/callStore';
 import {
+  getParticipantIsDeafened,
+  getParticipantIsMuted,
   getParticipantIsSpeaking,
+  useParticipantGlobalAudioStates,
+  useParticipantMuteStates,
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import MicOffIcon from '@mui/icons-material/MicOff';
@@ -131,6 +136,10 @@ const VideoCallGrid = ({
 }) => {
   const bottomGridRef = useRef(null);
   const participantSpeakingStates = useParticipantSpeakingStates();
+  const participantMuteStates = useParticipantMuteStates();
+  const participantGlobalAudioStates = useParticipantGlobalAudioStates();
+  const localIsMuted = useCallStore((state) => state.isMuted);
+  const localIsGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -410,7 +419,12 @@ const VideoCallGrid = ({
 
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
-    const isMuted = participant.isMuted || false;
+    const isMuted = getParticipantIsMuted(participantMuteStates, participant, localIsMuted);
+    const isDeafened = getParticipantIsDeafened(
+      participantGlobalAudioStates,
+      participant,
+      localIsGlobalAudioMuted
+    );
     const isSpeaking = getParticipantIsSpeaking(participantSpeakingStates, participant.id, {
       isMuted,
       audioEnabled: participant.isAudioEnabled,
@@ -586,7 +600,7 @@ const VideoCallGrid = ({
                       <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
                     )}
                   </div>
-                  {participant.isGlobalAudioMuted && (
+                  {isDeafened && (
                     <div className="headset-status">
                       <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
                     </div>

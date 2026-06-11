@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import {
+  getParticipantIsDeafened,
+  getParticipantIsMuted,
   getParticipantIsSpeaking,
+  useParticipantGlobalAudioStates,
+  useParticipantMuteStates,
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { isSameVoiceChannel } from '../../../lib/stores/callStore';
@@ -18,7 +22,6 @@ import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
 } from '../VoiceCallChrome';
-import { SpatialAudioStage } from '../SpatialAudioStage';
 import styles from './ChatVoiceCall.module.css';
 
 const PANEL_MIN_HEIGHT = 230;
@@ -131,6 +134,8 @@ const ChatVoiceCall = ({
   } = useGlobalCall(userId, userName);
 
   const participantSpeakingStatesLive = useParticipantSpeakingStates();
+  const participantMuteStatesLive = useParticipantMuteStates();
+  const participantGlobalAudioStatesLive = useParticipantGlobalAudioStates();
 
   const {
     showErrorBanner,
@@ -236,8 +241,16 @@ const ChatVoiceCall = ({
         'online',
         'participant'
       );
-      videoParticipant.isMuted = participantMuteStates?.get(pid) ?? participant.isMuted ?? false;
-      videoParticipant.isGlobalAudioMuted = participant.isGlobalAudioMuted || false;
+      videoParticipant.isMuted =
+        participantMuteStatesLive?.get(String(pid)) ??
+        participantMuteStatesLive?.get(pid) ??
+        participant.isMuted ??
+        false;
+      videoParticipant.isGlobalAudioMuted =
+        participantGlobalAudioStatesLive?.get(String(pid)) ??
+        participantGlobalAudioStatesLive?.get(pid) ??
+        participant.isGlobalAudioMuted ??
+        false;
       videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
       const remoteAudioOn = participantAudioStates?.get(pid) !== false;
       videoParticipant.isSpeaking =
@@ -256,7 +269,8 @@ const ChatVoiceCall = ({
     appendTestParticipants,
     currentUser,
     participantAudioStates,
-    participantMuteStates,
+    participantGlobalAudioStatesLive,
+    participantMuteStatesLive,
     participantSpeakingStates,
     participants,
     userId,
@@ -323,13 +337,21 @@ const ChatVoiceCall = ({
             </div>
           ) : (
             displayParticipants.map((participant) => {
-              const participantIsDeafened =
-                participant.isGlobalAudioMuted || participant.isAudioDisabled || participant.isDeafened;
+              const isMutedLive = getParticipantIsMuted(
+                participantMuteStatesLive,
+                participant,
+                isMuted
+              );
+              const participantIsDeafened = getParticipantIsDeafened(
+                participantGlobalAudioStatesLive,
+                participant,
+                isGlobalAudioMuted
+              );
               const isSpeakingLive = getParticipantIsSpeaking(
                 participantSpeakingStatesLive,
                 participant.id,
                 {
-                  isMuted: participant.isMuted,
+                  isMuted: isMutedLive,
                   audioEnabled: participant.isAudioEnabled,
                 }
               );
@@ -360,8 +382,8 @@ const ChatVoiceCall = ({
                   </div>
                   <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
                   <div className={styles.participantStatusRow}>
-                    <div className={`${styles.participantStatusPill} ${participant.isMuted ? styles.statusOff : styles.statusOn}`}>
-                      {participant.isMuted ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
+                    <div className={`${styles.participantStatusPill} ${isMutedLive ? styles.statusOff : styles.statusOn}`}>
+                      {isMutedLive ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
                     </div>
                     <div className={`${styles.participantStatusPill} ${participantIsDeafened ? styles.statusOff : styles.statusOn}`}>
                       {participantIsDeafened ? <HeadsetOffIcon sx={{ fontSize: 14 }} /> : <HeadsetIcon sx={{ fontSize: 14 }} />}
@@ -373,8 +395,6 @@ const ChatVoiceCall = ({
           )}
         </div>
       </div>
-
-      <SpatialAudioStage currentUserId={userId} />
 
       <VoiceCallChromeOverlay
         showHeader={false}
@@ -401,6 +421,12 @@ const ChatVoiceCall = ({
           showSpatialAudioStage,
           onToggleSpatialAudioStage: () => toggleSpatialAudioStage(),
           onToggleSpatialAudio: () => toggleSpatialAudio(),
+          spatialAudioUserId: userId,
+          spatialAudioUserProfile: {
+            name: userName,
+            avatar: currentUserProfile?.avatar || null,
+            avatarColor: currentUserProfile?.avatarColor || '#5865f2',
+          },
           onDisconnect: handleDisconnect
         }}
       />

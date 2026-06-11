@@ -17,7 +17,7 @@ import {
   defaultPositionForIndex,
   ensureSpatialListener,
   DEFAULT_SPATIAL_POSITION,
-  clamp01,
+  clampNormFromCenter,
 } from '../utils/spatialAudio';
 
 const SOUNDPAD_TRACK_NAME = 'soundpad';
@@ -2348,7 +2348,7 @@ export const useCallStore = create(
 
       setParticipantSpatialPosition: (userId, nx, ny) => {
         if (!userId) return;
-        const nextPosition = { nx: clamp01(nx), ny: clamp01(ny) };
+        const nextPosition = clampNormFromCenter(nx, ny);
 
         set((state) => {
           const next = new Map(state.participantSpatialPositions);
