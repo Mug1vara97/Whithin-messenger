@@ -1,7 +1,7 @@
 import { audioDeviceStorage } from './audioDeviceStorage';
 import { soundpadStorage } from './soundpadStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from './soundpadInAppMixer';
-import { shouldUseHybridSystemCallAudio } from './soundpadCallAudio';
+import { soundpadLocalMonitor } from './soundpadLocalMonitor';
 import { soundpadLog, soundpadWarn, soundpadError } from './soundpadLogger';
 
 const getElectronApi = () => window.electronAPI;
@@ -159,6 +159,9 @@ export const soundpadBridge = {
     }
 
     const volume = Math.max(0, Math.min(2, (slot.volume ?? 1) * (config.globalVolume ?? 1)));
+    const monitorPlay = soundpadLocalMonitor.playBlob(blob, volume).catch((error) => {
+      soundpadWarn('playSlot: local monitor failed', error);
+    });
 
     soundpadLog('playSlot: loaded blob', {
       soundId: slot.soundId,
@@ -170,6 +173,7 @@ export const soundpadBridge = {
 
     if (usesInAppSoundpad()) {
       const result = await soundpadInAppMixer.playBlob(blob, volume);
+      await monitorPlay;
       soundpadLog('playSlot: inApp done', result);
       return { ...result, mode: 'inApp' };
     }
@@ -188,15 +192,6 @@ export const soundpadBridge = {
       throw new Error('Воспроизведение через VB-Cable доступно только в десктоп-приложении.');
     }
 
-    if (shouldUseHybridSystemCallAudio() && soundpadInAppMixer.isActive()) {
-      try {
-        await soundpadInAppMixer.playBlob(blob, volume);
-        soundpadLog('playSlot: hybrid call mixer (NS on voice, soundpad clean)');
-      } catch (error) {
-        soundpadWarn('playSlot: hybrid mixer play failed', error);
-      }
-    }
-
     const base64 = await blobToBase64(blob);
     const extension = extensionFromMime(blob.type);
 
@@ -208,18 +203,36 @@ export const soundpadBridge = {
       label: slot.label,
     });
 
+    await monitorPlay;
     soundpadLog('playSlot: system bridge done', result);
     return { ...result, mode: 'system' };
   },
 
   async stopPlayback() {
     soundpadLog('stopPlayback');
+    soundpadLocalMonitor.stopPlayback();
     if (usesInAppSoundpad()) {
       soundpadInAppMixer.stopPlayback();
       return;
     }
     if (!getElectronApi()?.soundpadStopPlayback) return;
     await getElectronApi().soundpadStopPlayback();
+  },
+
+  setMonitorEnabled(enabled) {
+    soundpadLocalMonitor.setEnabled(enabled);
+  },
+
+  setMonitorVolume(volume) {
+    soundpadLocalMonitor.setVolume(volume);
+  },
+
+  getMonitorSettings() {
+    const config = soundpadStorage.getConfig();
+    return {
+      enabled: config.monitorEnabled !== false,
+      volume: config.monitorVolume ?? 1,
+    };
   },
 
   buildElectronAudioConfig() {

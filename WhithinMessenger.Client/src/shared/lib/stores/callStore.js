@@ -10,12 +10,6 @@ import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
 import { soundpadBridge } from '../soundpad/soundpadBridge';
-import {
-  getPhysicalMicConstraints,
-  isNoiseSuppressionSettingEnabled,
-  shouldUseHybridSystemCallAudio,
-  usesCallMixerForMic,
-} from '../soundpad/soundpadCallAudio';
 
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
@@ -2077,11 +2071,12 @@ export const useCallStore = create(
             stream = getLiveKitMicStream();
           }
 
+          const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
           const systemSoundpadMode = audioDeviceStorage.getConfig().soundpadMode === 'system';
-          const useHybridSystemPublish = shouldUseHybridSystemCallAudio();
-          const nsSettingEnabled = isNoiseSuppressionSettingEnabled();
-          const wantsNoiseSuppression = nsSettingEnabled && (!systemSoundpadMode || useHybridSystemPublish);
-          const inAppSoundpad = usesInAppSoundpad() || useHybridSystemPublish;
+          const wantsNoiseSuppression = !systemSoundpadMode && savedNoiseSuppression
+            ? JSON.parse(savedNoiseSuppression)
+            : false;
+          const inAppSoundpad = usesInAppSoundpad();
           const virtualMicDeviceId = inAppSoundpad ? '' : audioDeviceStorage.getVirtualMicDeviceId();
           const useVirtualMic = Boolean(virtualMicDeviceId);
 
@@ -2102,9 +2097,9 @@ export const useCallStore = create(
           };
 
           if (useVirtualMic || !stream || wantsNoiseSuppression || inAppSoundpad) {
-            const capturedStream = await navigator.mediaDevices.getUserMedia(
-              useHybridSystemPublish ? getPhysicalMicConstraints() : { audio: buildMicConstraints() }
-            );
+            const capturedStream = await navigator.mediaDevices.getUserMedia({
+              audio: buildMicConstraints(),
+            });
             stream = capturedStream;
           }
 
@@ -2213,7 +2208,7 @@ export const useCallStore = create(
         console.log('Mic state saved to localStorage:', newMutedState);
         
         try {
-          if (usesCallMixerForMic()) {
+          if (usesInAppSoundpad()) {
             soundpadInAppMixer.setMicMuted(newMutedState);
             await voiceCallApi.setMicrophoneEnabled(true);
             const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
@@ -2453,7 +2448,7 @@ export const useCallStore = create(
               const localParticipant = room.localParticipant;
               let trackToPublish = null;
 
-              if (usesCallMixerForMic()) {
+              if (usesInAppSoundpad()) {
                 trackToPublish = await refreshInAppSoundpadPublishTrack(state, newState);
               } else if (newState) {
                 // При включении шумоподавления используем обработанный трек
@@ -2591,7 +2586,7 @@ export const useCallStore = create(
               if (room) {
                 const localParticipant = room.localParticipant;
                 let newTrack = null;
-                if (usesCallMixerForMic()) {
+                if (usesInAppSoundpad()) {
                   newTrack = await refreshInAppSoundpadPublishTrack(state, true);
                 } else {
                   const processedStream = state.noiseSuppressionManager.getProcessedStream();

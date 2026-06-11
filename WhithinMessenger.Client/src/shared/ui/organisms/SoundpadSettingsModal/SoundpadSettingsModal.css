@@ -228,3 +228,20 @@
   margin-top: 3px;
   flex-shrink: 0;
 }
+
+.soundpad-monitor-field {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--background, #2f3136);
+}
+
+.soundpad-monitor-toggle {
+  margin-bottom: 8px;
+}
+
+.soundpad-monitor-volume-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-secondary, #8e9297);
+}

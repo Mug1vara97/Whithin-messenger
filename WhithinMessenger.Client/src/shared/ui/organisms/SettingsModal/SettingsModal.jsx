@@ -347,9 +347,8 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
                 <span className="setting-text">Подавление шума</span>
               </label>
               <p className="setting-description">
-                Обрабатывает только голос с физического микрофона. В режиме VB-Cable в звонке Whithin
-                шумоподавление включается на голос отдельно — саундпад не режется. В Telegram/играх
-                через CABLE голос без RNNoise (как в мосте).
+                Автоматически удаляет фоновый шум из микрофона. В режиме VB-Cable отключается —
+                используется поток CABLE Output без дополнительной обработки.
               </p>
             </div>
           </div>

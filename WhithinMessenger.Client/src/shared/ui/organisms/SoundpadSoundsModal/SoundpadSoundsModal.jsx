@@ -9,6 +9,12 @@ import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 const SoundpadSoundsModal = ({ isOpen, onClose }) => {
   const [slots, setSlots] = useState(() => soundpadStorage.getConfig().slots);
   const [globalVolume, setGlobalVolume] = useState(() => soundpadStorage.getConfig().globalVolume);
+  const [monitorEnabled, setMonitorEnabled] = useState(
+    () => soundpadStorage.getConfig().monitorEnabled !== false
+  );
+  const [monitorVolume, setMonitorVolume] = useState(
+    () => soundpadStorage.getConfig().monitorVolume ?? 1
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingLabel, setPendingLabel] = useState('Новый звук');
@@ -76,6 +82,18 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
     soundpadStorage.saveConfig({ globalVolume: next });
   };
 
+  const handleMonitorEnabled = (enabled) => {
+    setMonitorEnabled(enabled);
+    soundpadBridge.setMonitorEnabled(enabled);
+  };
+
+  const handleMonitorVolume = (value) => {
+    const parsed = Number(value);
+    const next = Number.isFinite(parsed) ? parsed : 1;
+    setMonitorVolume(next);
+    soundpadBridge.setMonitorVolume(next);
+  };
+
   const startHotkeyEdit = (slotId, currentHotkey = '') => {
     setEditingHotkeySlotId(slotId);
     setTempHotkey(currentHotkey || '');
@@ -140,7 +158,7 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
           <section className="soundpad-section">
             <h3>Звуки</h3>
             <div className="soundpad-field">
-              <label htmlFor="global-volume">Общая громкость</label>
+              <label htmlFor="global-volume">Громкость в микрофон / CABLE</label>
               <input
                 id="global-volume"
                 type="range"
@@ -149,6 +167,30 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
                 step="0.05"
                 value={globalVolume}
                 onChange={(e) => handleGlobalVolume(e.target.value)}
+              />
+            </div>
+
+            <div className="soundpad-field soundpad-monitor-field">
+              <label className="soundpad-checkbox soundpad-monitor-toggle">
+                <input
+                  type="checkbox"
+                  checked={monitorEnabled}
+                  onChange={(e) => handleMonitorEnabled(e.target.checked)}
+                />
+                <span>Слышать у себя (наушники / колонки)</span>
+              </label>
+              <label htmlFor="monitor-volume" className="soundpad-monitor-volume-label">
+                Громкость прослушивания
+              </label>
+              <input
+                id="monitor-volume"
+                type="range"
+                min="0"
+                max="2"
+                step="0.05"
+                value={monitorVolume}
+                disabled={!monitorEnabled}
+                onChange={(e) => handleMonitorVolume(e.target.value)}
               />
             </div>
 

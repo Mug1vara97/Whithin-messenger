@@ -6,6 +6,9 @@ const CONFIG_KEY = 'whithinSoundpadConfig';
 const defaultConfig = () => ({
   slots: [],
   globalVolume: 1,
+  /** Hear soundpad in your headphones/speakers (separate from mic/CABLE level). */
+  monitorEnabled: true,
+  monitorVolume: 1,
   showPanel: true,
 });
 
