@@ -16,6 +16,7 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { NotificationsModal, SettingsModal, SoundpadSoundsModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
 import { UserAvatar } from '../../../shared/ui';
+import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
@@ -848,22 +849,24 @@ const HomePage = () => {
             userId={user?.id}
           />
           <div className="content-area">
-            {selectedServer ? (
-              <ServerPanel 
-                selectedServer={selectedServer}
-                onChatSelected={handleChatSelected}
-                selectedChat={selectedChat}
-                onServerDataUpdated={handleServerDataUpdated}
-                unreadCountByChat={messageUnreadCountByChat}
-              />
-            ) : (
-              <ChatList 
-                onChatSelected={handleChatSelected}
-                onFriendsSelected={handleFriendsSelected}
-                selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
-                unreadCountByChat={messageUnreadCountByChat}
-              />
-            )}
+            <ResizableSidebarShell>
+              {selectedServer ? (
+                <ServerPanel
+                  selectedServer={selectedServer}
+                  onChatSelected={handleChatSelected}
+                  selectedChat={selectedChat}
+                  onServerDataUpdated={handleServerDataUpdated}
+                  unreadCountByChat={messageUnreadCountByChat}
+                />
+              ) : (
+                <ChatList
+                  onChatSelected={handleChatSelected}
+                  onFriendsSelected={handleFriendsSelected}
+                  selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
+                  unreadCountByChat={messageUnreadCountByChat}
+                />
+              )}
+            </ResizableSidebarShell>
             <div className="main-area">
               {showFriends ? (
                 <FriendsPanel 

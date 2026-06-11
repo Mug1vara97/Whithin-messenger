@@ -4,7 +4,7 @@ export class VolumeStorage {
     this.storageKey = 'voiceCallSettings';
     this.defaultSettings = {
       inputVolume: 1.0,
-      outputVolume: 1.0,
+      outputVolume: 1.4,
       noiseSuppression: 'medium',
       echoCancellation: true,
       autoGainControl: true
@@ -46,7 +46,7 @@ export class VolumeStorage {
   }
 
   setOutputVolume(volume) {
-    this.saveSettings({ outputVolume: Math.max(0, Math.min(1, volume)) });
+    this.saveSettings({ outputVolume: Math.max(0.5, Math.min(2.5, volume)) });
   }
 
   getNoiseSuppression() {

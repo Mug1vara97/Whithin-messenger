@@ -19,8 +19,30 @@ import {
   DEFAULT_SPATIAL_POSITION,
   clampNormFromCenter,
 } from '../utils/spatialAudio';
+import {
+  disconnectCallMasterOutputBus,
+  ensureCallMasterOutputBus,
+} from '../utils/callAudioMasterBus';
+import { participantVolumeStorage } from '../utils/participantVolumeStorage';
 
 const SOUNDPAD_TRACK_NAME = 'soundpad';
+
+const resolveParticipantName = (state, userId) => {
+  const id = String(userId);
+  const inCall = state.participants.find((p) => String(p.userId) === id);
+  if (inCall?.name || inCall?.userName) {
+    return inCall.name || inCall.userName;
+  }
+  const roomId = state.currentRoomId;
+  if (roomId) {
+    const channelList = state.voiceChannelParticipants.get(roomId) || [];
+    const inChannel = channelList.find((p) => String(p.userId) === id);
+    if (inChannel?.userName) {
+      return inChannel.userName;
+    }
+  }
+  return participantVolumeStorage.getVolumeEntry(userId)?.userName || null;
+};
 
 const getParticipantPlaybackGain = (state, userId) => {
   if (state.isGlobalAudioMuted) return 0;
@@ -296,6 +318,8 @@ export const useCallStore = create(
       localStream: null,
       noiseSuppressionManager: null,
       audioContext: null,
+      masterOutputGain: null,
+      masterOutputCompressor: null,
       gainNodes: new Map(),
       audioElements: new Map(),
       audioSources: new Map(),
@@ -2368,43 +2392,84 @@ export const useCallStore = create(
         }
       },
 
+      ensureMasterOutputBus: () => {
+        const state = get();
+        const audioContext = state.audioContext;
+        if (!audioContext || audioContext.state === 'closed') return null;
+
+        const bus = ensureCallMasterOutputBus(audioContext, {
+          masterGain: state.masterOutputGain,
+          masterCompressor: state.masterOutputCompressor,
+        });
+
+        if (
+          bus &&
+          (bus.masterGain !== state.masterOutputGain ||
+            bus.masterCompressor !== state.masterOutputCompressor)
+        ) {
+          set({
+            masterOutputGain: bus.masterGain,
+            masterOutputCompressor: bus.masterCompressor,
+          });
+        }
+
+        return bus;
+      },
+
       applyParticipantAudioRouting: (userId) => {
         const state = get();
         const audioElement = state.audioElements.get(userId);
         const gainNode = state.gainNodes.get(userId);
         const panner = state.pannerNodes.get(userId);
+        const source = state.audioSources.get(userId);
         const audioContext = state.audioContext;
         if (!audioElement || !gainNode || !audioContext) return;
 
         const volume = getParticipantPlaybackGain(state, userId);
         const position =
           state.participantSpatialPositions.get(userId) || DEFAULT_SPATIAL_POSITION;
+        const masterBus = get().ensureMasterOutputBus();
+        const outputTarget = masterBus?.masterGain || audioContext.destination;
 
         if (panner) {
           applyPannerWorldPosition(panner, position.nx, position.ny);
         }
 
-        if (state.spatialAudioEnabled && panner) {
-          audioElement.volume = 0;
-          gainNode.gain.value = volume;
+        if (source) {
           try {
-            gainNode.disconnect();
+            source.disconnect();
           } catch {
             // ignore
           }
-          try {
-            gainNode.connect(audioContext.destination);
-          } catch {
-            // ignore
+          if (state.spatialAudioEnabled && panner) {
+            try {
+              panner.disconnect();
+            } catch {
+              // ignore
+            }
+            source.connect(panner);
+            panner.connect(gainNode);
+          } else {
+            try {
+              panner.disconnect();
+            } catch {
+              // ignore
+            }
+            source.connect(gainNode);
           }
-        } else {
-          try {
-            gainNode.disconnect(audioContext.destination);
-          } catch {
-            // ignore
-          }
-          audioElement.volume = volume;
-          gainNode.gain.value = volume;
+        }
+
+        audioElement.volume = 0;
+        gainNode.gain.value = volume;
+        try {
+          gainNode.disconnect();
+        } catch {
+          // ignore
+        }
+        try {
+          gainNode.connect(outputTarget);
+        } catch {
+          // ignore
         }
       },
 
@@ -2524,7 +2589,7 @@ export const useCallStore = create(
           newGains.set(targetUserId, gainNode);
           newAudioElements.set(targetUserId, audioElement);
           if (!newUserVolumes.has(targetUserId)) {
-            newUserVolumes.set(targetUserId, 100);
+            newUserVolumes.set(targetUserId, participantVolumeStorage.getVolume(targetUserId));
           }
 
           return {
@@ -2600,12 +2665,59 @@ export const useCallStore = create(
         }
       },
       
+      setParticipantVolume: (peerId, newVolume, userName, options = {}) => {
+        const { persist = true } = options;
+        const clamped = Math.max(0, Math.min(100, Math.round(newVolume)));
+        const name = userName || resolveParticipantName(get(), peerId);
+        if (persist) {
+          participantVolumeStorage.setVolume(peerId, clamped, name);
+        }
+
+        set((s) => {
+          const newUserVolumes = new Map(s.userVolumes);
+          newUserVolumes.set(peerId, clamped);
+          return { userVolumes: newUserVolumes };
+        });
+
+        const state = get();
+        const audioElement = state.audioElements.get(peerId);
+        const soundpadAudioElement = state.soundpadAudioElements.get(peerId);
+        if (!audioElement && !soundpadAudioElement) {
+          return;
+        }
+
+        get().applyParticipantAudioRouting(peerId);
+        if (soundpadAudioElement) {
+          soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(get(), peerId);
+        }
+
+        if (clamped > 0 && state.userMutedStates.get(peerId)) {
+          set((s) => {
+            const newUserMutedStates = new Map(s.userMutedStates);
+            newUserMutedStates.set(peerId, false);
+            return { userMutedStates: newUserMutedStates };
+          });
+        } else if (clamped === 0 && !state.userMutedStates.get(peerId)) {
+          set((s) => {
+            const newUserMutedStates = new Map(s.userMutedStates);
+            newUserMutedStates.set(peerId, true);
+            return { userMutedStates: newUserMutedStates };
+          });
+        }
+      },
+
       // Изменение громкости отдельного пользователя
       changeUserVolume: (peerId, newVolume) => {
         const state = get();
         const audioElement = state.audioElements.get(peerId);
         const soundpadAudioElement = state.soundpadAudioElements.get(peerId);
         if (!audioElement && !soundpadAudioElement) return;
+
+        participantVolumeStorage.setVolume(
+          peerId,
+          newVolume,
+          resolveParticipantName(state, peerId)
+        );
 
         set((s) => {
           const newUserVolumes = new Map(s.userVolumes);
@@ -3008,6 +3120,11 @@ export const useCallStore = create(
           }
         });
 
+        disconnectCallMasterOutputBus({
+          masterGain: state.masterOutputGain,
+          masterCompressor: state.masterOutputCompressor,
+        });
+
         if (state.audioContext && state.audioContext.state !== 'closed') {
           await state.audioContext.close();
         }
@@ -3047,6 +3164,8 @@ export const useCallStore = create(
           localStream: null,
           noiseSuppressionManager: null,
           audioContext: null,
+          masterOutputGain: null,
+          masterOutputCompressor: null,
         });
 
         console.log('leaveRoom: Left room successfully, connection preserved');
@@ -3166,6 +3285,11 @@ export const useCallStore = create(
             }
           });
 
+          disconnectCallMasterOutputBus({
+            masterGain: state.masterOutputGain,
+            masterCompressor: state.masterOutputCompressor,
+          });
+
           if (state.audioContext && state.audioContext.state !== 'closed') {
             await state.audioContext.close();
           }
@@ -3209,6 +3333,8 @@ export const useCallStore = create(
             localStream: null,
             noiseSuppressionManager: null,
             audioContext: null,
+            masterOutputGain: null,
+            masterOutputCompressor: null,
             connecting: false,
             isScreenShareTransitioning: false,
             screenShareSessionId: 0,

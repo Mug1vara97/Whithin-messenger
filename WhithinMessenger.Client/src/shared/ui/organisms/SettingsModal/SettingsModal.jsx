@@ -5,6 +5,7 @@ import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { userApi } from '../../../../entities/user/api/userApi';
 import { SoundpadConfigSection } from '../SoundpadConfigSection';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
+import { ParticipantVolumeSettings } from '../../molecules/ParticipantVolumeSettings';
 import './SettingsModal.css';
 
 const BASE_TABS = [
@@ -361,6 +362,10 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
                 labelTextClassName="setting-text"
               />
             </div>
+            <div className="setting-item">
+              <h4 className="setting-subheading">Громкость участников</h4>
+              <ParticipantVolumeSettings />
+            </div>
           </div>
         );
 
@@ -410,6 +415,12 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
         return (
           <div className="setting-section">
             <h3>Горячие клавиши</h3>
+            {isElectron && (
+              <p className="setting-description">
+                В десктоп-приложении хоткеи срабатывают глобально, даже когда окно в фоне.
+                Назначенные клавиши (F1 и др.) продолжают работать в играх, браузере и других программах.
+              </p>
+            )}
             {renderHotkeyRow('toggleMic', '🎤 Переключить микрофон', 'Включение/выключение микрофона')}
             {renderHotkeyRow('toggleAudio', '🔊 Переключить наушники', 'Включение/выключение звука в наушниках')}
             {isElectron &&

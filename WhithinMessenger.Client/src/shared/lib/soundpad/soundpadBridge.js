@@ -32,9 +32,7 @@ const blobToBase64 = (blob) =>
 
 export const soundpadBridge = {
   isElectronAvailable() {
-    const available = Boolean(getElectronApi()?.soundpadIsAvailable);
-    soundpadLog('isElectronAvailable:', available);
-    return available;
+    return Boolean(getElectronApi()?.soundpadIsAvailable);
   },
 
   usesInAppSoundpad,

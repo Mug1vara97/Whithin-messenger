@@ -104,6 +104,8 @@ let selectedScreenSource = null;
 let lastSelectedScreenSource = null;
 let tray = null;
 let mouseShortcutBindings = [];
+let keyboardShortcutBindings = [];
+let globalKeyboardListener = null;
 /** Windows: низкоуровневый хук для боковых кнопок (Chromium часто не шлёт X1/X2 в before-input-event). */
 let win32GlobalMouseEvents = null;
 let win32GlobalMouseHookInitialized = false;
@@ -238,6 +240,155 @@ function isMouseShortcutMatch(binding, input) {
     Boolean(input.shift) === Boolean(binding.modifiers.shift) &&
     Boolean(input.meta) === Boolean(binding.modifiers.meta)
   );
+}
+
+const WEB_KEY_TO_LISTENER = {
+  ArrowUp: 'UP ARROW',
+  ArrowDown: 'DOWN ARROW',
+  ArrowLeft: 'LEFT ARROW',
+  ArrowRight: 'RIGHT ARROW',
+  Escape: 'ESCAPE',
+  ' ': 'SPACE',
+  Enter: 'RETURN',
+  Delete: 'DELETE',
+  Backspace: 'BACKSPACE',
+  Tab: 'TAB',
+  Home: 'HOME',
+  End: 'END',
+  PageUp: 'PAGE UP',
+  PageDown: 'PAGE DOWN',
+  Insert: 'INS',
+  CapsLock: 'CAPS LOCK',
+  NumLock: 'NUM LOCK',
+  ScrollLock: 'SCROLL LOCK',
+  PrintScreen: 'PRINT SCREEN',
+  Pause: 'PAUSE',
+};
+
+function webKeyToListenerKeyName(webKey) {
+  if (!webKey || typeof webKey !== 'string') {
+    return null;
+  }
+  if (WEB_KEY_TO_LISTENER[webKey]) {
+    return WEB_KEY_TO_LISTENER[webKey];
+  }
+  if (/^F\d+$/i.test(webKey)) {
+    return webKey.toUpperCase();
+  }
+  if (webKey.length === 1) {
+    return webKey.toLocaleUpperCase('en-US');
+  }
+  return webKey.toUpperCase();
+}
+
+function parseKeyboardHotkey(webkit) {
+  if (!webkit || typeof webkit !== 'string') {
+    return null;
+  }
+  if (parseMouseHotkey(webkit)) {
+    return null;
+  }
+
+  const parts = webkit
+    .split('+')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    return null;
+  }
+
+  const modifiers = { ctrl: false, alt: false, shift: false, meta: false };
+  let keyPart = null;
+
+  for (const part of parts) {
+    const lower = part.toLowerCase();
+    if (lower === 'ctrl' || lower === 'control') {
+      modifiers.ctrl = true;
+    } else if (lower === 'alt' || lower === 'altgraph') {
+      modifiers.alt = true;
+    } else if (lower === 'shift') {
+      modifiers.shift = true;
+    } else if (lower === 'cmd' || lower === 'meta' || lower === 'command') {
+      modifiers.meta = true;
+    } else {
+      keyPart = part;
+    }
+  }
+
+  if (!keyPart) {
+    return null;
+  }
+
+  const listenerKey = webKeyToListenerKeyName(keyPart);
+  if (!listenerKey) {
+    return null;
+  }
+
+  return { listenerKey, modifiers };
+}
+
+function isModifierHeld(isDown, kind) {
+  if (!isDown || typeof isDown !== 'object') {
+    return false;
+  }
+  switch (kind) {
+    case 'ctrl':
+      return Boolean(isDown['LEFT CTRL'] || isDown['RIGHT CTRL']);
+    case 'alt':
+      return Boolean(isDown['LEFT ALT'] || isDown['RIGHT ALT']);
+    case 'shift':
+      return Boolean(isDown['LEFT SHIFT'] || isDown['RIGHT SHIFT']);
+    case 'meta':
+      return Boolean(isDown['LEFT META'] || isDown['RIGHT META']);
+    default:
+      return false;
+  }
+}
+
+function isKeyboardShortcutMatch(binding, event, isDown) {
+  if (!binding || !event || event.state !== 'DOWN') {
+    return false;
+  }
+  if (!event.name || event.name !== binding.listenerKey) {
+    return false;
+  }
+  return (
+    isModifierHeld(isDown, 'ctrl') === Boolean(binding.modifiers.ctrl) &&
+    isModifierHeld(isDown, 'alt') === Boolean(binding.modifiers.alt) &&
+    isModifierHeld(isDown, 'shift') === Boolean(binding.modifiers.shift) &&
+    isModifierHeld(isDown, 'meta') === Boolean(binding.modifiers.meta)
+  );
+}
+
+function ensureGlobalKeyboardListener() {
+  if (globalKeyboardListener) {
+    return globalKeyboardListener;
+  }
+  try {
+    const { GlobalKeyboardListener } = require('node-global-key-listener');
+    globalKeyboardListener = new GlobalKeyboardListener();
+    globalKeyboardListener
+      .addListener((event, isDown) => {
+        if (!keyboardShortcutBindings.length) {
+          return false;
+        }
+        const matched = keyboardShortcutBindings.find((binding) =>
+          isKeyboardShortcutMatch(binding, event, isDown)
+        );
+        if (matched) {
+          dispatchShortcutAction(matched.action);
+        }
+        return false;
+      })
+      .catch((err) => {
+        console.warn('[shortcuts] failed to start global keyboard listener:', err.message);
+        globalKeyboardListener = null;
+      });
+    return globalKeyboardListener;
+  } catch (err) {
+    console.warn('[shortcuts] node-global-key-listener unavailable:', err.message);
+    return null;
+  }
 }
 
 function dispatchShortcutAction(action, options = {}) {
@@ -711,8 +862,8 @@ function installCustomTitlebarChrome(webContents) {
 }
 
 function registerGlobalShortcuts(shortcuts = {}) {
-  globalShortcut.unregisterAll();
   mouseShortcutBindings = [];
+  keyboardShortcutBindings = [];
   console.log('[mouse-bind-debug] registerGlobalShortcuts payload:', shortcuts);
 
   Object.entries(shortcuts).forEach(([action, accelerator]) => {
@@ -732,29 +883,28 @@ function registerGlobalShortcuts(shortcuts = {}) {
       return;
     }
 
-    const acc = webHotkeyToElectronAccelerator(String(accelerator));
-    if (!acc) {
-      if (/Mouse|Click|AuxClick/i.test(String(accelerator))) {
-        return;
-      }
-      console.warn(`[shortcuts] Skip unsupported hotkey for "${action}":`, accelerator);
+    const keyboardBinding = parseKeyboardHotkey(String(accelerator));
+    if (keyboardBinding) {
+      keyboardShortcutBindings.push({ action, ...keyboardBinding });
+      console.log('[shortcuts] keyboard binding registered (passive):', {
+        action,
+        accelerator,
+        listenerKey: keyboardBinding.listenerKey,
+        modifiers: keyboardBinding.modifiers
+      });
+      ensureGlobalKeyboardListener();
       return;
     }
 
-    const registered = globalShortcut.register(acc, () => {
-      dispatchShortcutAction(action);
-    });
-
-    if (!registered) {
-      console.warn(
-        `Failed to register shortcut "${acc}" (from "${accelerator}") for action "${action}"`
-      );
-    } else {
-      console.log('[mouse-bind-debug] keyboard shortcut registered:', { action, accelerator, acc });
+    if (/Mouse|Click|AuxClick/i.test(String(accelerator))) {
+      return;
     }
+
+    console.warn(`[shortcuts] Skip unsupported hotkey for "${action}":`, accelerator);
   });
 
   console.log('[mouse-bind-debug] total mouse bindings:', mouseShortcutBindings.length);
+  console.log('[shortcuts] total keyboard bindings:', keyboardShortcutBindings.length);
   syncWin32GlobalMouseHook();
 }
 
@@ -1183,6 +1333,12 @@ app.on('before-quit', (event) => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (globalKeyboardListener) {
+    try {
+      globalKeyboardListener.kill();
+    } catch (_) {}
+    globalKeyboardListener = null;
+  }
   if (win32GlobalMouseHookInitialized && win32GlobalMouseEvents) {
     try {
       win32GlobalMouseEvents.pauseMouseEvents();

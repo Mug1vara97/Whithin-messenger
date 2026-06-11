@@ -65,10 +65,10 @@ export function worldDistanceFromNorm(nx, ny) {
 export function configureSpatialPanner(panner) {
   panner.panningModel = 'HRTF';
   panner.distanceModel = 'inverse';
-  panner.refDistance = 1.2;
+  panner.refDistance = 1;
   panner.maxDistance =
     Math.hypot(SPATIAL_WORLD_HALF_WIDTH, SPATIAL_WORLD_HALF_DEPTH) * 2 + 2;
-  panner.rolloffFactor = 1.15;
+  panner.rolloffFactor = 1;
   panner.coneInnerAngle = 360;
   panner.coneOuterAngle = 360;
   panner.coneOuterGain = 1;

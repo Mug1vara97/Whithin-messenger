@@ -1,0 +1,48 @@
+.resizable-sidebar-shell {
+  position: relative;
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+}
+
+.resizable-sidebar-shell__content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.resizable-sidebar-shell__handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 30;
+  touch-action: none;
+}
+
+.resizable-sidebar-shell__handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.resizable-sidebar-shell__handle:hover::after,
+body.resizable-sidebar-shell--resizing .resizable-sidebar-shell__handle::after {
+  background: var(--primary, #5865f2);
+}
+
+body.resizable-sidebar-shell--resizing {
+  cursor: col-resize;
+  user-select: none;
+}

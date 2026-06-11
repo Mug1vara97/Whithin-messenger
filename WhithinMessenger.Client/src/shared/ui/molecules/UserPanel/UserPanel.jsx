@@ -24,8 +24,10 @@ const UserPanel = ({
     isOpen
 }) => {
     // Подключаемся к глобальному состоянию звонка напрямую в компоненте
-    const { isMuted, isGlobalAudioMuted, toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
-    
+    const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
+    const isMuted = useCallStore((state) => state.isMuted);
+    const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
+
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
     const [showBannerEditor, setShowBannerEditor] = useState(false);
@@ -235,6 +237,23 @@ const UserPanel = ({
         await applyStatus(statusValue, true);
     };
 
+    const syncPresenceFromServer = (statusValue) => {
+        const normalizedStatus = normalizeUserStatus(statusValue);
+        const storageKey = getStorageKey();
+        setCurrentStatus(normalizedStatus);
+        currentStatusRef.current = normalizedStatus;
+        manualStatusRef.current = normalizedStatus;
+        localStorage.setItem(storageKey, normalizedStatus);
+    };
+
+    const syncOnlineAfterHubConnect = () => {
+        const saved = normalizeUserStatus(localStorage.getItem(getStorageKey()));
+        if (saved !== PRESENCE_STATUS.OFFLINE) {
+            return;
+        }
+        syncPresenceFromServer(PRESENCE_STATUS.ONLINE);
+    };
+
     useEffect(() => {
         if (!isOpen || !userId) return undefined;
 
@@ -314,14 +333,20 @@ const UserPanel = ({
                     if (String(changedUserId) !== String(userId)) {
                         return;
                     }
+                    syncPresenceFromServer(payload?.status ?? payload?.Status);
+                };
 
-                    const normalizedStatus = normalizeUserStatus(payload?.status ?? payload?.Status);
-                    setCurrentStatus(normalizedStatus);
-                    currentStatusRef.current = normalizedStatus;
-                    localStorage.setItem(getStorageKey(), normalizedStatus);
+                const onReconnected = () => {
+                    if (!mounted) return;
+                    syncOnlineAfterHubConnect();
                 };
 
                 notificationConnection.on('UserStatusChanged', onUserStatusChanged);
+                notificationConnection.onreconnected(onReconnected);
+
+                if (notificationConnection.state === 'Connected') {
+                    syncOnlineAfterHubConnect();
+                }
             } catch (error) {
                 console.error('Error setting up realtime status in user panel:', error);
             }
@@ -334,6 +359,7 @@ const UserPanel = ({
             if (notificationConnectionRef.current) {
                 notificationConnectionRef.current.off('UserStatusChanged');
             }
+            notificationConnectionRef.current = null;
         };
     }, [isOpen, userId, getConnection]);
 
@@ -344,10 +370,10 @@ const UserPanel = ({
             <div className={styles['user-panel']}>
                 <div className={styles['user-panel-content']}>
                     <div className={styles['user-avatar-container']}>
-                        <div 
-                            className={styles['user-avatar']} 
-                            style={{ 
-                                backgroundColor: userProfile?.avatarColor || '#5865F2', 
+                        <div
+                            className={styles['user-avatar']}
+                            style={{
+                                backgroundColor: userProfile?.avatarColor || '#5865F2',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -357,7 +383,7 @@ const UserPanel = ({
                                 fontWeight: 'bold',
                                 width: '40px',
                                 height: '40px',
-                                borderRadius: '50%'
+                                borderRadius: '50%',
                             }}
                             onClick={toggleProfile}
                         >
@@ -379,7 +405,7 @@ const UserPanel = ({
                         <button
                             className={styles['user-avatar-status-button']}
                             onClick={() => setIsStatusMenuOpen((prev) => !prev)}
-                            title="Изменить статус"
+                            title={getUserStatusLabel(currentStatus)}
                             type="button"
                         >
                             <span

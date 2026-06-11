@@ -1,5 +1,6 @@
 .server-panel {
-  width: 240px;
+  width: 100%;
+  min-width: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
   height: 100%;

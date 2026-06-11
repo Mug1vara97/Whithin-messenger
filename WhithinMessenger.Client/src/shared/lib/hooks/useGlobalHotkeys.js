@@ -72,7 +72,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     if (window.electronAPI?.updateGlobalShortcuts) {
       const electronHotkeys = buildAllElectronShortcuts();
       window.electronAPI.updateGlobalShortcuts(electronHotkeys);
-      console.log('🔄 Горячие клавиши обновлены в Electron:', electronHotkeys);
+      console.log('🔄 Глобальные привязки обновлены в Electron:', electronHotkeys);
     }
   }, []);
 
@@ -91,6 +91,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   }, [handleGlobalShortcut]);
 
   useEffect(() => {
+    // Electron main process: passive global keyboard + mouse hooks.
     if (!window.electronAPI?.updateGlobalShortcuts) {
       return;
     }
@@ -119,6 +120,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     return map;
   }, [currentHotkeys, soundpadSlots]);
 
+  // Browser: keyboard in-window. Electron: passive global hook in main process.
   useEffect(() => {
     if (isElectronEnv()) {
       return undefined;

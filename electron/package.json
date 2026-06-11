@@ -34,7 +34,8 @@
     "executableName": "Whithin",
     "asar": true,
     "asarUnpack": [
-      "node_modules/global-mouse-events/**/*.node"
+      "node_modules/global-mouse-events/**/*.node",
+      "node_modules/node-global-key-listener/**/*.exe"
     ],
     "directories": {
       "output": "release"
@@ -52,6 +53,7 @@
       "package.json",
       "audio-bridge-bin/**/*",
       "node_modules/global-mouse-events/**/*",
+      "node_modules/node-global-key-listener/**/*",
       "node_modules/bindings/**/*",
       "node_modules/file-uri-to-path/**/*"
     ],
@@ -59,7 +61,9 @@
       {
         "from": "audio-bridge-bin",
         "to": "audio-bridge-bin",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -78,6 +82,7 @@
     }
   },
   "dependencies": {
-    "global-mouse-events": "^1.2.0"
+    "global-mouse-events": "^1.2.0",
+    "node-global-key-listener": "^0.3.0"
   }
 }
