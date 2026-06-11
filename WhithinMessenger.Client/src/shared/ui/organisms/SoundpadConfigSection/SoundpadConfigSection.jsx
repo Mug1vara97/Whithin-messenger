@@ -3,6 +3,7 @@ import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { audioDeviceStorage } from '../../../lib/soundpad/audioDeviceStorage';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { soundpadLog, soundpadError } from '../../../lib/soundpad/soundpadLogger';
+import { useCallStore } from '../../../lib/stores/callStore';
 import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 
 const VB_CABLE_URL = 'https://vb-audio.com/Cable/';
@@ -14,6 +15,15 @@ const SoundpadConfigSection = ({ active }) => {
   const [bridgeStatus, setBridgeStatus] = useState({ running: false });
   const [config, setConfig] = useState(() => audioDeviceStorage.getConfig());
   const [showPanel, setShowPanel] = useState(() => soundpadStorage.getConfig().showPanel !== false);
+  const [monitorEnabled, setMonitorEnabled] = useState(
+    () => soundpadStorage.getConfig().monitorEnabled !== false
+  );
+  const [monitorVolume, setMonitorVolume] = useState(
+    () => soundpadStorage.getConfig().monitorVolume ?? 1
+  );
+  const [remoteSoundpadEnabled, setRemoteSoundpadEnabled] = useState(
+    () => soundpadStorage.getConfig().remoteSoundpadEnabled !== false
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,6 +64,19 @@ const SoundpadConfigSection = ({ active }) => {
       setError(err.message || String(err));
     });
   }, [active, refresh]);
+
+  useEffect(() => {
+    const onConfigChange = () => {
+      const soundpadConfig = soundpadStorage.getConfig();
+      setShowPanel(soundpadConfig.showPanel !== false);
+      setMonitorEnabled(soundpadConfig.monitorEnabled !== false);
+      setMonitorVolume(soundpadConfig.monitorVolume ?? 1);
+      setRemoteSoundpadEnabled(soundpadConfig.remoteSoundpadEnabled !== false);
+    };
+
+    window.addEventListener('soundpadConfigChanged', onConfigChange);
+    return () => window.removeEventListener('soundpadConfigChanged', onConfigChange);
+  }, []);
 
   const saveDeviceConfig = (patch) => {
     const saved = audioDeviceStorage.saveConfig(patch);
@@ -138,6 +161,68 @@ const SoundpadConfigSection = ({ active }) => {
             }}
           />
           <span>Показывать панель саундпада в звонке</span>
+        </label>
+      </section>
+
+      <section className="soundpad-section">
+        <h3>Прослушивание у себя</h3>
+        <p className="soundpad-hint">
+          Звук в звонке и через VB-Cable не меняется — отключается только воспроизведение в ваших наушниках или колонках.
+        </p>
+        <div className="soundpad-field soundpad-monitor-field">
+          <label className="soundpad-checkbox soundpad-monitor-toggle">
+            <input
+              type="checkbox"
+              checked={monitorEnabled}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setMonitorEnabled(next);
+                soundpadBridge.setMonitorEnabled(next);
+              }}
+            />
+            <span>Слышать саундпад у себя</span>
+          </label>
+          {monitorEnabled && (
+            <>
+              <label htmlFor="soundpad-config-monitor-volume" className="soundpad-monitor-volume-label">
+                Громкость прослушивания
+              </label>
+              <input
+                id="soundpad-config-monitor-volume"
+                type="range"
+                min="0"
+                max="2"
+                step="0.05"
+                value={monitorVolume}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setMonitorVolume(next);
+                  soundpadBridge.setMonitorVolume(next);
+                }}
+              />
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="soundpad-section">
+        <h3>Саундпад других участников</h3>
+        <p className="soundpad-hint">
+          Отключает только звуки саундпада от других людей в звонке. Голос они по-прежнему слышны.
+          Работает, если у них режим «Физический микрофон». В режиме VB-Cable саундпад смешан с голосом и отключить отдельно нельзя.
+        </p>
+        <label className="soundpad-checkbox">
+          <input
+            type="checkbox"
+            checked={remoteSoundpadEnabled}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setRemoteSoundpadEnabled(next);
+              soundpadStorage.saveConfig({ remoteSoundpadEnabled: next });
+              useCallStore.getState().applyRemoteSoundpadVolumes();
+            }}
+          />
+          <span>Слышать саундпад других участников</span>
         </label>
       </section>
 

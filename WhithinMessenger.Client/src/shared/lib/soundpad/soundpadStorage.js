@@ -9,6 +9,8 @@ const defaultConfig = () => ({
   /** Hear soundpad in your headphones/speakers (separate from mic/CABLE level). */
   monitorEnabled: true,
   monitorVolume: 1,
+  /** Hear soundpad tracks from other call participants (in-app mode, separate track). */
+  remoteSoundpadEnabled: true,
   showPanel: true,
 });
 

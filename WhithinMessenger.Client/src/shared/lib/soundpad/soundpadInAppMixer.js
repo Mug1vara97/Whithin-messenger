@@ -11,13 +11,14 @@ class SoundpadInAppMixer {
     this.micSource = null;
     this.micGain = null;
     this.soundpadGain = null;
-    this.destination = null;
+    this.voiceDestination = null;
+    this.soundpadDestination = null;
     this.micMuted = false;
     this.activeSources = new Set();
   }
 
   isActive() {
-    return Boolean(this.destination?.stream?.active);
+    return Boolean(this.voiceDestination?.stream?.active);
   }
 
   async ensureInitialized(audioConstraints = { audio: true }) {
@@ -71,15 +72,16 @@ class SoundpadInAppMixer {
     this.micSource = this.audioContext.createMediaStreamSource(stream);
     this.micGain = this.audioContext.createGain();
     this.soundpadGain = this.audioContext.createGain();
-    this.destination = this.audioContext.createMediaStreamDestination();
+    this.voiceDestination = this.audioContext.createMediaStreamDestination();
+    this.soundpadDestination = this.audioContext.createMediaStreamDestination();
 
     this.micGain.gain.value = this.micMuted ? 0 : 1;
     this.micSource.connect(this.micGain);
-    this.micGain.connect(this.destination);
-    this.soundpadGain.connect(this.destination);
+    this.micGain.connect(this.voiceDestination);
+    this.soundpadGain.connect(this.soundpadDestination);
 
-    soundpadLog('soundpadInAppMixer: graph ready');
-    return this.getMixedStream();
+    soundpadLog('soundpadInAppMixer: graph ready (voice + soundpad tracks)');
+    return this.getVoiceStream();
   }
 
   _disconnectMic() {
@@ -95,8 +97,17 @@ class SoundpadInAppMixer {
     }
   }
 
+  getVoiceStream() {
+    return this.voiceDestination?.stream ?? this.micStream;
+  }
+
+  getSoundpadStream() {
+    return this.soundpadDestination?.stream ?? null;
+  }
+
+  /** @deprecated use getVoiceStream */
   getMixedStream() {
-    return this.destination?.stream ?? this.micStream;
+    return this.getVoiceStream();
   }
 
   getAudioContext() {
@@ -178,7 +189,8 @@ class SoundpadInAppMixer {
     this.micSource = null;
     this.micGain = null;
     this.soundpadGain = null;
-    this.destination = null;
+    this.voiceDestination = null;
+    this.soundpadDestination = null;
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close().catch(() => {});
     }

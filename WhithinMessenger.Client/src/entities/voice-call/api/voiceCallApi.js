@@ -104,6 +104,9 @@ class VoiceCallApi {
   }
 
   getPublicationMediaType(publication) {
+    const trackName = publication?.trackName || publication?.name;
+    if (trackName === 'soundpad') return 'soundpad';
+
     const source = publication?.source;
     if (source === Track.Source.ScreenShare) return 'screen';
     if (source === Track.Source.Camera) return 'camera';
@@ -733,6 +736,13 @@ class VoiceCallApi {
     };
   }
 
+  // Notify server about mute state without changing LiveKit track (in-app soundpad keeps mic published).
+  broadcastMuteState(isMuted) {
+    if (this.socket) {
+      this.socket.emit('muteState', { isMuted: Boolean(isMuted) });
+    }
+  }
+
   // Enable/disable microphone
   async setMicrophoneEnabled(enabled) {
     if (!this.room) {
@@ -740,11 +750,7 @@ class VoiceCallApi {
     }
     
     await this.room.localParticipant.setMicrophoneEnabled(enabled);
-    
-    // Notify server about mute state
-    if (this.socket) {
-      this.socket.emit('muteState', { isMuted: !enabled });
-    }
+    this.broadcastMuteState(!enabled);
   }
 
   // Enable/disable camera

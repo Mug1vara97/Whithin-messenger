@@ -10,6 +10,16 @@ import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
 import { soundpadBridge } from '../soundpad/soundpadBridge';
+import { soundpadStorage } from '../soundpad/soundpadStorage';
+
+const SOUNDPAD_TRACK_NAME = 'soundpad';
+
+const getRemoteSoundpadPlaybackVolume = (state, userId) => {
+  const remoteEnabled = soundpadStorage.getConfig().remoteSoundpadEnabled !== false;
+  if (!remoteEnabled || state.isGlobalAudioMuted) return 0;
+  if (state.userMutedStates.get(userId)) return 0;
+  return (state.userVolumes.get(userId) || 100) / 100;
+};
 
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
@@ -68,8 +78,8 @@ export const isSameVoiceChannel = (left, right) => {
 const resolveParticipantUserId = (participant) =>
   participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
 
-const getSoundpadPublishTrack = () =>
-  soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0] ?? null;
+const getVoicePublishTrack = () =>
+  soundpadInAppMixer.getVoiceStream()?.getAudioTracks()[0] ?? null;
 
 const getMicStreamForSoundpadMixer = (state, noiseSuppressed) => {
   if (noiseSuppressed && state.noiseSuppressionManager) {
@@ -78,14 +88,34 @@ const getMicStreamForSoundpadMixer = (state, noiseSuppressed) => {
   return state.localStream;
 };
 
-const refreshInAppSoundpadPublishTrack = async (state, noiseSuppressed) => {
+const refreshInAppVoicePublishTrack = async (state, noiseSuppressed) => {
   const micStream = getMicStreamForSoundpadMixer(state, noiseSuppressed);
   if (!micStream) {
-    return getSoundpadPublishTrack();
+    return getVoicePublishTrack();
   }
   await soundpadInAppMixer.attachMicStream(micStream);
   soundpadInAppMixer.setMicMuted(state.isMuted);
-  return getSoundpadPublishTrack();
+  return getVoicePublishTrack();
+};
+
+const publishLocalSoundpadTrack = async (localParticipant) => {
+  const soundpadTrack = soundpadInAppMixer.getSoundpadStream()?.getAudioTracks()[0];
+  if (!soundpadTrack) return;
+
+  const existingPublication = Array.from(localParticipant.audioTrackPublications.values()).find(
+    (publication) =>
+      publication.trackName === SOUNDPAD_TRACK_NAME || publication.name === SOUNDPAD_TRACK_NAME
+  );
+
+  if (existingPublication?.track) {
+    await existingPublication.track.replaceTrack(soundpadTrack);
+    return;
+  }
+
+  await localParticipant.publishTrack(soundpadTrack, {
+    source: Track.Source.Unknown,
+    name: SOUNDPAD_TRACK_NAME,
+  });
 };
 
 // ICE серверы для WebRTC
@@ -205,6 +235,7 @@ export const useCallStore = create(
       audioContext: null,
       gainNodes: new Map(),
       audioElements: new Map(),
+      soundpadAudioElements: new Map(),
       previousVolumes: new Map(),
       voiceActivityDetectors: new Map(), // userId -> VoiceActivityDetector
       localVoiceActivityDetector: null, // VAD для локального пользователя
@@ -720,6 +751,15 @@ export const useCallStore = create(
                   audioElement.parentNode.removeChild(audioElement);
                 }
               }
+
+              const soundpadAudioElement = get().soundpadAudioElements.get(userId);
+              if (soundpadAudioElement) {
+                soundpadAudioElement.pause();
+                soundpadAudioElement.srcObject = null;
+                if (soundpadAudioElement.parentNode) {
+                  soundpadAudioElement.parentNode.removeChild(soundpadAudioElement);
+                }
+              }
               
               // Очищаем gain node
               const gainNode = get().gainNodes.get(userId);
@@ -741,6 +781,7 @@ export const useCallStore = create(
                 const newShowVolumeSliders = new Map(state.showVolumeSliders);
                 const newGainNodes = new Map(state.gainNodes);
                 const newAudioElements = new Map(state.audioElements);
+                const newSoundpadAudioElements = new Map(state.soundpadAudioElements);
                 const newPreviousVolumes = new Map(state.previousVolumes);
                 const newPeerIdToUserIdMap = new Map(state.peerIdToUserIdMap);
                 
@@ -749,6 +790,7 @@ export const useCallStore = create(
                 newShowVolumeSliders.delete(userId);
                 newGainNodes.delete(userId);
                 newAudioElements.delete(userId);
+                newSoundpadAudioElements.delete(userId);
                 newPreviousVolumes.delete(userId);
                 newPeerIdToUserIdMap.delete(socketId);
                 
@@ -758,6 +800,7 @@ export const useCallStore = create(
                   showVolumeSliders: newShowVolumeSliders,
                   gainNodes: newGainNodes,
                   audioElements: newAudioElements,
+                  soundpadAudioElements: newSoundpadAudioElements,
                   previousVolumes: newPreviousVolumes,
                   peerIdToUserIdMap: newPeerIdToUserIdMap,
                   participants: state.participants.filter(p => p.userId !== userId)
@@ -957,6 +1000,43 @@ export const useCallStore = create(
             }
             
             // Handle AUDIO tracks
+            if (mediaType === 'soundpad') {
+              if (targetUserId === state.currentUserId) {
+                return;
+              }
+
+              const playbackVolume = getRemoteSoundpadPlaybackVolume(state, targetUserId);
+              const mediaStream = new MediaStream([track.mediaStreamTrack]);
+              let audioElement = state.soundpadAudioElements.get(targetUserId);
+
+              if (audioElement) {
+                audioElement.srcObject = mediaStream;
+                audioElement.volume = playbackVolume;
+              } else {
+                audioElement = document.createElement('audio');
+                audioElement.srcObject = mediaStream;
+                audioElement.autoplay = true;
+                audioElement.playsInline = true;
+                audioElement.controls = false;
+                audioElement.style.display = 'none';
+                audioElement.volume = playbackVolume;
+                document.body.appendChild(audioElement);
+
+                set((currentState) => {
+                  const newSoundpadAudioElements = new Map(currentState.soundpadAudioElements);
+                  newSoundpadAudioElements.set(targetUserId, audioElement);
+                  return { soundpadAudioElements: newSoundpadAudioElements };
+                });
+              }
+
+              try {
+                await audioElement.play();
+              } catch (error) {
+                console.warn('🔊 callStore: Remote soundpad autoplay blocked:', error);
+              }
+              return;
+            }
+
             // Skip screen share audio (handled separately if needed)
             if (mediaType === 'screen') {
               console.log('🔊 callStore: Screen share audio track, creating audio element');
@@ -2135,7 +2215,7 @@ export const useCallStore = create(
           if (inAppSoundpad) {
             await soundpadInAppMixer.attachMicStream(streamForPublish);
             soundpadInAppMixer.setMicMuted(state.isMuted);
-            streamForPublish = soundpadInAppMixer.getMixedStream();
+            streamForPublish = soundpadInAppMixer.getVoiceStream();
             set({ audioStream: streamForPublish });
           }
 
@@ -2157,7 +2237,7 @@ export const useCallStore = create(
             throw new Error('No audio track in stream');
           }
 
-          const publishMicEnabled = inAppSoundpad ? true : !state.isMuted;
+          const publishMicEnabled = !state.isMuted;
           audioTrack.enabled = publishMicEnabled;
           
           const publishTrack = streamForPublish.getAudioTracks()[0];
@@ -2178,6 +2258,10 @@ export const useCallStore = create(
               }
 
               await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
+
+              if (inAppSoundpad) {
+                await publishLocalSoundpadTrack(room.localParticipant);
+              }
             } catch (error) {
               console.warn('Failed to publish custom audio track via LiveKit:', error);
               await room.localParticipant.setMicrophoneEnabled(publishMicEnabled);
@@ -2210,13 +2294,9 @@ export const useCallStore = create(
         try {
           if (usesInAppSoundpad()) {
             soundpadInAppMixer.setMicMuted(newMutedState);
-            await voiceCallApi.setMicrophoneEnabled(true);
-            const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
-            if (mixedTrack) {
-              mixedTrack.enabled = true;
-            }
-          } else {
-            await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+          }
+          await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+          if (!usesInAppSoundpad()) {
             if (state.noiseSuppressionManager) {
               const processedStream = state.noiseSuppressionManager.getProcessedStream();
               const audioTrack = processedStream?.getAudioTracks()[0];
@@ -2235,10 +2315,30 @@ export const useCallStore = create(
         }
         
         set({ isMuted: newMutedState });
+
+        const userId = state.currentUserId;
+        if (userId) {
+          set((currentState) => {
+            const newMuteStates = new Map(currentState.participantMuteStates);
+            newMuteStates.set(userId, newMutedState);
+            return {
+              participantMuteStates: newMuteStates,
+              participants: currentState.participants.map((p) =>
+                p.userId === userId
+                  ? { ...p, isMuted: newMutedState, isSpeaking: newMutedState ? false : p.isSpeaking }
+                  : p
+              ),
+            };
+          });
+
+          const currentRoomId = get().currentRoomId;
+          if (currentRoomId) {
+            get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: newMutedState });
+          }
+        }
         
         // Сбрасываем состояние говорения при мьюте
         if (newMutedState) {
-          const userId = state.currentUserId;
           if (userId) {
             get().resetSpeakingState(userId);
             // Также принудительно сбрасываем VAD детектор
@@ -2262,11 +2362,21 @@ export const useCallStore = create(
         }
       },
       
+      applyRemoteSoundpadVolumes: () => {
+        const state = get();
+        state.soundpadAudioElements.forEach((audioElement, userId) => {
+          if (audioElement) {
+            audioElement.volume = getRemoteSoundpadPlaybackVolume(state, userId);
+          }
+        });
+      },
+
       // Переключение мута для отдельного пользователя
       toggleUserMute: (peerId) => {
         const state = get();
         const audioElement = state.audioElements.get(peerId);
-        if (!audioElement) return;
+        const soundpadAudioElement = state.soundpadAudioElements.get(peerId);
+        if (!audioElement && !soundpadAudioElement) return;
 
         const isCurrentlyMuted = state.userMutedStates.get(peerId) || false;
         const newIsMuted = !isCurrentlyMuted;
@@ -2278,11 +2388,18 @@ export const useCallStore = create(
             newPreviousVolumes.set(peerId, currentVolume);
             return { previousVolumes: newPreviousVolumes };
           });
-          audioElement.volume = 0;
+          if (audioElement) audioElement.volume = 0;
+          if (soundpadAudioElement) soundpadAudioElement.volume = 0;
         } else {
           const currentVolume = state.userVolumes.get(peerId) || 100;
           const audioVolume = state.isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
-          audioElement.volume = audioVolume;
+          if (audioElement) audioElement.volume = audioVolume;
+          if (soundpadAudioElement) {
+            soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(
+              { ...state, userMutedStates: new Map(state.userMutedStates).set(peerId, false) },
+              peerId
+            );
+          }
         }
 
         set((state) => {
@@ -2296,10 +2413,17 @@ export const useCallStore = create(
       changeUserVolume: (peerId, newVolume) => {
         const state = get();
         const audioElement = state.audioElements.get(peerId);
-        if (!audioElement) return;
+        const soundpadAudioElement = state.soundpadAudioElements.get(peerId);
+        if (!audioElement && !soundpadAudioElement) return;
 
         const audioVolume = state.isGlobalAudioMuted ? 0 : (newVolume / 100.0);
-        audioElement.volume = audioVolume;
+        if (audioElement) audioElement.volume = audioVolume;
+        if (soundpadAudioElement) {
+          soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(
+            { ...state, userVolumes: new Map(state.userVolumes).set(peerId, newVolume) },
+            peerId
+          );
+        }
 
         set((state) => {
           const newUserVolumes = new Map(state.userVolumes);
@@ -2398,6 +2522,7 @@ export const useCallStore = create(
             }
           }
         });
+        get().applyRemoteSoundpadVolumes();
         
         // Воспроизводим звук глобального мьюта/размьюта (только локально)
         if (newMutedState) {
@@ -2449,7 +2574,7 @@ export const useCallStore = create(
               let trackToPublish = null;
 
               if (usesInAppSoundpad()) {
-                trackToPublish = await refreshInAppSoundpadPublishTrack(state, newState);
+                trackToPublish = await refreshInAppVoicePublishTrack(state, newState);
               } else if (newState) {
                 // При включении шумоподавления используем обработанный трек
                 const processedStream = state.noiseSuppressionManager.getProcessedStream();
@@ -2587,7 +2712,7 @@ export const useCallStore = create(
                 const localParticipant = room.localParticipant;
                 let newTrack = null;
                 if (usesInAppSoundpad()) {
-                  newTrack = await refreshInAppSoundpadPublishTrack(state, true);
+                  newTrack = await refreshInAppVoicePublishTrack(state, true);
                 } else {
                   const processedStream = state.noiseSuppressionManager.getProcessedStream();
                   newTrack = processedStream?.getAudioTracks()[0] ?? null;
@@ -2672,6 +2797,18 @@ export const useCallStore = create(
           }
         });
 
+        state.soundpadAudioElements.forEach((audioElement) => {
+          try {
+            audioElement.pause();
+            audioElement.srcObject = null;
+            if (audioElement.parentNode) {
+              audioElement.parentNode.removeChild(audioElement);
+            }
+          } catch (e) {
+            console.warn('Error removing soundpad audio element:', e);
+          }
+        });
+
         state.gainNodes.forEach((gainNode) => {
           try {
             gainNode.disconnect();
@@ -2701,6 +2838,7 @@ export const useCallStore = create(
           showVolumeSliders: new Map(),
           gainNodes: new Map(),
           audioElements: new Map(),
+          soundpadAudioElements: new Map(),
           previousVolumes: new Map(),
           peerIdToUserIdMap: new Map(),
           remoteScreenShares: new Map(),
