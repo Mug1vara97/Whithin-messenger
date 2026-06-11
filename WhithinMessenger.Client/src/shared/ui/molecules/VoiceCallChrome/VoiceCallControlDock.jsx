@@ -10,6 +10,7 @@ import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
+import SurroundSoundIcon from '@mui/icons-material/SurroundSound';
 import './voiceCallChrome.css';
 
 const noiseMenuPaperSx = {
@@ -49,6 +50,10 @@ export function VoiceCallControlDock({
   onToggleVideo,
   isScreenSharing,
   onToggleScreenShare,
+  spatialAudioEnabled,
+  showSpatialAudioStage,
+  onToggleSpatialAudioStage,
+  onToggleSpatialAudio,
   onDisconnect
 }) {
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
@@ -161,6 +166,29 @@ export function VoiceCallControlDock({
                 <ScreenShareIcon sx={{ fontSize: 24 }} />
               </button>
             </div>
+
+            {onToggleSpatialAudioStage && (
+              <div className="attached-button-container control-button">
+                <button
+                  className={`center-button ${showSpatialAudioStage || spatialAudioEnabled ? 'active' : ''}`}
+                  type="button"
+                  aria-label="Пространственный звук"
+                  title={
+                    spatialAudioEnabled
+                      ? 'ЛКМ — карта 3D-звука, ПКМ — выключить 3D'
+                      : 'ЛКМ — карта 3D-звука, ПКМ — включить 3D'
+                  }
+                  onClick={onToggleSpatialAudioStage}
+                  onContextMenu={(event) => {
+                    if (!onToggleSpatialAudio) return;
+                    event.preventDefault();
+                    onToggleSpatialAudio();
+                  }}
+                >
+                  <SurroundSoundIcon sx={{ fontSize: 24 }} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="dock-divider" aria-hidden />

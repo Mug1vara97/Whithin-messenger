@@ -49,6 +49,9 @@ export const CallProvider = ({ children }) => {
   const participantGlobalAudioStates = useCallStore(state => state.participantGlobalAudioStates);
   const participantVideoStates = useCallStore(state => state.participantVideoStates);
   const participantSpeakingStates = useCallStore(state => state.participantSpeakingStates);
+  const spatialAudioEnabled = useCallStore(state => state.spatialAudioEnabled);
+  const showSpatialAudioStage = useCallStore(state => state.showSpatialAudioStage);
+  const spatialPositionsVersion = useCallStore(state => state.spatialPositionsVersion);
 
   // Инициализация шумоподавления из localStorage
   useEffect(() => {
@@ -144,6 +147,9 @@ export const CallProvider = ({ children }) => {
     participantGlobalAudioStates,
     participantVideoStates,
     participantSpeakingStates,
+    spatialAudioEnabled,
+    showSpatialAudioStage,
+    spatialPositionsVersion,
     
     // Методы
     initializeCall: callStore.initializeCall,
@@ -167,6 +173,9 @@ export const CallProvider = ({ children }) => {
     stopVideo: callStore.stopVideo,
     toggleVideo: callStore.toggleVideo,
     preinitializeAudioDevices: callStore.preinitializeAudioDevices,
+    toggleSpatialAudio: callStore.toggleSpatialAudio,
+    toggleSpatialAudioStage: callStore.toggleSpatialAudioStage,
+    setParticipantSpatialPosition: callStore.setParticipantSpatialPosition,
     
     // Прямой доступ к store для расширенного использования
     store: callStore
@@ -201,6 +210,9 @@ export const CallProvider = ({ children }) => {
     participantGlobalAudioStates,
     participantVideoStates,
     participantSpeakingStates,
+    spatialAudioEnabled,
+    showSpatialAudioStage,
+    spatialPositionsVersion,
     callStore
   ]);
 

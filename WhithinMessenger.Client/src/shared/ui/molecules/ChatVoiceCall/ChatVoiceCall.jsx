@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
+import {
+  getParticipantIsSpeaking,
+  useParticipantSpeakingStates,
+} from '../../../lib/hooks/useParticipantSpeakingStates';
 import { isSameVoiceChannel } from '../../../lib/stores/callStore';
 import { useCallGridTestMode } from '../../../lib/hooks/useCallGridTestMode';
 import { createParticipant } from '../../../../entities/video-call/model/types';
@@ -14,6 +18,7 @@ import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
 } from '../VoiceCallChrome';
+import { SpatialAudioStage } from '../SpatialAudioStage';
 import styles from './ChatVoiceCall.module.css';
 
 const PANEL_MIN_HEIGHT = 230;
@@ -118,8 +123,14 @@ const ChatVoiceCall = ({
     toggleScreenShare,
     toggleVideo,
     toggleNoiseSuppression,
-    changeNoiseSuppressionMode
+    changeNoiseSuppressionMode,
+    spatialAudioEnabled,
+    showSpatialAudioStage,
+    toggleSpatialAudio,
+    toggleSpatialAudioStage
   } = useGlobalCall(userId, userName);
+
+  const participantSpeakingStatesLive = useParticipantSpeakingStates();
 
   const {
     showErrorBanner,
@@ -314,11 +325,19 @@ const ChatVoiceCall = ({
             displayParticipants.map((participant) => {
               const participantIsDeafened =
                 participant.isGlobalAudioMuted || participant.isAudioDisabled || participant.isDeafened;
+              const isSpeakingLive = getParticipantIsSpeaking(
+                participantSpeakingStatesLive,
+                participant.id,
+                {
+                  isMuted: participant.isMuted,
+                  audioEnabled: participant.isAudioEnabled,
+                }
+              );
               return (
                 <div
                   key={participant.id}
                   className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''} ${
-                    participant.isSpeaking ? styles.participantSpeaking : ''
+                    isSpeakingLive ? styles.participantSpeaking : ''
                   }`}
                 >
                   <div className={styles.participantAvatarContainer}>
@@ -355,6 +374,8 @@ const ChatVoiceCall = ({
         </div>
       </div>
 
+      <SpatialAudioStage currentUserId={userId} />
+
       <VoiceCallChromeOverlay
         showHeader={false}
         compactBanners
@@ -376,6 +397,10 @@ const ChatVoiceCall = ({
           onToggleVideo: toggleVideo,
           isScreenSharing,
           onToggleScreenShare: toggleScreenShare,
+          spatialAudioEnabled,
+          showSpatialAudioStage,
+          onToggleSpatialAudioStage: () => toggleSpatialAudioStage(),
+          onToggleSpatialAudio: () => toggleSpatialAudio(),
           onDisconnect: handleDisconnect
         }}
       />

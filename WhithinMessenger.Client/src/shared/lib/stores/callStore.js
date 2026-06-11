@@ -11,8 +11,22 @@ import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
 import { soundpadBridge } from '../soundpad/soundpadBridge';
 import { soundpadStorage } from '../soundpad/soundpadStorage';
+import {
+  applyPannerWorldPosition,
+  configureSpatialPanner,
+  defaultPositionForIndex,
+  ensureSpatialListener,
+  DEFAULT_SPATIAL_POSITION,
+  clamp01,
+} from '../utils/spatialAudio';
 
 const SOUNDPAD_TRACK_NAME = 'soundpad';
+
+const getParticipantPlaybackGain = (state, userId) => {
+  if (state.isGlobalAudioMuted) return 0;
+  if (state.userMutedStates.get(userId)) return 0;
+  return (state.userVolumes.get(userId) || 100) / 100;
+};
 
 const getRemoteSoundpadPlaybackVolume = (state, userId) => {
   const remoteEnabled = soundpadStorage.getConfig().remoteSoundpadEnabled !== false;
@@ -234,7 +248,13 @@ export const useCallStore = create(
       audioContext: null,
       gainNodes: new Map(),
       audioElements: new Map(),
+      audioSources: new Map(),
+      pannerNodes: new Map(),
       soundpadAudioElements: new Map(),
+      spatialAudioEnabled: false,
+      showSpatialAudioStage: false,
+      participantSpatialPositions: new Map(),
+      spatialPositionsVersion: 0,
       previousVolumes: new Map(),
       voiceActivityDetectors: new Map(), // userId -> VoiceActivityDetector
       localVoiceActivityDetector: null, // VAD для локального пользователя
@@ -322,9 +342,10 @@ export const useCallStore = create(
       
       // Сброс состояния говорения для пользователя
       resetSpeakingState: (userId) => {
+        const normalizedUserId = String(userId);
         set((state) => {
           const newSpeakingStates = new Map(state.participantSpeakingStates);
-          newSpeakingStates.set(userId, false);
+          newSpeakingStates.set(normalizedUserId, false);
           return { participantSpeakingStates: newSpeakingStates };
         });
       },
@@ -511,15 +532,18 @@ export const useCallStore = create(
           debounceTime: 150,
           onSpeakingChange: (isSpeaking) => {
             const s = get();
-            const isMuted = s.participantMuteStates?.get(userId) === true;
-            const audioOn = s.participantAudioStates?.get(userId) !== false;
+            const normalizedUserId = String(userId);
+            const isMuted = s.participantMuteStates?.get(normalizedUserId) === true
+              || s.participantMuteStates?.get(userId) === true;
+            const audioOn = s.participantAudioStates?.get(normalizedUserId) !== false
+              && s.participantAudioStates?.get(userId) !== false;
             if (isMuted || !audioOn) {
-              if (s.participantSpeakingStates.get(userId)) {
-                s.resetSpeakingState(userId);
+              if (s.participantSpeakingStates.get(normalizedUserId)) {
+                s.resetSpeakingState(normalizedUserId);
               }
               return;
             }
-            s.updateSpeakingState(userId, isSpeaking);
+            s.updateSpeakingState(normalizedUserId, isSpeaking);
           }
         });
 
@@ -718,6 +742,8 @@ export const useCallStore = create(
               console.log('📢 Added peer to voice channel participants:', peerData.userId);
             }
 
+            get().ensureParticipantSpatialPosition(peerUserId);
+
             // Воспроизводим звук подключения пользователя
             audioNotificationManager.playUserJoinedSound().catch(error => {
               console.warn('Failed to play user joined sound:', error);
@@ -759,6 +785,24 @@ export const useCallStore = create(
                   soundpadAudioElement.parentNode.removeChild(soundpadAudioElement);
                 }
               }
+
+              const audioSource = get().audioSources.get(userId);
+              if (audioSource) {
+                try {
+                  audioSource.disconnect();
+                } catch (e) {
+                  console.warn('Error disconnecting audio source:', e);
+                }
+              }
+
+              const pannerNode = get().pannerNodes.get(userId);
+              if (pannerNode) {
+                try {
+                  pannerNode.disconnect();
+                } catch (e) {
+                  console.warn('Error disconnecting panner node:', e);
+                }
+              }
               
               // Очищаем gain node
               const gainNode = get().gainNodes.get(userId);
@@ -781,6 +825,9 @@ export const useCallStore = create(
                 const newGainNodes = new Map(state.gainNodes);
                 const newAudioElements = new Map(state.audioElements);
                 const newSoundpadAudioElements = new Map(state.soundpadAudioElements);
+                const newAudioSources = new Map(state.audioSources);
+                const newPannerNodes = new Map(state.pannerNodes);
+                const newSpatialPositions = new Map(state.participantSpatialPositions);
                 const newPreviousVolumes = new Map(state.previousVolumes);
                 const newPeerIdToUserIdMap = new Map(state.peerIdToUserIdMap);
                 
@@ -790,6 +837,9 @@ export const useCallStore = create(
                 newGainNodes.delete(userId);
                 newAudioElements.delete(userId);
                 newSoundpadAudioElements.delete(userId);
+                newAudioSources.delete(userId);
+                newPannerNodes.delete(userId);
+                newSpatialPositions.delete(userId);
                 newPreviousVolumes.delete(userId);
                 newPeerIdToUserIdMap.delete(socketId);
                 
@@ -800,6 +850,10 @@ export const useCallStore = create(
                   gainNodes: newGainNodes,
                   audioElements: newAudioElements,
                   soundpadAudioElements: newSoundpadAudioElements,
+                  audioSources: newAudioSources,
+                  pannerNodes: newPannerNodes,
+                  participantSpatialPositions: newSpatialPositions,
+                  spatialPositionsVersion: state.spatialPositionsVersion + 1,
                   previousVolumes: newPreviousVolumes,
                   peerIdToUserIdMap: newPeerIdToUserIdMap,
                   participants: state.participants.filter(p => p.userId !== userId)
@@ -1057,127 +1111,12 @@ export const useCallStore = create(
               return;
             }
             
-            // Only the microphone track drives voice playback — never replace it with soundpad/screen.
             if (mediaType !== 'microphone') {
               return;
             }
 
-            // Check if we already have an audio element for this user
-            if (state.audioElements.has(targetUserId)) {
-              console.log('🔊 callStore: Audio element already exists for user:', targetUserId, 'updating...');
-              const existingElement = state.audioElements.get(targetUserId);
-              const mediaStream = new MediaStream([track.mediaStreamTrack]);
-              existingElement.srcObject = mediaStream;
-              try {
-                await existingElement.play();
-                console.log('🔊 callStore: Updated audio element playback started');
-              } catch (error) {
-                console.warn('🔊 callStore: Failed to play updated audio element:', error);
-              }
-              let ctx = get().audioContext;
-              if (ctx && ctx.state !== 'closed') {
-                if (ctx.state === 'suspended') {
-                  try {
-                    await ctx.resume();
-                  } catch (e) {
-                    console.warn('[VAD] audioContext resume failed', e);
-                  }
-                }
-                try {
-                  await get().initializeRemoteVAD(targetUserId, mediaStream, ctx);
-                } catch (vadError) {
-                  console.warn('[VAD] Failed to re-init remote VAD after track update:', targetUserId, vadError);
-                }
-              }
-              return;
-            }
-            
-            // Initialize AudioContext if needed
-            let audioContext = state.audioContext;
-            if (!audioContext || audioContext.state === 'closed') {
-              audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 48000,
-                latencyHint: 'interactive'
-              });
-              set({ audioContext });
-            }
-            
-            // Resume audio context if suspended
-            if (audioContext.state === 'suspended') {
-              await audioContext.resume();
-            }
-            
-            // Create audio element
-            const audioElement = document.createElement('audio');
             const mediaStream = new MediaStream([track.mediaStreamTrack]);
-            audioElement.srcObject = mediaStream;
-            audioElement.autoplay = true;
-            audioElement.playsInline = true;
-            audioElement.controls = false;
-            audioElement.style.display = 'none';
-            document.body.appendChild(audioElement);
-            console.log('🔊 callStore: Created audio element for user:', targetUserId);
-            
-            // Create Web Audio API chain: source -> gain
-            const source = audioContext.createMediaStreamSource(mediaStream);
-            const gainNode = audioContext.createGain();
-            
-            // Set initial volume
-            const initialVolume = state.userVolumes.get(targetUserId) || 100;
-            const isMuted = state.userMutedStates.get(targetUserId) || false;
-            const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-            audioElement.volume = audioVolume;
-            gainNode.gain.value = audioVolume;
-            
-            // Connect source -> gain (not to destination to avoid double playback)
-            source.connect(gainNode);
-            
-            // Save references
-            set((state) => {
-              const newGainNodes = new Map(state.gainNodes);
-              const newAudioElements = new Map(state.audioElements);
-              const newUserVolumes = new Map(state.userVolumes);
-              
-              newGainNodes.set(targetUserId, gainNode);
-              newAudioElements.set(targetUserId, audioElement);
-              if (!newUserVolumes.has(targetUserId)) {
-                newUserVolumes.set(targetUserId, 100);
-              }
-              
-              return {
-                gainNodes: newGainNodes,
-                audioElements: newAudioElements,
-                userVolumes: newUserVolumes
-              };
-            });
-            
-            // Try to play audio element
-            try {
-              await audioElement.play();
-              console.log('🔊✅ callStore: Audio playback started for peer:', targetUserId);
-              set({ audioBlocked: false });
-              if (!usesInAppSoundpad()) {
-                get().routeCallAudioAwayFromCable();
-              }
-            } catch (error) {
-              console.warn('🔊⚠️ callStore: Auto-play blocked, user interaction required:', error);
-              set({ audioBlocked: true });
-              setTimeout(async () => {
-                try {
-                  await audioElement.play();
-                  console.log('🔊✅ callStore: Audio playback started after delay');
-                  set({ audioBlocked: false });
-                } catch (err) {
-                  console.error('🔊❌ callStore: Audio playback still blocked:', err);
-                }
-              }, 1000);
-            }
-
-            try {
-              await get().initializeRemoteVAD(targetUserId, mediaStream, audioContext);
-            } catch (vadError) {
-              console.warn('[VAD] Failed to init remote VAD (LiveKit):', targetUserId, vadError);
-            }
+            await get().setupParticipantVoiceAudio(targetUserId, mediaStream);
           });
 
           // Handle video state changes (camera muted/unmuted)
@@ -1572,6 +1511,8 @@ export const useCallStore = create(
         })).catch((error) => {
           console.warn('Error loading profiles for existing peers:', error);
         });
+
+        get().assignDefaultSpatialPositions();
       },
 
       refreshVoiceChannelParticipantsList: async (roomId) => {
@@ -2027,83 +1968,9 @@ export const useCallStore = create(
             return;
           }
           
-          // Инициализируем AudioContext если еще не создан
-          let audioContext = state.audioContext;
-          if (!audioContext || audioContext.state === 'closed') {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({
-              sampleRate: 48000,
-              latencyHint: 'interactive'
-            });
-            set({ audioContext });
-          }
-          
-          if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-          }
-          
-          // Создаем audio element
-          const audioElement = document.createElement('audio');
-          audioElement.srcObject = new MediaStream([consumer.track]);
-          audioElement.autoplay = true;
-          audioElement.playsInline = true;
-          audioElement.controls = false;
-          audioElement.style.display = 'none';
-          document.body.appendChild(audioElement);
-          
-          // Создаем Web Audio API chain
-          const source = audioContext.createMediaStreamSource(new MediaStream([consumer.track]));
-          const gainNode = audioContext.createGain();
-          source.connect(gainNode);
-          
-          // Устанавливаем начальную громкость
-          const initialVolume = state.userVolumes.get(userId) || 100;
-          const isMuted = state.userMutedStates.get(userId) || false;
-          const audioVolume = state.isGlobalAudioMuted ? 0 : (isMuted ? 0 : (initialVolume / 100.0));
-          audioElement.volume = audioVolume;
-          
-          // Сохраняем ссылки
-          set((state) => {
-            const newGainNodes = new Map(state.gainNodes);
-            const newAudioElements = new Map(state.audioElements);
-            newGainNodes.set(userId, gainNode);
-            newAudioElements.set(userId, audioElement);
-            
-            const newUserVolumes = new Map(state.userVolumes);
-            if (!newUserVolumes.has(userId)) {
-              newUserVolumes.set(userId, 100);
-            }
-            
-            return {
-              gainNodes: newGainNodes,
-              audioElements: newAudioElements,
-              userVolumes: newUserVolumes
-            };
-          });
-          
-          // Инициализация Voice Activity Detection (VAD) для удалённого участника
-          try {
-            const remoteStream = new MediaStream([consumer.track]);
-            await get().initializeRemoteVAD(userId, remoteStream, audioContext);
-          } catch (vadError) {
-            console.warn('[VAD] Failed to initialize remote VAD for user:', userId, vadError);
-          }
-
-          try {
-            await audioElement.play();
-            console.log('Audio playback started for peer:', userId);
-            set({ audioBlocked: false });
-          } catch (error) {
-            console.log('Auto-play blocked, user interaction required:', error);
-            set({ audioBlocked: true });
-            setTimeout(async () => {
-              try {
-                await audioElement.play();
-                set({ audioBlocked: false });
-              } catch {
-                console.log('Audio playback still blocked');
-              }
-            }, 1000);
-          }
+          const mediaStream = new MediaStream([consumer.track]);
+          await get().setupParticipantVoiceAudio(userId, mediaStream);
+          console.log('Audio playback started for peer:', userId);
 
           await voiceCallApi.resumeConsumer(consumerData.id);
           console.log('New consumer created:', consumerData.id);
@@ -2377,6 +2244,262 @@ export const useCallStore = create(
         });
       },
 
+      ensureSpatialListener: () => {
+        const audioContext = get().audioContext;
+        if (audioContext && audioContext.state !== 'closed') {
+          ensureSpatialListener(audioContext);
+        }
+      },
+
+      ensureParticipantSpatialPosition: (userId) => {
+        if (!userId || get().participantSpatialPositions.has(userId)) return;
+
+        const state = get();
+        const remote = state.participants.filter(
+          (p) => String(p.userId || p.id) !== String(state.currentUserId)
+        );
+        const index = remote.findIndex((p) => String(p.userId || p.id) === String(userId));
+        const position =
+          index >= 0
+            ? defaultPositionForIndex(index, remote.length)
+            : DEFAULT_SPATIAL_POSITION;
+
+        set((s) => {
+          const next = new Map(s.participantSpatialPositions);
+          next.set(userId, position);
+          return {
+            participantSpatialPositions: next,
+            spatialPositionsVersion: s.spatialPositionsVersion + 1,
+          };
+        });
+      },
+
+      assignDefaultSpatialPositions: () => {
+        const state = get();
+        const remote = state.participants.filter(
+          (p) => String(p.userId || p.id) !== String(state.currentUserId)
+        );
+        if (!remote.length) return;
+
+        const next = new Map(state.participantSpatialPositions);
+        let changed = false;
+        remote.forEach((participant, index) => {
+          const userId = participant.userId || participant.id;
+          if (!next.has(userId)) {
+            next.set(userId, defaultPositionForIndex(index, remote.length));
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          set((s) => ({
+            participantSpatialPositions: next,
+            spatialPositionsVersion: s.spatialPositionsVersion + 1,
+          }));
+        }
+      },
+
+      applyParticipantAudioRouting: (userId) => {
+        const state = get();
+        const audioElement = state.audioElements.get(userId);
+        const gainNode = state.gainNodes.get(userId);
+        const panner = state.pannerNodes.get(userId);
+        const audioContext = state.audioContext;
+        if (!audioElement || !gainNode || !audioContext) return;
+
+        const volume = getParticipantPlaybackGain(state, userId);
+        const position =
+          state.participantSpatialPositions.get(userId) || DEFAULT_SPATIAL_POSITION;
+
+        if (panner) {
+          applyPannerWorldPosition(panner, position.nx, position.ny);
+        }
+
+        if (state.spatialAudioEnabled && panner) {
+          audioElement.volume = 0;
+          gainNode.gain.value = volume;
+          try {
+            gainNode.disconnect();
+          } catch {
+            // ignore
+          }
+          try {
+            gainNode.connect(audioContext.destination);
+          } catch {
+            // ignore
+          }
+        } else {
+          try {
+            gainNode.disconnect(audioContext.destination);
+          } catch {
+            // ignore
+          }
+          audioElement.volume = volume;
+          gainNode.gain.value = volume;
+        }
+      },
+
+      applyAllParticipantAudioRouting: () => {
+        const state = get();
+        state.audioElements.forEach((_, userId) => {
+          get().applyParticipantAudioRouting(userId);
+        });
+      },
+
+      setParticipantSpatialPosition: (userId, nx, ny) => {
+        if (!userId) return;
+        const nextPosition = { nx: clamp01(nx), ny: clamp01(ny) };
+
+        set((state) => {
+          const next = new Map(state.participantSpatialPositions);
+          next.set(userId, nextPosition);
+          return {
+            participantSpatialPositions: next,
+            spatialPositionsVersion: state.spatialPositionsVersion + 1,
+          };
+        });
+
+        const panner = get().pannerNodes.get(userId);
+        if (panner) {
+          applyPannerWorldPosition(panner, nextPosition.nx, nextPosition.ny);
+        }
+        get().applyParticipantAudioRouting(userId);
+      },
+
+      toggleSpatialAudio: () => {
+        const next = !get().spatialAudioEnabled;
+        set({ spatialAudioEnabled: next });
+
+        if (next) {
+          get().ensureSpatialListener();
+          get().assignDefaultSpatialPositions();
+        }
+
+        get().applyAllParticipantAudioRouting();
+      },
+
+      toggleSpatialAudioStage: (forceValue) => {
+        const next =
+          typeof forceValue === 'boolean' ? forceValue : !get().showSpatialAudioStage;
+        set({ showSpatialAudioStage: next });
+        if (next) {
+          get().assignDefaultSpatialPositions();
+        }
+      },
+
+      setupParticipantVoiceAudio: async (targetUserId, mediaStream) => {
+        let state = get();
+        let audioContext = state.audioContext;
+        if (!audioContext || audioContext.state === 'closed') {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 48000,
+            latencyHint: 'interactive',
+          });
+          set({ audioContext });
+        }
+
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        let audioElement = state.audioElements.get(targetUserId);
+        if (!audioElement) {
+          audioElement = document.createElement('audio');
+          audioElement.autoplay = true;
+          audioElement.playsInline = true;
+          audioElement.controls = false;
+          audioElement.style.display = 'none';
+          document.body.appendChild(audioElement);
+        }
+        audioElement.srcObject = mediaStream;
+
+        const oldSource = state.audioSources.get(targetUserId);
+        if (oldSource) {
+          try {
+            oldSource.disconnect();
+          } catch {
+            // ignore
+          }
+        }
+
+        let panner = state.pannerNodes.get(targetUserId);
+        if (!panner) {
+          panner = audioContext.createPanner();
+          configureSpatialPanner(panner);
+        }
+
+        let gainNode = state.gainNodes.get(targetUserId);
+        if (!gainNode) {
+          gainNode = audioContext.createGain();
+        }
+
+        try {
+          gainNode.disconnect();
+        } catch {
+          // ignore
+        }
+
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(panner);
+        panner.connect(gainNode);
+
+        set((s) => {
+          const newSources = new Map(s.audioSources);
+          const newPanners = new Map(s.pannerNodes);
+          const newGains = new Map(s.gainNodes);
+          const newAudioElements = new Map(s.audioElements);
+          const newUserVolumes = new Map(s.userVolumes);
+
+          newSources.set(targetUserId, source);
+          newPanners.set(targetUserId, panner);
+          newGains.set(targetUserId, gainNode);
+          newAudioElements.set(targetUserId, audioElement);
+          if (!newUserVolumes.has(targetUserId)) {
+            newUserVolumes.set(targetUserId, 100);
+          }
+
+          return {
+            audioSources: newSources,
+            pannerNodes: newPanners,
+            gainNodes: newGains,
+            audioElements: newAudioElements,
+            userVolumes: newUserVolumes,
+          };
+        });
+
+        if (get().spatialAudioEnabled) {
+          get().ensureSpatialListener();
+        }
+
+        get().ensureParticipantSpatialPosition(targetUserId);
+        get().applyParticipantAudioRouting(targetUserId);
+
+        try {
+          await audioElement.play();
+          set({ audioBlocked: false });
+          if (!usesInAppSoundpad()) {
+            get().routeCallAudioAwayFromCable();
+          }
+        } catch (error) {
+          console.warn('🔊 callStore: Voice playback blocked:', error);
+          set({ audioBlocked: true });
+          setTimeout(async () => {
+            try {
+              await audioElement.play();
+              set({ audioBlocked: false });
+            } catch (retryError) {
+              console.error('🔊 callStore: Voice playback still blocked:', retryError);
+            }
+          }, 1000);
+        }
+
+        try {
+          await get().initializeRemoteVAD(targetUserId, mediaStream, audioContext);
+        } catch (vadError) {
+          console.warn('[VAD] Failed to init remote VAD:', targetUserId, vadError);
+        }
+      },
+
       // Переключение мута для отдельного пользователя
       toggleUserMute: (peerId) => {
         const state = get();
@@ -2389,30 +2512,23 @@ export const useCallStore = create(
 
         if (newIsMuted) {
           const currentVolume = state.userVolumes.get(peerId) || 100;
-          set((state) => {
-            const newPreviousVolumes = new Map(state.previousVolumes);
+          set((s) => {
+            const newPreviousVolumes = new Map(s.previousVolumes);
             newPreviousVolumes.set(peerId, currentVolume);
             return { previousVolumes: newPreviousVolumes };
           });
-          if (audioElement) audioElement.volume = 0;
-          if (soundpadAudioElement) soundpadAudioElement.volume = 0;
-        } else {
-          const currentVolume = state.userVolumes.get(peerId) || 100;
-          const audioVolume = state.isGlobalAudioMuted ? 0 : (currentVolume / 100.0);
-          if (audioElement) audioElement.volume = audioVolume;
-          if (soundpadAudioElement) {
-            soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(
-              { ...state, userMutedStates: new Map(state.userMutedStates).set(peerId, false) },
-              peerId
-            );
-          }
         }
 
-        set((state) => {
-          const newUserMutedStates = new Map(state.userMutedStates);
+        set((s) => {
+          const newUserMutedStates = new Map(s.userMutedStates);
           newUserMutedStates.set(peerId, newIsMuted);
           return { userMutedStates: newUserMutedStates };
         });
+
+        get().applyParticipantAudioRouting(peerId);
+        if (soundpadAudioElement) {
+          soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(get(), peerId);
+        }
       },
       
       // Изменение громкости отдельного пользователя
@@ -2422,20 +2538,16 @@ export const useCallStore = create(
         const soundpadAudioElement = state.soundpadAudioElements.get(peerId);
         if (!audioElement && !soundpadAudioElement) return;
 
-        const audioVolume = state.isGlobalAudioMuted ? 0 : (newVolume / 100.0);
-        if (audioElement) audioElement.volume = audioVolume;
-        if (soundpadAudioElement) {
-          soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(
-            { ...state, userVolumes: new Map(state.userVolumes).set(peerId, newVolume) },
-            peerId
-          );
-        }
-
-        set((state) => {
-          const newUserVolumes = new Map(state.userVolumes);
+        set((s) => {
+          const newUserVolumes = new Map(s.userVolumes);
           newUserVolumes.set(peerId, newVolume);
           return { userVolumes: newUserVolumes };
         });
+
+        get().applyParticipantAudioRouting(peerId);
+        if (soundpadAudioElement) {
+          soundpadAudioElement.volume = getRemoteSoundpadPlaybackVolume(get(), peerId);
+        }
 
         // Если размутиваем через слайдер, обновляем состояние мута
         if (newVolume > 0 && state.userMutedStates.get(peerId)) {
@@ -2515,19 +2627,7 @@ export const useCallStore = create(
           });
         }
         
-        // Управляем HTML Audio элементами
-        state.audioElements.forEach((audioElement, peerId) => {
-          if (audioElement) {
-            if (newMutedState) {
-              audioElement.volume = 0;
-            } else {
-              const volume = state.userVolumes.get(peerId) || 100;
-              const isIndividuallyMuted = state.userMutedStates.get(peerId) || false;
-              const audioVolume = isIndividuallyMuted ? 0 : (volume / 100.0);
-              audioElement.volume = audioVolume;
-            }
-          }
-        });
+        get().applyAllParticipantAudioRouting();
         get().applyRemoteSoundpadVolumes();
         
         // Воспроизводим звук глобального мьюта/размьюта (только локально)
@@ -2815,6 +2915,22 @@ export const useCallStore = create(
           }
         });
 
+        state.audioSources.forEach((audioSource) => {
+          try {
+            audioSource.disconnect();
+          } catch (e) {
+            console.warn('Error disconnecting audio source:', e);
+          }
+        });
+
+        state.pannerNodes.forEach((pannerNode) => {
+          try {
+            pannerNode.disconnect();
+          } catch (e) {
+            console.warn('Error disconnecting panner node:', e);
+          }
+        });
+
         state.gainNodes.forEach((gainNode) => {
           try {
             gainNode.disconnect();
@@ -2844,7 +2960,13 @@ export const useCallStore = create(
           showVolumeSliders: new Map(),
           gainNodes: new Map(),
           audioElements: new Map(),
+          audioSources: new Map(),
+          pannerNodes: new Map(),
           soundpadAudioElements: new Map(),
+          spatialAudioEnabled: false,
+          showSpatialAudioStage: false,
+          participantSpatialPositions: new Map(),
+          spatialPositionsVersion: 0,
           previousVolumes: new Map(),
           peerIdToUserIdMap: new Map(),
           remoteScreenShares: new Map(),
@@ -2916,11 +3038,6 @@ export const useCallStore = create(
           // Очистка всех Voice Activity Detectors
           get().cleanupAllVAD();
           
-          // Закрытие audio context
-          if (state.audioContext && state.audioContext.state !== 'closed') {
-            await state.audioContext.close();
-          }
-          
           if (state.sendTransport) {
             state.sendTransport.close();
           }
@@ -2932,7 +3049,22 @@ export const useCallStore = create(
           state.consumers.forEach(consumer => consumer.close());
           state.producers.forEach(producer => producer.close());
           
-          // Очистка GainNodes и audio elements
+          state.audioSources.forEach((audioSource) => {
+            try {
+              audioSource.disconnect();
+            } catch (e) {
+              console.warn('Error disconnecting audio source:', e);
+            }
+          });
+
+          state.pannerNodes.forEach((pannerNode) => {
+            try {
+              pannerNode.disconnect();
+            } catch (e) {
+              console.warn('Error disconnecting panner node:', e);
+            }
+          });
+
           state.gainNodes.forEach(gainNode => {
             try {
               gainNode.disconnect();
@@ -2952,6 +3084,22 @@ export const useCallStore = create(
               console.warn('Error removing audio element:', e);
             }
           });
+
+          state.soundpadAudioElements.forEach((audioElement) => {
+            try {
+              audioElement.pause();
+              audioElement.srcObject = null;
+              if (audioElement.parentNode) {
+                audioElement.parentNode.removeChild(audioElement);
+              }
+            } catch (e) {
+              console.warn('Error removing soundpad audio element:', e);
+            }
+          });
+
+          if (state.audioContext && state.audioContext.state !== 'closed') {
+            await state.audioContext.close();
+          }
           
           // Воспроизводим звук отключения для самого пользователя
           audioNotificationManager.playUserLeftSound().catch(error => {
@@ -2975,6 +3123,13 @@ export const useCallStore = create(
             showVolumeSliders: new Map(),
             gainNodes: new Map(),
             audioElements: new Map(),
+            audioSources: new Map(),
+            pannerNodes: new Map(),
+            soundpadAudioElements: new Map(),
+            spatialAudioEnabled: false,
+            showSpatialAudioStage: false,
+            participantSpatialPositions: new Map(),
+            spatialPositionsVersion: 0,
             previousVolumes: new Map(),
             peerIdToUserIdMap: new Map(),
             device: null,

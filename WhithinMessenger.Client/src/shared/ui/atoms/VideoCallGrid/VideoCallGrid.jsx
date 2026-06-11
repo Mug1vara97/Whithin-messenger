@@ -1,4 +1,8 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import {
+  getParticipantIsSpeaking,
+  useParticipantSpeakingStates,
+} from '../../../lib/hooks/useParticipantSpeakingStates';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import MicIcon from '@mui/icons-material/Mic';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
@@ -126,6 +130,7 @@ const VideoCallGrid = ({
   onRemoveTestParticipant // Callback для удаления тестового участника
 }) => {
   const bottomGridRef = useRef(null);
+  const participantSpeakingStates = useParticipantSpeakingStates();
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -406,16 +411,14 @@ const VideoCallGrid = ({
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const isMuted = participant.isMuted || false;
-    const isSpeaking = participant.isSpeaking || false;
+    const isSpeaking = getParticipantIsSpeaking(participantSpeakingStates, participant.id, {
+      isMuted,
+      audioEnabled: participant.isAudioEnabled,
+    });
     const isScreenShare = participant.isScreenShare || false;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
-    
-    // Debug: логируем состояние говорения для текущего пользователя
-    if (participant.isCurrentUser && isSpeaking) {
-      console.log('🎤 [VideoCallGrid] Current user is speaking, applying .speaking class');
-    }
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
