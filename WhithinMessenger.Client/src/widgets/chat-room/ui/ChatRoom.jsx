@@ -72,7 +72,6 @@ const ChatRoom = ({
   const navigate = useNavigate();
   const username = user?.username;
   const userId = user?.id || user?.userId;
-
   const {
     messages,
     connection,
@@ -101,6 +100,7 @@ const ChatRoom = ({
     const mid = tail?.messageId ?? tail?.MessageId ?? tail?.id ?? tail?.Id ?? '';
     return `${messages.length}:${mid}`;
   }, [messages]);
+
 
   useEffect(() => {
     if (!chatId || typeof onMessagesActivity !== 'function') return;
@@ -1085,7 +1085,7 @@ const ChatRoom = ({
           </div>
         )}
 
-        {!isLoading && messages.map((msg) => {
+        {!isLoading && messages.map((msg, messageIndex) => {
           const isOwn = msg.senderUsername === username;
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
           const isStickerMessage = !msg.forwardedMessage && msg.contentType === 'sticker' && msg.sticker;
@@ -1094,38 +1094,8 @@ const ChatRoom = ({
           const hasMedia = Boolean(msg.mediaFiles?.length);
           const isMediaOnly = hasMedia && !hasTextContent && !msg.repliedMessage && !msg.forwardedMessage && !isStickerMessage;
 
-          return (
-            <div
-              key={msg.messageId}
-              id={`message-${msg.messageId}`}
-              className={`message ${isOwn ? 'my-message' : 'user-message'} ${
-                isStickerMessage ? 'message--sticker' : ''
-              } ${isMediaOnly ? 'message--media-only' : ''} ${
-                highlightedMessageId === msg.messageId ? 'highlighted' : ''
-              }`}
-              onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
-            >
-              <UserAvatar
-                username={msg.senderUsername}
-                avatarUrl={msg.avatarUrl}
-                avatarColor={msg.avatarColor}
-              />
-              <div className="message-content">
-                <div className="message-header">
-                  <strong className="message-username">{msg.senderUsername}</strong>
-                  {headerTime && (
-                    <span className="message-header-time">{headerTime}</span>
-                  )}
-                  {msg.isEdited && (
-                    <span className="message-edited">ред.</span>
-                  )}
-                  {isOwn && (
-                    <MessageStatusIndicator
-                      status={msg.status || MessageStatus.SENT}
-                      onLightBubble
-                    />
-                  )}
-                </div>
+          const messageBody = (
+            <>
                 {msg.repliedMessage && (
                   <div className="replied-message" onClick={() => scrollToMessage(msg.repliedMessage.messageId)}>
                     <div className="replied-message-header">
@@ -1231,7 +1201,42 @@ const ChatRoom = ({
                     }
                   />
                 )}
+            </>
+          );
 
+          return (
+            <div
+              key={msg.messageId}
+              id={`message-${msg.messageId}`}
+              className={`message ${isOwn ? 'my-message' : 'user-message'} ${
+                isStickerMessage ? 'message--sticker' : ''
+              } ${isMediaOnly ? 'message--media-only' : ''} ${
+                highlightedMessageId === msg.messageId ? 'highlighted' : ''
+              }`}
+              onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
+            >
+              <UserAvatar
+                username={msg.senderUsername}
+                avatarUrl={msg.avatarUrl}
+                avatarColor={msg.avatarColor}
+              />
+              <div className="message-content">
+                <div className="message-header">
+                  <strong className="message-username">{msg.senderUsername}</strong>
+                  {headerTime && (
+                    <span className="message-header-time">{headerTime}</span>
+                  )}
+                  {msg.isEdited && (
+                    <span className="message-edited">ред.</span>
+                  )}
+                  {isOwn && (
+                    <MessageStatusIndicator
+                      status={msg.status || MessageStatus.SENT}
+                      onLightBubble
+                    />
+                  )}
+                </div>
+                {messageBody}
               </div>
             </div>
           );
@@ -1346,7 +1351,10 @@ const ChatRoom = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <form className={`input-container ${replyingToMessage ? 'replying' : ''}`} onSubmit={handleSendMessage}>
+      <form
+        className={`input-container ${replyingToMessage ? 'replying' : ''}`}
+        onSubmit={handleSendMessage}
+      >
         {editingMessageId && (
           <div className="editing-notice">
             <span className='editing-text'>Редактирование сообщения</span>
@@ -1416,18 +1424,18 @@ const ChatRoom = ({
                 handleComposerTextChange(value);
               }}
               placeholder={
-                editingMessageId 
-                  ? "Редактируйте сообщение..." 
-                  : replyingToMessage 
-                    ? "Напишите ответ..." 
-                    : "Введите сообщение..."
+                editingMessageId
+                  ? 'Редактируйте сообщение...'
+                  : replyingToMessage
+                    ? 'Напишите ответ...'
+                    : 'Введите сообщение...'
               }
               className="message-input no-focus-outline"
               autoComplete="off"
               spellCheck={true}
             />
             <button type="submit" className="send-button">
-              {editingMessageId ? 'Сохранить' : replyingToMessage ? 'Отправить' : 'Отправить'}
+              {editingMessageId ? 'Сохранить' : 'Отправить'}
             </button>
           </>
         )}

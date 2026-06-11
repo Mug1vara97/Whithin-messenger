@@ -1,3 +1,12 @@
+import {
+  THEME_PRESET_STORAGE_KEY,
+  THEME_PRESET_IDS,
+  THEME_PRESETS,
+  applyThemePresetAttribute,
+  getBaseThemeForPreset,
+  getThemePresetId,
+} from './themePresets';
+
 const STORAGE_KEY = 'whithin-app-theme';
 const PREVIEW_KEY = 'whithin-app-theme-preview';
 
@@ -67,13 +76,13 @@ function hexToRgbTriplet(hex) {
 }
 
 export function getMergedTheme() {
-  const base = { ...DEFAULT_THEME };
+  const base = getBaseThemeForPreset(getThemePresetId(), DEFAULT_THEME);
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
     const saved = JSON.parse(raw);
     if (saved && typeof saved === 'object') {
-      Object.keys(base).forEach((k) => {
+      Object.keys(DEFAULT_THEME).forEach((k) => {
         if (saved[k] != null && saved[k] !== '') base[k] = saved[k];
       });
     }
@@ -82,6 +91,19 @@ export function getMergedTheme() {
   }
   return base;
 }
+
+export function persistThemePreset(presetId) {
+  const id = THEME_PRESETS[presetId] ? presetId : THEME_PRESET_IDS.DEFAULT;
+  localStorage.setItem(THEME_PRESET_STORAGE_KEY, id);
+  const colors = getBaseThemeForPreset(id, DEFAULT_THEME);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
+  clearThemePreview();
+  applyThemePresetAttribute(id);
+  applyThemeToRoot(colors);
+  window.dispatchEvent(new CustomEvent('themePresetChanged', { detail: { presetId: id } }));
+}
+
+export { getThemePresetId, THEME_PRESET_LIST, THEME_PRESET_IDS } from './themePresets';
 
 export function applyThemeToRoot(theme) {
   const root = document.documentElement;
@@ -106,6 +128,7 @@ export function applyThemeToRoot(theme) {
 }
 
 export function applySavedTheme() {
+  applyThemePresetAttribute(getThemePresetId());
   applyThemeToRoot(getMergedTheme());
 }
 
@@ -119,7 +142,8 @@ export function persistTheme(partial) {
 export function resetTheme() {
   localStorage.removeItem(STORAGE_KEY);
   clearThemePreview();
-  applyThemeToRoot(DEFAULT_THEME);
+  applyThemePresetAttribute(getThemePresetId());
+  applyThemeToRoot(getMergedTheme());
 }
 
 /** Предпросмотр в основном окне, пока редактор открыт в отдельном. */
@@ -167,8 +191,9 @@ export function setupThemeWindowSync() {
       applyThemeToRoot(getMergedTheme());
       return;
     }
-    if (event.key === STORAGE_KEY) {
+    if (event.key === STORAGE_KEY || event.key === THEME_PRESET_STORAGE_KEY) {
       clearThemePreview();
+      applyThemePresetAttribute(getThemePresetId());
       applyThemeToRoot(getMergedTheme());
     }
   };

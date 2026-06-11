@@ -210,27 +210,37 @@
   background: var(--hover);
 }
 
-.voice-participant.speaking {
-  background-color: rgba(35, 165, 90, 0.1);
-}
-
 .voice-participant-avatar {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
   position: relative;
 }
 
-.voice-participant.speaking .voice-participant-avatar {
-  box-shadow: 0 0 0 2px #23a55a;
+.voice-participant-avatar::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  box-sizing: border-box;
+}
+
+.voice-participant.speaking .voice-participant-avatar::after {
+  opacity: 1;
+  border-color: #23a55a;
 }
 
 .voice-participant-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
 }
 
 .voice-participant-initials {
@@ -243,6 +253,8 @@
   font-weight: 600;
   color: white;
   text-transform: uppercase;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .voice-participant-name {
@@ -256,10 +268,6 @@
 
 .voice-participant:hover .voice-participant-name {
   color: var(--text);
-}
-
-.voice-participant.speaking .voice-participant-name {
-  color: #23a55a;
 }
 
 .voice-participant.muted .voice-participant-name {

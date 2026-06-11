@@ -6,6 +6,11 @@ import { userApi } from '../../../../entities/user/api/userApi';
 import { SoundpadConfigSection } from '../SoundpadConfigSection';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import { ParticipantVolumeSettings } from '../../molecules/ParticipantVolumeSettings';
+import {
+  getThemePresetId,
+  persistThemePreset,
+  THEME_PRESET_LIST,
+} from '../../../lib/theme/appTheme';
 import './SettingsModal.css';
 
 const BASE_TABS = [
@@ -45,6 +50,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
   const [emailError, setEmailError] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [themePresetId, setThemePresetId] = useState(() => getThemePresetId());
 
   const isElectron = soundpadBridge.isElectronAvailable();
   const tabs = useMemo(
@@ -378,12 +384,28 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
             <h3>Интерфейс</h3>
             <div className="setting-item">
               <label className="setting-label">
-                <span className="setting-text">Тема</span>
-                <select className="setting-select">
-                  <option value="dark">Темная</option>
-                  <option value="light">Светлая</option>
+                <span className="setting-text">Тема оформления</span>
+                <select
+                  className="setting-select"
+                  value={themePresetId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setThemePresetId(nextId);
+                    persistThemePreset(nextId);
+                  }}
+                >
+                  {THEME_PRESET_LIST.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
                 </select>
               </label>
+              {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
+                <p className="setting-description">
+                  {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId).description}
+                </p>
+              )}
             </div>
           </div>
         );
