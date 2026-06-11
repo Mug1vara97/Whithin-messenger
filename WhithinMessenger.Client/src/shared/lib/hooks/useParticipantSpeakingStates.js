@@ -90,8 +90,16 @@ export const getParticipantIsDeafened = (
 export const getParticipantIsSpeaking = (
   speakingStates,
   userId,
-  { isMuted = false, audioEnabled = true } = {}
+  { isMuted = false, audioEnabled = true, channelParticipant = null } = {}
 ) => {
   if (!userId || isMuted || audioEnabled === false) return false;
-  return Boolean(getMapValue(speakingStates, userId));
+
+  const mapValue = getMapValue(speakingStates, userId);
+  if (mapValue !== undefined) return Boolean(mapValue);
+
+  if (channelParticipant?.isSpeaking !== undefined) {
+    return Boolean(channelParticipant.isSpeaking);
+  }
+
+  return false;
 };

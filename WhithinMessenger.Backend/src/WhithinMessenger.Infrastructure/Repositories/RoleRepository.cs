@@ -35,6 +35,63 @@ public class RoleRepository : IRoleRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> UserHasRoleAsync(Guid userId, Guid serverId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.UserServerRoles
+            .AnyAsync(ur => ur.Id == userId && ur.ServerId == serverId && ur.RoleId == roleId, cancellationToken);
+    }
+
+    public async Task AssignRoleToUserAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        var role = await GetByIdAsync(roleId, cancellationToken)
+            ?? throw new InvalidOperationException("Роль не найдена");
+
+        if (await UserHasRoleAsync(userId, role.ServerId, roleId, cancellationToken))
+        {
+            return;
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+            ?? throw new InvalidOperationException("Пользователь не найден");
+        var server = await _context.Servers.FirstOrDefaultAsync(s => s.Id == role.ServerId, cancellationToken)
+            ?? throw new InvalidOperationException("Сервер не найден");
+
+        _context.UserServerRoles.Add(new UserServerRole
+        {
+            Id = userId,
+            ServerId = role.ServerId,
+            RoleId = roleId,
+            AssignedAt = DateTimeOffset.UtcNow,
+            User = user,
+            Server = server,
+            Role = role,
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveRoleFromUserAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        var role = await GetByIdAsync(roleId, cancellationToken);
+        if (role == null)
+        {
+            return;
+        }
+
+        var assignment = await _context.UserServerRoles
+            .FirstOrDefaultAsync(
+                ur => ur.Id == userId && ur.ServerId == role.ServerId && ur.RoleId == roleId,
+                cancellationToken);
+
+        if (assignment == null)
+        {
+            return;
+        }
+
+        _context.UserServerRoles.Remove(assignment);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<ServerRole> CreateAsync(ServerRole role, CancellationToken cancellationToken = default)
     {
         _context.ServerRoles.Add(role);

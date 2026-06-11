@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Mic, Headset, GraphicEq, RestartAlt, Check, Close } from '@mui/icons-material';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
@@ -229,10 +230,13 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     return actionNames[action] || action;
   };
 
-  const renderHotkeyRow = (action, title, description) => (
+  const renderHotkeyRow = (action, icon, title, description) => (
     <div className="setting-item" key={action}>
       <div className="setting-item-info">
-        <span className="setting-text">{title}</span>
+        <span className="setting-text setting-text-with-icon">
+          {icon}
+          {title}
+        </span>
         <p className="setting-description">{description}</p>
       </div>
       {editingHotkey === action ? (
@@ -248,11 +252,11 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
             autoFocus
             readOnly
           />
-          <button className="hotkey-save-btn" type="button" onClick={() => handleHotkeySave(action)}>
-            ✓
+          <button className="hotkey-save-btn" type="button" onClick={() => handleHotkeySave(action)} aria-label="Сохранить">
+            <Check fontSize="small" />
           </button>
-          <button className="hotkey-cancel-btn" type="button" onClick={handleHotkeyCancel}>
-            ✕
+          <button className="hotkey-cancel-btn" type="button" onClick={handleHotkeyCancel} aria-label="Отмена">
+            <Close fontSize="small" />
           </button>
         </div>
       ) : (
@@ -443,17 +447,31 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
                 Назначенные клавиши (F1 и др.) продолжают работать в играх, браузере и других программах.
               </p>
             )}
-            {renderHotkeyRow('toggleMic', '🎤 Переключить микрофон', 'Включение/выключение микрофона')}
-            {renderHotkeyRow('toggleAudio', '🔊 Переключить наушники', 'Включение/выключение звука в наушниках')}
+            {renderHotkeyRow(
+              'toggleMic',
+              <Mic className="setting-row-icon" fontSize="small" />,
+              'Переключить микрофон',
+              'Включение/выключение микрофона'
+            )}
+            {renderHotkeyRow(
+              'toggleAudio',
+              <Headset className="setting-row-icon" fontSize="small" />,
+              'Переключить наушники',
+              'Включение/выключение звука в наушниках'
+            )}
             {isElectron &&
               renderHotkeyRow(
                 'toggleSoundpadPanel',
-                '🎹 Панель саундпада',
+                <GraphicEq className="setting-row-icon" fontSize="small" />,
+                'Панель саундпада',
                 'Открыть или закрыть окно с кнопками звуков (глобально в десктоп-приложении)'
               )}
             <div className="setting-item">
               <div className="setting-item-info">
-                <span className="setting-text">🔄 Сбросить горячие клавиши</span>
+                <span className="setting-text setting-text-with-icon">
+                  <RestartAlt className="setting-row-icon" fontSize="small" />
+                  Сбросить горячие клавиши
+                </span>
                 <p className="setting-description">
                   {isElectron ? 'Вернуть F1, F2 и F3 по умолчанию' : 'Вернуть F1 и F2 по умолчанию'}
                 </p>

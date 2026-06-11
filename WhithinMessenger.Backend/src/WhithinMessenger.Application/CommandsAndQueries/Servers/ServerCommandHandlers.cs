@@ -1,8 +1,83 @@
 using MediatR;
+using System.Text.Json;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
+
+internal static class ServerPermissionHelper
+{
+    public static bool HasManageRolesPermission(IEnumerable<ServerRole> userRoles, Guid userId, Guid ownerId)
+    {
+        if (ownerId == userId)
+        {
+            return true;
+        }
+
+        return userRoles.Any(role => RoleGrantsPermission(role.Permissions, "manageRoles"));
+    }
+
+    public static bool RoleGrantsPermission(string? permissionsJson, string permission)
+    {
+        if (string.IsNullOrWhiteSpace(permissionsJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            var permissions = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(permissionsJson);
+            if (permissions != null &&
+                permissions.TryGetValue(permission, out var value) &&
+                value.ValueKind == JsonValueKind.True)
+            {
+                return true;
+            }
+        }
+        catch
+        {
+            // ignore malformed permission payloads
+        }
+
+        return false;
+    }
+
+    public static Dictionary<string, bool> MergePermissions(IEnumerable<ServerRole> roles)
+    {
+        var merged = new Dictionary<string, bool>();
+
+        foreach (var role in roles)
+        {
+            if (string.IsNullOrWhiteSpace(role.Permissions))
+            {
+                continue;
+            }
+
+            try
+            {
+                var permissions = JsonSerializer.Deserialize<Dictionary<string, bool>>(role.Permissions);
+                if (permissions == null)
+                {
+                    continue;
+                }
+
+                foreach (var (key, allowed) in permissions)
+                {
+                    if (allowed)
+                    {
+                        merged[key] = true;
+                    }
+                }
+            }
+            catch
+            {
+                // ignore malformed permission payloads
+            }
+        }
+
+        return merged;
+    }
+}
 
 public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, DeleteCategoryResult>
 {
@@ -575,21 +650,70 @@ public class GetServerMembersQueryHandler : IRequestHandler<GetServerMembersQuer
 public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, AssignRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly IServerRepository _serverRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
 
-    public AssignRoleCommandHandler(IRoleRepository roleRepository)
+    public AssignRoleCommandHandler(
+        IRoleRepository roleRepository,
+        IServerRepository serverRepository,
+        IServerMemberRepository serverMemberRepository)
     {
         _roleRepository = roleRepository;
+        _serverRepository = serverRepository;
+        _serverMemberRepository = serverMemberRepository;
     }
 
-    public Task<AssignRoleResult> Handle(AssignRoleCommand request, CancellationToken cancellationToken)
+    public async Task<AssignRoleResult> Handle(AssignRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new AssignRoleResult { Success = true, Role = new { }, ServerId = Guid.NewGuid() });
+            var role = await _roleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+            if (role == null)
+            {
+                return new AssignRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            var server = await _serverRepository.GetByIdAsync(role.ServerId, cancellationToken);
+            if (server == null)
+            {
+                return new AssignRoleResult { Success = false, ErrorMessage = "Сервер не найден" };
+            }
+
+            var actorRoles = await _roleRepository.GetUserRolesAsync(
+                request.CurrentUserId,
+                role.ServerId,
+                cancellationToken);
+
+            if (!ServerPermissionHelper.HasManageRolesPermission(actorRoles, request.CurrentUserId, server.OwnerId))
+            {
+                return new AssignRoleResult { Success = false, ErrorMessage = "Недостаточно прав для назначения ролей" };
+            }
+
+            if (!await _serverMemberRepository.IsUserMemberAsync(role.ServerId, request.UserId, cancellationToken))
+            {
+                return new AssignRoleResult { Success = false, ErrorMessage = "Пользователь не является участником сервера" };
+            }
+
+            if (!await _roleRepository.UserHasRoleAsync(request.UserId, role.ServerId, request.RoleId, cancellationToken))
+            {
+                await _roleRepository.AssignRoleToUserAsync(request.UserId, request.RoleId, cancellationToken);
+            }
+
+            return new AssignRoleResult
+            {
+                Success = true,
+                ServerId = role.ServerId,
+                Role = new
+                {
+                    roleId = role.Id,
+                    roleName = role.RoleName,
+                    color = role.Color,
+                },
+            };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new AssignRoleResult { Success = false, ErrorMessage = ex.Message });
+            return new AssignRoleResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -597,21 +721,70 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
 public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, RemoveRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly IServerRepository _serverRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
 
-    public RemoveRoleCommandHandler(IRoleRepository roleRepository)
+    public RemoveRoleCommandHandler(
+        IRoleRepository roleRepository,
+        IServerRepository serverRepository,
+        IServerMemberRepository serverMemberRepository)
     {
         _roleRepository = roleRepository;
+        _serverRepository = serverRepository;
+        _serverMemberRepository = serverMemberRepository;
     }
 
-    public Task<RemoveRoleResult> Handle(RemoveRoleCommand request, CancellationToken cancellationToken)
+    public async Task<RemoveRoleResult> Handle(RemoveRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new RemoveRoleResult { Success = true, RemainingRoles = new List<object>(), MergedPermissions = new { }, ServerId = Guid.NewGuid() });
+            var role = await _roleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+            if (role == null)
+            {
+                return new RemoveRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            var server = await _serverRepository.GetByIdAsync(role.ServerId, cancellationToken);
+            if (server == null)
+            {
+                return new RemoveRoleResult { Success = false, ErrorMessage = "Сервер не найден" };
+            }
+
+            var actorRoles = await _roleRepository.GetUserRolesAsync(
+                request.CurrentUserId,
+                role.ServerId,
+                cancellationToken);
+
+            if (!ServerPermissionHelper.HasManageRolesPermission(actorRoles, request.CurrentUserId, server.OwnerId))
+            {
+                return new RemoveRoleResult { Success = false, ErrorMessage = "Недостаточно прав для управления ролями" };
+            }
+
+            await _roleRepository.RemoveRoleFromUserAsync(request.UserId, request.RoleId, cancellationToken);
+
+            var remainingRoles = await _roleRepository.GetUserRolesAsync(
+                request.UserId,
+                role.ServerId,
+                cancellationToken);
+
+            return new RemoveRoleResult
+            {
+                Success = true,
+                ServerId = role.ServerId,
+                RemainingRoles = remainingRoles
+                    .Select(r => new
+                    {
+                        roleId = r.Id,
+                        roleName = r.RoleName,
+                        color = r.Color,
+                    })
+                    .ToList(),
+                MergedPermissions = ServerPermissionHelper.MergePermissions(remainingRoles),
+            };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new RemoveRoleResult { Success = false, ErrorMessage = ex.Message });
+            return new RemoveRoleResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -647,15 +820,30 @@ public class GetUserRolesQueryHandler : IRequestHandler<GetUserRolesQuery, GetUs
         _roleRepository = roleRepository;
     }
 
-    public Task<GetUserRolesResult> Handle(GetUserRolesQuery request, CancellationToken cancellationToken)
+    public async Task<GetUserRolesResult> Handle(GetUserRolesQuery request, CancellationToken cancellationToken)
     {
         try
-        {   
-            return Task.FromResult(new GetUserRolesResult { Success = true, Roles = new List<object>() });
+        {
+            var roles = await _roleRepository.GetUserRolesAsync(
+                request.UserId,
+                request.ServerId,
+                cancellationToken);
+
+            var mappedRoles = roles
+                .Select(role => new
+                {
+                    roleId = role.Id,
+                    roleName = role.RoleName,
+                    color = role.Color,
+                    permissions = role.Permissions,
+                })
+                .ToList<object>();
+
+            return new GetUserRolesResult { Success = true, Roles = mappedRoles };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new GetUserRolesResult { Success = false, ErrorMessage = ex.Message });
+            return new GetUserRolesResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }

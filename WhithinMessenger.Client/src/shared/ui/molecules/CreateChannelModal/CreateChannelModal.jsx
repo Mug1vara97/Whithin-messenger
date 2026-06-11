@@ -101,8 +101,8 @@ const CreateChannelModal = ({
       newErrors.name = 'Название должно содержать минимум 2 символа';
     } else if (channelName.length > 100) {
       newErrors.name = 'Название не должно превышать 100 символов';
-    } else if (!/^[a-z0-9_-]+$/i.test(channelName)) {
-      newErrors.name = 'Название может содержать только буквы, цифры, дефисы и подчеркивания';
+    } else if (!/^[\p{L}\p{N}\s_-]+$/u.test(channelName.trim())) {
+      newErrors.name = 'Название может содержать буквы, цифры, пробелы, дефисы и подчеркивания';
     }
 
     setErrors(newErrors);
@@ -216,15 +216,15 @@ const CreateChannelModal = ({
             <div className="form-group channel-name-group">
               <label htmlFor="channelName">Название канала</label>
               <div className="input-container">
-                <span className="input-prefix">
-                  {channelType === 3 ? '#' : '🔊'}
+                <span className={`input-prefix ${channelType === 4 ? 'input-prefix--icon' : ''}`}>
+                  {channelType === 3 ? '#' : <FaVolumeUp aria-hidden />}
                 </span>
                 <input
                   id="channelName"
                   type="text"
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
-                  placeholder={channelType === 3 ? 'новый-канал' : 'Новый канал'}
+                  placeholder={channelType === 3 ? 'общий-чат' : 'Общий голосовой'}
                   className={errors.name ? 'error' : ''}
                   autoComplete="off"
                 />

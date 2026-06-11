@@ -244,12 +244,16 @@ io.on('connection', async (socket) => {
         // Only update speaking state if the peer is not muted
         if (!peer.muted) {
             peer.speaking = speaking;
+            scheduleChannelUpdate(room.id, 100);
             // Broadcast speaking state to all peers in the room
             socket.to(room.id).emit('speakingStateChanged', {
                 peerId: socket.id,
                 userId: peer.userId, // Добавляем userId для правильного сопоставления
                 speaking: speaking && !peer.muted
             });
+        } else if (!speaking) {
+            peer.speaking = false;
+            scheduleChannelUpdate(room.id, 100);
         }
     });
 

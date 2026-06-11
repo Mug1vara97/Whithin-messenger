@@ -156,6 +156,17 @@
   font-size: 16px;
 }
 
+.setting-text-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-row-icon {
+  color: var(--text-secondary, #8e9297);
+  flex-shrink: 0;
+}
+
 .setting-description {
   margin: 4px 0 0 30px;
   font-size: 14px;

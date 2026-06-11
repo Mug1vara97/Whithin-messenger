@@ -216,7 +216,11 @@ const ChannelItem = ({
                     const isSpeakingLive = getParticipantIsSpeaking(
                       participantSpeakingStates,
                       participantId,
-                      { isMuted: isMutedLive, audioEnabled: !isDeafenedLive }
+                      {
+                        isMuted: isMutedLive,
+                        audioEnabled: !isDeafenedLive,
+                        channelParticipant: participant,
+                      }
                     );
 
                     return (

@@ -106,6 +106,16 @@ const MemberManagement = ({
     }
   };
 
+  useEffect(() => {
+    if (!selectedMemberForRoles) return;
+    const updatedMember = members.find(
+      (member) => String(member.userId) === String(selectedMemberForRoles.userId)
+    );
+    if (updatedMember) {
+      setSelectedMemberForRoles(updatedMember);
+    }
+  }, [members, selectedMemberForRoles?.userId]);
+
   const handleRoleToggle = async (roleId, checked) => {
     if (!selectedMemberForRoles) return;
 
@@ -115,6 +125,7 @@ const MemberManagement = ({
       } else {
         await removeRole(selectedMemberForRoles.userId, roleId);
       }
+      await fetchMembers();
     } catch (error) {
       alert(`Ошибка обновления роли: ${error.message}`);
     }
@@ -229,7 +240,7 @@ const MemberManagement = ({
     if (!showRoleManagement.visible || !selectedMemberForRoles) return null;
 
     const memberRoles = selectedMemberForRoles.roles || [];
-    const selectedRoleIds = memberRoles.map(role => role.roleId);
+    const selectedRoleIds = memberRoles.map((role) => String(role.roleId));
     
     console.log('RoleManagementModal - roles:', roles);
     console.log('RoleManagementModal - selectedMemberForRoles:', selectedMemberForRoles);
@@ -271,7 +282,7 @@ const MemberManagement = ({
                 <label key={role.roleId} className="role-item">
                   <input
                     type="checkbox"
-                    checked={selectedRoleIds.includes(role.roleId)}
+                    checked={selectedRoleIds.includes(String(role.roleId))}
                     onChange={(e) => handleRoleToggle(role.roleId, e.target.checked)}
                   />
                   <div 

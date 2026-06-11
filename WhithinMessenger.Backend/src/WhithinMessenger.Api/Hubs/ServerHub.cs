@@ -494,12 +494,16 @@ public class ServerHub : Hub
             }
             else
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                throw new HubException(result.ErrorMessage ?? "Не удалось назначить роль");
             }
+        }
+        catch (HubException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            await Clients.Caller.SendAsync("Error", $"Ошибка при назначении роли: {ex.Message}");
+            throw new HubException($"Ошибка при назначении роли: {ex.Message}");
         }
     }
 
@@ -525,12 +529,16 @@ public class ServerHub : Hub
             }
             else
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                throw new HubException(result.ErrorMessage ?? "Не удалось снять роль");
             }
+        }
+        catch (HubException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            await Clients.Caller.SendAsync("Error", $"Ошибка при удалении роли: {ex.Message}");
+            throw new HubException($"Ошибка при удалении роли: {ex.Message}");
         }
     }
 

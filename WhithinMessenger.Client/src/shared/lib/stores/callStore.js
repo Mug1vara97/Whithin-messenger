@@ -164,6 +164,34 @@ const applyVoiceChannelStatesToLiveMaps = (state, channelId, participants, updat
   };
 };
 
+/** Sync speaking ring in sidebar for channels the user is not connected to. */
+const syncObserverSpeakingStates = (state, channelId, participantsOrUpdate) => {
+  if (normalizeChannelId(state.currentRoomId) === normalizeChannelId(channelId)) {
+    return null;
+  }
+
+  const newSpeakingStates = new Map(state.participantSpeakingStates);
+  let changed = false;
+
+  const applySpeaking = (participant) => {
+    const userId = String(resolveParticipantUserId(participant) || '');
+    if (!userId || participant.isSpeaking === undefined) return;
+    const nextSpeaking = Boolean(participant.isSpeaking);
+    if (newSpeakingStates.get(userId) !== nextSpeaking) {
+      newSpeakingStates.set(userId, nextSpeaking);
+      changed = true;
+    }
+  };
+
+  if (Array.isArray(participantsOrUpdate)) {
+    participantsOrUpdate.forEach(applySpeaking);
+  } else if (participantsOrUpdate) {
+    applySpeaking(participantsOrUpdate);
+  }
+
+  return changed ? { participantSpeakingStates: newSpeakingStates } : null;
+};
+
 const getMixedPublishTrack = () =>
   soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0] ?? null;
 
@@ -398,7 +426,16 @@ export const useCallStore = create(
       },
       
       // Voice Activity Detection (VAD) функции
-      updateSpeakingState: (userId, isSpeaking) => {
+        emitLocalSpeakingToServer: (userId, isSpeaking) => {
+          const normalizedUserId = String(userId || '');
+          const currentUserId = String(get().currentUserId || '');
+          if (normalizedUserId !== currentUserId) return;
+          if (voiceCallApi?.socket?.connected) {
+            voiceCallApi.socket.emit('speaking', { speaking: isSpeaking });
+          }
+        },
+
+        updateSpeakingState: (userId, isSpeaking) => {
         const state = get();
         const normalizedUserId = String(userId);
         const currentUserId = String(state.currentUserId || '');
@@ -407,21 +444,80 @@ export const useCallStore = create(
           return;
         }
 
+        if (state.participantSpeakingStates.get(normalizedUserId) === isSpeaking) {
+          return;
+        }
+
         set((prevState) => {
           const newSpeakingStates = new Map(prevState.participantSpeakingStates);
           newSpeakingStates.set(normalizedUserId, isSpeaking);
-          return { participantSpeakingStates: newSpeakingStates };
+
+          const roomId = prevState.currentRoomId;
+          if (!roomId) {
+            return { participantSpeakingStates: newSpeakingStates };
+          }
+
+          const key = normalizeChannelId(roomId);
+          const newMap = new Map(prevState.voiceChannelParticipants);
+          const currentParticipants = newMap.get(key);
+          if (!currentParticipants?.length) {
+            return { participantSpeakingStates: newSpeakingStates };
+          }
+
+          const updatedParticipants = currentParticipants.map((participant) =>
+            String(resolveParticipantUserId(participant)) === normalizedUserId
+              ? { ...participant, isSpeaking }
+              : participant
+          );
+          newMap.set(key, updatedParticipants);
+
+          return {
+            participantSpeakingStates: newSpeakingStates,
+            voiceChannelParticipants: newMap,
+          };
         });
+
+        get().emitLocalSpeakingToServer(normalizedUserId, isSpeaking);
       },
       
       // Сброс состояния говорения для пользователя
       resetSpeakingState: (userId) => {
         const normalizedUserId = String(userId);
-        set((state) => {
-          const newSpeakingStates = new Map(state.participantSpeakingStates);
+        const state = get();
+        if (state.participantSpeakingStates.get(normalizedUserId) === false) {
+          return;
+        }
+
+        set((prevState) => {
+          const newSpeakingStates = new Map(prevState.participantSpeakingStates);
           newSpeakingStates.set(normalizedUserId, false);
-          return { participantSpeakingStates: newSpeakingStates };
+
+          const roomId = prevState.currentRoomId;
+          if (!roomId) {
+            return { participantSpeakingStates: newSpeakingStates };
+          }
+
+          const key = normalizeChannelId(roomId);
+          const newMap = new Map(prevState.voiceChannelParticipants);
+          const currentParticipants = newMap.get(key);
+          if (!currentParticipants?.length) {
+            return { participantSpeakingStates: newSpeakingStates };
+          }
+
+          const updatedParticipants = currentParticipants.map((participant) =>
+            String(resolveParticipantUserId(participant)) === normalizedUserId
+              ? { ...participant, isSpeaking: false }
+              : participant
+          );
+          newMap.set(key, updatedParticipants);
+
+          return {
+            participantSpeakingStates: newSpeakingStates,
+            voiceChannelParticipants: newMap,
+          };
         });
+
+        get().emitLocalSpeakingToServer(normalizedUserId, false);
       },
       
       // Управление участниками голосовых каналов (для отображения в списке каналов)
@@ -439,9 +535,11 @@ export const useCallStore = create(
             channelId,
             participants
           );
+          const observerSpeakingPatch = syncObserverSpeakingStates(state, channelId, participants);
           return {
             voiceChannelParticipants: newMap,
             ...(liveStatePatch || {}),
+            ...(observerSpeakingPatch || {}),
           };
         });
       },
@@ -505,9 +603,14 @@ export const useCallStore = create(
             userId: odUserId,
             ...updates,
           });
+          const observerSpeakingPatch = syncObserverSpeakingStates(state, channelId, {
+            userId: odUserId,
+            ...updates,
+          });
           return {
             voiceChannelParticipants: newMap,
             ...(liveStatePatch || {}),
+            ...(observerSpeakingPatch || {}),
           };
         });
       },
