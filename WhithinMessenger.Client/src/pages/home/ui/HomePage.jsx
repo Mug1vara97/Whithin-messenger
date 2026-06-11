@@ -19,6 +19,10 @@ import { UserAvatar } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import {
+  getServerPermissions,
+  isServerOwner as checkIsServerOwner,
+} from '../../../entities/role/lib/serverPermissions';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
@@ -833,6 +837,10 @@ const HomePage = () => {
     handleCloseSelectedChat,
   ]);
 
+  const activeServerForPermissions = serverDataFromPanel || selectedServer;
+  const serverChannelPermissions = getServerPermissions(activeServerForPermissions);
+  const isActiveServerOwner = checkIsServerOwner(activeServerForPermissions, user?.id);
+
   return (
     <div className="home-page">
       <div className="home-content">
@@ -914,6 +922,8 @@ const HomePage = () => {
                       isServerChat={selectedServer ? true : false}
                       chatTypeId={selectedChat.chatTypeId}
                       userId={user?.id}
+                      userPermissions={serverChannelPermissions}
+                      isServerOwner={isActiveServerOwner}
                       onJoinVoiceChannel={handleJoinVoiceChannel}
                       activeChatCall={activeChatCall}
                       onEndChatCall={handleEndChatCall}

@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -9,18 +10,34 @@ public class MoveCategoryCommandHandler : IRequestHandler<MoveCategoryCommand, M
     private readonly IServerRepository _serverRepository;
     private readonly ICategoryRepository _categoryRepository;
     private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public MoveCategoryCommandHandler(IServerRepository serverRepository, ICategoryRepository categoryRepository, IChatRepository chatRepository)
+    public MoveCategoryCommandHandler(
+        IServerRepository serverRepository,
+        ICategoryRepository categoryRepository,
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
         _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<MoveCategoryResult> Handle(MoveCategoryCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new MoveCategoryResult
+                {
+                    Success = false,
+                    ErrorMessage = "Недостаточно прав для управления каналами"
+                };
+            }
+
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var orderedCategories = categories.OrderBy(c => c.CategoryOrder).ToList();
 

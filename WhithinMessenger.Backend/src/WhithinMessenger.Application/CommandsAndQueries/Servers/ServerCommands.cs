@@ -252,6 +252,7 @@ public class AssignRoleResult
     public string? ErrorMessage { get; set; }
     public object? Role { get; set; }
     public Guid ServerId { get; set; }
+    public Dictionary<string, bool>? TargetUserPermissions { get; set; }
 }
 
 public class RemoveRoleCommand : IRequest<RemoveRoleResult>
@@ -273,7 +274,7 @@ public class RemoveRoleResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public object? RemainingRoles { get; set; }
-    public object? MergedPermissions { get; set; }
+    public Dictionary<string, bool>? MergedPermissions { get; set; }
     public Guid ServerId { get; set; }
 }
 

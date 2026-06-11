@@ -1,5 +1,6 @@
 using MediatR;
 using System.Text.Json;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -7,15 +8,23 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
 
 internal static class ServerPermissionHelper
 {
-    public static bool HasManageRolesPermission(IEnumerable<ServerRole> userRoles, Guid userId, Guid ownerId)
+    public static bool HasPermission(IEnumerable<ServerRole> userRoles, Guid userId, Guid ownerId, string permission)
     {
         if (ownerId == userId)
         {
             return true;
         }
 
-        return userRoles.Any(role => RoleGrantsPermission(role.Permissions, "manageRoles"));
+        if (userRoles.Any(role => RoleGrantsPermission(role.Permissions, permission)))
+        {
+            return true;
+        }
+
+        return ServerPermissionChecker.DefaultMemberPermissions.Contains(permission);
     }
+
+    public static bool HasManageRolesPermission(IEnumerable<ServerRole> userRoles, Guid userId, Guid ownerId)
+        => HasPermission(userRoles, userId, ownerId, "manageRoles");
 
     public static bool RoleGrantsPermission(string? permissionsJson, string permission)
     {
@@ -82,16 +91,24 @@ internal static class ServerPermissionHelper
 public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, DeleteCategoryResult>
 {
     private readonly ICategoryRepository _categoryRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public DeleteCategoryCommandHandler(ICategoryRepository categoryRepository)
+    public DeleteCategoryCommandHandler(ICategoryRepository categoryRepository, ServerPermissionChecker permissionChecker)
     {
         _categoryRepository = categoryRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<DeleteCategoryResult> Handle(DeleteCategoryCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new DeleteCategoryResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
+            }
+
             var category = await _categoryRepository.GetByIdAsync(request.CategoryId, cancellationToken);
             if (category == null)
             {
@@ -117,16 +134,24 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
 public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryCommand, UpdateCategoryResult>
 {
     private readonly ICategoryRepository _categoryRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public UpdateCategoryCommandHandler(ICategoryRepository categoryRepository)
+    public UpdateCategoryCommandHandler(ICategoryRepository categoryRepository, ServerPermissionChecker permissionChecker)
     {
         _categoryRepository = categoryRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<UpdateCategoryResult> Handle(UpdateCategoryCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new UpdateCategoryResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
+            }
+
             var category = await _categoryRepository.GetByIdAsync(request.CategoryId, cancellationToken);
             if (category == null)
             {
@@ -184,6 +209,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
     private readonly IUserRepository _userRepository;
     private readonly IServerRepository _serverRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public CreateChatCommandHandler(
         IChatRepository chatRepository,
@@ -191,7 +217,8 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
         IChatMemberRepository chatMemberRepository,
         IUserRepository userRepository,
         IServerRepository serverRepository,
-        IServerMemberRepository serverMemberRepository)
+        IServerMemberRepository serverMemberRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
@@ -199,12 +226,19 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
         _userRepository = userRepository;
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<CreateChatResult> Handle(CreateChatCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new CreateChatResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
+            }
+
             if (request.CategoryId.HasValue)
             {
                 var category = await _categoryRepository.GetByIdAsync(request.CategoryId.Value, cancellationToken);
@@ -350,10 +384,12 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
 public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, DeleteChatResult>
 {
     private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public DeleteChatCommandHandler(IChatRepository chatRepository)
+    public DeleteChatCommandHandler(IChatRepository chatRepository, ServerPermissionChecker permissionChecker)
     {
         _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<DeleteChatResult> Handle(DeleteChatCommand request, CancellationToken cancellationToken)
@@ -370,6 +406,13 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
             {
                 return new DeleteChatResult { Success = false, ErrorMessage = "Чат не принадлежит указанному серверу" };
             }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new DeleteChatResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
+            }
+
             var categoryId = chat.CategoryId;
 
             await _chatRepository.DeleteAsync(request.ChatId, cancellationToken);
@@ -386,10 +429,12 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
 public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameCommand, UpdateChatNameResult>
 {
     private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public UpdateChatNameCommandHandler(IChatRepository chatRepository)
+    public UpdateChatNameCommandHandler(IChatRepository chatRepository, ServerPermissionChecker permissionChecker)
     {
         _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<UpdateChatNameResult> Handle(UpdateChatNameCommand request, CancellationToken cancellationToken)
@@ -405,6 +450,12 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
             if (chat.ServerId != request.ServerId)
             {
                 return new UpdateChatNameResult { Success = false, ErrorMessage = "Чат не принадлежит указанному серверу" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new UpdateChatNameResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
             }
 
             chat.Name = request.NewName;
@@ -469,16 +520,24 @@ public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, GetRolesResul
 public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, CreateRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public CreateRoleCommandHandler(IRoleRepository roleRepository)
+    public CreateRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
     {
         _roleRepository = roleRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<CreateRoleResult> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageRoles", cancellationToken))
+            {
+                return new CreateRoleResult { Success = false, ErrorMessage = "Недостаточно прав для управления ролями" };
+            }
+
             var roleName = request.RoleName?.Trim();
             if (string.IsNullOrWhiteSpace(roleName))
             {
@@ -525,10 +584,12 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
 public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, UpdateRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public UpdateRoleCommandHandler(IRoleRepository roleRepository)
+    public UpdateRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
     {
         _roleRepository = roleRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<UpdateRoleResult> Handle(UpdateRoleCommand request, CancellationToken cancellationToken)
@@ -539,6 +600,12 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
             if (existingRole == null)
             {
                 return new UpdateRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    existingRole.ServerId, request.UserId, "manageRoles", cancellationToken))
+            {
+                return new UpdateRoleResult { Success = false, ErrorMessage = "Недостаточно прав для управления ролями" };
             }
 
             var roleName = request.RoleName?.Trim();
@@ -578,10 +645,12 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
 public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, DeleteRoleResult>
 {
     private readonly IRoleRepository _roleRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public DeleteRoleCommandHandler(IRoleRepository roleRepository)
+    public DeleteRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
     {
         _roleRepository = roleRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<DeleteRoleResult> Handle(DeleteRoleCommand request, CancellationToken cancellationToken)
@@ -592,6 +661,12 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
             if (existingRole == null)
             {
                 return new DeleteRoleResult { Success = false, ErrorMessage = "Роль не найдена" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    existingRole.ServerId, request.UserId, "manageRoles", cancellationToken))
+            {
+                return new DeleteRoleResult { Success = false, ErrorMessage = "Недостаточно прав для управления ролями" };
             }
 
             await _roleRepository.DeleteAsync(request.RoleId, cancellationToken);
@@ -652,15 +727,18 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
     private readonly IRoleRepository _roleRepository;
     private readonly IServerRepository _serverRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public AssignRoleCommandHandler(
         IRoleRepository roleRepository,
         IServerRepository serverRepository,
-        IServerMemberRepository serverMemberRepository)
+        IServerMemberRepository serverMemberRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _roleRepository = roleRepository;
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<AssignRoleResult> Handle(AssignRoleCommand request, CancellationToken cancellationToken)
@@ -679,12 +757,8 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
                 return new AssignRoleResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            var actorRoles = await _roleRepository.GetUserRolesAsync(
-                request.CurrentUserId,
-                role.ServerId,
-                cancellationToken);
-
-            if (!ServerPermissionHelper.HasManageRolesPermission(actorRoles, request.CurrentUserId, server.OwnerId))
+            if (!await _permissionChecker.HasPermissionAsync(
+                    role.ServerId, request.CurrentUserId, "manageRoles", cancellationToken))
             {
                 return new AssignRoleResult { Success = false, ErrorMessage = "Недостаточно прав для назначения ролей" };
             }
@@ -699,10 +773,16 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
                 await _roleRepository.AssignRoleToUserAsync(request.UserId, request.RoleId, cancellationToken);
             }
 
+            var targetPermissions = await _permissionChecker.GetMergedPermissionsAsync(
+                role.ServerId,
+                request.UserId,
+                cancellationToken);
+
             return new AssignRoleResult
             {
                 Success = true,
                 ServerId = role.ServerId,
+                TargetUserPermissions = targetPermissions,
                 Role = new
                 {
                     roleId = role.Id,
@@ -722,16 +802,16 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
 {
     private readonly IRoleRepository _roleRepository;
     private readonly IServerRepository _serverRepository;
-    private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public RemoveRoleCommandHandler(
         IRoleRepository roleRepository,
         IServerRepository serverRepository,
-        IServerMemberRepository serverMemberRepository)
+        ServerPermissionChecker permissionChecker)
     {
         _roleRepository = roleRepository;
         _serverRepository = serverRepository;
-        _serverMemberRepository = serverMemberRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<RemoveRoleResult> Handle(RemoveRoleCommand request, CancellationToken cancellationToken)
@@ -750,12 +830,8 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
                 return new RemoveRoleResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            var actorRoles = await _roleRepository.GetUserRolesAsync(
-                request.CurrentUserId,
-                role.ServerId,
-                cancellationToken);
-
-            if (!ServerPermissionHelper.HasManageRolesPermission(actorRoles, request.CurrentUserId, server.OwnerId))
+            if (!await _permissionChecker.HasPermissionAsync(
+                    role.ServerId, request.CurrentUserId, "manageRoles", cancellationToken))
             {
                 return new RemoveRoleResult { Success = false, ErrorMessage = "Недостаточно прав для управления ролями" };
             }
@@ -765,6 +841,11 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
             var remainingRoles = await _roleRepository.GetUserRolesAsync(
                 request.UserId,
                 role.ServerId,
+                cancellationToken);
+
+            var mergedPermissions = await _permissionChecker.GetMergedPermissionsAsync(
+                role.ServerId,
+                request.UserId,
                 cancellationToken);
 
             return new RemoveRoleResult
@@ -779,7 +860,7 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
                         color = r.Color,
                     })
                     .ToList(),
-                MergedPermissions = ServerPermissionHelper.MergePermissions(remainingRoles),
+                MergedPermissions = mergedPermissions,
             };
         }
         catch (Exception ex)
@@ -791,22 +872,58 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
 
 public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickMemberResult>
 {
-    private readonly IMemberRepository _memberRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public KickMemberCommandHandler(IMemberRepository memberRepository)
+    public KickMemberCommandHandler(
+        IServerMemberRepository serverMemberRepository,
+        IServerRepository serverRepository,
+        ServerPermissionChecker permissionChecker)
     {
-        _memberRepository = memberRepository;
+        _serverMemberRepository = serverMemberRepository;
+        _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
     }
 
-    public Task<KickMemberResult> Handle(KickMemberCommand request, CancellationToken cancellationToken)
+    public async Task<KickMemberResult> Handle(KickMemberCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new KickMemberResult { Success = true });
+            var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+            if (server == null)
+            {
+                return new KickMemberResult { Success = false, ErrorMessage = "Сервер не найден" };
+            }
+
+            if (server.OwnerId == request.UserId)
+            {
+                return new KickMemberResult { Success = false, ErrorMessage = "Нельзя исключить владельца сервера" };
+            }
+
+            if (request.UserId == request.CurrentUserId)
+            {
+                return new KickMemberResult { Success = false, ErrorMessage = "Нельзя исключить самого себя" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.CurrentUserId, "kickMembers", cancellationToken))
+            {
+                return new KickMemberResult { Success = false, ErrorMessage = "Недостаточно прав для исключения участников" };
+            }
+
+            if (!await _serverMemberRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken))
+            {
+                return new KickMemberResult { Success = false, ErrorMessage = "Пользователь не является участником сервера" };
+            }
+
+            await _serverMemberRepository.DeleteByServerAndUserAsync(
+                request.ServerId, request.UserId, cancellationToken);
+            return new KickMemberResult { Success = true };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new KickMemberResult { Success = false, ErrorMessage = ex.Message });
+            return new KickMemberResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -851,10 +968,12 @@ public class GetUserRolesQueryHandler : IRequestHandler<GetUserRolesQuery, GetUs
 public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCommand, UpdateServerNameResult>
 {
     private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public UpdateServerNameCommandHandler(IServerRepository serverRepository)
+    public UpdateServerNameCommandHandler(IServerRepository serverRepository, ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<UpdateServerNameResult> Handle(UpdateServerNameCommand request, CancellationToken cancellationToken)
@@ -867,9 +986,10 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
                 return new UpdateServerNameResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            if (server.OwnerId != request.UserId)
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageServer", cancellationToken))
             {
-                return new UpdateServerNameResult { Success = false, ErrorMessage = "Только владелец сервера может изменить его название" };
+                return new UpdateServerNameResult { Success = false, ErrorMessage = "Недостаточно прав для управления сервером" };
             }
 
             server.Name = request.NewName;
@@ -887,10 +1007,12 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
 public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, GetServerInfoResult>
 {
     private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public GetServerInfoQueryHandler(IServerRepository serverRepository)
+    public GetServerInfoQueryHandler(IServerRepository serverRepository, ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<GetServerInfoResult> Handle(GetServerInfoQuery request, CancellationToken cancellationToken)
@@ -909,6 +1031,11 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
                 return new GetServerInfoResult { Success = false, ErrorMessage = "У вас нет доступа к этому серверу" };
             }
 
+            var permissions = await _permissionChecker.GetMergedPermissionsAsync(
+                request.ServerId,
+                request.UserId,
+                cancellationToken);
+
             var serverInfo = new
             {
                 serverId = server.Id,
@@ -919,7 +1046,8 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
                 description = server.Description,
                 avatar = server.Avatar,
                 banner = server.Banner,
-                bannerColor = server.BannerColor
+                bannerColor = server.BannerColor,
+                permissions,
             };
 
             return new GetServerInfoResult { Success = true, ServerInfo = serverInfo };

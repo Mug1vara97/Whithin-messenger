@@ -32,6 +32,7 @@ const CategoriesList = ({
   onCategoryContextMenu,
   onChannelSettings,
   onEmptySpaceContextMenu,
+  canManageChannels = false,
   connection,
   serverId,
   userId,
@@ -230,6 +231,10 @@ const CategoriesList = ({
   const handleDragEnd = useCallback(async (result) => {
     console.log('handleDragEnd called:', result);
     
+    if (!canManageChannels) {
+      return;
+    }
+
     if (!result.destination || !connection || connection.state !== 'Connected') {
       console.log('No destination or connection, returning. Connection state:', connection?.state);
       return;
@@ -381,7 +386,7 @@ const CategoriesList = ({
       console.error('Move operation failed:', error);
       alert(`Ошибка перемещения: ${error.message}`);
     }
-  }, [localCategories, connection, serverId]);
+  }, [localCategories, connection, serverId, canManageChannels]);
 
   const uncategorizedChannels = localCategories.find(cat => 
     cat.categoryId === null
@@ -436,8 +441,8 @@ const CategoriesList = ({
                       isActive={isChannelActive(channel)}
                       onClick={handleChatClick}
                       onContextMenu={(e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })}
-                      onSettings={handleChannelSettings}
-                      isDragDisabled={false}
+                      onSettings={onChannelSettings ? handleChannelSettings : undefined}
+                      isDragDisabled={!canManageChannels}
                       userId={userId}
                       userName={userName}
                     />
@@ -455,9 +460,9 @@ const CategoriesList = ({
                 key={category.categoryId || category.CategoryId}
                 category={category}
                 index={index}
-                onAddChannel={handleAddChannel}
+                onAddChannel={canManageChannels ? handleAddChannel : undefined}
                 onCategoryContextMenu={handleCategoryContextMenu}
-                isDragDisabled={false}
+                isDragDisabled={!canManageChannels}
               >
                 {category.chats?.map((channel, channelIndex) => {
                   const channelId = channel.chatId || channel.ChatId;
@@ -471,8 +476,8 @@ const CategoriesList = ({
                     isActive={isChannelActive(channel)}
                     onClick={handleChatClick}
                     onContextMenu={(e) => handleChannelContextMenu(e, channel, category)}
-                    onSettings={handleChannelSettings}
-                    isDragDisabled={false}
+                    onSettings={onChannelSettings ? handleChannelSettings : undefined}
+                    isDragDisabled={!canManageChannels}
                     userId={userId}
                     userName={userName}
                   />

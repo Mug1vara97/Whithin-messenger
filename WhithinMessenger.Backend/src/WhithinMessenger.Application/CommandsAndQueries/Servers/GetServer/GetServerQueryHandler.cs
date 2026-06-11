@@ -1,5 +1,6 @@
 using MediatR;
 using System.Text.Json;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -11,17 +12,20 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
     private readonly ICategoryRepository _categoryRepository;
     private readonly IChatRepository _chatRepository;
     private readonly IRoleRepository _roleRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public GetServerQueryHandler(
         IServerRepository serverRepository,
         ICategoryRepository categoryRepository,
         IChatRepository chatRepository,
-        IRoleRepository roleRepository)
+        IRoleRepository roleRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
         _chatRepository = chatRepository;
         _roleRepository = roleRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<GetServerResult> Handle(GetServerQuery request, CancellationToken cancellationToken)
@@ -50,6 +54,10 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
 
             var userRoles = await _roleRepository.GetUserRolesAsync(request.UserId, request.ServerId, cancellationToken);
             var userRoleIds = userRoles.Select(r => r.Id).ToList();
+            var permissions = await _permissionChecker.GetMergedPermissionsAsync(
+                request.ServerId,
+                request.UserId,
+                cancellationToken);
 
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var orderedCategories = categories.OrderBy(c => c.CategoryOrder).ToList();
@@ -127,7 +135,8 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
                 server.BannerColor,
                 Categories = resultCategories,
                 OwnerId = server.OwnerId,
-                UserRoles = userRoleIds
+                UserRoles = userRoleIds,
+                permissions,
             };
 
             return new GetServerResult

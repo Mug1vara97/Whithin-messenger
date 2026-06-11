@@ -51,6 +51,11 @@ import {
   EditOutlined,
   DeleteOutline,
 } from '@mui/icons-material';
+import {
+  canSendMessages,
+  canAttachFiles,
+  canSendVoiceMessages,
+} from '../../../entities/role/lib/serverPermissions';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -63,6 +68,8 @@ const ChatRoom = ({
   activePrivateCall,
   activeChatCall,
   onEndChatCall,
+  userPermissions = {},
+  isServerOwner = false,
   /** When messages load/update; parent debounces the server «mark chat read» call */
   onMessagesActivity
 }) => {
@@ -93,6 +100,10 @@ const ChatRoom = ({
   } = useChat(chatId, username, userId);
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
+
+  const canSend = !isServerChat || canSendMessages(userPermissions, isServerOwner);
+  const canAttach = !isServerChat || canAttachFiles(userPermissions, isServerOwner);
+  const canVoice = !isServerChat || canSendVoiceMessages(userPermissions, isServerOwner);
 
   const messagesTailKey = useMemo(() => {
     if (!messages?.length) return '0:';
@@ -1355,6 +1366,12 @@ const ChatRoom = ({
         className={`input-container ${replyingToMessage ? 'replying' : ''}`}
         onSubmit={handleSendMessage}
       >
+        {isServerChat && !canSend && !editingMessageId ? (
+          <div className="no-send-permission-notice">
+            У вас нет права отправлять сообщения в этом канале.
+          </div>
+        ) : (
+        <>
         {editingMessageId && (
           <div className="editing-notice">
             <span className='editing-text'>Редактирование сообщения</span>
@@ -1442,6 +1459,7 @@ const ChatRoom = ({
         
         {!editingMessageId && (
           <>
+            {canVoice && (
             <div className="voice-message-wrapper">
               {(isRecording || isRecordingVideoNote) && (
                 <button 
@@ -1463,7 +1481,9 @@ const ChatRoom = ({
                 {isRecording ? <Stop /> : <Mic />}
               </button>
             </div>
-            
+            )}
+            {canAttach && (
+            <>
             <input
               type="file"
               ref={fileInputRef}
@@ -1483,6 +1503,8 @@ const ChatRoom = ({
             >
               <AttachFile />
             </button>
+            </>
+            )}
             <button
               type="button"
               onClick={() => setStickerPickerOpen((open) => !open)}
@@ -1493,6 +1515,8 @@ const ChatRoom = ({
               <EmojiEmotions />
             </button>
           </>
+        )}
+        </>
         )}
       </form>
       </div>

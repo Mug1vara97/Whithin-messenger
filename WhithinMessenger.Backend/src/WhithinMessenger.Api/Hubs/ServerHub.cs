@@ -491,6 +491,13 @@ public class ServerHub : Hub
             if (result.Success)
             {
                 await Clients.Group(result.ServerId.ToString()).SendAsync("RoleAssigned", userId, result.Role);
+                if (result.TargetUserPermissions != null)
+                {
+                    await Clients.User(userId.ToString()).SendAsync(
+                        "UserPermissionsUpdated",
+                        userId,
+                        result.TargetUserPermissions);
+                }
             }
             else
             {

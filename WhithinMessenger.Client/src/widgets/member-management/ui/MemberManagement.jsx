@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
+import { canManageRoles } from '../../../entities/role/lib/serverPermissions';
 import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { Button } from '../../../shared/ui/atoms/Button';
@@ -205,6 +206,7 @@ const MemberManagement = ({
               </button>
             );
           })()}
+          {(isServerOwner || canManageRoles(userPermissions, isServerOwner)) && (
           <button
             className="context-menu-item"
             onClick={() => {
@@ -219,6 +221,7 @@ const MemberManagement = ({
           >
             Роли
           </button>
+          )}
           {(isServerOwner || userPermissions?.kickMembers) && String(member.userId) !== String(userId) && (
             <button
               className="context-menu-item danger"

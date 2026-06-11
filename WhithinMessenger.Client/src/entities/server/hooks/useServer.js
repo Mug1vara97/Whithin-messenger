@@ -30,7 +30,8 @@ export const useServer = (serverId) => {
         banner: serverData.banner,
         bannerColor: serverData.bannerColor,
         categories: serverData.categories,
-        userRoles: serverData.userRoles
+        userRoles: serverData.userRoles,
+        permissions: serverData.permissions ?? serverData.Permissions ?? {},
       };
       
       console.log('useServer: Formatted server data:', formattedServer);

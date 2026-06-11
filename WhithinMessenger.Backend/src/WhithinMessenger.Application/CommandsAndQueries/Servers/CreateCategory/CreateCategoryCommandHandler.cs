@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -8,11 +9,16 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
 {
     private readonly IServerRepository _serverRepository;
     private readonly ICategoryRepository _categoryRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public CreateCategoryCommandHandler(IServerRepository serverRepository, ICategoryRepository categoryRepository)
+    public CreateCategoryCommandHandler(
+        IServerRepository serverRepository,
+        ICategoryRepository categoryRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<CreateCategoryResult> Handle(CreateCategoryCommand request, CancellationToken cancellationToken)
@@ -26,6 +32,16 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
                 {
                     Success = false,
                     ErrorMessage = "Сервер не найден"
+                };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new CreateCategoryResult
+                {
+                    Success = false,
+                    ErrorMessage = "Недостаточно прав для управления каналами"
                 };
             }
 

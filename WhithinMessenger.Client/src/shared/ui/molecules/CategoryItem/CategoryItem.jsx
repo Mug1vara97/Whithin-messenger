@@ -79,6 +79,7 @@ const CategoryItem = ({
                             </span>
                         </div>
                         <div className="category-actions">
+                            {onAddChannel && (
                             <button
                                 className="add-channel-button"
                                 onClick={handleAddChannel}
@@ -86,6 +87,7 @@ const CategoryItem = ({
                             >
                                 <FaPlus className="add-icon" />
                             </button>
+                            )}
                         </div>
                     </div>
                     

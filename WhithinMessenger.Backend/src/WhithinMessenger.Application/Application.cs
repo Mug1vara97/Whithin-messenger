@@ -12,6 +12,7 @@ public static class Application
     {
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddMediatR(x => x.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
+        services.AddScoped<ServerPermissionChecker>();
         
         // FileService регистрируется в Program.cs с использованием IWebHostEnvironment
         // NotificationService регистрируется в Program.cs после добавления SignalR

@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Domain.Interfaces;
 
@@ -9,15 +10,18 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
     private readonly IMessageRepository _messageRepository;
     private readonly IUserRepository _userRepository;
     private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public SendMessageCommandHandler(
         IMessageRepository messageRepository,
         IUserRepository userRepository,
-        IChatRepository chatRepository)
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
         _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<SendMessageResult> Handle(SendMessageCommand request, CancellationToken cancellationToken)
@@ -44,6 +48,18 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 };
             }
 
+            if (chat.ServerId.HasValue)
+            {
+                if (!await _permissionChecker.HasPermissionAsync(
+                        chat.ServerId.Value, request.UserId, "sendMessages", cancellationToken))
+                {
+                    return new SendMessageResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Недостаточно прав для отправки сообщений"
+                    };
+                }
+            }
             var newMessage = new Message
             {
                 Id = Guid.NewGuid(),

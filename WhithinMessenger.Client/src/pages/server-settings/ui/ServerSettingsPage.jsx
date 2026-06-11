@@ -7,6 +7,7 @@ import { RoleManagement } from '../../../widgets/role-management';
 import { MemberManagement } from '../../../widgets/member-management';
 import { ServerSettings } from '../../../widgets/server-settings';
 import { Button } from '../../../shared/ui/atoms/Button';
+import { canManageRoles, canManageServer } from '../../../entities/role/lib/serverPermissions';
 import './ServerSettingsPage.css';
 
 const ServerSettingsPage = () => {
@@ -19,7 +20,7 @@ const ServerSettingsPage = () => {
   const [, setConnection] = useState(null);
   const connectionRef = useRef(null);
   const [activeTab, setActiveTab] = useState('profile');
-  const [userPermissions] = useState({});
+  const [userPermissions, setUserPermissions] = useState({});
   const [isServerOwner, setIsServerOwner] = useState(false);
 
   const initializeConnection = useCallback(async () => {
@@ -58,6 +59,12 @@ const ServerSettingsPage = () => {
         setServer(updatedServer);
       });
 
+      newConnection.on('UserPermissionsUpdated', (updatedUserId, permissions) => {
+        if (String(updatedUserId) === String(user?.id)) {
+          setUserPermissions(permissions || {});
+        }
+      });
+
       newConnection.on('Error', (errorMessage) => {
         console.error('SignalR Error:', errorMessage);
         setError(errorMessage);
@@ -88,6 +95,7 @@ const ServerSettingsPage = () => {
         if (serverInfo && serverInfo.ownerId) {
           setServer(serverInfo);
           setIsServerOwner(serverInfo.ownerId === user?.id);
+          setUserPermissions(serverInfo.permissions || {});
           setIsLoading(false);
         } else {
           console.warn('ServerInfo is null or missing ownerId:', serverInfo);
@@ -175,6 +183,17 @@ const ServerSettingsPage = () => {
       }
     };
   }, [serverId, user?.id]);
+
+  const userCanManageServer = canManageServer(userPermissions, isServerOwner);
+  const userCanManageRoles = canManageRoles(userPermissions, isServerOwner);
+
+  useEffect(() => {
+    if (activeTab === 'profile' && !userCanManageServer) {
+      setActiveTab('members');
+    } else if (activeTab === 'roles' && !userCanManageRoles) {
+      setActiveTab('members');
+    }
+  }, [activeTab, userCanManageServer, userCanManageRoles]);
 
   if (isLoading) {
     return (
@@ -267,6 +286,7 @@ const ServerSettingsPage = () => {
 
         <nav className="settings-nav">
           <div className="nav-section">
+            {userCanManageServer && (
             <button
               className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => setActiveTab('profile')}
@@ -276,9 +296,10 @@ const ServerSettingsPage = () => {
               </svg>
               Профиль сервера
             </button>
+            )}
           </div>
 
-          <div className="nav-divider"></div>
+          {userCanManageServer && <div className="nav-divider"></div>}
 
           <div className="nav-section">
             <h3 className="nav-section-title">ЛЮДИ</h3>
@@ -295,6 +316,7 @@ const ServerSettingsPage = () => {
             <button
               className={`settings-nav-item ${activeTab === 'roles' ? 'active' : ''}`}
               onClick={() => setActiveTab('roles')}
+              disabled={!userCanManageRoles}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2M21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z"/>
@@ -321,7 +343,7 @@ const ServerSettingsPage = () => {
         </div>
 
         <div className="server-settings-main">
-        {activeTab === 'profile' && (
+        {activeTab === 'profile' && userCanManageServer && (
           <ServerSettings
             connection={connectionRef.current}
             serverId={serverId}
@@ -333,7 +355,7 @@ const ServerSettingsPage = () => {
           />
         )}
 
-        {activeTab === 'roles' && (
+        {activeTab === 'roles' && userCanManageRoles && (
           <RoleManagement
             connection={connectionRef.current}
             serverId={serverId}

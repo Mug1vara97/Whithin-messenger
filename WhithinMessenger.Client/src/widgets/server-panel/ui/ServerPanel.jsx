@@ -12,6 +12,12 @@ const getAuthHeaders = () => {
 };
 import { CategoriesList } from '../../categories-list';
 import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, UserPanel, AddMemberModal } from '../../../shared/ui/molecules';
+import {
+  canManageChannels,
+  canManageServer,
+  getServerPermissions,
+  isServerOwner as checkIsServerOwner,
+} from '../../../entities/role/lib/serverPermissions';
 import { 
   CreateNewFolder, 
   Add, 
@@ -51,6 +57,10 @@ const ServerPanel = ({
   
   const currentServer = server || selectedServer;
   const isConnectingRef = useRef(false);
+  const isOwner = checkIsServerOwner(currentServer, user?.id);
+  const serverPermissions = getServerPermissions(currentServer);
+  const userCanManageChannels = canManageChannels(serverPermissions, isOwner);
+  const userCanManageServer = canManageServer(serverPermissions, isOwner);
 
   const fetchServerData = useCallback(async () => {
     if (!selectedServer?.serverId) return null;
@@ -393,6 +403,12 @@ const ServerPanel = ({
     serverConnection.on("ChannelMemberAdded", handleChannelMemberAdded);
     serverConnection.on("ChannelMemberRemoved", handleChannelMemberRemoved);
 
+    const handleUserPermissionsUpdated = (updatedUserId, permissions) => {
+      if (String(updatedUserId) !== String(user?.id)) return;
+      setServer((prev) => (prev ? { ...prev, permissions: permissions || {} } : prev));
+    };
+    serverConnection.on("UserPermissionsUpdated", handleUserPermissionsUpdated);
+
     return () => {
       serverConnection.off("ChatCreated", handleChatCreated);
       serverConnection.off("ChatDeleted", handleChatDeleted);
@@ -402,6 +418,7 @@ const ServerPanel = ({
       serverConnection.off("CategoryUpdated", handleCategoryUpdated);
       serverConnection.off("ChannelMemberAdded", handleChannelMemberAdded);
       serverConnection.off("ChannelMemberRemoved", handleChannelMemberRemoved);
+      serverConnection.off("UserPermissionsUpdated", handleUserPermissionsUpdated);
     };
   }, [serverConnection, onServerDataUpdated, user, selectedServer?.serverId, fetchServerData]);
 
@@ -907,6 +924,10 @@ const ServerPanel = ({
   }, [currentServer, serverConnection]);
 
   const getContextMenuItems = useCallback(() => {
+    if (!userCanManageChannels) {
+      return [];
+    }
+
     switch (contextMenu.type) {
       case 'empty':
         return [
@@ -957,7 +978,7 @@ const ServerPanel = ({
       default:
         return [];
     }
-  }, [contextMenu.type, contextMenu.data, handleCreateCategory, handleCreateChannelInCategory, handleCreateChannelWithoutCategory, handleEditChannel, handleDeleteChannelFromContext, handleEditCategory, handleDeleteCategory]);
+  }, [contextMenu.type, contextMenu.data, userCanManageChannels, handleCreateCategory, handleCreateChannelInCategory, handleCreateChannelWithoutCategory, handleEditChannel, handleDeleteChannelFromContext, handleEditCategory, handleDeleteCategory]);
 
   if (!selectedServer) {
     return (
@@ -1016,6 +1037,7 @@ const ServerPanel = ({
         </div>
         {showDropdown && (
           <div className="server-dropdown">
+            {userCanManageServer && (
             <div 
               className="dropdown-item"
               onClick={() => {
@@ -1026,6 +1048,7 @@ const ServerPanel = ({
               <Settings sx={{ fontSize: 16, marginRight: 8 }} />
               Настройки сервера
             </div>
+            )}
             <div 
               className="dropdown-item"
               onClick={handleAddMember}
@@ -1072,7 +1095,8 @@ const ServerPanel = ({
           onChannelContextMenu={(e, channel, category) => handleContextMenu(e, 'channel', { channel, category })}
           onCategoryContextMenu={(e, category) => handleContextMenu(e, 'category', category)}
           onEmptySpaceContextMenu={(e) => handleContextMenu(e, 'empty')}
-          onChannelSettings={handleChannelSettings}
+          onChannelSettings={userCanManageChannels ? handleChannelSettings : undefined}
+          canManageChannels={userCanManageChannels}
           connection={connectionRef.current}
           serverId={currentServer?.serverId}
           onServerDataUpdated={onServerDataUpdated}

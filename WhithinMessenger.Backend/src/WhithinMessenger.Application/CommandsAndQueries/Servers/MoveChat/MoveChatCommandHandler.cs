@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -8,17 +9,32 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
 {
     private readonly IChatRepository _chatRepository;
     private readonly ICategoryRepository _categoryRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public MoveChatCommandHandler(IChatRepository chatRepository, ICategoryRepository categoryRepository)
+    public MoveChatCommandHandler(
+        IChatRepository chatRepository,
+        ICategoryRepository categoryRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<MoveChatResult> Handle(MoveChatCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new MoveChatResult
+                {
+                    Success = false,
+                    ErrorMessage = "Недостаточно прав для управления каналами"
+                };
+            }
+
             var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
             if (chat == null)
             {
