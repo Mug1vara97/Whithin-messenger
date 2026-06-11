@@ -361,7 +361,7 @@ const ServerList = ({
                   type="button"
                   className={`${styles['server-button']} ${styles['soundpad-button']}`}
                   onClick={onSoundpadClick}
-                  title="Саундпад (VB-Cable)"
+                  title="Саундпад"
                 >
                   <GraphicEq />
                 </button>

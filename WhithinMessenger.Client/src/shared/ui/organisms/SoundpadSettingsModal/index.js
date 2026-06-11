@@ -1,1 +1,2 @@
-export { default as SoundpadSettingsModal } from './SoundpadSettingsModal';
+/** @deprecated Use SoundpadSoundsModal */
+export { SoundpadSoundsModal as SoundpadSettingsModal } from '../SoundpadSoundsModal';

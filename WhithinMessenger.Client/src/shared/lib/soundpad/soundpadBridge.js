@@ -1,6 +1,7 @@
 import { audioDeviceStorage } from './audioDeviceStorage';
 import { soundpadStorage } from './soundpadStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from './soundpadInAppMixer';
+import { shouldUseHybridSystemCallAudio } from './soundpadCallAudio';
 import { soundpadLog, soundpadWarn, soundpadError } from './soundpadLogger';
 
 const getElectronApi = () => window.electronAPI;
@@ -107,8 +108,13 @@ export const soundpadBridge = {
 
     const status = await this.getStatus();
     if (status?.running) {
-      soundpadLog('ensureSystemBridgeStarted: already running');
-      return status;
+      if (/cable\s*output/i.test(String(status.captureDevice || ''))) {
+        soundpadWarn('ensureSystemBridgeStarted: bridge captures CABLE Output — restarting');
+        await this.stopBridge();
+      } else {
+        soundpadLog('ensureSystemBridgeStarted: already running');
+        return status;
+      }
     }
 
     if (systemBridgeStartInFlight) {
@@ -180,6 +186,15 @@ export const soundpadBridge = {
 
     if (!getElectronApi()?.soundpadPlayBase64) {
       throw new Error('Воспроизведение через VB-Cable доступно только в десктоп-приложении.');
+    }
+
+    if (shouldUseHybridSystemCallAudio() && soundpadInAppMixer.isActive()) {
+      try {
+        await soundpadInAppMixer.playBlob(blob, volume);
+        soundpadLog('playSlot: hybrid call mixer (NS on voice, soundpad clean)');
+      } catch (error) {
+        soundpadWarn('playSlot: hybrid mixer play failed', error);
+      }
     }
 
     const base64 = await blobToBase64(blob);

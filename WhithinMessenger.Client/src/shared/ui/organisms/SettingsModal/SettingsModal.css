@@ -17,8 +17,61 @@
   width: 90%;
   max-width: 600px;
   max-height: 80vh;
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-modal--tabbed {
+  max-width: 820px;
+}
+
+.settings-layout {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 180px;
+  flex-shrink: 0;
+  padding: 12px;
+  border-right: 1px solid var(--border, #4f545c);
+  background: var(--background, #2f3136);
+  overflow-y: auto;
+}
+
+.settings-tab {
+  border: none;
+  border-radius: 4px;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  color: var(--text-secondary, #8e9297);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.settings-tab:hover {
+  background: var(--hover, #40444b);
+  color: var(--text, #dcddde);
+}
+
+.settings-tab--active {
+  background: var(--primary, #5865f2);
+  color: #fff;
+}
+
+.settings-content--tabbed {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(80vh - 130px);
 }
 
 .modal-header {

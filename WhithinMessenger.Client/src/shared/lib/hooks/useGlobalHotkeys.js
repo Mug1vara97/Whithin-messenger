@@ -1,5 +1,12 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import hotkeyStorage from '../utils/hotkeyStorage';
+import { soundpadBridge } from '../soundpad/soundpadBridge';
+import { soundpadStorage } from '../soundpad/soundpadStorage';
+import {
+  buildAllElectronShortcuts,
+  getSlotIdFromAction,
+  isSoundpadAction,
+} from '../soundpad/soundpadHotkeys';
 
 const SHORTCUT_DEDUPE_MS = 200;
 
@@ -14,6 +21,7 @@ const isEditableTarget = (target) => {
 
 export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   const [currentHotkeys, setCurrentHotkeys] = useState(() => hotkeyStorage.getHotkeys());
+  const [soundpadSlots, setSoundpadSlots] = useState(() => soundpadStorage.getConfig().slots);
   const lastShortcutDispatchRef = useRef({ action: null, at: 0 });
 
   const handleGlobalShortcut = useCallback((shortcut) => {
@@ -42,17 +50,22 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
         }
         break;
       default:
+        if (isSoundpadAction(shortcut)) {
+          const slotId = getSlotIdFromAction(shortcut);
+          if (slotId) {
+            soundpadBridge.playSlot(slotId).catch((error) => {
+              console.warn('Саундпад: не удалось воспроизвести по шорткату', slotId, error);
+            });
+          }
+          break;
+        }
         console.log('❓ Неизвестная горячая клавиша:', shortcut);
     }
   }, [onToggleMic, onToggleAudio]);
 
-  // Функция для обновления горячих клавиш в Electron
-  const updateElectronHotkeys = useCallback((hotkeys) => {
-    if (window.electronAPI && window.electronAPI.updateGlobalShortcuts) {
-      const electronHotkeys = {
-        'toggle-mic': hotkeys.toggleMic,
-        'toggle-audio': hotkeys.toggleAudio
-      };
+  const updateElectronHotkeys = useCallback(() => {
+    if (window.electronAPI?.updateGlobalShortcuts) {
+      const electronHotkeys = buildAllElectronShortcuts();
       window.electronAPI.updateGlobalShortcuts(electronHotkeys);
       console.log('🔄 Горячие клавиши обновлены в Electron:', electronHotkeys);
     }
@@ -76,18 +89,34 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     if (!window.electronAPI?.updateGlobalShortcuts) {
       return;
     }
-    updateElectronHotkeys(currentHotkeys);
-  }, [currentHotkeys, updateElectronHotkeys]);
+    updateElectronHotkeys();
+  }, [currentHotkeys, soundpadSlots, updateElectronHotkeys]);
+
+  useEffect(() => {
+    const onSoundpadConfigChange = () => {
+      setSoundpadSlots(soundpadStorage.getConfig().slots);
+    };
+    window.addEventListener('soundpadConfigChanged', onSoundpadConfigChange);
+    return () => window.removeEventListener('soundpadConfigChanged', onSoundpadConfigChange);
+  }, []);
+
+  const hotkeyToAction = useMemo(() => {
+    const map = {
+      [currentHotkeys.toggleMic]: 'toggle-mic',
+      [currentHotkeys.toggleAudio]: 'toggle-audio',
+    };
+    for (const slot of soundpadSlots) {
+      if (slot.hotkey) {
+        map[slot.hotkey] = `soundpad:${slot.id}`;
+      }
+    }
+    return map;
+  }, [currentHotkeys, soundpadSlots]);
 
   useEffect(() => {
     if (isElectronEnv()) {
       return undefined;
     }
-
-    const hotkeyToAction = {
-      [currentHotkeys.toggleMic]: 'toggle-mic',
-      [currentHotkeys.toggleAudio]: 'toggle-audio'
-    };
 
     const handleKeyboardHotkey = (event) => {
       if (event.repeat || isEditableTarget(event.target)) {
@@ -107,17 +136,12 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
 
     window.addEventListener('keydown', handleKeyboardHotkey, true);
     return () => window.removeEventListener('keydown', handleKeyboardHotkey, true);
-  }, [currentHotkeys, handleGlobalShortcut]);
+  }, [hotkeyToAction, handleGlobalShortcut]);
 
   useEffect(() => {
     if (isElectronEnv()) {
       return undefined;
     }
-
-    const hotkeyToAction = {
-      [currentHotkeys.toggleMic]: 'toggle-mic',
-      [currentHotkeys.toggleAudio]: 'toggle-audio'
-    };
 
     const handleMouseHotkey = (event) => {
       const isSupportedMouseButton =
@@ -150,14 +174,14 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
       window.removeEventListener('pointerdown', handleMouseHotkey, true);
       window.removeEventListener('pointerup', handleMouseHotkey, true);
     };
-  }, [currentHotkeys, handleGlobalShortcut]);
+  }, [hotkeyToAction, handleGlobalShortcut]);
 
   // Слушаем изменения горячих клавиш в localStorage
   useEffect(() => {
     const handleStorageChange = () => {
       const newHotkeys = hotkeyStorage.getHotkeys();
       setCurrentHotkeys(newHotkeys);
-      updateElectronHotkeys(newHotkeys);
+      updateElectronHotkeys();
     };
 
     // Слушаем изменения в localStorage
@@ -167,7 +191,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     const handleHotkeyChange = () => {
       const newHotkeys = hotkeyStorage.getHotkeys();
       setCurrentHotkeys(newHotkeys);
-      updateElectronHotkeys(newHotkeys);
+      updateElectronHotkeys();
     };
     
     window.addEventListener('hotkeySettingsChanged', handleHotkeyChange);

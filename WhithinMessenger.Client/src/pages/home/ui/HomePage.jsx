@@ -13,7 +13,7 @@ import { useNotifications } from '../../../entities/notification';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { NotificationsModal, SettingsModal, SoundpadSettingsModal } from '../../../shared/ui/organisms';
+import { NotificationsModal, SettingsModal, SoundpadSoundsModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
 import { UserAvatar } from '../../../shared/ui';
 import { Call, CallEnd } from '@mui/icons-material';
@@ -35,8 +35,10 @@ const HomePage = () => {
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('account');
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showSoundpadModal, setShowSoundpadModal] = useState(false);
+  const isElectronApp = soundpadBridge.isElectronAvailable();
   
   const showFriends = location.pathname === '/channels/@me/friends';
 
@@ -683,6 +685,7 @@ const HomePage = () => {
   }, []);
 
   const handleSettingsClick = useCallback(() => {
+    setSettingsInitialTab('account');
     setShowSettingsModal(true);
   }, []);
 
@@ -839,7 +842,7 @@ const HomePage = () => {
             onDiscoverClick={handleDiscoverClick}
             onCreateServerClick={handleCreateServerClick}
             onSettingsClick={handleSettingsClick}
-            onSoundpadClick={handleSoundpadClick}
+            onSoundpadClick={isElectronApp ? handleSoundpadClick : undefined}
             onNotificationsClick={handleNotificationsClick}
             unreadNotificationsCount={unreadCount}
             userId={user?.id}
@@ -959,15 +962,18 @@ const HomePage = () => {
         </div>
       )}
 
-      <SettingsModal 
-        isOpen={showSettingsModal} 
-        onClose={handleCloseSettingsModal} 
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={handleCloseSettingsModal}
+        initialTab={settingsInitialTab}
       />
 
-      <SoundpadSettingsModal
-        isOpen={showSoundpadModal}
-        onClose={handleCloseSoundpadModal}
-      />
+      {isElectronApp && (
+        <SoundpadSoundsModal
+          isOpen={showSoundpadModal}
+          onClose={handleCloseSoundpadModal}
+        />
+      )}
 
       <NotificationsModal
         isOpen={showNotificationsModal}

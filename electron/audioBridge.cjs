@@ -421,17 +421,17 @@ async function ensureMixerBridgeStarted(captureDeviceId = null, renderDeviceId =
     const status = await bridgeRequest('GET', '/status');
 
     if (status?.running) {
-
-      log('ensureMixerBridgeStarted: already running', {
-
-        captureDevice: status.captureDevice,
-
-        renderDevice: status.renderDevice,
-
-      });
-
-      return status;
-
+      const captureName = String(status.captureDevice || '');
+      if (/cable\s*output/i.test(captureName)) {
+        warn('ensureMixerBridgeStarted: bridge captures CABLE Output (feedback loop) — restarting');
+        await stopBridge();
+      } else {
+        log('ensureMixerBridgeStarted: already running', {
+          captureDevice: status.captureDevice,
+          renderDevice: status.renderDevice,
+        });
+        return status;
+      }
     }
 
   } catch (error) {
@@ -670,10 +670,8 @@ async function applySoundpadAudioConfig(config) {
 
   try {
     if (isSystem) {
-      const micResult = autoDefault
-        ? await activateDefaultCableMic(config.cableOutputDeviceId || null)
-        : { ok: true, skipped: true };
-
+      // Start bridge before switching Windows default mic to CABLE Output,
+      // otherwise the bridge would capture CABLE Output and soundpad audio loops.
       let bridgeResult = { ok: true, skipped: true };
       try {
         bridgeResult = await ensureMixerBridgeStarted(
@@ -684,6 +682,10 @@ async function applySoundpadAudioConfig(config) {
         warn('ensureMixerBridgeStarted failed', error.message);
         bridgeResult = { ok: false, error: error.message };
       }
+
+      const micResult = autoDefault
+        ? await activateDefaultCableMic(config.cableOutputDeviceId || null)
+        : { ok: true, skipped: true };
 
       return { ...micResult, bridge: bridgeResult };
     }
@@ -753,7 +755,7 @@ function registerAudioBridgeIpc(ipcMain) {
 
     log('IPC soundpad:start-bridge', payload);
 
-    return startBridge(payload?.captureDeviceId, payload?.renderDeviceId);
+    return ensureMixerBridgeStarted(payload?.captureDeviceId, payload?.renderDeviceId);
 
   });
 

@@ -10,6 +10,12 @@ import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
 import { soundpadBridge } from '../soundpad/soundpadBridge';
+import {
+  getPhysicalMicConstraints,
+  isNoiseSuppressionSettingEnabled,
+  shouldUseHybridSystemCallAudio,
+  usesCallMixerForMic,
+} from '../soundpad/soundpadCallAudio';
 
 // Определяет, является ли banner путём к изображению или цветом
 const isBannerImage = (banner) => {
@@ -67,6 +73,26 @@ export const isSameVoiceChannel = (left, right) => {
 
 const resolveParticipantUserId = (participant) =>
   participant?.odUserId ?? participant?.userId ?? participant?.id ?? null;
+
+const getSoundpadPublishTrack = () =>
+  soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0] ?? null;
+
+const getMicStreamForSoundpadMixer = (state, noiseSuppressed) => {
+  if (noiseSuppressed && state.noiseSuppressionManager) {
+    return state.noiseSuppressionManager.getProcessedStream() || state.localStream;
+  }
+  return state.localStream;
+};
+
+const refreshInAppSoundpadPublishTrack = async (state, noiseSuppressed) => {
+  const micStream = getMicStreamForSoundpadMixer(state, noiseSuppressed);
+  if (!micStream) {
+    return getSoundpadPublishTrack();
+  }
+  await soundpadInAppMixer.attachMicStream(micStream);
+  soundpadInAppMixer.setMicMuted(state.isMuted);
+  return getSoundpadPublishTrack();
+};
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -2051,11 +2077,11 @@ export const useCallStore = create(
             stream = getLiveKitMicStream();
           }
 
-          const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
-          const wantsNoiseSuppression = savedNoiseSuppression
-            ? JSON.parse(savedNoiseSuppression)
-            : false;
-          const inAppSoundpad = usesInAppSoundpad();
+          const systemSoundpadMode = audioDeviceStorage.getConfig().soundpadMode === 'system';
+          const useHybridSystemPublish = shouldUseHybridSystemCallAudio();
+          const nsSettingEnabled = isNoiseSuppressionSettingEnabled();
+          const wantsNoiseSuppression = nsSettingEnabled && (!systemSoundpadMode || useHybridSystemPublish);
+          const inAppSoundpad = usesInAppSoundpad() || useHybridSystemPublish;
           const virtualMicDeviceId = inAppSoundpad ? '' : audioDeviceStorage.getVirtualMicDeviceId();
           const useVirtualMic = Boolean(virtualMicDeviceId);
 
@@ -2076,9 +2102,9 @@ export const useCallStore = create(
           };
 
           if (useVirtualMic || !stream || wantsNoiseSuppression || inAppSoundpad) {
-            const capturedStream = await navigator.mediaDevices.getUserMedia({
-              audio: buildMicConstraints(),
-            });
+            const capturedStream = await navigator.mediaDevices.getUserMedia(
+              useHybridSystemPublish ? getPhysicalMicConstraints() : { audio: buildMicConstraints() }
+            );
             stream = capturedStream;
           }
 
@@ -2187,7 +2213,7 @@ export const useCallStore = create(
         console.log('Mic state saved to localStorage:', newMutedState);
         
         try {
-          if (usesInAppSoundpad()) {
+          if (usesCallMixerForMic()) {
             soundpadInAppMixer.setMicMuted(newMutedState);
             await voiceCallApi.setMicrophoneEnabled(true);
             const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
@@ -2426,8 +2452,10 @@ export const useCallStore = create(
             if (room) {
               const localParticipant = room.localParticipant;
               let trackToPublish = null;
-              
-              if (newState) {
+
+              if (usesCallMixerForMic()) {
+                trackToPublish = await refreshInAppSoundpadPublishTrack(state, newState);
+              } else if (newState) {
                 // При включении шумоподавления используем обработанный трек
                 const processedStream = state.noiseSuppressionManager.getProcessedStream();
                 if (processedStream) {
@@ -2562,36 +2590,36 @@ export const useCallStore = create(
               const room = voiceCallApi.getRoom();
               if (room) {
                 const localParticipant = room.localParticipant;
-                const processedStream = state.noiseSuppressionManager.getProcessedStream();
-                if (processedStream) {
-                  const newTrack = processedStream.getAudioTracks()[0];
-                  if (newTrack) {
-                    try {
-                      const wasMuted = state.isMuted;
-                      const microphonePublication = localParticipant.getTrackPublication('microphone');
-                      
-                      if (microphonePublication && microphonePublication.track) {
-                        // Используем replaceTrack на существующем треке (предотвращает утечки памяти)
-                        console.log('Replacing existing microphone track with new noise suppression mode using replaceTrack');
-                        await microphonePublication.track.replaceTrack(newTrack);
-                        console.log('LiveKit track replaced with new noise suppression mode:', mode);
-                      } else {
-                        // Если публикации нет, публикуем новый трек
-                        console.log('No existing microphone publication, publishing new track');
-                        await localParticipant.setMicrophoneEnabled(false);
-                        await localParticipant.publishTrack(newTrack, {
-                          source: Track.Source.Microphone,
-                          name: 'microphone'
-                        });
-                        console.log('LiveKit track published with new noise suppression mode:', mode);
-                      }
-                      
-                      // Восстанавливаем состояние микрофона
-                      await localParticipant.setMicrophoneEnabled(!wasMuted);
-                    } catch (error) {
-                      console.warn('Failed to replace LiveKit track:', error);
-                      await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                let newTrack = null;
+                if (usesCallMixerForMic()) {
+                  newTrack = await refreshInAppSoundpadPublishTrack(state, true);
+                } else {
+                  const processedStream = state.noiseSuppressionManager.getProcessedStream();
+                  newTrack = processedStream?.getAudioTracks()[0] ?? null;
+                }
+                if (newTrack) {
+                  try {
+                    const wasMuted = state.isMuted;
+                    const microphonePublication = localParticipant.getTrackPublication('microphone');
+
+                    if (microphonePublication && microphonePublication.track) {
+                      console.log('Replacing existing microphone track with new noise suppression mode using replaceTrack');
+                      await microphonePublication.track.replaceTrack(newTrack);
+                      console.log('LiveKit track replaced with new noise suppression mode:', mode);
+                    } else {
+                      console.log('No existing microphone publication, publishing new track');
+                      await localParticipant.setMicrophoneEnabled(false);
+                      await localParticipant.publishTrack(newTrack, {
+                        source: Track.Source.Microphone,
+                        name: 'microphone',
+                      });
+                      console.log('LiveKit track published with new noise suppression mode:', mode);
                     }
+
+                    await localParticipant.setMicrophoneEnabled(!wasMuted);
+                  } catch (error) {
+                    console.warn('Failed to replace LiveKit track:', error);
+                    await localParticipant.setMicrophoneEnabled(!state.isMuted);
                   }
                 }
               }

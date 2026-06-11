@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
+import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadLog, soundpadError } from '../../../lib/soundpad/soundpadLogger';
 import './SoundpadPanel.css';
 
@@ -49,7 +50,7 @@ const SoundpadPanel = () => {
     };
   }, []);
 
-  if (!visible || slots.length === 0) {
+  if (!soundpadBridge.isElectronAvailable() || !visible || slots.length === 0) {
     return null;
   }
 
@@ -62,21 +63,25 @@ const SoundpadPanel = () => {
     <aside className="soundpad-panel" aria-label="Саундпад">
       <p className="soundpad-panel__title">Саундпад</p>
       <div className="soundpad-panel__grid">
-        {slots.map((slot) => (
-          <button
-            key={slot.id}
-            type="button"
-            className="soundpad-panel__btn"
-            title={slot.label}
-            onClick={() =>
-              soundpadBridge.playSlot(slot.id).catch((err) => {
-                soundpadError('SoundpadPanel: play failed', slot.id, err);
-              })
-            }
-          >
-            {slot.label}
-          </button>
-        ))}
+        {slots.map((slot) => {
+          const hotkeyLabel = slot.hotkey ? hotkeyStorage.formatKey(slot.hotkey) : '';
+          return (
+            <button
+              key={slot.id}
+              type="button"
+              className="soundpad-panel__btn"
+              title={hotkeyLabel ? `${slot.label} (${hotkeyLabel})` : slot.label}
+              onClick={() =>
+                soundpadBridge.playSlot(slot.id).catch((err) => {
+                  soundpadError('SoundpadPanel: play failed', slot.id, err);
+                })
+              }
+            >
+              <span className="soundpad-panel__btn-label">{slot.label}</span>
+              {hotkeyLabel ? <span className="soundpad-panel__btn-hotkey">{hotkeyLabel}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </aside>
   );

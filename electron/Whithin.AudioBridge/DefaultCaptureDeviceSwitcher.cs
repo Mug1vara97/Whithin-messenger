@@ -107,6 +107,18 @@ public static class DefaultCaptureDeviceSwitcher
             cable?.Name);
     }
 
+    /// <summary>
+    /// Physical mic saved before switching Windows default to CABLE Output (bridge capture must use this).
+    /// </summary>
+    public static string? SavedPhysicalCaptureDeviceId
+    {
+        get
+        {
+            TryLoadBackupFromDisk();
+            return _savedMultimediaId;
+        }
+    }
+
     private static void ClearState()
     {
         _isActive = false;

@@ -2,7 +2,8 @@ export * from './LoginForm';
 export * from './RegisterForm';
 export * from './SettingsModal';
 export * from './NotificationsModal';
-export * from './SoundpadSettingsModal';
+export * from './SoundpadSoundsModal';
+export * from './SoundpadConfigSection';
 
 // Default exports
 export { default as GlobalCallManager } from './GlobalCallManager';
