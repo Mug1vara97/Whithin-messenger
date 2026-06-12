@@ -24,6 +24,7 @@ import {
   ensureCallMasterOutputBus,
 } from '../utils/callAudioMasterBus';
 import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModerationState';
+import { buildCallOnlyChannelEntry } from '../voice/callOnlyVoiceChannels';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
 
 const SOUNDPAD_TRACK_NAME = 'soundpad';
@@ -665,23 +666,27 @@ export const useCallStore = create(
         });
       },
 
-      registerCallOnlyVoiceChannel: (channelId, channelName) => {
+      registerCallOnlyVoiceChannel: (channelId, channelName, placement = {}) => {
         const key = normalizeChannelId(channelId);
         if (!key) return;
-        const name = channelName || key;
+        const existing = get().callOnlyVoiceChannels.get(key);
+        const resolvedName =
+          channelName && channelName !== key
+            ? channelName
+            : existing?.name && existing.name !== key
+              ? existing.name
+              : channelName || key;
         set((state) => {
           const map = new Map(state.callOnlyVoiceChannels);
-          map.set(key, {
-            chatId: key,
-            ChatId: key,
-            name,
-            Name: name,
-            typeId: '44444444-4444-4444-4444-444444444444',
-            chatType: 4,
-            chatTypeId: '44444444-4444-4444-4444-444444444444',
-            isCallOnlyChannel: true,
-            isPrivate: true,
-          });
+          map.set(
+            key,
+            buildCallOnlyChannelEntry(key, resolvedName, {
+              categoryId: placement.categoryId ?? existing?.categoryId ?? existing?.CategoryId ?? null,
+              categoryName: placement.categoryName ?? existing?.categoryName ?? existing?.CategoryName ?? null,
+              categoryOrder: placement.categoryOrder ?? existing?.categoryOrder ?? existing?.CategoryOrder ?? null,
+              chatOrder: placement.chatOrder ?? existing?.chatOrder ?? existing?.ChatOrder ?? null,
+            })
+          );
           return { callOnlyVoiceChannels: map };
         });
       },
@@ -938,7 +943,9 @@ export const useCallStore = create(
                 name: peerData.name,
                 isMuted: peerData.isMuted || false,
                 isAudioEnabled: peerData.isAudioEnabled !== undefined ? peerData.isAudioEnabled : true,
-                isGlobalAudioMuted: peerData.isGlobalAudioMuted || false, // Добавляем статус глобального звука
+                isGlobalAudioMuted: peerData.isGlobalAudioMuted || false,
+                isServerMuted: Boolean(peerData.isServerMuted),
+                isServerDeafened: Boolean(peerData.isServerDeafened),
                 isSpeaking: false,
                 avatar: profileData?.avatar || null,
                 avatarColor: profileData?.avatarColor || '#5865f2',
@@ -955,6 +962,8 @@ export const useCallStore = create(
                 userName: peerData.name || peerData.userName,
                 isMuted: peerData.isMuted || false,
                 isGlobalAudioMuted: peerData.isGlobalAudioMuted || false,
+                isServerMuted: Boolean(peerData.isServerMuted),
+                isServerDeafened: Boolean(peerData.isServerDeafened),
                 isAudioDisabled: peerData.isGlobalAudioMuted || false,
                 isDeafened: peerData.isGlobalAudioMuted || false,
                 avatar: profileData?.avatar || null,
@@ -1699,6 +1708,8 @@ export const useCallStore = create(
             isMuted: peer.isMuted || false,
             isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
             isGlobalAudioMuted: peer.isGlobalAudioMuted || false,
+            isServerMuted: Boolean(peer.isServerMuted),
+            isServerDeafened: Boolean(peer.isServerDeafened),
             isSpeaking: false,
             avatar: null,
             avatarColor: '#5865f2',
@@ -2398,104 +2409,135 @@ export const useCallStore = create(
           return;
         }
 
+        let state = get();
+        const targetUserId =
+          data?.userId != null
+            ? String(data.userId)
+            : String(state.currentUserId || '');
+        if (!targetUserId) return;
+
+        const isSelf = targetUserId === String(state.currentUserId);
         const serverMuted = Boolean(data?.serverMuted);
         const serverDeafened = Boolean(data?.serverDeafened);
+        const channelId =
+          data?.channelId != null
+            ? normalizeChannelId(data.channelId)
+            : normalizeChannelId(state.currentRoomId);
 
-        set((state) => {
-          const serverVoiceModerationByServer = new Map(state.serverVoiceModerationByServer);
-          serverVoiceModerationByServer.set(serverId, {
-            isServerMuted: serverMuted,
-            isServerDeafened: serverDeafened,
+        const participantUpdates = {
+          isServerMuted: serverMuted,
+          isServerDeafened: serverDeafened,
+        };
+        if (data?.isMuted !== undefined) {
+          participantUpdates.isMuted = Boolean(data.isMuted);
+        }
+        if (data?.isGlobalAudioMuted !== undefined) {
+          const deafened = Boolean(data.isGlobalAudioMuted);
+          participantUpdates.isGlobalAudioMuted = deafened;
+          participantUpdates.isAudioDisabled = deafened;
+          participantUpdates.isDeafened = deafened;
+        }
+
+        if (isSelf) {
+          set((prev) => {
+            const serverVoiceModerationByServer = new Map(prev.serverVoiceModerationByServer);
+            serverVoiceModerationByServer.set(serverId, {
+              isServerMuted: serverMuted,
+              isServerDeafened: serverDeafened,
+            });
+            return { serverVoiceModerationByServer };
           });
-          return { serverVoiceModerationByServer };
-        });
+        }
 
-        const state = get();
         const isActiveServerCall =
           state.isInCall &&
           state.currentCallServerId &&
           String(state.currentCallServerId) === serverId;
 
-        const userId = state.currentUserId;
-        const currentRoomId = state.currentRoomId;
-        const participantUpdates = {
-          isServerMuted: serverMuted,
-          isServerDeafened: serverDeafened,
-        };
-
-        if (!isActiveServerCall) {
-          if (currentRoomId && userId) {
-            get().updateVoiceChannelParticipant(currentRoomId, userId, participantUpdates);
-          }
-          return;
-        }
-
-        if (serverMuted && data?.isMuted !== undefined) {
+        if (isSelf && isActiveServerCall && data?.isMuted !== undefined) {
           const muted = Boolean(data.isMuted);
           localStorage.setItem('micMuted', JSON.stringify(muted));
 
-          try {
-            if (usesInAppSoundpad()) {
-              soundpadInAppMixer.setMicMuted(muted);
-              await voiceCallApi.setMicrophoneEnabled(true);
+          if (serverMuted || muted) {
+            try {
+              if (usesInAppSoundpad()) {
+                soundpadInAppMixer.setMicMuted(muted);
+                await voiceCallApi.setMicrophoneEnabled(true);
+                voiceCallApi.broadcastMuteState(muted);
+              } else {
+                await voiceCallApi.setMicrophoneEnabled(!muted);
+              }
+            } catch (error) {
+              console.warn('Failed to apply server mic moderation:', error);
               voiceCallApi.broadcastMuteState(muted);
-            } else {
-              await voiceCallApi.setMicrophoneEnabled(!muted);
             }
-          } catch (error) {
-            console.warn('Failed to apply server mic moderation:', error);
-            voiceCallApi.broadcastMuteState(muted);
+          } else {
+            set({ isMuted: muted });
           }
 
-          set((state) => {
-            const newMuteStates = new Map(state.participantMuteStates);
-            if (userId) newMuteStates.set(String(userId), muted);
-            return {
-              isMuted: muted,
-              participantMuteStates: newMuteStates,
-              participants: state.participants.map((p) =>
-                String(p.userId) === String(userId)
-                  ? { ...p, isMuted: muted, isSpeaking: muted ? false : p.isSpeaking }
-                  : p
-              ),
-            };
-          });
-
-          participantUpdates.isMuted = muted;
           if (muted) {
-            get().resetSpeakingState(userId);
+            get().resetSpeakingState(targetUserId);
           }
         }
 
-        if (serverDeafened && data?.isGlobalAudioMuted !== undefined) {
+        if (
+          isSelf &&
+          isActiveServerCall &&
+          serverDeafened &&
+          data?.isGlobalAudioMuted !== undefined
+        ) {
           const deafened = Boolean(data.isGlobalAudioMuted);
           localStorage.setItem('audioMuted', JSON.stringify(deafened));
           set({
             isGlobalAudioMuted: deafened,
             isAudioEnabled: !deafened,
           });
-
-          set((state) => {
-            const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
-            if (userId) newGlobalAudioStates.set(String(userId), deafened);
-            return {
-              participantGlobalAudioStates: newGlobalAudioStates,
-              participants: state.participants.map((p) =>
-                String(p.userId) === String(userId)
-                  ? { ...p, isGlobalAudioMuted: deafened, isAudioEnabled: !deafened }
-                  : p
-              ),
-            };
-          });
-
-          participantUpdates.isGlobalAudioMuted = deafened;
-          participantUpdates.isAudioDisabled = deafened;
-          participantUpdates.isDeafened = deafened;
           get().applyAllParticipantAudioRouting();
         }
 
-        if (currentRoomId && userId) {
-          get().updateVoiceChannelParticipant(currentRoomId, userId, participantUpdates);
+        set((prev) => {
+          const newMuteStates = new Map(prev.participantMuteStates);
+          const newGlobalAudioStates = new Map(prev.participantGlobalAudioStates);
+
+          if (participantUpdates.isMuted !== undefined) {
+            newMuteStates.set(targetUserId, participantUpdates.isMuted);
+          }
+          if (participantUpdates.isGlobalAudioMuted !== undefined) {
+            newGlobalAudioStates.set(targetUserId, participantUpdates.isGlobalAudioMuted);
+          }
+
+          const nextState = {
+            participantMuteStates: newMuteStates,
+            participantGlobalAudioStates: newGlobalAudioStates,
+            participants: prev.participants.map((p) =>
+              String(p.userId) === targetUserId
+                ? {
+                    ...p,
+                    ...participantUpdates,
+                    isSpeaking: participantUpdates.isMuted ? false : p.isSpeaking,
+                    ...(participantUpdates.isGlobalAudioMuted !== undefined
+                      ? { isAudioEnabled: !participantUpdates.isGlobalAudioMuted }
+                      : {}),
+                  }
+                : p
+            ),
+          };
+
+          if (isSelf && isActiveServerCall) {
+            if (participantUpdates.isMuted !== undefined) {
+              nextState.isMuted = participantUpdates.isMuted;
+            }
+            if (participantUpdates.isGlobalAudioMuted !== undefined) {
+              nextState.isGlobalAudioMuted = participantUpdates.isGlobalAudioMuted;
+              nextState.isAudioEnabled = !participantUpdates.isGlobalAudioMuted;
+            }
+          }
+
+          return nextState;
+        });
+
+        if (channelId) {
+          get().updateVoiceChannelParticipant(channelId, targetUserId, participantUpdates);
         }
       },
 

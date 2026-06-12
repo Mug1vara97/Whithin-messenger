@@ -12,12 +12,15 @@ import {
   useParticipantMuteStates,
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
-import { VoiceParticipantStatusIcons } from '../VoiceParticipantStatusIcons';
 import {
   selectActiveServerDeafened,
   selectActiveServerMuted,
 } from '../../../lib/voice/serverVoiceModerationState';
 import SettingsIcon from '@mui/icons-material/Settings';
+import MicOffIcon from '@mui/icons-material/MicOff';
+import MicIcon from '@mui/icons-material/Mic';
+import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
+import GavelIcon from '@mui/icons-material/Gavel';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
@@ -456,14 +459,22 @@ const VideoCallGrid = ({
       isMuted,
       audioEnabled: participant.isAudioEnabled,
     });
-    const isServerMuted = getParticipantIsServerMuted(channelParticipant, {
-      isCurrentUser: participant.isCurrentUser,
-      localIsServerMuted,
-    });
-    const isServerDeafened = getParticipantIsServerDeafened(channelParticipant, {
-      isCurrentUser: participant.isCurrentUser,
-      localIsServerDeafened,
-    });
+    const isServerMuted =
+      getParticipantIsServerMuted(channelParticipant, {
+        isCurrentUser: participant.isCurrentUser,
+        localIsServerMuted,
+      }) || Boolean(participant.isServerMuted);
+    const isServerDeafened =
+      getParticipantIsServerDeafened(channelParticipant, {
+        isCurrentUser: participant.isCurrentUser,
+        localIsServerDeafened,
+      }) || Boolean(participant.isServerDeafened);
+    const micModerated = Boolean(isMuted && isServerMuted);
+    const micSelfMuted = Boolean(isMuted && !isServerMuted);
+    const deafModerated = Boolean(isDeafened && isServerDeafened);
+    const deafSelf = Boolean(isDeafened && !isServerDeafened);
+    const iconSize = isSmall ? 16 : 18;
+    const modColor = '#f0b232';
     const isScreenShare = participant.isScreenShare || false;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
@@ -498,7 +509,7 @@ const VideoCallGrid = ({
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${channelParticipant?.isServerMuted ? 'server-muted' : ''} ${channelParticipant?.isServerDeafened ? 'server-deafened' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${isServerMuted ? 'server-muted' : ''} ${isServerDeafened ? 'server-deafened' : ''}`}
         onClick={() => handleParticipantClick(participant)}
         onContextMenu={onTileContextMenu}
       >
@@ -630,14 +641,36 @@ const VideoCallGrid = ({
                   <span className="status-text">Демонстрация экрана</span>
                 </div>
               ) : (
-                <VoiceParticipantStatusIcons
-                  isMuted={isMuted}
-                  isDeafened={isDeafened}
-                  isServerMuted={isServerMuted}
-                  isServerDeafened={isServerDeafened}
-                  isSpeaking={isSpeaking}
-                  variant="tile"
-                />
+                <>
+                  {micModerated ? (
+                    <div className="mic-status server-moderated" title="Микрофон отключён модератором">
+                      <MicOffIcon sx={{ fontSize: iconSize, color: modColor }} />
+                      <GavelIcon className="tile-mod-badge" sx={{ fontSize: isSmall ? 9 : 10 }} />
+                    </div>
+                  ) : micSelfMuted || isMuted ? (
+                    <div className="mic-status muted" title="Микрофон выключен">
+                      <MicOffIcon sx={{ fontSize: iconSize, color: '#ed4245' }} />
+                    </div>
+                  ) : isSpeaking ? (
+                    <div className="mic-status speaking" title="Говорит">
+                      <MicIcon sx={{ fontSize: iconSize, color: '#3ba55c' }} />
+                    </div>
+                  ) : (
+                    <div className="mic-status silent" title="Микрофон включён">
+                      <MicIcon sx={{ fontSize: iconSize, color: '#B5BAC1' }} />
+                    </div>
+                  )}
+                  {deafModerated ? (
+                    <div className="headset-status server-moderated" title="Звук отключён модератором">
+                      <HeadsetOffIcon sx={{ fontSize: iconSize, color: modColor }} />
+                      <GavelIcon className="tile-mod-badge" sx={{ fontSize: isSmall ? 9 : 10 }} />
+                    </div>
+                  ) : deafSelf ? (
+                    <div className="headset-status muted" title="Звук выключен">
+                      <HeadsetOffIcon sx={{ fontSize: iconSize, color: '#ed4245' }} />
+                    </div>
+                  ) : null}
+                </>
               )}
               <span className="participant-name">{participant.name}</span>
             </div>
@@ -860,7 +893,9 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
               prev.isMuted !== next.isMuted ||
               prev.isAudioEnabled !== next.isAudioEnabled ||
               prev.isGlobalAudioMuted !== next.isGlobalAudioMuted ||
-              prev.isSpeaking !== next.isSpeaking) {
+              prev.isSpeaking !== next.isSpeaking ||
+              prev.isServerMuted !== next.isServerMuted ||
+              prev.isServerDeafened !== next.isServerDeafened) {
             return false;
           }
         }

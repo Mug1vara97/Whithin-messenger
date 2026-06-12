@@ -474,6 +474,8 @@ io.on('connection', async (socket) => {
                         isMuted: existingPeer.muted,
                         isAudioEnabled: existingPeer.audioEnabled,
                         isGlobalAudioMuted: userState.isAudioDisabled || false,
+                        isServerMuted: Boolean(existingPeer.serverMuted),
+                        isServerDeafened: Boolean(existingPeer.serverDeafened),
                         userId: existingPeer.userId
                     });
                 }
@@ -489,6 +491,8 @@ io.on('connection', async (socket) => {
                 isMuted: peer.muted,
                 isAudioEnabled: peer.audioEnabled,
                 isGlobalAudioMuted: userState.isAudioDisabled || false,
+                isServerMuted: Boolean(peer.serverMuted),
+                isServerDeafened: Boolean(peer.serverDeafened),
                 userId: peer.userId
             });
 
@@ -641,7 +645,12 @@ io.on('connection', async (socket) => {
             appliedState.isGlobalAudioMuted = true;
         }
 
-        targetPeer.socket.emit('serverVoiceModerationApplied', appliedState);
+        const moderationBroadcast = {
+            ...appliedState,
+            userId: targetUserId,
+            channelId: normalizedChannelId,
+        };
+        io.to(room.id).emit('serverVoiceModerationApplied', moderationBroadcast);
 
         io.to(room.id).emit('peerMuteStateChanged', {
             peerId: targetPeer.id,
@@ -932,7 +941,15 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик переключения пользователя в другой канал
-    socket.on('switchUserToChannel', ({ userId, targetChannelId }, callback) => {
+    socket.on('switchUserToChannel', ({
+        userId,
+        targetChannelId,
+        channelName,
+        categoryId,
+        categoryName,
+        categoryOrder,
+        chatOrder,
+    }, callback) => {
         console.log('switchUserToChannel: Switching user', userId, 'to channel', targetChannelId);
         
         if (!userId || !targetChannelId) {
@@ -1041,7 +1058,12 @@ io.on('connection', async (socket) => {
             // Клиент обработает это событие и переключится через LiveKit
             userSocket.emit('switchToChannel', {
                 channelId: targetChannelId,
-                sourceChannelId: sourceChannelId
+                sourceChannelId: sourceChannelId,
+                channelName: channelName || null,
+                categoryId: categoryId ?? null,
+                categoryName: categoryName || null,
+                categoryOrder: categoryOrder ?? null,
+                chatOrder: chatOrder ?? null,
             });
             console.log(`Sent switchToChannel event to user ${userId} for channel ${targetChannelId}`);
         } else {

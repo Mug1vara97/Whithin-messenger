@@ -438,22 +438,26 @@ const ServerPanel = ({
         return;
       }
 
-      const updates = {};
-      if (muteMic !== null && muteMic !== undefined) {
-        updates.isServerMuted = Boolean(muteMic);
-        if (muteMic === true) {
-          updates.isMuted = true;
-          updates.isSpeaking = false;
-        }
+      const updates = {
+        isServerMuted: muteMic !== null && muteMic !== undefined ? Boolean(muteMic) : undefined,
+        isServerDeafened: deafen !== null && deafen !== undefined ? Boolean(deafen) : undefined,
+      };
+      if (muteMic === true) {
+        updates.isMuted = true;
+        updates.isSpeaking = false;
+      } else if (muteMic === false) {
+        updates.isMuted = false;
       }
-      if (deafen !== null && deafen !== undefined) {
-        updates.isServerDeafened = Boolean(deafen);
-        if (deafen === true) {
-          updates.isGlobalAudioMuted = true;
-          updates.isAudioDisabled = true;
-          updates.isDeafened = true;
-        }
+      if (deafen === true) {
+        updates.isGlobalAudioMuted = true;
+        updates.isAudioDisabled = true;
+        updates.isDeafened = true;
+      } else if (deafen === false) {
+        updates.isServerDeafened = false;
       }
+      Object.keys(updates).forEach((key) => {
+        if (updates[key] === undefined) delete updates[key];
+      });
       if (Object.keys(updates).length > 0) {
         useCallStore.getState().updateVoiceChannelParticipant(channelId, targetUserId, updates);
       }

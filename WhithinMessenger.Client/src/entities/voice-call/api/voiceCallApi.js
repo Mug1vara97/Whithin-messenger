@@ -230,7 +230,15 @@ class VoiceCallApi {
     });
 
     // Обработчик переключения в другой канал (от сервера)
-    this.socket.on('switchToChannel', async ({ channelId, sourceChannelId }) => {
+    this.socket.on('switchToChannel', async ({
+      channelId,
+      sourceChannelId,
+      channelName: eventChannelName,
+      categoryId,
+      categoryName,
+      categoryOrder,
+      chatOrder,
+    }) => {
       console.log('switchToChannel: Received switch command to channel', channelId, 'from', sourceChannelId);
       
       // Если мы находимся в исходном канале, переключаемся
@@ -240,73 +248,67 @@ class VoiceCallApi {
           const { useCallStore } = await import('../../../shared/lib/stores/callStore');
           const callStore = useCallStore.getState();
           
-          // Всегда получаем название нового канала (не используем старое название)
-          let channelName = null;
+          let channelName = eventChannelName || null;
           
-          try {
-            // Пытаемся получить название канала через API
-            const { serverApi } = await import('../../server/api/serverApi');
-            // Пытаемся найти serverId из URL
-            const serverId = window.location.pathname.match(/\/server\/([^\/]+)/)?.[1];
-            
-            if (serverId) {
-              try {
-                const serverData = await serverApi.getServerById(serverId);
+          if (!channelName) {
+            try {
+              const { serverApi } = await import('../../server/api/serverApi');
+              const serverId = window.location.pathname.match(/\/server\/([^/]+)/)?.[1];
+              
+              if (serverId) {
+                try {
+                  const serverData = await serverApi.getServerById(serverId);
+                  const allChannels = serverData.categories?.flatMap(cat => cat.chats || cat.Chats || []) || [];
+                  const foundChannel = allChannels.find(chat => 
+                    (chat.chatId || chat.ChatId || chat.chat_id) === channelId
+                  );
+                  if (foundChannel) {
+                    channelName = foundChannel.name || foundChannel.Name || foundChannel.groupName;
+                  }
+                } catch (apiErr) {
+                  console.warn('switchToChannel: Failed to get channel name from API:', apiErr);
+                }
+              }
+              
+              if (!channelName && window.__serverData__) {
+                const serverData = window.__serverData__;
                 const allChannels = serverData.categories?.flatMap(cat => cat.chats || cat.Chats || []) || [];
                 const foundChannel = allChannels.find(chat => 
                   (chat.chatId || chat.ChatId || chat.chat_id) === channelId
                 );
                 if (foundChannel) {
                   channelName = foundChannel.name || foundChannel.Name || foundChannel.groupName;
-                  console.log('switchToChannel: Found channel name from API:', channelName, 'for channelId:', channelId);
                 }
-              } catch (apiErr) {
-                console.warn('switchToChannel: Failed to get channel name from API:', apiErr);
               }
+            } catch (err) {
+              console.warn('switchToChannel: Failed to get channel name:', err);
             }
-            
-            // Если не нашли через API, пытаемся получить из window (если доступно)
-            if (!channelName && window.__serverData__) {
-              const serverData = window.__serverData__;
-              const allChannels = serverData.categories?.flatMap(cat => cat.chats || cat.Chats || []) || [];
-              const foundChannel = allChannels.find(chat => 
-                (chat.chatId || chat.ChatId || chat.chat_id) === channelId
-              );
-              if (foundChannel) {
-                channelName = foundChannel.name || foundChannel.Name || foundChannel.groupName;
-                console.log('switchToChannel: Found channel name from window:', channelName, 'for channelId:', channelId);
-              }
-            }
-          } catch (err) {
-            console.warn('switchToChannel: Failed to get channel name:', err);
           }
           
-          // Если не удалось получить название, используем channelId
           if (!channelName) {
-            channelName = channelId;
-            console.warn('switchToChannel: Could not find channel name, using channelId:', channelId);
+            channelName = callStore.currentCall?.channelName || channelId;
+            console.warn('switchToChannel: Could not find channel name, using fallback:', channelName);
           }
-          
-          console.log('switchToChannel: About to switch, channelName:', channelName, 'channelId:', channelId);
           
           const serverId =
             callStore.currentCallServerId ||
             window.location.pathname.match(/\/server\/([^/]+)/)?.[1] ||
             null;
 
-          // Выходим из текущей комнаты через callStore
+          const channelPlacement = {
+            categoryId: categoryId ?? null,
+            categoryName: categoryName || null,
+            categoryOrder: categoryOrder ?? null,
+            chatOrder: chatOrder ?? null,
+          };
+
           await callStore.leaveRoom();
-          
-          // Присоединяемся к новому каналу через callStore с названием
           await callStore.joinRoom(channelId, channelName, serverId);
+          callStore.registerCallOnlyVoiceChannel(channelId, channelName, channelPlacement);
           
-          console.log('switchToChannel: Successfully switched to channel', channelId, 'with name', channelName);
-          
-          // Эмитим событие для обновления интерфейса ПОСЛЕ переключения (HomePage может слушать это событие)
           window.dispatchEvent(new CustomEvent('voiceChannelSwitched', {
-            detail: { channelId, channelName, sourceChannelId }
+            detail: { channelId, channelName, sourceChannelId, ...channelPlacement }
           }));
-          console.log('switchToChannel: Dispatched voiceChannelSwitched event with channelName:', channelName);
         } catch (error) {
           console.error('switchToChannel: Failed to switch channel:', error);
         }

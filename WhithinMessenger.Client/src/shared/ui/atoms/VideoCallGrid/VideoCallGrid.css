@@ -165,6 +165,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  z-index: 2;
 }
 
 .bottom-info {
@@ -199,6 +201,31 @@
 .mic-status.silent {
   background: rgba(0, 0, 0, 0.8);
   color: #B5BAC1;
+}
+
+.mic-status.server-moderated,
+.headset-status.server-moderated {
+  background: rgba(240, 178, 50, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(240, 178, 50, 0.55);
+}
+
+.headset-status.muted {
+  color: #ed4245;
+}
+
+.tile-mod-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  color: #f0b232 !important;
+  background: #1e1f22;
+  border-radius: 50%;
+  padding: 1px;
+}
+
+.mic-status,
+.headset-status {
+  position: relative;
 }
 
 .headset-status {

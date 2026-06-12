@@ -4,6 +4,11 @@ import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
 import { useCallStore } from '../../../../shared/lib/stores/callStore';
+import {
+  findChannelInCategories,
+  getChannelDisplayName,
+  mergeCallOnlyIntoCategories,
+} from '../../../../shared/lib/voice/callOnlyVoiceChannels';
 import './CategoriesList.css';
 
 const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
@@ -45,43 +50,21 @@ const CategoriesList = ({
   const [localCategories, setLocalCategories] = useState(categories);
   const isInCall = useCallStore((state) => state.isInCall);
   const currentRoomId = useCallStore((state) => state.currentRoomId);
-  const currentCall = useCallStore((state) => state.currentCall);
   const callOnlyVoiceChannels = useCallStore((state) => state.callOnlyVoiceChannels);
 
   useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
 
-  const hiddenCallVoiceChannels = useMemo(() => {
-    if (!isInCall || !currentRoomId) return [];
-
-    const visibleChannelIds = new Set();
-    localCategories.forEach((category) => {
-      const chats = category.chats || category.Chats || [];
-      chats.forEach((chat) => {
-        const id = chat.chatId || chat.ChatId;
-        if (id) visibleChannelIds.add(String(id));
-      });
-    });
-
-    const roomId = String(currentRoomId);
-    if (visibleChannelIds.has(roomId)) return [];
-
-    const fromStore = callOnlyVoiceChannels.get(roomId) || callOnlyVoiceChannels.get(currentRoomId);
-    if (fromStore) return [fromStore];
-
-    return [{
-      chatId: roomId,
-      ChatId: roomId,
-      name: currentCall?.channelName || roomId,
-      Name: currentCall?.channelName || roomId,
-      typeId: VOICE_TYPE_GUID,
-      chatType: 4,
-      chatTypeId: VOICE_TYPE_GUID,
-      isCallOnlyChannel: true,
-      isPrivate: true,
-    }];
-  }, [localCategories, isInCall, currentRoomId, currentCall, callOnlyVoiceChannels]);
+  const displayCategories = useMemo(
+    () =>
+      mergeCallOnlyIntoCategories(
+        localCategories,
+        callOnlyVoiceChannels,
+        isInCall ? currentRoomId : null
+      ),
+    [localCategories, callOnlyVoiceChannels, isInCall, currentRoomId]
+  );
 
   // Подключаемся к voice-server для получения участников голосовых каналов
   const voiceServiceConnectedRef = useRef(false);
@@ -107,8 +90,8 @@ const CategoriesList = ({
   useEffect(() => {
     const voiceChannelIds = new Set();
 
-    if (localCategories?.length) {
-      localCategories.forEach((category) => {
+    if (displayCategories?.length) {
+      displayCategories.forEach((category) => {
         const chats = category.chats || category.Chats || [];
         chats.forEach((chat) => {
           if (isVoiceChannelChat(chat)) {
@@ -118,11 +101,6 @@ const CategoriesList = ({
         });
       });
     }
-
-    hiddenCallVoiceChannels.forEach((channel) => {
-      const channelId = channel.chatId || channel.ChatId;
-      if (channelId) voiceChannelIds.add(String(channelId));
-    });
 
     if (voiceChannelIds.size === 0) return;
     
@@ -141,7 +119,7 @@ const CategoriesList = ({
         subscribedChannelsRef.current.delete(channelId);
       }
     });
-  }, [localCategories, hiddenCallVoiceChannels]);
+  }, [displayCategories]);
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
@@ -412,10 +390,21 @@ const CategoriesList = ({
         }
         
         console.log('Moving participant:', { userId, sourceChannelId, targetChannelId });
+
+        const targetChannelInfo = findChannelInCategories(localCategories, targetChannelId);
+        const targetCategory = targetChannelInfo?.category;
+        const channelMeta = targetChannelInfo
+          ? {
+              channelName: getChannelDisplayName(targetChannelInfo.channel),
+              categoryId: targetCategory?.categoryId ?? targetCategory?.CategoryId ?? null,
+              categoryName: targetCategory?.categoryName ?? targetCategory?.CategoryName ?? null,
+              categoryOrder: targetCategory?.categoryOrder ?? targetCategory?.CategoryOrder ?? null,
+              chatOrder: targetChannelInfo.chatOrder,
+            }
+          : null;
         
-        // Переключаем пользователя через voiceChannelService (работает даже если мы сами не в звонке)
         try {
-          await voiceChannelService.switchUserToChannel(userId, targetChannelId);
+          await voiceChannelService.switchUserToChannel(userId, targetChannelId, channelMeta);
           console.log('Participant moved successfully');
         } catch (error) {
           console.error('Failed to move participant:', error);
@@ -428,12 +417,12 @@ const CategoriesList = ({
     }
   }, [localCategories, connection, serverId, canManageChannels]);
 
-  const uncategorizedChannels = localCategories.find(cat => 
+  const uncategorizedChannels = displayCategories.find(cat => 
     cat.categoryId === null
   )?.chats || [];
 
 
-  const sortedCategories = localCategories
+  const sortedCategories = displayCategories
     .filter(cat => cat.categoryId !== null)
     .sort((a, b) => (a.categoryOrder || a.CategoryOrder) - (b.categoryOrder || b.CategoryOrder));
 
@@ -468,23 +457,6 @@ const CategoriesList = ({
                   {...provided.droppableProps}
                   className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
                 >
-                  {hiddenCallVoiceChannels.map((channel, index) => {
-                    const channelId = channel.chatId || channel.ChatId;
-                    const unreadCount = unreadCountByChat[channelId] || 0;
-                    return (
-                      <ChannelItem
-                        key={`call-only-${channelId}`}
-                        channel={channel}
-                        index={index}
-                        unreadCount={unreadCount}
-                        isActive={isChannelActive(channel)}
-                        onClick={handleChatClick}
-                        isDragDisabled
-                        userId={userId}
-                        userName={userName}
-                      />
-                    );
-                  })}
                   {uncategorizedChannels.map((channel, index) => {
                     const channelId = channel.chatId || channel.ChatId;
                     const unreadCount = unreadCountByChat[channelId] || 0;
@@ -492,7 +464,7 @@ const CategoriesList = ({
                     <ChannelItem
                       key={channel.chatId || channel.ChatId}
                       channel={channel}
-                      index={hiddenCallVoiceChannels.length + index}
+                      index={index}
                       unreadCount={unreadCount}
                       isActive={isChannelActive(channel)}
                       onClick={handleChatClick}
@@ -500,7 +472,7 @@ const CategoriesList = ({
                         ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
                         : undefined}
                       onSettings={onChannelSettings ? handleChannelSettings : undefined}
-                      isDragDisabled={!canManageChannels}
+                      isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
                       userId={userId}
                       userName={userName}
                     />
@@ -536,8 +508,8 @@ const CategoriesList = ({
                     onContextMenu={onChannelContextMenu
                       ? (e) => handleChannelContextMenu(e, channel, category)
                       : undefined}
-                    onSettings={onChannelSettings ? handleChannelSettings : undefined}
-                    isDragDisabled={!canManageChannels}
+                    onSettings={onChannelSettings && !channel.isCallOnlyChannel ? handleChannelSettings : undefined}
+                    isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
                     userId={userId}
                     userName={userName}
                   />

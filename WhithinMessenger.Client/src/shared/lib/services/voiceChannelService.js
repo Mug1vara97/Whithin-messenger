@@ -271,7 +271,7 @@ class VoiceChannelService {
     });
   }
 
-  switchUserToChannel(userId, targetChannelId) {
+  switchUserToChannel(userId, targetChannelId, channelMeta = null) {
     return new Promise((resolve, reject) => {
       if (!this.socket || !this.isConnected) {
         reject(new Error('Not connected to voice server'));
@@ -282,7 +282,16 @@ class VoiceChannelService {
         return;
       }
 
-      this.socket.emit('switchUserToChannel', { userId, targetChannelId }, (response) => {
+      const payload = { userId, targetChannelId };
+      if (channelMeta) {
+        if (channelMeta.channelName) payload.channelName = channelMeta.channelName;
+        if (channelMeta.categoryId !== undefined) payload.categoryId = channelMeta.categoryId;
+        if (channelMeta.categoryName) payload.categoryName = channelMeta.categoryName;
+        if (channelMeta.categoryOrder !== undefined) payload.categoryOrder = channelMeta.categoryOrder;
+        if (channelMeta.chatOrder !== undefined) payload.chatOrder = channelMeta.chatOrder;
+      }
+
+      this.socket.emit('switchUserToChannel', payload, (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
           return;
