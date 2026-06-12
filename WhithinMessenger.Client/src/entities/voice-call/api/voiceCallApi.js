@@ -758,14 +758,13 @@ class VoiceCallApi {
     }
   }
 
-  // Enable/disable microphone
+  // Enable/disable microphone (LiveKit publish only — callers broadcast soft-mute separately)
   async setMicrophoneEnabled(enabled) {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
-    
+
     await this.room.localParticipant.setMicrophoneEnabled(enabled);
-    this.broadcastMuteState(!enabled);
   }
 
   // Enable/disable camera

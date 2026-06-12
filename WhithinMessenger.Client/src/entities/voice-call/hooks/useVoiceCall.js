@@ -553,8 +553,8 @@ export const useVoiceCall = (userId, userName) => {
     const newMutedState = !isMuted;
     
     try {
-      // Use LiveKit API to toggle microphone
       await voiceCallApi.setMicrophoneEnabled(!newMutedState);
+      voiceCallApi.broadcastMuteState(newMutedState);
       setIsMuted(newMutedState);
     } catch (error) {
       console.error('Error toggling mute:', error);

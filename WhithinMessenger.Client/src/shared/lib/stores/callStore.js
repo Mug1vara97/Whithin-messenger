@@ -2507,6 +2507,7 @@ export const useCallStore = create(
                 voiceCallApi.broadcastMuteState(muted);
               } else {
                 await voiceCallApi.setMicrophoneEnabled(!muted);
+                voiceCallApi.broadcastMuteState(muted);
               }
             } catch (error) {
               console.warn('Failed to apply server mic moderation:', error);
