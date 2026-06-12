@@ -229,6 +229,18 @@ class VoiceCallApi {
       this.emit('serverVoiceModerationApplied', data);
     });
 
+    this.socket.on('peerMuteStateChanged', (data) => {
+      this.emit('peerMuteStateChanged', {
+        peerId: data.peerId,
+        userId: data.userId,
+        isMuted: data.isMuted,
+      });
+    });
+
+    this.socket.on('peerAudioStateChanged', (data) => {
+      this.emit('peerAudioStateChanged', data);
+    });
+
     // Обработчик переключения в другой канал (от сервера)
     this.socket.on('switchToChannel', async ({
       channelId,

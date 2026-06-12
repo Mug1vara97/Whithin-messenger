@@ -206,6 +206,44 @@ class VoiceChannelService {
       });
     });
 
+    this.socket.on('globalMuteState', (data) => {
+      const { userId, isMuted } = data;
+      if (!userId) return;
+
+      const normalizedUserId = String(userId);
+      const mutedState = Boolean(isMuted);
+      const state = useCallStore.getState();
+
+      state.voiceChannelParticipants.forEach((participants, channelId) => {
+        const participant = participants.find(
+          (p) => String(resolveParticipantUserId(p)) === normalizedUserId
+        );
+        if (participant) {
+          useCallStore.getState().updateVoiceChannelParticipant(channelId, normalizedUserId, {
+            isMuted: mutedState,
+            isSpeaking: mutedState ? false : participant.isSpeaking,
+          });
+        }
+      });
+
+      useCallStore.setState((prev) => {
+        const newMuteStates = new Map(prev.participantMuteStates);
+        newMuteStates.set(normalizedUserId, mutedState);
+        return {
+          participantMuteStates: newMuteStates,
+          participants: prev.participants.map((participant) =>
+            String(resolveParticipantUserId(participant)) === normalizedUserId
+              ? {
+                  ...participant,
+                  isMuted: mutedState,
+                  isSpeaking: mutedState ? false : participant.isSpeaking,
+                }
+              : participant
+          ),
+        };
+      });
+    });
+
     if (!this.refreshTimer) {
       this.refreshTimer = window.setInterval(() => {
         if (!this.isConnected) return;

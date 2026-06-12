@@ -242,11 +242,13 @@ const VoiceCallView = ({
       );
       
       // Читаем состояния из отдельных Maps для реактивности в реальном времени
-      videoParticipant.isMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+      videoParticipant.isMuted =
+        participantMuteStates?.get(String(participantUserId)) ?? participant.isMuted ?? false;
       videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
       videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
       // Используем Voice Activity Detection для определения говорения (если микрофон не замьючен)
-      const participantIsMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
+      const participantIsMuted =
+        participantMuteStates?.get(String(participantUserId)) ?? participant.isMuted ?? false;
       videoParticipant.isSpeaking =
         !participantIsMuted &&
         (participantSpeakingStates?.get(String(participantUserId)) || false);

@@ -852,6 +852,7 @@ export const useCallStore = create(
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
             voiceCallApi.socket.off('globalAudioState');
+            voiceCallApi.socket.off('globalMuteState');
           }
           
           await voiceCallApi.connect(userId, userName);
@@ -1144,7 +1145,7 @@ export const useCallStore = create(
           voiceCallApi.on('peerAudioStateChanged', (data) => {
             const { peerId, isAudioEnabled, isEnabled, isGlobalAudioMuted, userId: dataUserId } = data;
             const audioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : isEnabled;
-            const userId = dataUserId || get().peerIdToUserIdMap.get(peerId) || peerId;
+            const userId = String(dataUserId || get().peerIdToUserIdMap.get(peerId) || peerId);
             
             console.log('peerAudioStateChanged received:', { peerId, userId, isAudioEnabled: audioEnabled, isGlobalAudioMuted });
             console.log('Full data received:', data);
@@ -1636,37 +1637,75 @@ export const useCallStore = create(
             }
           });
 
-          // Временное решение: слушаем событие globalAudioState от сервера
+          const applyRemoteGlobalAudioState = (userId, isGlobalAudioMuted) => {
+            if (!userId) return;
+            const normalizedUserId = String(userId);
+            const deafened = Boolean(isGlobalAudioMuted);
+
+            set((state) => {
+              const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+              newGlobalAudioStates.set(normalizedUserId, deafened);
+              return {
+                participantGlobalAudioStates: newGlobalAudioStates,
+                participants: state.participants.map((participant) =>
+                  String(participant.userId) === normalizedUserId
+                    ? { ...participant, isGlobalAudioMuted: deafened, isAudioEnabled: !deafened }
+                    : participant
+                ),
+              };
+            });
+
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId) {
+              get().updateVoiceChannelParticipant(currentRoomId, normalizedUserId, {
+                isGlobalAudioMuted: deafened,
+                isAudioDisabled: deafened,
+                isDeafened: deafened,
+              });
+            }
+          };
+
+          const applyRemoteGlobalMuteState = (userId, isMuted) => {
+            if (!userId) return;
+            const normalizedUserId = String(userId);
+            const mutedState = Boolean(isMuted);
+
+            if (mutedState) {
+              get().resetSpeakingState(normalizedUserId);
+            }
+
+            set((state) => {
+              const newMuteStates = new Map(state.participantMuteStates);
+              newMuteStates.set(normalizedUserId, mutedState);
+              return {
+                participantMuteStates: newMuteStates,
+                participants: state.participants.map((participant) =>
+                  String(participant.userId) === normalizedUserId
+                    ? {
+                        ...participant,
+                        isMuted: mutedState,
+                        isSpeaking: mutedState ? false : participant.isSpeaking,
+                      }
+                    : participant
+                ),
+              };
+            });
+
+            const currentRoomId = get().currentRoomId;
+            if (currentRoomId) {
+              get().updateVoiceChannelParticipant(currentRoomId, normalizedUserId, {
+                isMuted: mutedState,
+                ...(mutedState ? { isSpeaking: false } : {}),
+              });
+            }
+          };
+
           if (voiceCallApi.socket) {
             voiceCallApi.socket.on('globalAudioState', (data) => {
-              console.log('Received globalAudioState from server:', data);
-              const { userId, isGlobalAudioMuted } = data;
-              
-              // Обновляем только отдельное состояние глобального звука
-              set((state) => {
-                const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
-                newGlobalAudioStates.set(userId, isGlobalAudioMuted);
-                return { participantGlobalAudioStates: newGlobalAudioStates };
-              });
-              
-              // Обновляем участников только если нужно (для совместимости)
-              set((state) => {
-                const updatedParticipants = state.participants.map(p => 
-                  p.userId === userId ? { ...p, isGlobalAudioMuted } : p
-                );
-                console.log('Updated participants with globalAudioState:', updatedParticipants);
-                return { participants: updatedParticipants };
-              });
-              
-              // Обновляем voiceChannelParticipants
-              const currentRoomId = get().currentRoomId;
-              if (currentRoomId) {
-                get().updateVoiceChannelParticipant(currentRoomId, userId, {
-                  isGlobalAudioMuted,
-                  isAudioDisabled: isGlobalAudioMuted,
-                  isDeafened: isGlobalAudioMuted
-                });
-              }
+              applyRemoteGlobalAudioState(data?.userId, data?.isGlobalAudioMuted);
+            });
+            voiceCallApi.socket.on('globalMuteState', (data) => {
+              applyRemoteGlobalMuteState(data?.userId, data?.isMuted);
             });
           }
           
@@ -3518,6 +3557,7 @@ export const useCallStore = create(
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
             voiceCallApi.socket.off('globalAudioState');
+            voiceCallApi.socket.off('globalMuteState');
             voiceCallApi.socket.off('speakingStateChanged');
           }
           

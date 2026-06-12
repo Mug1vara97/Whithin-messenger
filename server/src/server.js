@@ -330,6 +330,13 @@ io.on('connection', async (socket) => {
             userId: peer.userId
         });
 
+        if (peer.userId) {
+            io.emit('globalMuteState', {
+                userId: peer.userId,
+                isMuted,
+            });
+        }
+
         // Also broadcast speaking state update if needed
         if (isMuted) {
             socket.to(room.id).emit('speakingStateChanged', {
@@ -656,6 +663,11 @@ io.on('connection', async (socket) => {
             peerId: targetPeer.id,
             userId: targetUserId,
             isMuted: targetPeer.muted,
+        });
+
+        io.emit('globalMuteState', {
+            userId: targetUserId,
+            isMuted: Boolean(targetPeer.muted),
         });
 
         io.to(room.id).emit('peerAudioStateChanged', {
