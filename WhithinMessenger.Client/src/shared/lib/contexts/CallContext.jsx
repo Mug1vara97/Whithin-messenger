@@ -12,7 +12,6 @@ export const useCall = () => {
 };
 
 export const CallProvider = ({ children }) => {
-  const callStore = useCallStore();
   const isInitialized = useRef(false);
   
   // Получаем реактивные значения из Zustand store через селекторы
@@ -71,7 +70,7 @@ export const CallProvider = ({ children }) => {
       }
       isInitialized.current = true;
     }
-  }, [callStore]);
+  }, []);
 
   // Обработчик изменения настроек шумоподавления из других компонентов
   useEffect(() => {
@@ -92,16 +91,16 @@ export const CallProvider = ({ children }) => {
     return () => {
       window.removeEventListener('noiseSuppressionChanged', handleNoiseSuppressionChanged);
     };
-  }, [callStore]);
+  }, []);
 
   // Очистка при размонтировании провайдера
   useEffect(() => {
     // Прединициализация списка аудиоустройств при запуске приложения
     // без захвата микрофона (только проверка доступности/permissions).
-    callStore.preinitializeAudioDevices(false);
+    useCallStore.getState().preinitializeAudioDevices(false);
 
     const handleDeviceChange = () => {
-      callStore.preinitializeAudioDevices(false);
+      useCallStore.getState().preinitializeAudioDevices(false);
     };
 
     navigator?.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
@@ -151,34 +150,34 @@ export const CallProvider = ({ children }) => {
     showSpatialAudioStage,
     spatialPositionsVersion,
     
-    // Методы
-    initializeCall: callStore.initializeCall,
-    joinRoom: callStore.joinRoom,
-    leaveRoom: callStore.leaveRoom,
-    endCall: callStore.endCall,
-    toggleMute: callStore.toggleMute,
-    toggleUserMute: callStore.toggleUserMute,
-    changeUserVolume: callStore.changeUserVolume,
-    toggleVolumeSlider: callStore.toggleVolumeSlider,
-    toggleGlobalAudio: callStore.toggleGlobalAudio,
-    toggleNoiseSuppression: callStore.toggleNoiseSuppression,
-    changeNoiseSuppressionMode: callStore.changeNoiseSuppressionMode,
-    setError: callStore.setError,
-    clearError: callStore.clearError,
-    setAudioBlocked: callStore.setAudioBlocked,
-    startScreenShare: callStore.startScreenShare,
-    stopScreenShare: callStore.stopScreenShare,
-    toggleScreenShare: callStore.toggleScreenShare,
-    startVideo: callStore.startVideo,
-    stopVideo: callStore.stopVideo,
-    toggleVideo: callStore.toggleVideo,
-    preinitializeAudioDevices: callStore.preinitializeAudioDevices,
-    toggleSpatialAudio: callStore.toggleSpatialAudio,
-    toggleSpatialAudioStage: callStore.toggleSpatialAudioStage,
-    setParticipantSpatialPosition: callStore.setParticipantSpatialPosition,
+    // Методы (стабильные ссылки из zustand store)
+    initializeCall: useCallStore.getState().initializeCall,
+    joinRoom: useCallStore.getState().joinRoom,
+    leaveRoom: useCallStore.getState().leaveRoom,
+    endCall: useCallStore.getState().endCall,
+    toggleMute: useCallStore.getState().toggleMute,
+    toggleUserMute: useCallStore.getState().toggleUserMute,
+    changeUserVolume: useCallStore.getState().changeUserVolume,
+    toggleVolumeSlider: useCallStore.getState().toggleVolumeSlider,
+    toggleGlobalAudio: useCallStore.getState().toggleGlobalAudio,
+    toggleNoiseSuppression: useCallStore.getState().toggleNoiseSuppression,
+    changeNoiseSuppressionMode: useCallStore.getState().changeNoiseSuppressionMode,
+    setError: useCallStore.getState().setError,
+    clearError: useCallStore.getState().clearError,
+    setAudioBlocked: useCallStore.getState().setAudioBlocked,
+    startScreenShare: useCallStore.getState().startScreenShare,
+    stopScreenShare: useCallStore.getState().stopScreenShare,
+    toggleScreenShare: useCallStore.getState().toggleScreenShare,
+    startVideo: useCallStore.getState().startVideo,
+    stopVideo: useCallStore.getState().stopVideo,
+    toggleVideo: useCallStore.getState().toggleVideo,
+    preinitializeAudioDevices: useCallStore.getState().preinitializeAudioDevices,
+    toggleSpatialAudio: useCallStore.getState().toggleSpatialAudio,
+    toggleSpatialAudioStage: useCallStore.getState().toggleSpatialAudioStage,
+    setParticipantSpatialPosition: useCallStore.getState().setParticipantSpatialPosition,
     
     // Прямой доступ к store для расширенного использования
-    store: callStore
+    store: useCallStore.getState()
   }), [
     isConnected,
     isInCall,
@@ -213,7 +212,6 @@ export const CallProvider = ({ children }) => {
     spatialAudioEnabled,
     showSpatialAudioStage,
     spatialPositionsVersion,
-    callStore
   ]);
 
   return (

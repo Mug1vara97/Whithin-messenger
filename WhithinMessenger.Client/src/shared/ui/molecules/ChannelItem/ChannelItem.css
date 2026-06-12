@@ -25,6 +25,10 @@
   color: var(--text);
 }
 
+.channel-item.call-only {
+  opacity: 0.85;
+}
+
 .channel-icon {
   margin-right: 8px;
   font-size: 16px;

@@ -289,11 +289,16 @@ class VoiceCallApi {
           
           console.log('switchToChannel: About to switch, channelName:', channelName, 'channelId:', channelId);
           
+          const serverId =
+            callStore.currentCallServerId ||
+            window.location.pathname.match(/\/server\/([^/]+)/)?.[1] ||
+            null;
+
           // Выходим из текущей комнаты через callStore
           await callStore.leaveRoom();
           
           // Присоединяемся к новому каналу через callStore с названием
-          await callStore.joinRoom(channelId, channelName);
+          await callStore.joinRoom(channelId, channelName, serverId);
           
           console.log('switchToChannel: Successfully switched to channel', channelId, 'with name', channelName);
           

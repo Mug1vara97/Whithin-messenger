@@ -13,7 +13,10 @@ import {
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { VoiceParticipantStatusIcons } from '../VoiceParticipantStatusIcons';
-import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
+import {
+  selectActiveServerDeafened,
+  selectActiveServerMuted,
+} from '../../../lib/voice/serverVoiceModerationState';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
@@ -149,8 +152,8 @@ const VideoCallGrid = ({
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
   const localIsMuted = useCallStore((state) => state.isMuted);
   const localIsGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
-  const { isServerMuted: localIsServerMuted, isServerDeafened: localIsServerDeafened } =
-    useCallStore((state) => selectActiveServerVoiceModeration(state, serverId));
+  const localIsServerMuted = useCallStore((state) => selectActiveServerMuted(state, serverId));
+  const localIsServerDeafened = useCallStore((state) => selectActiveServerDeafened(state, serverId));
   const { handleParticipantContextMenu, moderationMenu } = useVoiceParticipantModeration({
     channelId: voiceChannelId,
     currentUserId,

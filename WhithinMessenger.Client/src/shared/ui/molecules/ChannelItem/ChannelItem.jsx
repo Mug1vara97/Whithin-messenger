@@ -82,6 +82,7 @@ const ChannelItem = ({
     channel.TypeId === 4 ||
     channel.typeId === '44444444-4444-4444-4444-444444444444';
   const isPrivate = channel.isPrivate === true || channel.IsPrivate === true;
+  const isCallOnlyChannel = channel.isCallOnlyChannel === true;
   const channelId = channel.chatId || channel.ChatId;
 
   const participantSpeakingStates = useParticipantSpeakingStates();
@@ -162,11 +163,11 @@ const ChannelItem = ({
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`channel-item-wrapper ${isVoiceChannel && voiceParticipants.length > 0 ? 'has-participants' : ''}`}
+          className={`channel-item-wrapper ${isVoiceChannel && voiceParticipants.length > 0 ? 'has-participants' : ''} ${isCallOnlyChannel ? 'call-only-channel' : ''}`}
           style={provided.draggableProps.style}
         >
           <div
-            className={`channel-item ${isActive ? 'active' : ''} ${snapshot.isDragging ? 'dragging' : ''}`}
+            className={`channel-item ${isActive ? 'active' : ''} ${snapshot.isDragging ? 'dragging' : ''} ${isCallOnlyChannel ? 'call-only' : ''}`}
             onClick={handleClick}
             onContextMenu={handleContextMenu}
             style={{

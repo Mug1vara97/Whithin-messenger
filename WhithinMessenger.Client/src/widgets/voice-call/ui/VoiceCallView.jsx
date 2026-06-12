@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
-import { selectActiveServerVoiceModeration } from '../../../shared/lib/voice/serverVoiceModerationState';
+import {
+  selectActiveServerDeafened,
+  selectActiveServerMuted,
+} from '../../../shared/lib/voice/serverVoiceModerationState';
 import { isSameVoiceChannel } from '../../../shared/lib/stores/callStore';
 import { useCallGridTestMode } from '../../../shared/lib/hooks/useCallGridTestMode';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
@@ -95,9 +98,8 @@ const VoiceCallView = ({
     toggleSpatialAudioStage
   } = useGlobalCall(userId, userName);
 
-  const { isServerMuted, isServerDeafened } = useCallStore((state) =>
-    selectActiveServerVoiceModeration(state, serverId)
-  );
+  const isServerMuted = useCallStore((state) => selectActiveServerMuted(state, serverId));
+  const isServerDeafened = useCallStore((state) => selectActiveServerDeafened(state, serverId));
 
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const {

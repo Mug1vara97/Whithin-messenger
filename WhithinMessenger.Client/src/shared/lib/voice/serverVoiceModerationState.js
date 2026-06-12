@@ -26,3 +26,10 @@ export const selectActiveServerVoiceModeration = (state, contextServerId = null)
     state.currentCallServerId
   );
 };
+
+/** Primitive selectors — safe for useCallStore without shallow compare. */
+export const selectActiveServerMuted = (state, contextServerId = null) =>
+  selectActiveServerVoiceModeration(state, contextServerId).isServerMuted;
+
+export const selectActiveServerDeafened = (state, contextServerId = null) =>
+  selectActiveServerVoiceModeration(state, contextServerId).isServerDeafened;

@@ -268,6 +268,8 @@ export const useCallStore = create(
       // Участники всех голосовых каналов (для отображения в списке каналов)
       // Map: channelId -> [{ userId, userName, avatar, avatarColor, isMuted }]
       voiceChannelParticipants: new Map(),
+      // Голосовые каналы, видимые в сайдбаре только на время звонка (например, приватный канал после переноса)
+      callOnlyVoiceChannels: new Map(),
       
       // Отдельные состояния для оптимизации (избегаем перерендера демонстрации экрана)
       participantMuteStates: new Map(), // userId -> isMuted
@@ -662,6 +664,29 @@ export const useCallStore = create(
           return { voiceChannelParticipants: newMap };
         });
       },
+
+      registerCallOnlyVoiceChannel: (channelId, channelName) => {
+        const key = normalizeChannelId(channelId);
+        if (!key) return;
+        const name = channelName || key;
+        set((state) => {
+          const map = new Map(state.callOnlyVoiceChannels);
+          map.set(key, {
+            chatId: key,
+            ChatId: key,
+            name,
+            Name: name,
+            typeId: '44444444-4444-4444-4444-444444444444',
+            chatType: 4,
+            chatTypeId: '44444444-4444-4444-4444-444444444444',
+            isCallOnlyChannel: true,
+            isPrivate: true,
+          });
+          return { callOnlyVoiceChannels: map };
+        });
+      },
+
+      clearCallOnlyVoiceChannels: () => set({ callOnlyVoiceChannels: new Map() }),
       
       // Инициализация VAD для локального пользователя
       initializeLocalVAD: async (stream, audioContext) => {
@@ -1840,6 +1865,7 @@ export const useCallStore = create(
                 },
               });
             }
+            get().registerCallOnlyVoiceChannel(normalizedRoomId, finalChannelName);
             console.log('joinRoom: Already in this room, resyncing participants');
             await get().resyncActiveCall(normalizedRoomId);
             return;
@@ -1925,6 +1951,7 @@ export const useCallStore = create(
                 serverId: serverId ? String(serverId) : null,
               },
             });
+            get().registerCallOnlyVoiceChannel(normalizedRoomId, finalChannelName);
 
             if (!usesInAppSoundpad()) {
               get().routeCallAudioAwayFromCable().catch(() => {});
@@ -3375,6 +3402,7 @@ export const useCallStore = create(
           currentRoomId: null,
           currentCallServerId: null,
           currentCall: null,
+          callOnlyVoiceChannels: new Map(),
           participants: [],
           participantMuteStates: new Map(),
           participantAudioStates: new Map(),

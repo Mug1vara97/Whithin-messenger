@@ -5,7 +5,10 @@ import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../lib/stores/callStore';
-import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
+import {
+  selectActiveServerDeafened,
+  selectActiveServerMuted,
+} from '../../../lib/voice/serverVoiceModerationState';
 import {
     getUserStatusColor,
     getUserStatusLabel,
@@ -29,9 +32,8 @@ const UserPanel = ({
     const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
     const isMuted = useCallStore((state) => state.isMuted);
     const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
-    const { isServerMuted, isServerDeafened } = useCallStore((state) =>
-        selectActiveServerVoiceModeration(state, serverId)
-    );
+    const isServerMuted = useCallStore((state) => selectActiveServerMuted(state, serverId));
+    const isServerDeafened = useCallStore((state) => selectActiveServerDeafened(state, serverId));
 
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);

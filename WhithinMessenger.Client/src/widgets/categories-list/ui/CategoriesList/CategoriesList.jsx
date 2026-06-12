@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
+import { useCallStore } from '../../../../shared/lib/stores/callStore';
 import './CategoriesList.css';
 
 const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
@@ -42,10 +43,45 @@ const CategoriesList = ({
   onServerDataUpdated
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
+  const isInCall = useCallStore((state) => state.isInCall);
+  const currentRoomId = useCallStore((state) => state.currentRoomId);
+  const currentCall = useCallStore((state) => state.currentCall);
+  const callOnlyVoiceChannels = useCallStore((state) => state.callOnlyVoiceChannels);
 
   useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
+
+  const hiddenCallVoiceChannels = useMemo(() => {
+    if (!isInCall || !currentRoomId) return [];
+
+    const visibleChannelIds = new Set();
+    localCategories.forEach((category) => {
+      const chats = category.chats || category.Chats || [];
+      chats.forEach((chat) => {
+        const id = chat.chatId || chat.ChatId;
+        if (id) visibleChannelIds.add(String(id));
+      });
+    });
+
+    const roomId = String(currentRoomId);
+    if (visibleChannelIds.has(roomId)) return [];
+
+    const fromStore = callOnlyVoiceChannels.get(roomId) || callOnlyVoiceChannels.get(currentRoomId);
+    if (fromStore) return [fromStore];
+
+    return [{
+      chatId: roomId,
+      ChatId: roomId,
+      name: currentCall?.channelName || roomId,
+      Name: currentCall?.channelName || roomId,
+      typeId: VOICE_TYPE_GUID,
+      chatType: 4,
+      chatTypeId: VOICE_TYPE_GUID,
+      isCallOnlyChannel: true,
+      isPrivate: true,
+    }];
+  }, [localCategories, isInCall, currentRoomId, currentCall, callOnlyVoiceChannels]);
 
   // Подключаемся к voice-server для получения участников голосовых каналов
   const voiceServiceConnectedRef = useRef(false);
@@ -69,22 +105,26 @@ const CategoriesList = ({
   
   // Подписываемся на голосовые каналы при изменении категорий
   useEffect(() => {
-    if (!localCategories || localCategories.length === 0) return;
-    
-    // Собираем все голосовые каналы
     const voiceChannelIds = new Set();
-    localCategories.forEach(category => {
-      const chats = category.chats || category.Chats || [];
-      chats.forEach(chat => {
-        const isVoice = isVoiceChannelChat(chat);
-        if (isVoice) {
-          const channelId = chat.chatId || chat.ChatId;
-          if (channelId) {
-            voiceChannelIds.add(channelId);
+
+    if (localCategories?.length) {
+      localCategories.forEach((category) => {
+        const chats = category.chats || category.Chats || [];
+        chats.forEach((chat) => {
+          if (isVoiceChannelChat(chat)) {
+            const channelId = chat.chatId || chat.ChatId;
+            if (channelId) voiceChannelIds.add(String(channelId));
           }
-        }
+        });
       });
+    }
+
+    hiddenCallVoiceChannels.forEach((channel) => {
+      const channelId = channel.chatId || channel.ChatId;
+      if (channelId) voiceChannelIds.add(String(channelId));
     });
+
+    if (voiceChannelIds.size === 0) return;
     
     // Подписываемся на новые каналы
     voiceChannelIds.forEach(channelId => {
@@ -101,7 +141,7 @@ const CategoriesList = ({
         subscribedChannelsRef.current.delete(channelId);
       }
     });
-  }, [localCategories]);
+  }, [localCategories, hiddenCallVoiceChannels]);
 
   useEffect(() => {
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
@@ -428,6 +468,23 @@ const CategoriesList = ({
                   {...provided.droppableProps}
                   className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
                 >
+                  {hiddenCallVoiceChannels.map((channel, index) => {
+                    const channelId = channel.chatId || channel.ChatId;
+                    const unreadCount = unreadCountByChat[channelId] || 0;
+                    return (
+                      <ChannelItem
+                        key={`call-only-${channelId}`}
+                        channel={channel}
+                        index={index}
+                        unreadCount={unreadCount}
+                        isActive={isChannelActive(channel)}
+                        onClick={handleChatClick}
+                        isDragDisabled
+                        userId={userId}
+                        userName={userName}
+                      />
+                    );
+                  })}
                   {uncategorizedChannels.map((channel, index) => {
                     const channelId = channel.chatId || channel.ChatId;
                     const unreadCount = unreadCountByChat[channelId] || 0;
@@ -435,7 +492,7 @@ const CategoriesList = ({
                     <ChannelItem
                       key={channel.chatId || channel.ChatId}
                       channel={channel}
-                      index={index}
+                      index={hiddenCallVoiceChannels.length + index}
                       unreadCount={unreadCount}
                       isActive={isChannelActive(channel)}
                       onClick={handleChatClick}

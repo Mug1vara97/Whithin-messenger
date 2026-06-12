@@ -13,7 +13,10 @@ import {
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { useCallStore } from '../../../lib/stores/callStore';
-import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
+import {
+  selectActiveServerDeafened,
+  selectActiveServerMuted,
+} from '../../../lib/voice/serverVoiceModerationState';
 import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
 import { isSameVoiceChannel } from '../../../lib/stores/callStore';
 import { useCallGridTestMode } from '../../../lib/hooks/useCallGridTestMode';
@@ -140,7 +143,8 @@ const ChatVoiceCall = ({
   const participantMuteStatesLive = useParticipantMuteStates();
   const participantGlobalAudioStatesLive = useParticipantGlobalAudioStates();
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
-  const { isServerMuted, isServerDeafened } = useCallStore(selectActiveServerVoiceModeration);
+  const isServerMuted = useCallStore(selectActiveServerMuted);
+  const isServerDeafened = useCallStore(selectActiveServerDeafened);
 
   const {
     showErrorBanner,
