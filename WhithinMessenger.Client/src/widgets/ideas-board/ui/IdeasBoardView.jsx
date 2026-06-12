@@ -42,8 +42,11 @@ const normalizeTag = (tag) => {
   return normalized || null;
 };
 
-const MIN_CARD_WIDTH = 200;
-const ESTIMATED_CARD_HEIGHT = 200;
+const MIN_CARD_WIDTH = 265;
+// Оценка высоты строки для пагинации (компактные листы ~140–190px).
+const ESTIMATED_CARD_HEIGHT = 165;
+const MIN_GRID_ROWS = 2;
+const MIN_PINBOARD_HEIGHT_FOR_TWO_ROWS = 260;
 const MAX_GRID_COLS = 4;
 const MAX_GRID_ROWS = 3;
 
@@ -218,9 +221,10 @@ const IdeasBoardView = ({
         1,
         Math.min(MAX_GRID_COLS, Math.floor((width + gapX) / (MIN_CARD_WIDTH + gapX)))
       );
+      const rowsByHeight = Math.floor((height + gapY) / (ESTIMATED_CARD_HEIGHT + gapY));
       const rows = Math.max(
-        1,
-        Math.min(MAX_GRID_ROWS, Math.floor((height + gapY) / (ESTIMATED_CARD_HEIGHT + gapY)))
+        height >= MIN_PINBOARD_HEIGHT_FOR_TWO_ROWS ? MIN_GRID_ROWS : 1,
+        Math.min(MAX_GRID_ROWS, rowsByHeight)
       );
 
       const cardMaxHeight = Math.max(
@@ -465,6 +469,7 @@ const IdeasBoardView = ({
           aria-live="polite"
           style={{
             '--grid-cols': gridLayout.cols,
+            '--grid-rows': gridLayout.rows,
             '--card-max-height': `${gridLayout.cardMaxHeight}px`,
           }}
         >

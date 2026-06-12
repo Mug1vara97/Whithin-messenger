@@ -519,145 +519,6 @@
   background: var(--primary-hover, #4752c4);
 }
 
-.search-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-input {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
-  font-size: 14px;
-  padding: 8px 12px;
-  width: 200px;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.search-input:focus {
-  border-color: var(--primary);
-  background: var(--hover);
-}
-
-.search-input::placeholder {
-  color: var(--textMuted);
-}
-
-.search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  max-height: 300px;
-  overflow-y: auto;
-  z-index: 1000;
-  margin-top: 4px;
-}
-
-.search-results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.search-results-title {
-  font-size: 12px;
-  color: var(--textMuted);
-  font-weight: 600;
-}
-
-.clear-search {
-  background: none;
-  border: none;
-  color: var(--textMuted);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s ease;
-}
-
-.clear-search:hover {
-  background: var(--hover);
-}
-
-.search-results-list {
-  max-height: 250px;
-  overflow-y: auto;
-}
-
-.search-result-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-bottom: 1px solid var(--border);
-}
-
-.search-result-item:hover {
-  background: var(--hover);
-}
-
-.search-result-item:last-child {
-  border-bottom: none;
-}
-
-.search-result-user {
-  flex-shrink: 0;
-}
-
-.search-result-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.search-result-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.search-result-username {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.search-result-date {
-  font-size: 12px;
-  color: var(--textMuted);
-}
-
-.search-result-content {
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.4;
-  word-break: break-word;
-}
-
 /* Область сообщений */
 .messages {
   flex: 1;
@@ -1060,14 +921,14 @@
 
 .message-input {
   flex: 1;
-  padding: 12px 16px;
-  border-radius: 20px;
+  padding: 10px 14px;
+  border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--background);
+  background: var(--background-primary, #2f3136);
   color: var(--text);
   font-size: 14px;
   line-height: 1.4;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   resize: none;
   min-height: 44px;
   max-height: 120px;
@@ -1076,8 +937,7 @@
 
 .message-input:focus {
   border-color: var(--primary);
-  background: var(--hover);
-  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1);
+  background: var(--background-primary, #2f3136);
 }
 
 .message-input::placeholder {
@@ -1088,12 +948,12 @@
   background: var(--primary);
   color: var(--text);
   border: none;
-  padding: 12px 20px;
-  border-radius: 20px;
+  padding: 10px 16px;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
   min-width: 80px;
   height: 44px;
@@ -1188,7 +1048,7 @@
   padding: 8px 16px;
   background-color: var(--danger);
   color: white;
-  border-radius: 20px;
+  border-radius: 4px;
   font-size: 14px;
 }
 
@@ -1659,10 +1519,6 @@
   
   .header-actions {
     gap: 8px;
-  }
-  
-  .search-input {
-    width: 150px;
   }
   
   .add-member-button {
