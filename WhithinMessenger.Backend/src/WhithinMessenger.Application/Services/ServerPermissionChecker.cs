@@ -16,6 +16,7 @@ public class ServerPermissionChecker
         "changeOwnNickname",
         "manageNicknames",
         "kickMembers",
+        "muteMembers",
         "banMembers",
         "sendMessages",
         "attachFiles",
@@ -103,5 +104,59 @@ public class ServerPermissionChecker
         }
 
         return merged;
+    }
+
+    public static bool IsAudioContentType(string contentType) =>
+        contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+
+    public async Task<(bool Allowed, string? ErrorMessage)> ValidateMediaUploadAsync(
+        Guid? serverId,
+        Guid userId,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        if (!serverId.HasValue)
+        {
+            return (true, null);
+        }
+
+        if (!await HasPermissionAsync(serverId.Value, userId, "sendMessages", cancellationToken))
+        {
+            return (false, "Недостаточно прав для отправки сообщений");
+        }
+
+        var attachmentPermission = IsAudioContentType(contentType) ? "sendVoiceMessages" : "attachFiles";
+        if (!await HasPermissionAsync(serverId.Value, userId, attachmentPermission, cancellationToken))
+        {
+            return attachmentPermission == "sendVoiceMessages"
+                ? (false, "Недостаточно прав для отправки голосовых сообщений")
+                : (false, "Недостаточно прав для прикрепления файлов");
+        }
+
+        return (true, null);
+    }
+
+    public async Task<(bool Allowed, string? ErrorMessage)> ValidateMessageModerationAsync(
+        Guid? serverId,
+        Guid actorUserId,
+        Guid messageAuthorId,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorUserId == messageAuthorId)
+        {
+            return (true, null);
+        }
+
+        if (!serverId.HasValue)
+        {
+            return (false, "User not authorized to modify this message");
+        }
+
+        if (!await HasPermissionAsync(serverId.Value, actorUserId, "manageMessages", cancellationToken))
+        {
+            return (false, "Недостаточно прав для управления сообщениями");
+        }
+
+        return (true, null);
     }
 }

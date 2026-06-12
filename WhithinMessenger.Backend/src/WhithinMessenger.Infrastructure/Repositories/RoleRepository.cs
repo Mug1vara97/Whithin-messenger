@@ -121,4 +121,13 @@ public class RoleRepository : IRoleRepository
         return await _context.ServerRoles
             .AnyAsync(r => r.ServerId == serverId && r.RoleName == roleName, cancellationToken);
     }
+
+    public async Task<List<Guid>> GetUserIdsByRoleAsync(Guid roleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.UserServerRoles
+            .Where(ur => ur.RoleId == roleId)
+            .Select(ur => ur.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
 }

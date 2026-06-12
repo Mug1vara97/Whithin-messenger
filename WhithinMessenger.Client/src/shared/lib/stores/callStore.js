@@ -306,6 +306,8 @@ export const useCallStore = create(
           return false;
         }
       })(),
+      isServerMuted: false,
+      isServerDeafened: false,
       devicesPreinitialized: false,
       mediaDeviceInfo: {
         hasMicrophone: false,
@@ -1101,6 +1103,10 @@ export const useCallStore = create(
             if (currentRoomId) {
               get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: mutedState });
             }
+          });
+
+          voiceCallApi.on('serverVoiceModerationApplied', (data) => {
+            get().applyServerVoiceModeration(data);
           });
 
           voiceCallApi.on('peerAudioStateChanged', (data) => {
@@ -2346,10 +2352,108 @@ export const useCallStore = create(
         }
       },
       
+      applyServerVoiceModeration: async (data) => {
+        const serverMuted = Boolean(data?.serverMuted);
+        const serverDeafened = Boolean(data?.serverDeafened);
+        set({ isServerMuted: serverMuted, isServerDeafened: serverDeafened });
+
+        if (data?.isMuted !== undefined) {
+          const muted = Boolean(data.isMuted);
+          localStorage.setItem('micMuted', JSON.stringify(muted));
+
+          try {
+            if (usesInAppSoundpad()) {
+              soundpadInAppMixer.setMicMuted(muted);
+              await voiceCallApi.setMicrophoneEnabled(true);
+              voiceCallApi.broadcastMuteState(muted);
+            } else {
+              await voiceCallApi.setMicrophoneEnabled(!muted);
+            }
+          } catch (error) {
+            console.warn('Failed to apply server mic moderation:', error);
+            voiceCallApi.broadcastMuteState(muted);
+          }
+
+          const userId = get().currentUserId;
+          set((state) => {
+            const newMuteStates = new Map(state.participantMuteStates);
+            if (userId) newMuteStates.set(String(userId), muted);
+            return {
+              isMuted: muted,
+              participantMuteStates: newMuteStates,
+              participants: state.participants.map((p) =>
+                String(p.userId) === String(userId)
+                  ? { ...p, isMuted: muted, isSpeaking: muted ? false : p.isSpeaking }
+                  : p
+              ),
+            };
+          });
+
+          const currentRoomId = get().currentRoomId;
+          if (currentRoomId && userId) {
+            get().updateVoiceChannelParticipant(currentRoomId, userId, {
+              isMuted: muted,
+              isServerMuted: serverMuted,
+            });
+          }
+
+          if (muted) {
+            get().resetSpeakingState(userId);
+          }
+        }
+
+        if (data?.isGlobalAudioMuted !== undefined) {
+          const deafened = Boolean(data.isGlobalAudioMuted);
+          localStorage.setItem('audioMuted', JSON.stringify(deafened));
+          set({
+            isGlobalAudioMuted: deafened,
+            isAudioEnabled: !deafened,
+          });
+
+          if (voiceCallApi.socket) {
+            voiceCallApi.socket.emit('audioState', {
+              isEnabled: !deafened,
+              isGlobalAudioMuted: deafened,
+              userId: get().currentUserId,
+            });
+          }
+
+          const userId = get().currentUserId;
+          set((state) => {
+            const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
+            if (userId) newGlobalAudioStates.set(String(userId), deafened);
+            return {
+              participantGlobalAudioStates: newGlobalAudioStates,
+              participants: state.participants.map((p) =>
+                String(p.userId) === String(userId)
+                  ? { ...p, isGlobalAudioMuted: deafened, isAudioEnabled: !deafened }
+                  : p
+              ),
+            };
+          });
+
+          const currentRoomId = get().currentRoomId;
+          if (currentRoomId && userId) {
+            get().updateVoiceChannelParticipant(currentRoomId, userId, {
+              isGlobalAudioMuted: deafened,
+              isAudioDisabled: deafened,
+              isDeafened: deafened,
+              isServerDeafened: serverDeafened,
+            });
+          }
+
+          get().applyAllParticipantAudioRouting();
+        }
+      },
+
       // Переключение микрофона
       toggleMute: async () => {
         const state = get();
         const newMutedState = !state.isMuted;
+
+        if (!newMutedState && state.isServerMuted) {
+          return;
+        }
         
         // Сохраняем состояние в localStorage
         localStorage.setItem('micMuted', JSON.stringify(newMutedState));
@@ -2863,6 +2967,10 @@ export const useCallStore = create(
       toggleGlobalAudio: () => {
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
+
+        if (!newMutedState && state.isServerDeafened) {
+          return;
+        }
         
         // Сохраняем состояние в localStorage
         localStorage.setItem('audioMuted', JSON.stringify(newMutedState));

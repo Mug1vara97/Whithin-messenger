@@ -10,6 +10,7 @@ export const ROLE_PERMISSIONS = {
   CHANGE_OWN_NICKNAME: 'changeOwnNickname',
   MANAGE_NICKNAMES: 'manageNicknames',
   KICK_MEMBERS: 'kickMembers',
+  MUTE_MEMBERS: 'muteMembers',
   BAN_MEMBERS: 'banMembers',
   
   // Управление сообщениями
@@ -37,6 +38,7 @@ export const PERMISSION_CATEGORIES = {
       ROLE_PERMISSIONS.CHANGE_OWN_NICKNAME,
       ROLE_PERMISSIONS.MANAGE_NICKNAMES,
       ROLE_PERMISSIONS.KICK_MEMBERS,
+      ROLE_PERMISSIONS.MUTE_MEMBERS,
       ROLE_PERMISSIONS.BAN_MEMBERS
     ]
   },
@@ -61,6 +63,7 @@ export const PERMISSION_LABELS = {
   [ROLE_PERMISSIONS.CHANGE_OWN_NICKNAME]: 'Изменить никнейм - свой ник',
   [ROLE_PERMISSIONS.MANAGE_NICKNAMES]: 'Управлять никнеймами - всех',
   [ROLE_PERMISSIONS.KICK_MEMBERS]: 'Удаление участников',
+  [ROLE_PERMISSIONS.MUTE_MEMBERS]: 'Отключение микрофона и звука',
   [ROLE_PERMISSIONS.BAN_MEMBERS]: 'Бан участников',
   [ROLE_PERMISSIONS.SEND_MESSAGES]: 'Отправлять сообщения',
   [ROLE_PERMISSIONS.ATTACH_FILES]: 'Прикреплять файлы',

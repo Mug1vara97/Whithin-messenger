@@ -8,12 +8,20 @@ export const useContextMenu = () => {
     messageId: null,
     isOwnMessage: false,
     canDelete: false,
+    canEdit: false,
     type: null
   });
 
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
 
-  const handleContextMenu = useCallback((e, messageId, isOwnMessage = false, canDelete = false, type = 'message') => {
+  const handleContextMenu = useCallback((
+    e,
+    messageId,
+    isOwnMessage = false,
+    canDelete = false,
+    type = 'message',
+    canEdit = false
+  ) => {
     e.preventDefault();
     setContextMenu({
       visible: true,
@@ -22,6 +30,7 @@ export const useContextMenu = () => {
       messageId: messageId,
       isOwnMessage: isOwnMessage,
       canDelete: canDelete,
+      canEdit: canEdit,
       type: type
     });
     setHighlightedMessageId(messageId);
@@ -35,6 +44,7 @@ export const useContextMenu = () => {
       messageId: null, 
       isOwnMessage: false, 
       canDelete: false,
+      canEdit: false,
       type: null
     });
     setHighlightedMessageId(null);

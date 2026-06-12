@@ -22,7 +22,9 @@ const participantsListChanged = (next = [], prev = []) => {
       (participant.userName || participant.name) !== (current.userName || current.name) ||
       Boolean(participant.isMuted) !== Boolean(current.isMuted) ||
       Boolean(participant.isSpeaking) !== Boolean(current.isSpeaking) ||
-      Boolean(participant.isAudioDisabled) !== Boolean(current.isAudioDisabled)
+      Boolean(participant.isAudioDisabled) !== Boolean(current.isAudioDisabled) ||
+      Boolean(participant.isServerMuted) !== Boolean(current.isServerMuted) ||
+      Boolean(participant.isServerDeafened) !== Boolean(current.isServerDeafened)
     );
   });
 };
@@ -123,6 +125,9 @@ class VoiceChannelService {
         isSpeaking: p.isSpeaking || false,
         isAudioDisabled: p.isAudioDisabled || false,
         isDeafened: p.isAudioDisabled || false,
+        isGlobalAudioMuted: p.isAudioDisabled || false,
+        isServerMuted: p.isServerMuted || false,
+        isServerDeafened: p.isServerDeafened || false,
         avatar: p.avatar || null,
         avatarColor: p.avatarColor || '#5865f2',
       }));

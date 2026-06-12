@@ -12,6 +12,8 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     private readonly IVideoConverterService _videoConverterService;
     private readonly IMediaFileRepository _mediaFileRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
     private readonly ILogger<UploadMediaCommandHandler> _logger;
 
     public UploadMediaCommandHandler(
@@ -19,12 +21,16 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
         IVideoConverterService videoConverterService,
         IMediaFileRepository mediaFileRepository,
         IMessageRepository messageRepository,
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker,
         ILogger<UploadMediaCommandHandler> logger)
     {
         _fileService = fileService;
         _videoConverterService = videoConverterService;
         _mediaFileRepository = mediaFileRepository;
         _messageRepository = messageRepository;
+        _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
         _logger = logger;
     }
 
@@ -32,7 +38,31 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     {
         try
         {
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat == null)
+            {
+                return new UploadMediaResult
+                {
+                    Success = false,
+                    ErrorMessage = "Чат не найден"
+                };
+            }
+
             var contentType = request.File.ContentType;
+            var uploadCheck = await _permissionChecker.ValidateMediaUploadAsync(
+                chat.ServerId,
+                request.UserId,
+                contentType,
+                cancellationToken);
+
+            if (!uploadCheck.Allowed)
+            {
+                return new UploadMediaResult
+                {
+                    Success = false,
+                    ErrorMessage = uploadCheck.ErrorMessage
+                };
+            }
             var folderPath = _fileService.GetMediaFolderPath(contentType);
 
             var filePath = await _fileService.SaveFileAsync(request.File, folderPath);

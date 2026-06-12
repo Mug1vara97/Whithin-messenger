@@ -186,12 +186,19 @@ public class UpdateRoleCommand : IRequest<UpdateRoleResult>
     }
 }
 
+public class AffectedUserPermissions
+{
+    public Guid UserId { get; set; }
+    public Dictionary<string, bool> Permissions { get; set; } = new();
+}
+
 public class UpdateRoleResult
 {
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public object? Role { get; set; }
     public Guid ServerId { get; set; }
+    public List<AffectedUserPermissions> AffectedUserPermissions { get; set; } = new();
 }
 
 public class DeleteRoleCommand : IRequest<DeleteRoleResult>

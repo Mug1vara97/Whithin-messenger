@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.EditMessage;
@@ -6,10 +7,17 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Messages.EditMessage;
 public class EditMessageCommandHandler : IRequestHandler<EditMessageCommand, EditMessageResult>
 {
     private readonly IMessageRepository _messageRepository;
+    private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public EditMessageCommandHandler(IMessageRepository messageRepository)
+    public EditMessageCommandHandler(
+        IMessageRepository messageRepository,
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _messageRepository = messageRepository;
+        _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<EditMessageResult> Handle(EditMessageCommand request, CancellationToken cancellationToken)
@@ -27,12 +35,19 @@ public class EditMessageCommandHandler : IRequestHandler<EditMessageCommand, Edi
                 };
             }
 
-            if (message.UserId != request.UserId)
+            var chat = await _chatRepository.GetByIdAsync(message.ChatId, cancellationToken);
+            var moderationCheck = await _permissionChecker.ValidateMessageModerationAsync(
+                chat?.ServerId,
+                request.UserId,
+                message.UserId,
+                cancellationToken);
+
+            if (!moderationCheck.Allowed)
             {
                 return new EditMessageResult
                 {
                     Success = false,
-                    ErrorMessage = "User not authorized to edit this message"
+                    ErrorMessage = moderationCheck.ErrorMessage
                 };
             }
 

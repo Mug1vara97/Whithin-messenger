@@ -27,6 +27,8 @@ const UserPanel = ({
     const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
     const isMuted = useCallStore((state) => state.isMuted);
     const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
+    const isServerMuted = useCallStore((state) => state.isServerMuted);
+    const isServerDeafened = useCallStore((state) => state.isServerDeafened);
 
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
@@ -450,7 +452,14 @@ const UserPanel = ({
                         <button
                             className={styles['voice-control-button']}
                             onClick={toggleMute}
-                            title={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+                            disabled={isServerMuted && isMuted}
+                            title={
+                              isServerMuted && isMuted
+                                ? 'Микрофон отключён модератором'
+                                : isMuted
+                                  ? 'Включить микрофон'
+                                  : 'Выключить микрофон'
+                            }
                         >
                             {isMuted ? <MicOff fontSize="small" /> : <Mic fontSize="small" />}
                         </button>
@@ -458,7 +467,14 @@ const UserPanel = ({
                         <button
                             className={styles['voice-control-button']}
                             onClick={toggleGlobalAudio}
-                            title={!isGlobalAudioMuted ? "Выключить звук" : "Включить звук"}
+                            disabled={isServerDeafened && isGlobalAudioMuted}
+                            title={
+                              isServerDeafened && isGlobalAudioMuted
+                                ? 'Звук отключён модератором'
+                                : !isGlobalAudioMuted
+                                  ? 'Выключить звук'
+                                  : 'Включить звук'
+                            }
                         >
                             {!isGlobalAudioMuted ? <Headset fontSize="small" /> : <HeadsetOff fontSize="small" />}
                         </button>

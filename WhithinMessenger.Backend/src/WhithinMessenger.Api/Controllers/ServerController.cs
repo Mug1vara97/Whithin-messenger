@@ -6,6 +6,7 @@ using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
@@ -19,13 +20,20 @@ public class ServerController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IWebHostEnvironment _environment;
     private readonly IHubContext<ServerHub> _serverHub;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public ServerController(IServerRepository serverRepository, IMediator mediator, IWebHostEnvironment environment, IHubContext<ServerHub> serverHub)
+    public ServerController(
+        IServerRepository serverRepository,
+        IMediator mediator,
+        IWebHostEnvironment environment,
+        IHubContext<ServerHub> serverHub,
+        ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
         _mediator = mediator;
         _environment = environment;
         _serverHub = serverHub;
+        _permissionChecker = permissionChecker;
     }
 
     [HttpGet("servers")]
@@ -475,12 +483,12 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            if (server.OwnerId != userId)
+            if (!await _permissionChecker.HasPermissionAsync(serverId, userId, "createInvites"))
             {
                 return Forbid("Недостаточно прав для добавления участников");
             }
 
-            var command = new AddMemberCommand(serverId, request.UserId);
+            var command = new AddMemberCommand(serverId, request.UserId, userId);
             var result = await _mediator.Send(command);
 
             if (!result.Success)

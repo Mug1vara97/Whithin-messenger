@@ -212,13 +212,7 @@ const ServerSettings = ({
   };
 
   if (!isServerOwner && !userPermissions?.manageServer) {
-    return (
-      <div className="server-settings">
-        <div className="no-permission">
-          У вас нет прав для управления настройками сервера
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

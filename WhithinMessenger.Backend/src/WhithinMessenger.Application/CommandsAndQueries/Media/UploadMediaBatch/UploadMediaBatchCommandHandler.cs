@@ -14,6 +14,8 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
     private readonly IVideoConverterService _videoConverterService;
     private readonly IMediaFileRepository _mediaFileRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
     private readonly ILogger<UploadMediaBatchCommandHandler> _logger;
 
     public UploadMediaBatchCommandHandler(
@@ -21,12 +23,16 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
         IVideoConverterService videoConverterService,
         IMediaFileRepository mediaFileRepository,
         IMessageRepository messageRepository,
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker,
         ILogger<UploadMediaBatchCommandHandler> logger)
     {
         _fileService = fileService;
         _videoConverterService = videoConverterService;
         _mediaFileRepository = mediaFileRepository;
         _messageRepository = messageRepository;
+        _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
         _logger = logger;
     }
 
@@ -51,6 +57,34 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
                     Success = false,
                     ErrorMessage = $"Можно отправить не больше {MaxBatchSize} файлов за раз"
                 };
+            }
+
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat == null)
+            {
+                return new UploadMediaBatchResult
+                {
+                    Success = false,
+                    ErrorMessage = "Чат не найден"
+                };
+            }
+
+            foreach (var file in files)
+            {
+                var uploadCheck = await _permissionChecker.ValidateMediaUploadAsync(
+                    chat.ServerId,
+                    request.UserId,
+                    file.ContentType,
+                    cancellationToken);
+
+                if (!uploadCheck.Allowed)
+                {
+                    return new UploadMediaBatchResult
+                    {
+                        Success = false,
+                        ErrorMessage = uploadCheck.ErrorMessage
+                    };
+                }
             }
 
             var message = new Message

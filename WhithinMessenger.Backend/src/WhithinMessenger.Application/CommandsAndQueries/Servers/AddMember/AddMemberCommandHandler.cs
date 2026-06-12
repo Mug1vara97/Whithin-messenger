@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -11,19 +12,22 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
     private readonly IUserRepository _userRepository;
     private readonly IChatRepository _chatRepository;
     private readonly IChatMemberRepository _chatMemberRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public AddMemberCommandHandler(
         IServerRepository serverRepository,
         IServerMemberRepository serverMemberRepository,
         IUserRepository userRepository,
         IChatRepository chatRepository,
-        IChatMemberRepository chatMemberRepository)
+        IChatMemberRepository chatMemberRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
         _userRepository = userRepository;
         _chatRepository = chatRepository;
         _chatMemberRepository = chatMemberRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<AddMemberResult> Handle(AddMemberCommand request, CancellationToken cancellationToken)
@@ -34,6 +38,12 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
             if (server == null)
             {
                 return new AddMemberResult(false, "Сервер не найден");
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.CurrentUserId, "createInvites", cancellationToken))
+            {
+                return new AddMemberResult(false, "Недостаточно прав для добавления участников");
             }
 
             var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);

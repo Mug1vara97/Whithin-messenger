@@ -225,6 +225,10 @@ class VoiceCallApi {
       });
     });
 
+    this.socket.on('serverVoiceModerationApplied', (data) => {
+      this.emit('serverVoiceModerationApplied', data);
+    });
+
     // Обработчик переключения в другой канал (от сервера)
     this.socket.on('switchToChannel', async ({ channelId, sourceChannelId }) => {
       console.log('switchToChannel: Received switch command to channel', channelId, 'from', sourceChannelId);
@@ -740,6 +744,12 @@ class VoiceCallApi {
   broadcastMuteState(isMuted) {
     if (this.socket) {
       this.socket.emit('muteState', { isMuted: Boolean(isMuted) });
+    }
+  }
+
+  emitServerVoiceModeration(payload) {
+    if (this.socket?.connected) {
+      this.socket.emit('serverVoiceModeration', payload);
     }
   }
 

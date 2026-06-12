@@ -19,7 +19,7 @@ const ServerSettingsPage = () => {
   const [error, setError] = useState(null);
   const [, setConnection] = useState(null);
   const connectionRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('members');
   const [userPermissions, setUserPermissions] = useState({});
   const [isServerOwner, setIsServerOwner] = useState(false);
 
@@ -192,6 +192,8 @@ const ServerSettingsPage = () => {
       setActiveTab('members');
     } else if (activeTab === 'roles' && !userCanManageRoles) {
       setActiveTab('members');
+    } else if (activeTab === 'audit-log' && !userCanManageServer) {
+      setActiveTab('members');
     }
   }, [activeTab, userCanManageServer, userCanManageRoles]);
 
@@ -285,8 +287,8 @@ const ServerSettingsPage = () => {
         </button>
 
         <nav className="settings-nav">
+          {userCanManageServer && (
           <div className="nav-section">
-            {userCanManageServer && (
             <button
               className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => setActiveTab('profile')}
@@ -296,8 +298,8 @@ const ServerSettingsPage = () => {
               </svg>
               Профиль сервера
             </button>
-            )}
           </div>
+          )}
 
           {userCanManageServer && <div className="nav-divider"></div>}
 
@@ -313,18 +315,21 @@ const ServerSettingsPage = () => {
               Участники
             </button>
             
+            {userCanManageRoles && (
             <button
               className={`settings-nav-item ${activeTab === 'roles' ? 'active' : ''}`}
               onClick={() => setActiveTab('roles')}
-              disabled={!userCanManageRoles}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2M21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z"/>
               </svg>
               Роли
             </button>
+            )}
           </div>
 
+          {userCanManageServer && (
+          <>
           <div className="nav-divider"></div>
 
           <div className="nav-section">
@@ -339,6 +344,8 @@ const ServerSettingsPage = () => {
               Журнал аудита
             </button>
           </div>
+          </>
+          )}
           </nav>
         </div>
 
@@ -376,7 +383,7 @@ const ServerSettingsPage = () => {
           />
         )}
 
-        {activeTab === 'audit-log' && (
+        {activeTab === 'audit-log' && userCanManageServer && (
           <div className="settings-content">
             <h1>Журнал аудита</h1>
             <p>Журнал аудита будет здесь</p>

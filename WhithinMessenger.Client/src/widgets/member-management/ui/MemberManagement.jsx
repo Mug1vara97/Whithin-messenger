@@ -55,6 +55,17 @@ const MemberManagement = ({
     }
   };
 
+  const userCanManageMemberRoles = isServerOwner || canManageRoles(userPermissions, isServerOwner);
+  const userCanKickMembers = isServerOwner || userPermissions?.kickMembers;
+
+  const memberHasMenuActions = useCallback((member) => {
+    const fa = friendActionForMember(member.userId);
+    if (fa.kind !== 'self') return true;
+    if (userCanManageMemberRoles) return true;
+    if (userCanKickMembers && String(member.userId) !== String(userId)) return true;
+    return false;
+  }, [friendActionForMember, userCanManageMemberRoles, userCanKickMembers, userId]);
+
   const [contextMenu, setContextMenu] = useState({
     visible: false,
     x: 0,
@@ -402,6 +413,7 @@ const MemberManagement = ({
                 </div>
               </div>
             </div>
+            {memberHasMenuActions(member) && (
             <button 
               className="member-menu-button"
               onClick={(e) => {
@@ -416,6 +428,7 @@ const MemberManagement = ({
             >
               ⋮
             </button>
+            )}
           </div>
         ))
         )}

@@ -14,4 +14,5 @@ public interface IRoleRepository
     Task<ServerRole> UpdateAsync(ServerRole role, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid roleId, CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(Guid serverId, string roleName, CancellationToken cancellationToken = default);
+    Task<List<Guid>> GetUserIdsByRoleAsync(Guid roleId, CancellationToken cancellationToken = default);
 }

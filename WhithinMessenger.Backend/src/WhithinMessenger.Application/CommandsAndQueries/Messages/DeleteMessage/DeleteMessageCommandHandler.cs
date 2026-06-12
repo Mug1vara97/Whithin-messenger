@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage;
@@ -6,10 +7,17 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage
 public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand, DeleteMessageResult>
 {
     private readonly IMessageRepository _messageRepository;
+    private readonly IChatRepository _chatRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public DeleteMessageCommandHandler(IMessageRepository messageRepository)
+    public DeleteMessageCommandHandler(
+        IMessageRepository messageRepository,
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _messageRepository = messageRepository;
+        _chatRepository = chatRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<DeleteMessageResult> Handle(DeleteMessageCommand request, CancellationToken cancellationToken)
@@ -24,6 +32,22 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
                 {
                     Success = false,
                     ErrorMessage = "Message not found"
+                };
+            }
+
+            var chat = await _chatRepository.GetByIdAsync(message.ChatId, cancellationToken);
+            var moderationCheck = await _permissionChecker.ValidateMessageModerationAsync(
+                chat?.ServerId,
+                request.UserId,
+                message.UserId,
+                cancellationToken);
+
+            if (!moderationCheck.Allowed)
+            {
+                return new DeleteMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = moderationCheck.ErrorMessage
                 };
             }
 

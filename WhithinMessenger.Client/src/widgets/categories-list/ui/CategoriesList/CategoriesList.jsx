@@ -39,7 +39,9 @@ const CategoriesList = ({
   userName,
   onCategoriesReordered,
   onChatsReordered,
-  onServerDataUpdated
+  onServerDataUpdated,
+  canMuteMembers = false,
+  serverConnection,
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
 
@@ -411,11 +413,10 @@ const CategoriesList = ({
             ref={provided.innerRef}
             className={`categories-list ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
             onContextMenu={(e) => {
+              if (!onEmptySpaceContextMenu) return;
               if (!e.target.closest('.category-item') && !e.target.closest('.channel-item')) {
                 e.preventDefault();
-                if (onEmptySpaceContextMenu) {
-                  onEmptySpaceContextMenu(e);
-                }
+                onEmptySpaceContextMenu(e);
               }
             }}
           >
@@ -440,11 +441,17 @@ const CategoriesList = ({
                       unreadCount={unreadCount}
                       isActive={isChannelActive(channel)}
                       onClick={handleChatClick}
-                      onContextMenu={(e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })}
+                      onContextMenu={onChannelContextMenu
+                        ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
+                        : undefined}
                       onSettings={onChannelSettings ? handleChannelSettings : undefined}
                       isDragDisabled={!canManageChannels}
                       userId={userId}
                       userName={userName}
+                      canMuteMembers={canMuteMembers}
+                      serverId={serverId}
+                      serverConnection={serverConnection}
+                      currentUserId={userId}
                     />
                     );
                   })}
@@ -461,7 +468,7 @@ const CategoriesList = ({
                 category={category}
                 index={index}
                 onAddChannel={canManageChannels ? handleAddChannel : undefined}
-                onCategoryContextMenu={handleCategoryContextMenu}
+                onCategoryContextMenu={onCategoryContextMenu ? handleCategoryContextMenu : undefined}
                 isDragDisabled={!canManageChannels}
               >
                 {category.chats?.map((channel, channelIndex) => {
@@ -475,11 +482,17 @@ const CategoriesList = ({
                     unreadCount={unreadCount}
                     isActive={isChannelActive(channel)}
                     onClick={handleChatClick}
-                    onContextMenu={(e) => handleChannelContextMenu(e, channel, category)}
+                    onContextMenu={onChannelContextMenu
+                      ? (e) => handleChannelContextMenu(e, channel, category)
+                      : undefined}
                     onSettings={onChannelSettings ? handleChannelSettings : undefined}
                     isDragDisabled={!canManageChannels}
                     userId={userId}
                     userName={userName}
+                    canMuteMembers={canMuteMembers}
+                    serverId={serverId}
+                    serverConnection={serverConnection}
+                    currentUserId={userId}
                   />
                   );
                 }) || (

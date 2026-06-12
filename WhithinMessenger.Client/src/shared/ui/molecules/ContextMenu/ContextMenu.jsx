@@ -35,7 +35,7 @@ const ContextMenu = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || items.length === 0) return null;
 
   return (
     <div 

@@ -620,6 +620,21 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
 
             var updatedRole = await _roleRepository.UpdateAsync(existingRole, cancellationToken);
 
+            var affectedUserIds = await _roleRepository.GetUserIdsByRoleAsync(request.RoleId, cancellationToken);
+            var affectedUserPermissions = new List<AffectedUserPermissions>();
+            foreach (var affectedUserId in affectedUserIds)
+            {
+                var mergedPermissions = await _permissionChecker.GetMergedPermissionsAsync(
+                    updatedRole.ServerId,
+                    affectedUserId,
+                    cancellationToken);
+                affectedUserPermissions.Add(new AffectedUserPermissions
+                {
+                    UserId = affectedUserId,
+                    Permissions = mergedPermissions,
+                });
+            }
+
             return new UpdateRoleResult
             {
                 Success = true,
@@ -632,7 +647,8 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
                     color = updatedRole.Color,
                     permissions = updatedRole.Permissions,
                     createdAt = updatedRole.CreatedAt
-                }
+                },
+                AffectedUserPermissions = affectedUserPermissions,
             };
         }
         catch (Exception ex)

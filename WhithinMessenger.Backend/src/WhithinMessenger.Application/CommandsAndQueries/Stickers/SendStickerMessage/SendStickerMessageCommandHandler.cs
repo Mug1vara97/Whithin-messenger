@@ -1,5 +1,6 @@
 using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -11,17 +12,20 @@ public class SendStickerMessageCommandHandler : IRequestHandler<SendStickerMessa
     private readonly IMessageRepository _messageRepository;
     private readonly IChatRepository _chatRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
     public SendStickerMessageCommandHandler(
         IStickerPackRepository stickerPackRepository,
         IMessageRepository messageRepository,
         IChatRepository chatRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ServerPermissionChecker permissionChecker)
     {
         _stickerPackRepository = stickerPackRepository;
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
         _userRepository = userRepository;
+        _permissionChecker = permissionChecker;
     }
 
     public async Task<SendStickerMessageResult> Handle(SendStickerMessageCommand request, CancellationToken cancellationToken)
@@ -45,6 +49,17 @@ public class SendStickerMessageCommandHandler : IRequestHandler<SendStickerMessa
                 {
                     Success = false,
                     ErrorMessage = "Чат не найден"
+                };
+            }
+
+            if (chat.ServerId.HasValue &&
+                !await _permissionChecker.HasPermissionAsync(
+                    chat.ServerId.Value, request.UserId, "sendMessages", cancellationToken))
+            {
+                return new SendStickerMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = "Недостаточно прав для отправки сообщений"
                 };
             }
 

@@ -13,6 +13,7 @@ import {
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { moderateVoiceParticipant } from '../../../lib/voice/moderateVoiceParticipant';
 import './ChannelItem.css';
 
 const EMPTY_VOICE_PARTICIPANTS = [];
@@ -56,7 +57,9 @@ const areParticipantsEqual = (a, b) => {
       pA.isSpeaking !== pB.isSpeaking ||
       pA.isDeafened !== pB.isDeafened ||
       pA.isAudioDisabled !== pB.isAudioDisabled ||
-      pA.isGlobalAudioMuted !== pB.isGlobalAudioMuted
+      pA.isGlobalAudioMuted !== pB.isGlobalAudioMuted ||
+      pA.isServerMuted !== pB.isServerMuted ||
+      pA.isServerDeafened !== pB.isServerDeafened
     ) {
       return false;
     }
@@ -73,7 +76,18 @@ const ChannelItem = ({
   onContextMenu,
   onSettings,
   isDragDisabled = false,
+  canMuteMembers = false,
+  serverId,
+  serverConnection,
+  currentUserId,
 }) => {
+  const [participantMenu, setParticipantMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    participant: null,
+  });
+  const participantMenuRef = useRef(null);
   const isVoiceChannel =
     channel.chatType === 4 ||
     channel.typeId === 4 ||
@@ -129,6 +143,67 @@ const ChannelItem = ({
     }
   };
 
+  useEffect(() => {
+    if (!participantMenu.visible) return undefined;
+
+    const handleOutside = (event) => {
+      if (participantMenuRef.current && !participantMenuRef.current.contains(event.target)) {
+        setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [participantMenu.visible]);
+
+  const handleParticipantContextMenu = (event, participant) => {
+    if (!canMuteMembers || !serverId || !serverConnection) return;
+
+    const participantUserId = String(participant.odUserId || participant.userId || '');
+    if (!participantUserId || participantUserId === String(currentUserId || '')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    setParticipantMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      participant,
+    });
+  };
+
+  const runVoiceModeration = async (options) => {
+    const participant = participantMenu.participant;
+    if (!participant) return;
+
+    const targetUserId = participant.odUserId || participant.userId;
+    try {
+      await moderateVoiceParticipant({
+        connection: serverConnection,
+        serverId,
+        channelId,
+        targetUserId,
+        muteMic: options.muteMic,
+        deafen: options.deafen,
+      });
+    } catch (error) {
+      console.error('Voice moderation failed:', error);
+      alert(error?.message || 'Не удалось применить модерацию');
+    } finally {
+      setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
+    }
+  };
+
   const getChannelIcon = () => {
     if (isVoiceChannel) {
       return <VolumeUp sx={{ fontSize: 16, width: 16, height: 16 }} />;
@@ -179,6 +254,7 @@ const ChannelItem = ({
             {unreadCount > 0 && !isActive && (
               <span className="channel-unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
             )}
+            {onSettings && (
             <div className="channel-settings">
               <button
                 className="settings-button"
@@ -188,6 +264,7 @@ const ChannelItem = ({
                 <FaCog />
               </button>
             </div>
+            )}
           </div>
 
           {isVoiceChannel && (
@@ -235,8 +312,9 @@ const ChannelItem = ({
                             ref={participantProvided.innerRef}
                             {...participantProvided.draggableProps}
                             {...participantProvided.dragHandleProps}
-                            className={`voice-participant ${isSpeakingLive ? 'speaking' : ''} ${isMutedLive ? 'muted' : ''} ${isDeafenedLive ? 'deafened' : ''} ${participantSnapshot.isDragging ? 'dragging' : ''}`}
+                            className={`voice-participant ${isSpeakingLive ? 'speaking' : ''} ${isMutedLive ? 'muted' : ''} ${isDeafenedLive ? 'deafened' : ''} ${participant.isServerMuted ? 'server-muted' : ''} ${participantSnapshot.isDragging ? 'dragging' : ''}`}
                             style={participantProvided.draggableProps.style}
+                            onContextMenu={(event) => handleParticipantContextMenu(event, participant)}
                           >
                             <div className="voice-participant-avatar">
                               {participant.avatar ? (
@@ -283,6 +361,33 @@ const ChannelItem = ({
                 </div>
               )}
             </Droppable>
+          )}
+        </div>
+      )}
+
+      {participantMenu.visible && participantMenu.participant && (
+        <div
+          ref={participantMenuRef}
+          className="voice-participant-context-menu"
+          style={{ left: participantMenu.x, top: participantMenu.y }}
+        >
+          {participantMenu.participant.isServerMuted ? (
+            <button type="button" onClick={() => runVoiceModeration({ muteMic: false })}>
+              Разрешить включить микрофон
+            </button>
+          ) : (
+            <button type="button" onClick={() => runVoiceModeration({ muteMic: true })}>
+              Выключить микрофон
+            </button>
+          )}
+          {participantMenu.participant.isServerDeafened ? (
+            <button type="button" onClick={() => runVoiceModeration({ deafen: false })}>
+              Разрешить включить звук
+            </button>
+          ) : (
+            <button type="button" onClick={() => runVoiceModeration({ deafen: true })}>
+              Выключить звук
+            </button>
           )}
         </div>
       )}

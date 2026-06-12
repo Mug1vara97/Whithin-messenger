@@ -15,9 +15,13 @@ import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextM
 import {
   canManageChannels,
   canManageServer,
+  canCreateInvites,
+  canMuteMembers,
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
 } from '../../../entities/role/lib/serverPermissions';
+import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
+import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { 
   CreateNewFolder, 
   Add, 
@@ -25,6 +29,7 @@ import {
   Delete,
   Settings,
   PersonAdd,
+  Group,
   ExitToApp
 } from '@mui/icons-material';
 import './ServerPanel.css';
@@ -61,6 +66,8 @@ const ServerPanel = ({
   const serverPermissions = getServerPermissions(currentServer);
   const userCanManageChannels = canManageChannels(serverPermissions, isOwner);
   const userCanManageServer = canManageServer(serverPermissions, isOwner);
+  const userCanCreateInvites = canCreateInvites(serverPermissions, isOwner);
+  const userCanMuteMembers = canMuteMembers(serverPermissions, isOwner);
 
   const fetchServerData = useCallback(async () => {
     if (!selectedServer?.serverId) return null;
@@ -409,6 +416,47 @@ const ServerPanel = ({
     };
     serverConnection.on("UserPermissionsUpdated", handleUserPermissionsUpdated);
 
+    const handleVoiceMemberModerated = ({
+      serverId: eventServerId,
+      channelId,
+      targetUserId,
+      muteMic,
+      deafen,
+      moderatorUserId,
+    }) => {
+      const activeServerId = selectedServer?.serverId || currentServer?.serverId;
+      if (String(eventServerId) !== String(activeServerId)) return;
+
+      if (String(moderatorUserId) === String(user?.id)) {
+        voiceCallApi.emitServerVoiceModeration({
+          channelId,
+          targetUserId,
+          moderatorUserId,
+          serverId: eventServerId,
+          muteMic: muteMic ?? null,
+          deafen: deafen ?? null,
+        });
+        return;
+      }
+
+      const updates = {};
+      if (muteMic !== null && muteMic !== undefined) {
+        updates.isMuted = Boolean(muteMic);
+        updates.isServerMuted = Boolean(muteMic);
+        if (muteMic) updates.isSpeaking = false;
+      }
+      if (deafen !== null && deafen !== undefined) {
+        updates.isGlobalAudioMuted = Boolean(deafen);
+        updates.isAudioDisabled = Boolean(deafen);
+        updates.isDeafened = Boolean(deafen);
+        updates.isServerDeafened = Boolean(deafen);
+      }
+      if (Object.keys(updates).length > 0) {
+        useCallStore.getState().updateVoiceChannelParticipant(channelId, targetUserId, updates);
+      }
+    };
+    serverConnection.on('VoiceMemberModerated', handleVoiceMemberModerated);
+
     return () => {
       serverConnection.off("ChatCreated", handleChatCreated);
       serverConnection.off("ChatDeleted", handleChatDeleted);
@@ -419,6 +467,7 @@ const ServerPanel = ({
       serverConnection.off("ChannelMemberAdded", handleChannelMemberAdded);
       serverConnection.off("ChannelMemberRemoved", handleChannelMemberRemoved);
       serverConnection.off("UserPermissionsUpdated", handleUserPermissionsUpdated);
+      serverConnection.off('VoiceMemberModerated', handleVoiceMemberModerated);
     };
   }, [serverConnection, onServerDataUpdated, user, selectedServer?.serverId, fetchServerData]);
 
@@ -735,6 +784,7 @@ const ServerPanel = ({
   }, [server?.serverId, serverConnection]);
 
   const handleContextMenu = useCallback((e, type, data = null) => {
+    if (!userCanManageChannels) return;
     e.preventDefault();
     setContextMenu({
       isOpen: true,
@@ -742,7 +792,7 @@ const ServerPanel = ({
       type,
       data
     });
-  }, []);
+  }, [userCanManageChannels]);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, type: null, data: null });
@@ -1051,11 +1101,23 @@ const ServerPanel = ({
             )}
             <div 
               className="dropdown-item"
+              onClick={() => {
+                setShowDropdown(false);
+                navigate(`/server/${currentServer?.serverId || currentServer?.ServerId}/settings`);
+              }}
+            >
+              <Group sx={{ fontSize: 16, marginRight: 8 }} />
+              Участники
+            </div>
+            {userCanCreateInvites && (
+            <div 
+              className="dropdown-item"
               onClick={handleAddMember}
             >
               <PersonAdd sx={{ fontSize: 16, marginRight: 8 }} />
               Добавить участника
             </div>
+            )}
             {currentServer?.ownerId === user?.id || currentServer?.OwnerId === user?.id ? (
               <div 
                 className="dropdown-item dropdown-item-danger"
@@ -1080,6 +1142,7 @@ const ServerPanel = ({
       <div 
         className={`server-channels ${(serverBanner?.banner || serverBanner?.bannerColor) ? 'with-banner' : ''}`}
         onContextMenu={(e) => {
+          if (!userCanManageChannels) return;
           if (!e.target.closest('.category-item') && !e.target.closest('.channel-item')) {
             e.preventDefault();
             handleContextMenu(e, 'empty');
@@ -1091,10 +1154,16 @@ const ServerPanel = ({
           selectedChat={selectedChat}
           unreadCountByChat={unreadCountByChat}
           onChatClick={handleChatClick}
-          onAddChannel={handleAddChannel}
-          onChannelContextMenu={(e, channel, category) => handleContextMenu(e, 'channel', { channel, category })}
-          onCategoryContextMenu={(e, category) => handleContextMenu(e, 'category', category)}
-          onEmptySpaceContextMenu={(e) => handleContextMenu(e, 'empty')}
+          onAddChannel={userCanManageChannels ? handleAddChannel : undefined}
+          onChannelContextMenu={userCanManageChannels
+            ? (e, channel, category) => handleContextMenu(e, 'channel', { channel, category })
+            : undefined}
+          onCategoryContextMenu={userCanManageChannels
+            ? (e, category) => handleContextMenu(e, 'category', category)
+            : undefined}
+          onEmptySpaceContextMenu={userCanManageChannels
+            ? (e) => handleContextMenu(e, 'empty')
+            : undefined}
           onChannelSettings={userCanManageChannels ? handleChannelSettings : undefined}
           canManageChannels={userCanManageChannels}
           connection={connectionRef.current}
@@ -1104,6 +1173,8 @@ const ServerPanel = ({
           onChatsReordered={handleChatsReordered}
           userId={user?.id}
           userName={user?.username || user?.userName}
+          canMuteMembers={userCanMuteMembers}
+          serverConnection={serverConnection}
         />
       </div>
 

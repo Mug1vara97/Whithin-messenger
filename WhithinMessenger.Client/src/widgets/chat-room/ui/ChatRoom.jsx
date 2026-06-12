@@ -55,6 +55,7 @@ import {
   canSendMessages,
   canAttachFiles,
   canSendVoiceMessages,
+  canManageMessages,
 } from '../../../entities/role/lib/serverPermissions';
 import './ChatRoom.css';
 
@@ -104,6 +105,7 @@ const ChatRoom = ({
   const canSend = !isServerChat || canSendMessages(userPermissions, isServerOwner);
   const canAttach = !isServerChat || canAttachFiles(userPermissions, isServerOwner);
   const canVoice = !isServerChat || canSendVoiceMessages(userPermissions, isServerOwner);
+  const canModerateMessages = isServerChat && canManageMessages(userPermissions, isServerOwner);
 
   const messagesTailKey = useMemo(() => {
     if (!messages?.length) return '0:';
@@ -659,10 +661,11 @@ const ChatRoom = ({
     const message = messages.find(m => m.messageId === messageId);
     if (!message) return;
 
-    const canDelete = message.senderUsername === username;
+    const isOwn = message.senderUsername === username;
+    const canDelete = isOwn || canModerateMessages;
 
     if (!canDelete) {
-      alert('Вы можете удалять только свои сообщения');
+      alert('У вас нет прав для удаления этого сообщения');
       return;
     }
 
@@ -686,9 +689,10 @@ const ChatRoom = ({
   const handleContextMenuClick = (e, messageId) => {
     const message = messages.find(m => m.messageId === messageId);
     const isOwnMessage = message?.senderUsername === username;
-    const canDelete = isOwnMessage;
-    
-    handleContextMenu(e, messageId, isOwnMessage, canDelete, 'message');
+    const canDelete = isOwnMessage || canModerateMessages;
+    const canEdit = isOwnMessage || canModerateMessages;
+
+    handleContextMenu(e, messageId, isOwnMessage, canDelete, 'message', canEdit);
   };
 
   const startChatCall = useCallback(() => {
@@ -1281,10 +1285,11 @@ const ChatRoom = ({
               </span>
               Переслать
             </button>
-            {contextMenu.isOwnMessage && (() => {
+            {contextMenu.canEdit && (() => {
               const message = messages.find(m => m.messageId === contextMenu.messageId);
               const isSticker = message?.contentType === 'sticker' && message?.sticker;
-              if (isSticker) return null;
+              const hasMediaOnly = message?.contentType === 'media' && !message?.content?.trim();
+              if (isSticker || hasMediaOnly) return null;
               return (
                 <button
                   onClick={() => {
@@ -1362,15 +1367,11 @@ const ChatRoom = ({
         <div ref={messagesEndRef} />
       </div>
 
+      {(canSend || editingMessageId || !isServerChat) && (
       <form
         className={`input-container ${replyingToMessage ? 'replying' : ''}`}
         onSubmit={handleSendMessage}
       >
-        {isServerChat && !canSend && !editingMessageId ? (
-          <div className="no-send-permission-notice">
-            У вас нет права отправлять сообщения в этом канале.
-          </div>
-        ) : (
         <>
         {editingMessageId && (
           <div className="editing-notice">
@@ -1517,12 +1518,12 @@ const ChatRoom = ({
           </>
         )}
         </>
-        )}
       </form>
+      )}
       </div>
 
       <StickerPicker
-        open={stickerPickerOpen && !editingMessageId}
+        open={stickerPickerOpen && !editingMessageId && canSend}
         width={stickerPanelWidth}
         onResizeStart={handleStickerPanelResizeStart}
         onClose={() => setStickerPickerOpen(false)}

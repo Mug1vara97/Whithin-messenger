@@ -5,6 +5,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.LeaveServer;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.DeleteServer;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Domain.Models;
 using System.Security.Claims;
@@ -14,10 +15,12 @@ namespace WhithinMessenger.Api.Hubs;
 public class ServerHub : Hub
 {
     private readonly IMediator _mediator;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public ServerHub(IMediator mediator)
+    public ServerHub(IMediator mediator, ServerPermissionChecker permissionChecker)
     {
         _mediator = mediator;
+        _permissionChecker = permissionChecker;
     }
 
     private Guid? GetCurrentUserId()
@@ -404,6 +407,14 @@ public class ServerHub : Hub
             if (result.Success)
             {
                 await Clients.Group(result.ServerId.ToString()).SendAsync("RoleUpdated", result.Role);
+
+                foreach (var affected in result.AffectedUserPermissions)
+                {
+                    await Clients.User(affected.UserId.ToString()).SendAsync(
+                        "UserPermissionsUpdated",
+                        affected.UserId,
+                        affected.Permissions);
+                }
             }
             else
             {
@@ -549,6 +560,53 @@ public class ServerHub : Hub
         }
     }
 
+    public async Task ModerateVoiceMember(
+        Guid serverId,
+        Guid channelId,
+        Guid targetUserId,
+        bool? muteMic,
+        bool? deafen)
+    {
+        try
+        {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId == null)
+            {
+                throw new HubException("Пользователь не авторизован");
+            }
+
+            if (targetUserId == currentUserId.Value)
+            {
+                throw new HubException("Нельзя применить модерацию к самому себе");
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(serverId, currentUserId.Value, "muteMembers"))
+            {
+                throw new HubException("Недостаточно прав для отключения микрофона или звука участников");
+            }
+
+            await Clients.Group(serverId.ToString()).SendAsync(
+                "VoiceMemberModerated",
+                new
+                {
+                    serverId,
+                    channelId,
+                    targetUserId,
+                    muteMic,
+                    deafen,
+                    moderatorUserId = currentUserId.Value,
+                });
+        }
+        catch (HubException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new HubException($"Ошибка модерации голосового канала: {ex.Message}");
+        }
+    }
+
     public async Task KickMember(Guid serverId, Guid userId)
     {
         try
@@ -590,7 +648,7 @@ public class ServerHub : Hub
                 return;
             }
 
-            var command = new AddMemberCommand(serverId, userId);
+            var command = new AddMemberCommand(serverId, userId, currentUserId.Value);
             var result = await _mediator.Send(command);
 
             if (result.Success)
