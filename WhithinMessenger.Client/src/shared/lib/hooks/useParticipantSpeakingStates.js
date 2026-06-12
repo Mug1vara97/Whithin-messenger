@@ -51,6 +51,13 @@ export const getMapValue = (map, userId) => {
   return map.get(userId);
 };
 
+const resolveParticipantUserId = (participant, channelParticipant = null) =>
+  participant?.id ??
+  participant?.userId ??
+  channelParticipant?.userId ??
+  channelParticipant?.odUserId ??
+  null;
+
 export const getParticipantIsMuted = (
   muteStates,
   participant,
@@ -59,11 +66,14 @@ export const getParticipantIsMuted = (
 ) => {
   if (channelParticipant?.isServerMuted) return true;
   if (participant?.isCurrentUser) return Boolean(localIsMuted);
+
+  const userId = resolveParticipantUserId(participant, channelParticipant);
+  const mapValue = getMapValue(muteStates, userId);
+  if (mapValue !== undefined) return Boolean(mapValue);
+
   if (channelParticipant && channelParticipant.isMuted !== undefined) {
     return Boolean(channelParticipant.isMuted);
   }
-  const mapValue = getMapValue(muteStates, participant?.id);
-  if (mapValue !== undefined) return Boolean(mapValue);
   return Boolean(participant?.isMuted ?? false);
 };
 
@@ -75,6 +85,11 @@ export const getParticipantIsDeafened = (
 ) => {
   if (channelParticipant?.isServerDeafened) return true;
   if (participant?.isCurrentUser) return Boolean(localIsGlobalAudioMuted);
+
+  const userId = resolveParticipantUserId(participant, channelParticipant);
+  const mapValue = getMapValue(globalStates, userId);
+  if (mapValue !== undefined) return Boolean(mapValue);
+
   if (channelParticipant) {
     const channelDeafened =
       channelParticipant.isGlobalAudioMuted ??
@@ -84,8 +99,6 @@ export const getParticipantIsDeafened = (
       return Boolean(channelDeafened);
     }
   }
-  const mapValue = getMapValue(globalStates, participant?.id);
-  if (mapValue !== undefined) return Boolean(mapValue);
   return Boolean(participant?.isGlobalAudioMuted ?? false);
 };
 

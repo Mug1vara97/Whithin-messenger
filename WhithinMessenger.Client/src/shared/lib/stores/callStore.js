@@ -1117,24 +1117,20 @@ export const useCallStore = create(
                 remoteVad.forceReset();
               }
             }
-            
-            // Обновляем только отдельное состояние мьюта, не весь массив участников
+
             set((state) => {
               const newMuteStates = new Map(state.participantMuteStates);
               newMuteStates.set(userId, mutedState);
-              return { participantMuteStates: newMuteStates };
+              return {
+                participantMuteStates: newMuteStates,
+                participants: state.participants.map((p) =>
+                  String(p.userId) === userId
+                    ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking }
+                    : p
+                ),
+              };
             });
-            
-            // Обновляем участников только если нужно (для совместимости)
-            set((state) => ({
-              participants: state.participants.map(p => 
-                String(p.userId) === userId
-                  ? { ...p, isMuted: mutedState, isSpeaking: mutedState ? false : p.isSpeaking }
-                  : p
-              )
-            }));
-            
-            // Обновляем voiceChannelParticipants
+
             const currentRoomId = get().currentRoomId;
             if (currentRoomId) {
               get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: mutedState });
@@ -2550,11 +2546,52 @@ export const useCallStore = create(
         if (!newMutedState && isServerMuted) {
           return;
         }
-        
-        // Сохраняем состояние в localStorage
+
         localStorage.setItem('micMuted', JSON.stringify(newMutedState));
-        console.log('Mic state saved to localStorage:', newMutedState);
-        
+
+        const userId = state.currentUserId;
+        const normalizedUserId = userId != null ? String(userId) : null;
+
+        set({ isMuted: newMutedState });
+
+        if (normalizedUserId) {
+          set((currentState) => {
+            const newMuteStates = new Map(currentState.participantMuteStates);
+            newMuteStates.set(normalizedUserId, newMutedState);
+            return {
+              participantMuteStates: newMuteStates,
+              participants: currentState.participants.map((p) =>
+                String(p.userId) === normalizedUserId
+                  ? { ...p, isMuted: newMutedState, isSpeaking: newMutedState ? false : p.isSpeaking }
+                  : p
+              ),
+            };
+          });
+
+          const currentRoomId = get().currentRoomId;
+          if (currentRoomId) {
+            get().updateVoiceChannelParticipant(currentRoomId, normalizedUserId, {
+              isMuted: newMutedState,
+            });
+          }
+
+          if (newMutedState) {
+            get().resetSpeakingState(normalizedUserId);
+            const vadDetector = get().localVoiceActivityDetector;
+            if (vadDetector?.forceReset) {
+              vadDetector.forceReset();
+            }
+          }
+        }
+
+        voiceCallApi.broadcastMuteState(newMutedState);
+
+        if (newMutedState) {
+          audioNotificationManager.playMicMutedSound().catch(() => {});
+        } else {
+          audioNotificationManager.playMicUnmutedSound().catch(() => {});
+        }
+
         try {
           if (usesInAppSoundpad()) {
             soundpadInAppMixer.setMicMuted(newMutedState);
@@ -2563,7 +2600,6 @@ export const useCallStore = create(
               mixedTrack.enabled = true;
             }
             await voiceCallApi.setMicrophoneEnabled(true);
-            voiceCallApi.broadcastMuteState(newMutedState);
           } else {
             await voiceCallApi.setMicrophoneEnabled(!newMutedState);
             if (state.noiseSuppressionManager) {
@@ -2581,53 +2617,6 @@ export const useCallStore = create(
           }
         } catch (error) {
           console.warn('Failed to toggle microphone via LiveKit:', error);
-        }
-        
-        set({ isMuted: newMutedState });
-
-        const userId = state.currentUserId;
-        if (userId) {
-          set((currentState) => {
-            const newMuteStates = new Map(currentState.participantMuteStates);
-            newMuteStates.set(userId, newMutedState);
-            return {
-              participantMuteStates: newMuteStates,
-              participants: currentState.participants.map((p) =>
-                p.userId === userId
-                  ? { ...p, isMuted: newMutedState, isSpeaking: newMutedState ? false : p.isSpeaking }
-                  : p
-              ),
-            };
-          });
-
-          const currentRoomId = get().currentRoomId;
-          if (currentRoomId) {
-            get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: newMutedState });
-          }
-        }
-        
-        // Сбрасываем состояние говорения при мьюте
-        if (newMutedState) {
-          if (userId) {
-            get().resetSpeakingState(userId);
-            // Также принудительно сбрасываем VAD детектор
-            const vadDetector = get().localVoiceActivityDetector;
-            if (vadDetector && vadDetector.forceReset) {
-              vadDetector.forceReset();
-            }
-            console.log('[VAD] Reset speaking state due to mute for user:', userId);
-          }
-        }
-        
-        // Воспроизводим звук мьюта/размьюта (только локально)
-        if (newMutedState) {
-          audioNotificationManager.playMicMutedSound().catch(error => {
-            console.warn('Failed to play mic muted sound:', error);
-          });
-        } else {
-          audioNotificationManager.playMicUnmutedSound().catch(error => {
-            console.warn('Failed to play mic unmuted sound:', error);
-          });
         }
       },
       
@@ -3084,25 +3073,33 @@ export const useCallStore = create(
           voiceCallApi.socket.emit('audioState', audioStateData);
         }
         
-        // Обновляем isAudioEnabled в соответствии с глобальным звуком
-        set({ isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState });
-        
-        // Обновляем отдельное состояние глобального звука для текущего пользователя
-        set((state) => {
-          const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
-          newGlobalAudioStates.set(state.currentUserId, newMutedState);
-          return { participantGlobalAudioStates: newGlobalAudioStates };
+        const normalizedUserId =
+          state.currentUserId != null ? String(state.currentUserId) : null;
+
+        set((prev) => {
+          const newGlobalAudioStates = new Map(prev.participantGlobalAudioStates);
+          if (normalizedUserId) {
+            newGlobalAudioStates.set(normalizedUserId, newMutedState);
+          }
+          return {
+            isGlobalAudioMuted: newMutedState,
+            isAudioEnabled: !newMutedState,
+            participantGlobalAudioStates: newGlobalAudioStates,
+            participants: prev.participants.map((p) =>
+              normalizedUserId && String(p.userId) === normalizedUserId
+                ? { ...p, isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState }
+                : p
+            ),
+          };
         });
-        
-        // Также обновляем локального пользователя в списке участников (для совместимости)
-        set((state) => ({
-          participants: state.participants.map(p => {
-            if (p.userId === state.currentUserId) {
-              return { ...p, isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState };
-            }
-            return p;
-          })
-        }));
+
+        if (normalizedUserId && get().currentRoomId) {
+          get().updateVoiceChannelParticipant(get().currentRoomId, normalizedUserId, {
+            isGlobalAudioMuted: newMutedState,
+            isAudioDisabled: newMutedState,
+            isDeafened: newMutedState,
+          });
+        }
         
         // Также отправляем отдельное событие для глобального звука
         if (voiceCallApi.socket) {
