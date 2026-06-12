@@ -609,16 +609,10 @@ class VoiceCallApi {
         kind: publication.kind,
         participantIdentity: participant.identity
       });
-      
-      // Emit mute state change only for microphone audio, not screen-share audio.
-      if (publication.kind === Track.Kind.Audio && publication.source === Track.Source.Microphone) {
-        this.emit('peerMuteStateChanged', {
-          peerId: participant.identity,
-          isMuted: false,
-          userId: participant.identity
-        });
-      }
-      
+
+      // Mic mute UI is driven by socket peerMuteStateChanged / globalMuteState.
+      // LiveKit TrackMuted/TrackUnmuted during enable/disable causes false flashes.
+
       // Emit video state change for video
       if (publication.kind === Track.Kind.Video) {
         console.log('🎥 Video track unmuted for participant:', participant.identity);
@@ -639,16 +633,7 @@ class VoiceCallApi {
         kind: publication.kind,
         participantIdentity: participant.identity
       });
-      
-      // Emit mute state change only for microphone audio, not screen-share audio.
-      if (publication.kind === Track.Kind.Audio && publication.source === Track.Source.Microphone) {
-        this.emit('peerMuteStateChanged', {
-          peerId: participant.identity,
-          isMuted: true,
-          userId: participant.identity
-        });
-      }
-      
+
       // Emit video state change for video
       if (publication.kind === Track.Kind.Video) {
         console.log('🎥 Video track muted for participant:', participant.identity);

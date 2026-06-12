@@ -127,11 +127,11 @@ const applyVoiceChannelStatesToLiveMaps = (state, channelId, participants, updat
   const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
   let changed = false;
 
-  const applyParticipant = (participant) => {
+  const applyParticipant = (participant, { includeMute = true } = {}) => {
     const userId = String(resolveParticipantUserId(participant) || '');
     if (!userId || userId === currentUserId) return;
 
-    if (participant.isMuted !== undefined) {
+    if (includeMute && participant.isMuted !== undefined) {
       const nextMuted = Boolean(participant.isMuted);
       if (newMuteStates.get(userId) !== nextMuted) {
         newMuteStates.set(userId, nextMuted);
@@ -153,10 +153,11 @@ const applyVoiceChannelStatesToLiveMaps = (state, channelId, participants, updat
   if (updates && (updates.isMuted !== undefined || updates.isGlobalAudioMuted !== undefined || updates.isAudioDisabled !== undefined || updates.isDeafened !== undefined)) {
     const userId = String(updates.userId || '');
     if (userId && userId !== currentUserId) {
-      applyParticipant({ userId, ...updates });
+      applyParticipant({ userId, ...updates }, { includeMute: true });
     }
   } else if (Array.isArray(participants)) {
-    participants.forEach(applyParticipant);
+    // Bulk channel list can lag behind socket mute events — don't overwrite live mute map.
+    participants.forEach((participant) => applyParticipant(participant, { includeMute: false }));
   }
 
   if (!changed) return null;
@@ -1109,6 +1110,11 @@ export const useCallStore = create(
             const userId = String(
               eventUserId || get().peerIdToUserIdMap.get(peerId) || peerId
             );
+            const currentUserId = String(get().currentUserId || '');
+            if (currentUserId && userId === currentUserId) {
+              return;
+            }
+
             const mutedState = Boolean(isMuted);
             
             if (mutedState) {
