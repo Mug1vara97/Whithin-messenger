@@ -362,32 +362,32 @@ const ChannelItem = ({
               )}
             </Droppable>
           )}
-        </div>
-      )}
 
-      {participantMenu.visible && participantMenu.participant && (
-        <div
-          ref={participantMenuRef}
-          className="voice-participant-context-menu"
-          style={{ left: participantMenu.x, top: participantMenu.y }}
-        >
-          {participantMenu.participant.isServerMuted ? (
-            <button type="button" onClick={() => runVoiceModeration({ muteMic: false })}>
-              Разрешить включить микрофон
-            </button>
-          ) : (
-            <button type="button" onClick={() => runVoiceModeration({ muteMic: true })}>
-              Выключить микрофон
-            </button>
-          )}
-          {participantMenu.participant.isServerDeafened ? (
-            <button type="button" onClick={() => runVoiceModeration({ deafen: false })}>
-              Разрешить включить звук
-            </button>
-          ) : (
-            <button type="button" onClick={() => runVoiceModeration({ deafen: true })}>
-              Выключить звук
-            </button>
+          {participantMenu.visible && participantMenu.participant && (
+            <div
+              ref={participantMenuRef}
+              className="voice-participant-context-menu"
+              style={{ left: participantMenu.x, top: participantMenu.y }}
+            >
+              {participantMenu.participant.isServerMuted ? (
+                <button type="button" onClick={() => runVoiceModeration({ muteMic: false })}>
+                  Разрешить включить микрофон
+                </button>
+              ) : (
+                <button type="button" onClick={() => runVoiceModeration({ muteMic: true })}>
+                  Выключить микрофон
+                </button>
+              )}
+              {participantMenu.participant.isServerDeafened ? (
+                <button type="button" onClick={() => runVoiceModeration({ deafen: false })}>
+                  Разрешить включить звук
+                </button>
+              ) : (
+                <button type="button" onClick={() => runVoiceModeration({ deafen: true })}>
+                  Выключить звук
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
