@@ -57,6 +57,7 @@ export const getParticipantIsMuted = (
   localIsMuted = false,
   channelParticipant = null
 ) => {
+  if (channelParticipant?.isServerMuted) return true;
   if (participant?.isCurrentUser) return Boolean(localIsMuted);
   if (channelParticipant && channelParticipant.isMuted !== undefined) {
     return Boolean(channelParticipant.isMuted);
@@ -72,6 +73,7 @@ export const getParticipantIsDeafened = (
   localIsGlobalAudioMuted = false,
   channelParticipant = null
 ) => {
+  if (channelParticipant?.isServerDeafened) return true;
   if (participant?.isCurrentUser) return Boolean(localIsGlobalAudioMuted);
   if (channelParticipant) {
     const channelDeafened =
@@ -86,6 +88,16 @@ export const getParticipantIsDeafened = (
   if (mapValue !== undefined) return Boolean(mapValue);
   return Boolean(participant?.isGlobalAudioMuted ?? false);
 };
+
+export const getParticipantIsServerMuted = (
+  channelParticipant,
+  { isCurrentUser = false, localIsServerMuted = false } = {}
+) => (isCurrentUser ? Boolean(localIsServerMuted) : Boolean(channelParticipant?.isServerMuted));
+
+export const getParticipantIsServerDeafened = (
+  channelParticipant,
+  { isCurrentUser = false, localIsServerDeafened = false } = {}
+) => (isCurrentUser ? Boolean(localIsServerDeafened) : Boolean(channelParticipant?.isServerDeafened));
 
 export const getParticipantIsSpeaking = (
   speakingStates,

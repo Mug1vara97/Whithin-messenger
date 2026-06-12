@@ -20,6 +20,7 @@ import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSid
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import {
+  canMuteMembers,
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
 } from '../../../entities/role/lib/serverPermissions';
@@ -840,6 +841,7 @@ const HomePage = () => {
   const activeServerForPermissions = serverDataFromPanel || selectedServer;
   const serverChannelPermissions = getServerPermissions(activeServerForPermissions);
   const isActiveServerOwner = checkIsServerOwner(activeServerForPermissions, user?.id);
+  const userCanMuteMembers = canMuteMembers(serverChannelPermissions, isActiveServerOwner);
 
   return (
     <div className="home-page">
@@ -912,6 +914,8 @@ const HomePage = () => {
                       userId={user?.id || user?.userId}
                       userName={user?.username || user?.name}
                       onClose={handleCloseSelectedChat}
+                      serverId={selectedServer?.serverId}
+                      canMuteMembers={userCanMuteMembers}
                     />
                   ) : (
                     <ChatRoom

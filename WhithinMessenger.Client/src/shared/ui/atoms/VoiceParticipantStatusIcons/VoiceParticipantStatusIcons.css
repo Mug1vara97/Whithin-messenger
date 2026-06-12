@@ -1,0 +1,56 @@
+.voice-participant-status-icons-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.voice-participant-status-icons-root.tile {
+  gap: 6px;
+}
+
+.voice-status-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.voice-participant-status-icons-root.tile .voice-status-icon {
+  width: 26px;
+  height: 26px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
+}
+
+.voice-participant-status-icons-root.tile .voice-status-icon.speaking {
+  background: rgba(59, 165, 92, 0.2);
+}
+
+.voice-participant-status-icons-root.tile .voice-status-icon.server-moderated {
+  background: rgba(240, 178, 50, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(240, 178, 50, 0.55);
+}
+
+.voice-participant-status-icons-root.inline .voice-status-icon.server-moderated {
+  padding: 1px;
+  border-radius: 3px;
+  background: rgba(240, 178, 50, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(240, 178, 50, 0.45);
+}
+
+.voice-status-mod-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  color: #f0b232 !important;
+  background: #1e1f22;
+  border-radius: 50%;
+  padding: 1px;
+}
+
+.voice-participant-status-icons-root.tile .voice-status-mod-badge {
+  right: -2px;
+  bottom: -2px;
+}

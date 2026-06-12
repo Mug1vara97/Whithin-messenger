@@ -99,6 +99,35 @@ function getUserVoiceState(userId) {
     };
 }
 
+function getServerModerationState(userState, serverId) {
+    if (!serverId) {
+        return { serverMuted: false, serverDeafened: false };
+    }
+
+    const bucket = userState?.serverModeration?.[String(serverId)];
+    if (bucket) {
+        return {
+            serverMuted: Boolean(bucket.serverMuted),
+            serverDeafened: Boolean(bucket.serverDeafened),
+        };
+    }
+
+    return { serverMuted: false, serverDeafened: false };
+}
+
+function updateServerModeration(userId, serverId, updates) {
+    if (!userId || !serverId) return;
+
+    const state = getUserVoiceState(userId);
+    const serverModeration = { ...(state.serverModeration || {}) };
+    const key = String(serverId);
+    serverModeration[key] = {
+        ...(serverModeration[key] || {}),
+        ...updates,
+    };
+    updateUserVoiceState(userId, { serverModeration });
+}
+
 function removeUserVoiceState(userId) {
     const state = userVoiceStates.get(userId);
     if (state) {
@@ -185,8 +214,14 @@ function getChannelParticipants(channelId) {
                 isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.muted,
                 isSpeaking: peer.speaking || false,
                 isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.audioEnabled,
-                isServerMuted: Boolean(peer.serverMuted || userState.serverMuted),
-                isServerDeafened: Boolean(peer.serverDeafened || userState.serverDeafened),
+                isServerMuted: Boolean(
+                    peer.serverMuted ||
+                    getServerModerationState(userState, peer.serverId).serverMuted
+                ),
+                isServerDeafened: Boolean(
+                    peer.serverDeafened ||
+                    getServerModerationState(userState, peer.serverId).serverDeafened
+                ),
                 isActive: true,
                 avatar: peer.avatar || userState.avatar || null,
                 avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
@@ -268,10 +303,10 @@ io.on('connection', async (socket) => {
 
         if (peer.serverMuted && !isMuted) {
             socket.emit('serverVoiceModerationApplied', {
+                serverId: peer.serverId || null,
                 serverMuted: true,
                 serverDeafened: Boolean(peer.serverDeafened),
                 isMuted: true,
-                isGlobalAudioMuted: !peer.audioEnabled,
             });
             return;
         }
@@ -350,7 +385,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('join', async ({ roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2' }, callback) => {
+    socket.on('join', async ({ roomId, name, userId, serverId = null, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2' }, callback) => {
         try {
             // Create room if it doesn't exist
             let room = rooms.get(roomId);
@@ -368,8 +403,11 @@ io.on('connection', async (socket) => {
             }
 
             const existingUserState = userId ? getUserVoiceState(userId) : {};
-            const serverMuted = Boolean(existingUserState.serverMuted);
-            const serverDeafened = Boolean(existingUserState.serverDeafened);
+            const normalizedServerId = serverId ? String(serverId) : null;
+            const { serverMuted, serverDeafened } = getServerModerationState(
+                existingUserState,
+                normalizedServerId
+            );
             const effectiveMuted = serverMuted || initialMuted;
             const effectiveAudioEnabled = serverDeafened ? false : initialAudioEnabled;
 
@@ -378,6 +416,7 @@ io.on('connection', async (socket) => {
                 id: socket.id,
                 socket: socket,
                 roomId: roomId,
+                serverId: normalizedServerId,
                 name: name,
                 userId: userId,
                 muted: effectiveMuted,
@@ -395,14 +434,13 @@ io.on('connection', async (socket) => {
                 userName: name, 
                 isMuted: effectiveMuted, 
                 isAudioDisabled: !effectiveAudioEnabled,
-                serverMuted,
-                serverDeafened,
                 avatar: avatar,
                 avatarColor: avatarColor
             });
 
-            if (serverMuted || serverDeafened) {
+            if (normalizedServerId && (serverMuted || serverDeafened)) {
                 socket.emit('serverVoiceModerationApplied', {
+                    serverId: normalizedServerId,
                     serverMuted,
                     serverDeafened,
                     isMuted: effectiveMuted,
@@ -516,6 +554,7 @@ io.on('connection', async (socket) => {
 
     socket.on('serverVoiceModeration', ({
         channelId,
+        serverId,
         targetUserId,
         moderatorUserId,
         muteMic,
@@ -538,14 +577,29 @@ io.on('connection', async (socket) => {
 
         if (!targetPeer || !targetPeer.socket) return;
 
+        const moderationServerId = serverId
+            ? String(serverId)
+            : targetPeer.serverId
+              ? String(targetPeer.serverId)
+              : null;
+
+        if (moderationServerId && !targetPeer.serverId) {
+            targetPeer.serverId = moderationServerId;
+        }
+
         if (muteMic !== undefined && muteMic !== null) {
             if (muteMic) {
                 targetPeer.serverMuted = true;
                 targetPeer.muted = true;
-                updateUserVoiceState(targetUserId, { isMuted: true, serverMuted: true });
+                updateUserVoiceState(targetUserId, { isMuted: true });
+                if (moderationServerId) {
+                    updateServerModeration(targetUserId, moderationServerId, { serverMuted: true });
+                }
             } else {
                 targetPeer.serverMuted = false;
-                updateUserVoiceState(targetUserId, { serverMuted: false });
+                if (moderationServerId) {
+                    updateServerModeration(targetUserId, moderationServerId, { serverMuted: false });
+                }
             }
         }
 
@@ -553,22 +607,39 @@ io.on('connection', async (socket) => {
             if (deafen) {
                 targetPeer.serverDeafened = true;
                 targetPeer.audioEnabled = false;
-                updateUserVoiceState(targetUserId, {
-                    isAudioDisabled: true,
-                    serverDeafened: true,
-                });
+                updateUserVoiceState(targetUserId, { isAudioDisabled: true });
+                if (moderationServerId) {
+                    updateServerModeration(targetUserId, moderationServerId, { serverDeafened: true });
+                }
             } else {
                 targetPeer.serverDeafened = false;
-                updateUserVoiceState(targetUserId, { serverDeafened: false });
+                if (moderationServerId) {
+                    updateServerModeration(targetUserId, moderationServerId, { serverDeafened: false });
+                }
             }
         }
 
         const appliedState = {
+            serverId: moderationServerId,
             serverMuted: Boolean(targetPeer.serverMuted),
             serverDeafened: Boolean(targetPeer.serverDeafened),
-            isMuted: Boolean(targetPeer.muted),
-            isGlobalAudioMuted: !targetPeer.audioEnabled,
         };
+
+        if (muteMic === true) {
+            appliedState.isMuted = true;
+        } else if (muteMic === false) {
+            appliedState.isMuted = Boolean(targetPeer.muted);
+        } else if (targetPeer.serverMuted) {
+            appliedState.isMuted = Boolean(targetPeer.muted);
+        }
+
+        if (deafen === true) {
+            appliedState.isGlobalAudioMuted = true;
+        } else if (deafen === false) {
+            // Only lift server block — user keeps their own headphone preference.
+        } else if (targetPeer.serverDeafened) {
+            appliedState.isGlobalAudioMuted = true;
+        }
 
         targetPeer.socket.emit('serverVoiceModerationApplied', appliedState);
 
@@ -604,9 +675,9 @@ io.on('connection', async (socket) => {
         const wantsUndeafen = isEnabled === true || isGlobalAudioMuted === false;
         if (peer.serverDeafened && wantsUndeafen) {
             socket.emit('serverVoiceModerationApplied', {
+                serverId: peer.serverId || null,
                 serverMuted: Boolean(peer.serverMuted),
                 serverDeafened: true,
-                isMuted: Boolean(peer.muted),
                 isGlobalAudioMuted: true,
             });
             return;
@@ -910,6 +981,9 @@ io.on('connection', async (socket) => {
             name: peerToMove.name,
             muted: peerToMove.muted,
             audioEnabled: peerToMove.audioEnabled,
+            serverId: peerToMove.serverId || null,
+            serverMuted: peerToMove.serverMuted || false,
+            serverDeafened: peerToMove.serverDeafened || false,
             speaking: peerToMove.speaking,
             avatar: peerToMove.avatar,
             avatarColor: peerToMove.avatarColor,

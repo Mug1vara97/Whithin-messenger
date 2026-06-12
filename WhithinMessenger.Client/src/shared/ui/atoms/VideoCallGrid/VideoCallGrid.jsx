@@ -4,21 +4,23 @@ import {
   findChannelParticipant,
   getParticipantIsDeafened,
   getParticipantIsMuted,
+  getParticipantIsServerDeafened,
+  getParticipantIsServerMuted,
   getParticipantIsSpeaking,
   useActiveVoiceChannelParticipantList,
   useParticipantGlobalAudioStates,
   useParticipantMuteStates,
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
-import MicOffIcon from '@mui/icons-material/MicOff';
-import MicIcon from '@mui/icons-material/Mic';
-import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
+import { VoiceParticipantStatusIcons } from '../VoiceParticipantStatusIcons';
+import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { Slider } from '@mui/material';
+import { useVoiceParticipantModeration } from '../../molecules/VoiceParticipantModerationMenu';
 import './VideoCallGrid.css';
 
 /** Максимум участников на одной странице сетки (есть CSS для 1–9) */
@@ -134,7 +136,11 @@ const VideoCallGrid = ({
   enableAutoFocus = true, // Новый пропс для управления автофокусом
   testMode = false, // Режим тестирования с кнопками добавления/удаления пользователей
   onAddTestParticipant, // Callback для добавления тестового участника
-  onRemoveTestParticipant // Callback для удаления тестового участника
+  onRemoveTestParticipant, // Callback для удаления тестового участника
+  canMuteMembers = false,
+  voiceChannelId = null,
+  serverId = null,
+  currentUserId = null,
 }) => {
   const bottomGridRef = useRef(null);
   const participantSpeakingStates = useParticipantSpeakingStates();
@@ -143,6 +149,14 @@ const VideoCallGrid = ({
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
   const localIsMuted = useCallStore((state) => state.isMuted);
   const localIsGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
+  const { isServerMuted: localIsServerMuted, isServerDeafened: localIsServerDeafened } =
+    useCallStore((state) => selectActiveServerVoiceModeration(state, serverId));
+  const { handleParticipantContextMenu, moderationMenu } = useVoiceParticipantModeration({
+    channelId: voiceChannelId,
+    currentUserId,
+    canMuteMembers,
+    serverId,
+  });
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -439,6 +453,14 @@ const VideoCallGrid = ({
       isMuted,
       audioEnabled: participant.isAudioEnabled,
     });
+    const isServerMuted = getParticipantIsServerMuted(channelParticipant, {
+      isCurrentUser: participant.isCurrentUser,
+      localIsServerMuted,
+    });
+    const isServerDeafened = getParticipantIsServerDeafened(channelParticipant, {
+      isCurrentUser: participant.isCurrentUser,
+      localIsServerDeafened,
+    });
     const isScreenShare = participant.isScreenShare || false;
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
@@ -466,11 +488,16 @@ const VideoCallGrid = ({
       }
     };
     
+    const onTileContextMenu = canMuteMembers && !participant.isCurrentUser
+      ? (event) => handleParticipantContextMenu(event, participant, channelParticipant)
+      : undefined;
+
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${channelParticipant?.isServerMuted ? 'server-muted' : ''} ${channelParticipant?.isServerDeafened ? 'server-deafened' : ''}`}
         onClick={() => handleParticipantClick(participant)}
+        onContextMenu={onTileContextMenu}
       >
         <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
           {/* Background with avatar, video, or screen share */}
@@ -600,22 +627,14 @@ const VideoCallGrid = ({
                   <span className="status-text">Демонстрация экрана</span>
                 </div>
               ) : (
-                <>
-                  <div className={`mic-status ${isMuted ? 'muted' : isSpeaking ? 'speaking' : 'silent'}`}>
-                    {isMuted ? (
-                      <MicOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
-                    ) : isSpeaking ? (
-                      <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#3ba55c' }} />
-                    ) : (
-                      <MicIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#B5BAC1' }} />
-                    )}
-                  </div>
-                  {isDeafened && (
-                    <div className="headset-status">
-                      <HeadsetOffIcon sx={{ fontSize: isSmall ? 16 : 18, color: '#ed4245' }} />
-                    </div>
-                  )}
-                </>
+                <VoiceParticipantStatusIcons
+                  isMuted={isMuted}
+                  isDeafened={isDeafened}
+                  isServerMuted={isServerMuted}
+                  isServerDeafened={isServerDeafened}
+                  isSpeaking={isSpeaking}
+                  variant="tile"
+                />
               )}
               <span className="participant-name">{participant.name}</span>
             </div>
@@ -710,6 +729,7 @@ const VideoCallGrid = ({
     // });
     
     return (
+      <>
       <div className={`video-call-container focused-mode ${className}`}>
         {renderTestControls()}
         <div className="focused-view">
@@ -750,11 +770,14 @@ const VideoCallGrid = ({
           )}
         </div>
       </div>
+      {moderationMenu}
+      </>
     );
   }
 
   // Обычный режим (сетка)
   return (
+    <>
     <div className={`video-call-container ${className}`}>
       {renderTestControls()}
 
@@ -794,6 +817,8 @@ const VideoCallGrid = ({
         </div>
       )}
     </div>
+    {moderationMenu}
+    </>
   );
 };
 

@@ -4,22 +4,23 @@ import {
   findChannelParticipant,
   getParticipantIsDeafened,
   getParticipantIsMuted,
+  getParticipantIsServerDeafened,
+  getParticipantIsServerMuted,
   getParticipantIsSpeaking,
   useActiveVoiceChannelParticipantList,
   useParticipantGlobalAudioStates,
   useParticipantMuteStates,
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
+import { useCallStore } from '../../../lib/stores/callStore';
+import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
+import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
 import { isSameVoiceChannel } from '../../../lib/stores/callStore';
 import { useCallGridTestMode } from '../../../lib/hooks/useCallGridTestMode';
 import { createParticipant } from '../../../../entities/video-call/model/types';
 import { userApi } from '../../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { VideoCallGrid } from '../../atoms';
-import MicIcon from '@mui/icons-material/Mic';
-import MicOffIcon from '@mui/icons-material/MicOff';
-import HeadsetIcon from '@mui/icons-material/Headset';
-import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
@@ -139,6 +140,7 @@ const ChatVoiceCall = ({
   const participantMuteStatesLive = useParticipantMuteStates();
   const participantGlobalAudioStatesLive = useParticipantGlobalAudioStates();
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
+  const { isServerMuted, isServerDeafened } = useCallStore(selectActiveServerVoiceModeration);
 
   const {
     showErrorBanner,
@@ -364,6 +366,14 @@ const ChatVoiceCall = ({
                   audioEnabled: participant.isAudioEnabled,
                 }
               );
+              const participantIsServerMuted = getParticipantIsServerMuted(channelParticipant, {
+                isCurrentUser: participant.isCurrentUser,
+                localIsServerMuted: isServerMuted,
+              });
+              const participantIsServerDeafened = getParticipantIsServerDeafened(channelParticipant, {
+                isCurrentUser: participant.isCurrentUser,
+                localIsServerDeafened: isServerDeafened,
+              });
               return (
                 <div
                   key={participant.id}
@@ -391,12 +401,14 @@ const ChatVoiceCall = ({
                   </div>
                   <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
                   <div className={styles.participantStatusRow}>
-                    <div className={`${styles.participantStatusPill} ${isMutedLive ? styles.statusOff : styles.statusOn}`}>
-                      {isMutedLive ? <MicOffIcon sx={{ fontSize: 14 }} /> : <MicIcon sx={{ fontSize: 14 }} />}
-                    </div>
-                    <div className={`${styles.participantStatusPill} ${participantIsDeafened ? styles.statusOff : styles.statusOn}`}>
-                      {participantIsDeafened ? <HeadsetOffIcon sx={{ fontSize: 14 }} /> : <HeadsetIcon sx={{ fontSize: 14 }} />}
-                    </div>
+                    <VoiceParticipantStatusIcons
+                      isMuted={isMutedLive}
+                      isDeafened={participantIsDeafened}
+                      isServerMuted={participantIsServerMuted}
+                      isServerDeafened={participantIsServerDeafened}
+                      isSpeaking={isSpeakingLive}
+                      variant="inline"
+                    />
                   </div>
                 </div>
               );
@@ -418,6 +430,8 @@ const ChatVoiceCall = ({
           onToggleMute: toggleMute,
           isGlobalAudioMuted,
           onToggleGlobalAudio: toggleGlobalAudio,
+          isServerMuted,
+          isServerDeafened,
           isNoiseSuppressed,
           noiseSuppressionMode,
           onToggleNoiseSuppression: toggleNoiseSuppression,

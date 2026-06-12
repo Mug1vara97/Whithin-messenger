@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { FaCog, FaLock } from 'react-icons/fa';
 import { VolumeUp } from '@mui/icons-material';
-import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import { useCallStore } from '../../../lib/stores/callStore';
+import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
 import {
   getParticipantIsDeafened,
   getParticipantIsMuted,
@@ -13,7 +13,6 @@ import {
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
-import { moderateVoiceParticipant } from '../../../lib/voice/moderateVoiceParticipant';
 import './ChannelItem.css';
 
 const EMPTY_VOICE_PARTICIPANTS = [];
@@ -76,18 +75,7 @@ const ChannelItem = ({
   onContextMenu,
   onSettings,
   isDragDisabled = false,
-  canMuteMembers = false,
-  serverId,
-  serverConnection,
-  currentUserId,
 }) => {
-  const [participantMenu, setParticipantMenu] = useState({
-    visible: false,
-    x: 0,
-    y: 0,
-    participant: null,
-  });
-  const participantMenuRef = useRef(null);
   const isVoiceChannel =
     channel.chatType === 4 ||
     channel.typeId === 4 ||
@@ -140,67 +128,6 @@ const ChannelItem = ({
     e.stopPropagation();
     if (onSettings) {
       onSettings(channel);
-    }
-  };
-
-  useEffect(() => {
-    if (!participantMenu.visible) return undefined;
-
-    const handleOutside = (event) => {
-      if (participantMenuRef.current && !participantMenuRef.current.contains(event.target)) {
-        setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
-      }
-    };
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [participantMenu.visible]);
-
-  const handleParticipantContextMenu = (event, participant) => {
-    if (!canMuteMembers || !serverId || !serverConnection) return;
-
-    const participantUserId = String(participant.odUserId || participant.userId || '');
-    if (!participantUserId || participantUserId === String(currentUserId || '')) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    setParticipantMenu({
-      visible: true,
-      x: event.clientX,
-      y: event.clientY,
-      participant,
-    });
-  };
-
-  const runVoiceModeration = async (options) => {
-    const participant = participantMenu.participant;
-    if (!participant) return;
-
-    const targetUserId = participant.odUserId || participant.userId;
-    try {
-      await moderateVoiceParticipant({
-        connection: serverConnection,
-        serverId,
-        channelId,
-        targetUserId,
-        muteMic: options.muteMic,
-        deafen: options.deafen,
-      });
-    } catch (error) {
-      console.error('Voice moderation failed:', error);
-      alert(error?.message || 'Не удалось применить модерацию');
-    } finally {
-      setParticipantMenu({ visible: false, x: 0, y: 0, participant: null });
     }
   };
 
@@ -314,7 +241,6 @@ const ChannelItem = ({
                             {...participantProvided.dragHandleProps}
                             className={`voice-participant ${isSpeakingLive ? 'speaking' : ''} ${isMutedLive ? 'muted' : ''} ${isDeafenedLive ? 'deafened' : ''} ${participant.isServerMuted ? 'server-muted' : ''} ${participantSnapshot.isDragging ? 'dragging' : ''}`}
                             style={participantProvided.draggableProps.style}
-                            onContextMenu={(event) => handleParticipantContextMenu(event, participant)}
                           >
                             <div className="voice-participant-avatar">
                               {participant.avatar ? (
@@ -338,20 +264,15 @@ const ChannelItem = ({
                               </span>
                             </div>
                             <span className="voice-participant-name">{participant.userName}</span>
-                            <div className="voice-participant-status-icons">
-                              {isMutedLive && (
-                                <span className="voice-participant-muted-icon" title="Микрофон выключен">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" />
-                                  </svg>
-                                </span>
-                              )}
-                              {isDeafenedLive && (
-                                <span className="voice-participant-deafened-icon" title="Звук выключен">
-                                  <HeadsetOffIcon sx={{ fontSize: 14, width: 14, height: 14 }} />
-                                </span>
-                              )}
-                            </div>
+                            <VoiceParticipantStatusIcons
+                              className="voice-participant-status-icons"
+                              isMuted={isMutedLive}
+                              isDeafened={isDeafenedLive}
+                              isServerMuted={participant.isServerMuted}
+                              isServerDeafened={participant.isServerDeafened}
+                              isSpeaking={isSpeakingLive}
+                              variant="inline"
+                            />
                           </div>
                         )}
                       </Draggable>
@@ -361,33 +282,6 @@ const ChannelItem = ({
                 </div>
               )}
             </Droppable>
-          )}
-
-          {participantMenu.visible && participantMenu.participant && (
-            <div
-              ref={participantMenuRef}
-              className="voice-participant-context-menu"
-              style={{ left: participantMenu.x, top: participantMenu.y }}
-            >
-              {participantMenu.participant.isServerMuted ? (
-                <button type="button" onClick={() => runVoiceModeration({ muteMic: false })}>
-                  Разрешить включить микрофон
-                </button>
-              ) : (
-                <button type="button" onClick={() => runVoiceModeration({ muteMic: true })}>
-                  Выключить микрофон
-                </button>
-              )}
-              {participantMenu.participant.isServerDeafened ? (
-                <button type="button" onClick={() => runVoiceModeration({ deafen: false })}>
-                  Разрешить включить звук
-                </button>
-              ) : (
-                <button type="button" onClick={() => runVoiceModeration({ deafen: true })}>
-                  Выключить звук
-                </button>
-              )}
-            </div>
           )}
         </div>
       )}

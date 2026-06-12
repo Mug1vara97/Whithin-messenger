@@ -43,6 +43,8 @@ export function VoiceCallControlDock({
   onToggleMute,
   isGlobalAudioMuted,
   onToggleGlobalAudio,
+  isServerMuted = false,
+  isServerDeafened = false,
   isNoiseSuppressed,
   noiseSuppressionMode,
   onToggleNoiseSuppression,
@@ -77,9 +79,17 @@ export function VoiceCallControlDock({
           <div className="button-section">
             <div className="attached-button-container">
               <button
-                className={`center-button ${isMuted ? 'muted' : ''}`}
+                className={`center-button ${isServerMuted && isMuted ? 'server-moderated' : ''} ${isMuted && !isServerMuted ? 'muted' : ''}`}
                 type="button"
                 aria-label={isMuted ? 'Включить микрофон' : 'Заглушить'}
+                title={
+                  isServerMuted && isMuted
+                    ? 'Микрофон отключён модератором'
+                    : isMuted
+                      ? 'Включить микрофон'
+                      : 'Выключить микрофон'
+                }
+                disabled={isServerMuted && isMuted}
                 onClick={onToggleMute}
               >
                 {isMuted ? <MicOffIcon sx={{ fontSize: 24 }} /> : <MicIcon sx={{ fontSize: 24 }} />}
@@ -88,11 +98,18 @@ export function VoiceCallControlDock({
 
             <div className="attached-button-container">
               <button
-                className={`center-button ${isGlobalAudioMuted ? 'muted' : ''}`}
+                className={`center-button ${isServerDeafened && isGlobalAudioMuted ? 'server-moderated' : ''} ${isGlobalAudioMuted && !isServerDeafened ? 'muted' : ''}`}
                 type="button"
                 onClick={onToggleGlobalAudio}
                 aria-label={isGlobalAudioMuted ? 'Включить звук всех' : 'Выключить звук всех'}
-                title={isGlobalAudioMuted ? 'Звук всех участников выключен' : 'Звук всех участников включен'}
+                title={
+                  isServerDeafened && isGlobalAudioMuted
+                    ? 'Звук отключён модератором'
+                    : isGlobalAudioMuted
+                      ? 'Звук всех участников выключен'
+                      : 'Звук всех участников включен'
+                }
+                disabled={isServerDeafened && isGlobalAudioMuted}
               >
                 {isGlobalAudioMuted ? (
                   <HeadsetOffIcon sx={{ fontSize: 24 }} />

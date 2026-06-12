@@ -14,7 +14,7 @@ export const useGlobalCall = (userId = null, userName = null) => {
   const user = userId && userName ? { id: userId, username: userName } : authUser;
 
   // Автоматическое подключение к звонку при наличии пользователя
-  const startCall = async (roomId, roomName) => {
+  const startCall = async (roomId, roomName, serverId = null) => {
     console.log('useGlobalCall: startCall called with user:', user);
     if (!user) {
       console.error('User not authenticated');
@@ -24,7 +24,7 @@ export const useGlobalCall = (userId = null, userName = null) => {
     try {
       if (callContext.isInCall && isSameVoiceChannel(callContext.currentRoomId, roomId)) {
         console.log(`useGlobalCall: Already in room ${roomId}, resyncing call state`);
-        await callContext.joinRoom(roomId, roomName);
+        await callContext.joinRoom(roomId, roomName, serverId);
         return true;
       }
 
@@ -41,7 +41,7 @@ export const useGlobalCall = (userId = null, userName = null) => {
       }
 
       // Присоединяемся к комнате с названием
-      await callContext.joinRoom(roomId, roomName);
+      await callContext.joinRoom(roomId, roomName, serverId);
       
       console.log(`Started call in room: ${roomName} (${roomId})`);
       return true;

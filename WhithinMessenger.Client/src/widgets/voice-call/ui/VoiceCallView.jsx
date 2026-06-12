@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
+import { useCallStore } from '../../../shared/lib/stores/callStore';
+import { selectActiveServerVoiceModeration } from '../../../shared/lib/voice/serverVoiceModerationState';
 import { isSameVoiceChannel } from '../../../shared/lib/stores/callStore';
 import { useCallGridTestMode } from '../../../shared/lib/hooks/useCallGridTestMode';
 import { VideoCallGrid } from '../../../shared/ui/atoms';
@@ -46,7 +48,9 @@ const VoiceCallView = ({
   channelName,
   userId,
   userName,
-  onClose
+  onClose,
+  serverId = null,
+  canMuteMembers = false,
 }) => {
   const {
     isConnected,
@@ -91,6 +95,10 @@ const VoiceCallView = ({
     toggleSpatialAudioStage
   } = useGlobalCall(userId, userName);
 
+  const { isServerMuted, isServerDeafened } = useCallStore((state) =>
+    selectActiveServerVoiceModeration(state, serverId)
+  );
+
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const {
     showErrorBanner,
@@ -124,21 +132,21 @@ const VoiceCallView = ({
 
     // После endCall isInCall=false — не переподключаемся, пока пользователь снова не откроет канал
     if (!alreadyInThisChannel && isInCall) {
-      startCall(channelId, channelName).catch((err) => {
+      startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call start error:', err);
       });
       return;
     }
 
     if (alreadyInThisChannel) {
-      startCall(channelId, channelName).catch((err) => {
+      startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call resync error:', err);
       });
       return;
     }
 
     if (!isInCall) {
-      startCall(channelId, channelName).catch((err) => {
+      startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call start error:', err);
       });
     }
@@ -329,6 +337,10 @@ const VoiceCallView = ({
                       testMode={testMode}
                       onAddTestParticipant={handleAddTestParticipant}
                       onRemoveTestParticipant={handleRemoveTestParticipant}
+                      canMuteMembers={canMuteMembers}
+                      voiceChannelId={channelId}
+                      serverId={serverId}
+                      currentUserId={userId}
                     />
                   </div>
                 )}
@@ -348,6 +360,8 @@ const VoiceCallView = ({
                 onToggleMute: toggleMute,
                 isGlobalAudioMuted,
                 onToggleGlobalAudio: toggleGlobalAudio,
+                isServerMuted,
+                isServerDeafened,
                 isNoiseSuppressed,
                 noiseSuppressionMode,
                 onToggleNoiseSuppression: handleToggleNoiseSuppression,

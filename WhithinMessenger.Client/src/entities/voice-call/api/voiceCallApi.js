@@ -438,7 +438,7 @@ class VoiceCallApi {
     });
   }
 
-  async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2') {
+  async joinRoom(roomId, name, userId, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2', serverId = null) {
     if (this.room && this.roomId != null && String(this.roomId) === String(roomId)) {
       console.log('joinRoom: Already in this LiveKit room, syncing existing state');
       this.syncExistingRemoteTracks();
@@ -470,7 +470,8 @@ class VoiceCallApi {
         initialMuted,
         initialAudioEnabled,
         avatar,
-        avatarColor
+        avatarColor,
+        serverId: serverId ? String(serverId) : null,
       }, async (response) => {
         if (response && response.error) {
           reject(new Error(response.error));

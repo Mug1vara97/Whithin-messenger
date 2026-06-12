@@ -5,6 +5,7 @@ import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../lib/stores/callStore';
+import { selectActiveServerVoiceModeration } from '../../../lib/voice/serverVoiceModerationState';
 import {
     getUserStatusColor,
     getUserStatusLabel,
@@ -21,14 +22,16 @@ const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 const UserPanel = ({ 
     userId, 
     username, 
-    isOpen
+    isOpen,
+    serverId = null,
 }) => {
     // Подключаемся к глобальному состоянию звонка напрямую в компоненте
     const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
     const isMuted = useCallStore((state) => state.isMuted);
     const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
-    const isServerMuted = useCallStore((state) => state.isServerMuted);
-    const isServerDeafened = useCallStore((state) => state.isServerDeafened);
+    const { isServerMuted, isServerDeafened } = useCallStore((state) =>
+        selectActiveServerVoiceModeration(state, serverId)
+    );
 
     const [userProfile, setUserProfile] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
@@ -450,7 +453,7 @@ const UserPanel = ({
                     
                     <div className={styles['voice-controls']}>
                         <button
-                            className={styles['voice-control-button']}
+                            className={`${styles['voice-control-button']} ${isServerMuted && isMuted ? styles['voice-control-buttonModerated'] : ''} ${isMuted && !isServerMuted ? styles['voice-control-buttonMuted'] : ''}`}
                             onClick={toggleMute}
                             disabled={isServerMuted && isMuted}
                             title={
@@ -465,7 +468,7 @@ const UserPanel = ({
                         </button>
                         
                         <button
-                            className={styles['voice-control-button']}
+                            className={`${styles['voice-control-button']} ${isServerDeafened && isGlobalAudioMuted ? styles['voice-control-buttonModerated'] : ''} ${isGlobalAudioMuted && !isServerDeafened ? styles['voice-control-buttonMuted'] : ''}`}
                             onClick={toggleGlobalAudio}
                             disabled={isServerDeafened && isGlobalAudioMuted}
                             title={

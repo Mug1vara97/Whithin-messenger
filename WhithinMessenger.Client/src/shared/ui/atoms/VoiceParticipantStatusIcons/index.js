@@ -1,0 +1,1 @@
+export { VoiceParticipantStatusIcons } from './VoiceParticipantStatusIcons';

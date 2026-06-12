@@ -414,6 +414,21 @@
   background: #d83b3e;
 }
 
+.center-button.server-moderated {
+  background: #f0b232;
+  color: #1e1f22;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.center-button.server-moderated:hover {
+  background: #d9a02d;
+}
+
+.center-button.server-moderated:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .center-button.active {
   background: #5865f2;
   color: #fff;

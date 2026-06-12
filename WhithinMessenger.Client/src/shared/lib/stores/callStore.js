@@ -23,6 +23,7 @@ import {
   disconnectCallMasterOutputBus,
   ensureCallMasterOutputBus,
 } from '../utils/callAudioMasterBus';
+import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModerationState';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
 
 const SOUNDPAD_TRACK_NAME = 'soundpad';
@@ -306,8 +307,8 @@ export const useCallStore = create(
           return false;
         }
       })(),
-      isServerMuted: false,
-      isServerDeafened: false,
+      serverVoiceModerationByServer: new Map(),
+      currentCallServerId: null,
       devicesPreinitialized: false,
       mediaDeviceInfo: {
         hasMicrophone: false,
@@ -839,7 +840,8 @@ export const useCallStore = create(
             try {
               await get().joinRoom(
                 state.currentRoomId,
-                state.currentCall?.channelName || state.currentRoomId
+                state.currentCall?.channelName || state.currentRoomId,
+                state.currentCallServerId
               );
             } catch (error) {
               console.error('Failed to rejoin voice room after reconnect:', error);
@@ -1785,7 +1787,8 @@ export const useCallStore = create(
           state.isMuted,
           !state.isGlobalAudioMuted,
           userAvatar,
-          userAvatarColor
+          userAvatarColor,
+          state.currentCallServerId
         );
 
         if (response?.existingPeers?.length) {
@@ -1810,7 +1813,7 @@ export const useCallStore = create(
       },
 
       // Присоединение к комнате (очередь + generation — защита от гонок при быстром переключении каналов)
-      joinRoom: async (roomId, channelName = null) => {
+      joinRoom: async (roomId, channelName = null, serverId = null) => {
         const joinGen = bumpVoiceJoinGeneration();
         const normalizedRoomId = normalizeChannelId(roomId);
 
@@ -1823,11 +1826,17 @@ export const useCallStore = create(
             voiceCallApi.room
           ) {
             const finalChannelName = channelName || state.currentCall?.channelName || normalizedRoomId;
-            if (state.currentCall?.channelName !== finalChannelName) {
+            const normalizedServerId = serverId ? String(serverId) : state.currentCallServerId;
+            if (
+              state.currentCall?.channelName !== finalChannelName ||
+              (serverId && String(state.currentCallServerId) !== String(serverId))
+            ) {
               set({
+                currentCallServerId: normalizedServerId,
                 currentCall: {
                   channelId: normalizedRoomId,
                   channelName: finalChannelName,
+                  serverId: normalizedServerId,
                 },
               });
             }
@@ -1897,7 +1906,8 @@ export const useCallStore = create(
               state.isMuted,
               !state.isGlobalAudioMuted,
               userAvatar,
-              userAvatarColor
+              userAvatarColor,
+              serverId
             );
 
             if (!isVoiceJoinCurrent(joinGen)) {
@@ -1907,10 +1917,12 @@ export const useCallStore = create(
 
             set({
               currentRoomId: normalizedRoomId,
+              currentCallServerId: serverId ? String(serverId) : null,
               isInCall: true,
               currentCall: {
                 channelId: normalizedRoomId,
                 channelName: finalChannelName,
+                serverId: serverId ? String(serverId) : null,
               },
             });
 
@@ -2353,11 +2365,45 @@ export const useCallStore = create(
       },
       
       applyServerVoiceModeration: async (data) => {
+        const serverId = data?.serverId ? String(data.serverId) : null;
+        if (!serverId) {
+          console.warn('applyServerVoiceModeration: missing serverId');
+          return;
+        }
+
         const serverMuted = Boolean(data?.serverMuted);
         const serverDeafened = Boolean(data?.serverDeafened);
-        set({ isServerMuted: serverMuted, isServerDeafened: serverDeafened });
 
-        if (data?.isMuted !== undefined) {
+        set((state) => {
+          const serverVoiceModerationByServer = new Map(state.serverVoiceModerationByServer);
+          serverVoiceModerationByServer.set(serverId, {
+            isServerMuted: serverMuted,
+            isServerDeafened: serverDeafened,
+          });
+          return { serverVoiceModerationByServer };
+        });
+
+        const state = get();
+        const isActiveServerCall =
+          state.isInCall &&
+          state.currentCallServerId &&
+          String(state.currentCallServerId) === serverId;
+
+        const userId = state.currentUserId;
+        const currentRoomId = state.currentRoomId;
+        const participantUpdates = {
+          isServerMuted: serverMuted,
+          isServerDeafened: serverDeafened,
+        };
+
+        if (!isActiveServerCall) {
+          if (currentRoomId && userId) {
+            get().updateVoiceChannelParticipant(currentRoomId, userId, participantUpdates);
+          }
+          return;
+        }
+
+        if (serverMuted && data?.isMuted !== undefined) {
           const muted = Boolean(data.isMuted);
           localStorage.setItem('micMuted', JSON.stringify(muted));
 
@@ -2374,7 +2420,6 @@ export const useCallStore = create(
             voiceCallApi.broadcastMuteState(muted);
           }
 
-          const userId = get().currentUserId;
           set((state) => {
             const newMuteStates = new Map(state.participantMuteStates);
             if (userId) newMuteStates.set(String(userId), muted);
@@ -2389,20 +2434,13 @@ export const useCallStore = create(
             };
           });
 
-          const currentRoomId = get().currentRoomId;
-          if (currentRoomId && userId) {
-            get().updateVoiceChannelParticipant(currentRoomId, userId, {
-              isMuted: muted,
-              isServerMuted: serverMuted,
-            });
-          }
-
+          participantUpdates.isMuted = muted;
           if (muted) {
             get().resetSpeakingState(userId);
           }
         }
 
-        if (data?.isGlobalAudioMuted !== undefined) {
+        if (serverDeafened && data?.isGlobalAudioMuted !== undefined) {
           const deafened = Boolean(data.isGlobalAudioMuted);
           localStorage.setItem('audioMuted', JSON.stringify(deafened));
           set({
@@ -2410,15 +2448,6 @@ export const useCallStore = create(
             isAudioEnabled: !deafened,
           });
 
-          if (voiceCallApi.socket) {
-            voiceCallApi.socket.emit('audioState', {
-              isEnabled: !deafened,
-              isGlobalAudioMuted: deafened,
-              userId: get().currentUserId,
-            });
-          }
-
-          const userId = get().currentUserId;
           set((state) => {
             const newGlobalAudioStates = new Map(state.participantGlobalAudioStates);
             if (userId) newGlobalAudioStates.set(String(userId), deafened);
@@ -2432,17 +2461,14 @@ export const useCallStore = create(
             };
           });
 
-          const currentRoomId = get().currentRoomId;
-          if (currentRoomId && userId) {
-            get().updateVoiceChannelParticipant(currentRoomId, userId, {
-              isGlobalAudioMuted: deafened,
-              isAudioDisabled: deafened,
-              isDeafened: deafened,
-              isServerDeafened: serverDeafened,
-            });
-          }
-
+          participantUpdates.isGlobalAudioMuted = deafened;
+          participantUpdates.isAudioDisabled = deafened;
+          participantUpdates.isDeafened = deafened;
           get().applyAllParticipantAudioRouting();
+        }
+
+        if (currentRoomId && userId) {
+          get().updateVoiceChannelParticipant(currentRoomId, userId, participantUpdates);
         }
       },
 
@@ -2451,7 +2477,8 @@ export const useCallStore = create(
         const state = get();
         const newMutedState = !state.isMuted;
 
-        if (!newMutedState && state.isServerMuted) {
+        const { isServerMuted } = selectActiveServerVoiceModeration(state);
+        if (!newMutedState && isServerMuted) {
           return;
         }
         
@@ -2968,7 +2995,8 @@ export const useCallStore = create(
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
 
-        if (!newMutedState && state.isServerDeafened) {
+        const { isServerDeafened } = selectActiveServerVoiceModeration(state);
+        if (!newMutedState && isServerDeafened) {
           return;
         }
         
@@ -3345,6 +3373,7 @@ export const useCallStore = create(
         set({
           isInCall: false,
           currentRoomId: null,
+          currentCallServerId: null,
           currentCall: null,
           participants: [],
           participantMuteStates: new Map(),

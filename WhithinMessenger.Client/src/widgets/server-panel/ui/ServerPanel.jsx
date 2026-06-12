@@ -16,12 +16,12 @@ import {
   canManageChannels,
   canManageServer,
   canCreateInvites,
-  canMuteMembers,
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
 } from '../../../entities/role/lib/serverPermissions';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
+import { setServerHubConnection, clearServerHubConnection } from '../../../shared/lib/services/serverHubRegistry';
 import { 
   CreateNewFolder, 
   Add, 
@@ -67,7 +67,6 @@ const ServerPanel = ({
   const userCanManageChannels = canManageChannels(serverPermissions, isOwner);
   const userCanManageServer = canManageServer(serverPermissions, isOwner);
   const userCanCreateInvites = canCreateInvites(serverPermissions, isOwner);
-  const userCanMuteMembers = canMuteMembers(serverPermissions, isOwner);
 
   const fetchServerData = useCallback(async () => {
     if (!selectedServer?.serverId) return null;
@@ -441,15 +440,19 @@ const ServerPanel = ({
 
       const updates = {};
       if (muteMic !== null && muteMic !== undefined) {
-        updates.isMuted = Boolean(muteMic);
         updates.isServerMuted = Boolean(muteMic);
-        if (muteMic) updates.isSpeaking = false;
+        if (muteMic === true) {
+          updates.isMuted = true;
+          updates.isSpeaking = false;
+        }
       }
       if (deafen !== null && deafen !== undefined) {
-        updates.isGlobalAudioMuted = Boolean(deafen);
-        updates.isAudioDisabled = Boolean(deafen);
-        updates.isDeafened = Boolean(deafen);
         updates.isServerDeafened = Boolean(deafen);
+        if (deafen === true) {
+          updates.isGlobalAudioMuted = true;
+          updates.isAudioDisabled = true;
+          updates.isDeafened = true;
+        }
       }
       if (Object.keys(updates).length > 0) {
         useCallStore.getState().updateVoiceChannelParticipant(channelId, targetUserId, updates);
@@ -532,9 +535,11 @@ const ServerPanel = ({
       
       if (connectionRef.current) {
         console.log('Stopping existing connection...');
+        const previousServerId = currentServerRef.current;
         await         connectionRef.current.stop();
         connectionRef.current = null;
         setServerConnection(null);
+        clearServerHubConnection(previousServerId);
       }
       console.log('ServerPanel: Creating connection to serverhub with userId:', user.id);
       const newConnection = new HubConnectionBuilder()
@@ -548,6 +553,7 @@ const ServerPanel = ({
 
       newConnection.onreconnected(() => {
         if (selectedServer?.serverId) {
+          setServerHubConnection(newConnection, selectedServer.serverId);
           setTimeout(() => {
             newConnection.invoke("JoinServerGroup", selectedServer.serverId.toString())
               .catch(error => console.error('Error rejoining server group:', error));
@@ -574,6 +580,7 @@ const ServerPanel = ({
         
         connectionRef.current = newConnection;
         setServerConnection(newConnection);
+        setServerHubConnection(newConnection, selectedServer.serverId);
         currentServerRef.current = selectedServer.serverId;
         console.log('Connected to server hub');
         
@@ -641,8 +648,10 @@ const ServerPanel = ({
         connectionRef.current.off("ServerDeleted");
         connectionRef.current.off("Error");
         
+        const disconnectedServerId = selectedServer?.serverId;
         connectionRef.current.stop();
         setServerConnection(null);
+        clearServerHubConnection(disconnectedServerId);
       }
     };
   }, [selectedServer?.serverId, user?.id, onServerDataUpdated, user?.userId]); // Возвращаем все зависимости
@@ -1173,8 +1182,6 @@ const ServerPanel = ({
           onChatsReordered={handleChatsReordered}
           userId={user?.id}
           userName={user?.username || user?.userName}
-          canMuteMembers={userCanMuteMembers}
-          serverConnection={serverConnection}
         />
       </div>
 
@@ -1238,6 +1245,7 @@ const ServerPanel = ({
         userId={user?.id}
         username={user?.username || user?.userName}
         isOpen={true}
+        serverId={currentServer?.serverId}
       />
     </div>
   );

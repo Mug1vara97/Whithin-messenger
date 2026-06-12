@@ -39,9 +39,7 @@ const CategoriesList = ({
   userName,
   onCategoriesReordered,
   onChatsReordered,
-  onServerDataUpdated,
-  canMuteMembers = false,
-  serverConnection,
+  onServerDataUpdated
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
 
@@ -448,10 +446,6 @@ const CategoriesList = ({
                       isDragDisabled={!canManageChannels}
                       userId={userId}
                       userName={userName}
-                      canMuteMembers={canMuteMembers}
-                      serverId={serverId}
-                      serverConnection={serverConnection}
-                      currentUserId={userId}
                     />
                     );
                   })}
@@ -489,10 +483,6 @@ const CategoriesList = ({
                     isDragDisabled={!canManageChannels}
                     userId={userId}
                     userName={userName}
-                    canMuteMembers={canMuteMembers}
-                    serverId={serverId}
-                    serverConnection={serverConnection}
-                    currentUserId={userId}
                   />
                   );
                 }) || (
