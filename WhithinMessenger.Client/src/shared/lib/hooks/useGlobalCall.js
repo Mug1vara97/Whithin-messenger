@@ -22,6 +22,8 @@ export const useGlobalCall = (userId = null, userName = null) => {
     }
 
     try {
+      callContext.clearVoiceAutoJoinSuppress?.();
+
       if (callContext.isInCall && isSameVoiceChannel(callContext.currentRoomId, roomId)) {
         console.log(`useGlobalCall: Already in room ${roomId}, resyncing call state`);
         await callContext.joinRoom(roomId, roomName, serverId);

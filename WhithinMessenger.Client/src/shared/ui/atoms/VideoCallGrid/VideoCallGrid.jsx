@@ -457,7 +457,6 @@ const VideoCallGrid = ({
     );
     const isSpeaking = getParticipantIsSpeaking(participantSpeakingStates, participant.id, {
       isMuted,
-      audioEnabled: participant.isAudioEnabled,
     });
     const isServerMuted =
       getParticipantIsServerMuted(channelParticipant, {

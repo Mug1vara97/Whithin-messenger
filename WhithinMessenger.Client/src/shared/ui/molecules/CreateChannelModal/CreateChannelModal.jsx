@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FaTimes, FaHashtag, FaVolumeUp, FaLock } from 'react-icons/fa';
+import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined';
+import { FaTimes, FaVolumeUp, FaLock, FaHashtag } from 'react-icons/fa';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import tokenManager from '../../../lib/services/tokenManager';
@@ -10,18 +11,45 @@ const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const CreateChannelModal = ({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
+const CHANNEL_TYPE_OPTIONS = [
+  {
+    value: 3,
+    label: 'Текст',
+    description: 'Отправляйте сообщения, изображения, GIF, эмодзи, мнения и файлы',
+    placeholder: 'новый-канал',
+    renderIcon: () => <FaHashtag aria-hidden />,
+    renderPrefix: () => '#',
+  },
+  {
+    value: 4,
+    label: 'Голос',
+    description: 'Общайтесь голосом вместе с другими участниками в реальном времени',
+    placeholder: 'общий-голосовой',
+    renderIcon: () => <FaVolumeUp aria-hidden />,
+    renderPrefix: () => <FaVolumeUp aria-hidden />,
+  },
+  {
+    value: 5,
+    label: 'Доска',
+    description: 'Коллективная доска с карточками идей, тегами и связями',
+    placeholder: 'идеи-команды',
+    renderIcon: () => <ContentPasteOutlinedIcon fontSize="small" aria-hidden />,
+    renderPrefix: () => <ContentPasteOutlinedIcon fontSize="small" aria-hidden />,
+  },
+];
+
+const CreateChannelModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
   categoryId,
   categoryName,
   serverId,
-  serverConnection 
+  serverConnection,
 }) => {
   const { user } = useAuthContext();
   const [channelName, setChannelName] = useState('');
-  const [channelType, setChannelType] = useState(3); // 3 - текстовый, 4 - голосовой
+  const [channelType, setChannelType] = useState(3);
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [serverMembers, setServerMembers] = useState([]);
@@ -30,7 +58,6 @@ const CreateChannelModal = ({
   const [errors, setErrors] = useState({});
   const membersHandlerRef = useRef(null);
 
-  // Список участников: как в настройках сервера — через SignalR GetServerMembers; иначе REST с токеном
   const fetchServerMembers = useCallback(async () => {
     if (!serverId) return;
     setMembersLoading(true);
@@ -45,7 +72,7 @@ const CreateChannelModal = ({
         serverConnection.on('ServerMembersLoaded', handler);
         await serverConnection.invoke('GetServerMembers', serverId);
         setTimeout(() => {
-          setMembersLoading(prev => {
+          setMembersLoading((prev) => {
             if (prev) serverConnection.off('ServerMembersLoaded', membersHandlerRef.current);
             return false;
           });
@@ -53,7 +80,7 @@ const CreateChannelModal = ({
       } else {
         const res = await fetch(`${BASE_URL}/api/server/${serverId}/members`, {
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (res.ok) {
           const data = await res.json();
@@ -110,37 +137,35 @@ const CreateChannelModal = ({
   };
 
   const toggleMember = (userId) => {
-    setSelectedMemberIds(prev =>
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    setSelectedMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
     );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
     setErrors({});
-    
+
     try {
       await onSubmit({
         name: channelName.trim(),
         type: channelType,
         categoryId: categoryId || null,
         isPrivate: isPrivate,
-        memberIds: isPrivate ? selectedMemberIds : []
+        memberIds: isPrivate ? selectedMemberIds : [],
       });
-      
     } catch (error) {
       console.error('Ошибка создания канала:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Ошибка создания канала';
-      
+
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Ошибка создания канала';
+
       setErrors({ submit: errorMessage });
     } finally {
       setIsLoading(false);
@@ -155,116 +180,124 @@ const CreateChannelModal = ({
 
   if (!isOpen) return null;
 
+  const selectedChannelType =
+    CHANNEL_TYPE_OPTIONS.find((option) => option.value === channelType) ??
+    CHANNEL_TYPE_OPTIONS[0];
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="create-channel-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Создать канал</h2>
-          <button className="close-button" onClick={onClose}>
+          <div className="modal-header-text">
+            <h2>Создать канал</h2>
+            <p className="modal-subtitle">в {categoryName || 'Без категории'}</p>
+          </div>
+          <button type="button" className="close-button" onClick={onClose} aria-label="Закрыть">
             <FaTimes />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="modal-body">
-            <div className="form-group">
-              <label htmlFor="category">Категория</label>
-              <div className="category-display">
-                {categoryName || 'Без категории'}
-              </div>
-            </div>
+            <fieldset className="channel-type-list">
+              <legend className="form-section-label">Тип канала</legend>
+              {CHANNEL_TYPE_OPTIONS.map((option) => {
+                const isSelected = channelType === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`channel-type-option ${isSelected ? 'selected' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="channelType"
+                      value={option.value}
+                      checked={isSelected}
+                      onChange={() => setChannelType(option.value)}
+                      className="channel-type-radio-input"
+                    />
+                    <span className="channel-type-radio" aria-hidden="true" />
+                    <span className="channel-type-info">
+                      <span className="channel-type-head">
+                        <span className="channel-type-icon">{option.renderIcon()}</span>
+                        <span className="channel-type-name">{option.label}</span>
+                      </span>
+                      <span className="channel-type-desc">{option.description}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
 
-            <div className="form-group">
-              <label htmlFor="channelType">Тип канала</label>
-              <div className="channel-type-selector">
-                <label className={`type-option ${channelType === 3 ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="channelType"
-                    value="3"
-                    checked={channelType === 3}
-                    onChange={(e) => setChannelType(parseInt(e.target.value))}
-                  />
-                  <div className="type-content">
-                    <FaHashtag className="type-icon" />
-                    <div>
-                      <div className="type-name">Текстовый канал</div>
-                      <div className="type-description">Отправляйте сообщения, изображения, GIF, эмодзи, мнения и файлы</div>
-                    </div>
-                  </div>
-                </label>
-
-                <label className={`type-option ${channelType === 4 ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="channelType"
-                    value="4"
-                    checked={channelType === 4}
-                    onChange={(e) => setChannelType(parseInt(e.target.value))}
-                  />
-                  <div className="type-content">
-                    <FaVolumeUp className="type-icon" />
-                    <div>
-                      <div className="type-name">Голосовой канал</div>
-                      <div className="type-description">Говорите вместе с другими участниками в реальном времени</div>
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="form-group channel-name-group">
-              <label htmlFor="channelName">Название канала</label>
-              <div className="input-container">
-                <span className={`input-prefix ${channelType === 4 ? 'input-prefix--icon' : ''}`}>
-                  {channelType === 3 ? '#' : <FaVolumeUp aria-hidden />}
+            <div className="channel-name-group">
+              <label htmlFor="channelName" className="form-section-label">
+                Название канала
+              </label>
+              <div
+                className={`channel-name-field ${errors.name ? 'has-error' : ''}`}
+                data-channel-type={channelType}
+              >
+                <span className="channel-name-prefix" aria-hidden="true">
+                  {selectedChannelType.renderPrefix()}
                 </span>
                 <input
                   id="channelName"
                   type="text"
+                  className="channel-name-input"
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
-                  placeholder={channelType === 3 ? 'общий-чат' : 'Общий голосовой'}
-                  className={errors.name ? 'error' : ''}
+                  placeholder={selectedChannelType.placeholder}
                   autoComplete="off"
                 />
               </div>
               {errors.name && <div className="error-message">{errors.name}</div>}
             </div>
 
-            <div className="form-group">
-              <label className="private-channel-label">
+            <div className="private-channel-row">
+              <div className="private-channel-info">
+                <div className="private-channel-title">
+                  <FaLock className="private-icon" aria-hidden />
+                  <span>Приватный канал</span>
+                </div>
+                <p className="private-channel-desc">
+                  Только выбранные участники смогут просматривать этот канал
+                </p>
+              </div>
+              <label className="toggle-switch">
                 <input
                   type="checkbox"
                   checked={isPrivate}
                   onChange={(e) => setIsPrivate(e.target.checked)}
                 />
-                <FaLock className="private-icon" />
-                Приватный канал — видят только те, кого вы добавите в список ниже
+                <span className="toggle-slider" aria-hidden="true" />
               </label>
             </div>
 
             {isPrivate && serverId && (
               <div className="form-group member-picker">
-                <label>Кто имеет доступ</label>
+                <label className="form-section-label">Кто имеет доступ</label>
                 {membersLoading ? (
                   <div className="members-loading">Загрузка участников...</div>
                 ) : (
                   <div className="member-list">
                     {serverMembers
-                      .filter(m => (m.userId ?? m.user_id) !== user?.id)
-                      .map(m => (
+                      .filter((m) => (m.userId ?? m.user_id) !== user?.id)
+                      .map((m) => (
                         <label key={m.userId || m.user_id} className="member-option">
                           <input
                             type="checkbox"
                             checked={selectedMemberIds.includes(m.userId ?? m.user_id)}
                             onChange={() => toggleMember(m.userId ?? m.user_id)}
                           />
-                          <span className="member-name">{m.username ?? m.userName ?? m.user_name ?? 'Участник'}</span>
+                          <span className="member-name">
+                            {m.username ?? m.userName ?? m.user_name ?? 'Участник'}
+                          </span>
                         </label>
                       ))}
                     {serverMembers.length === 0 && !membersLoading && (
-                      <div className="no-members">Загрузите участников сервера или добавьте себя позже.</div>
+                      <div className="no-members">
+                        Загрузите участников сервера или добавьте себя позже.
+                      </div>
                     )}
                   </div>
                 )}
@@ -280,8 +313,8 @@ const CreateChannelModal = ({
             <button type="button" className="cancel-button" onClick={onClose}>
               Отмена
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="create-button"
               disabled={isLoading || !channelName.trim()}
             >

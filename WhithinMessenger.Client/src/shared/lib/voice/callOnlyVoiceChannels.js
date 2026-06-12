@@ -71,8 +71,13 @@ const insertChannelAtOrder = (category, channel, order) => {
   setCategoryChats(category, chats);
 };
 
-export const mergeCallOnlyIntoCategories = (categories, callOnlyMap, currentRoomId) => {
-  if (!currentRoomId || !callOnlyMap?.size || !categories?.length) {
+export const mergeCallOnlyIntoCategories = (
+  categories,
+  callOnlyMap,
+  currentRoomId,
+  isInCall = false
+) => {
+  if (!isInCall || !currentRoomId || !callOnlyMap?.size || !categories?.length) {
     return categories;
   }
 

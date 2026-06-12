@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WhithinMessenger.Domain.Models;
 
@@ -41,6 +41,11 @@ public class ChatTypeConfiguration : IEntityTypeConfiguration<ChatType>
             {
                 Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
                 TypeName = "VoiceChannel"
+            },
+            new ChatType
+            {
+                Id = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+                TypeName = "IdeasBoard"
             }
         );
     }

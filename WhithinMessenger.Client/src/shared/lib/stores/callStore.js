@@ -272,6 +272,8 @@ export const useCallStore = create(
       voiceChannelParticipants: new Map(),
       // Голосовые каналы, видимые в сайдбаре только на время звонка (например, приватный канал после переноса)
       callOnlyVoiceChannels: new Map(),
+      // Блокирует автоподключение к каналу после явного выхода из звонка (VoiceCallView / ChatVoiceCall)
+      suppressVoiceAutoJoinForChannel: null,
       
       // Отдельные состояния для оптимизации (избегаем перерендера демонстрации экрана)
       participantMuteStates: new Map(), // userId -> isMuted
@@ -693,6 +695,8 @@ export const useCallStore = create(
       },
 
       clearCallOnlyVoiceChannels: () => set({ callOnlyVoiceChannels: new Map() }),
+
+      clearVoiceAutoJoinSuppress: () => set({ suppressVoiceAutoJoinForChannel: null }),
       
       // Инициализация VAD для локального пользователя
       initializeLocalVAD: async (stream, audioContext) => {
@@ -761,9 +765,7 @@ export const useCallStore = create(
             const normalizedUserId = String(userId);
             const isMuted = s.participantMuteStates?.get(normalizedUserId) === true
               || s.participantMuteStates?.get(userId) === true;
-            const audioOn = s.participantAudioStates?.get(normalizedUserId) !== false
-              && s.participantAudioStates?.get(userId) !== false;
-            if (isMuted || !audioOn) {
+            if (isMuted) {
               if (s.participantSpeakingStates.get(normalizedUserId)) {
                 s.resetSpeakingState(normalizedUserId);
               }
@@ -1171,14 +1173,6 @@ export const useCallStore = create(
                 participantGlobalAudioStates: newGlobalAudioStates
               };
             });
-            
-            if (audioEnabled === false) {
-              get().resetSpeakingState(userId);
-              const remoteVad = get().voiceActivityDetectors.get(userId);
-              if (remoteVad?.forceReset) {
-                remoteVad.forceReset();
-              }
-            }
             
             // Обновляем участников только если нужно (для совместимости)
             set((state) => ({
@@ -3539,6 +3533,7 @@ export const useCallStore = create(
       
       // Завершение звонка
       endCall: async () => {
+        const endedChannelId = normalizeChannelId(get().currentRoomId);
         try {
           const state = get();
           
@@ -3660,6 +3655,9 @@ export const useCallStore = create(
             isInCall: false,
             currentRoomId: null,
             currentCall: null,
+            currentCallServerId: null,
+            callOnlyVoiceChannels: new Map(),
+            suppressVoiceAutoJoinForChannel: endedChannelId,
             participants: [],
             participantMuteStates: new Map(),
             participantAudioStates: new Map(),
@@ -3698,9 +3696,27 @@ export const useCallStore = create(
           });
           
           console.log('Call ended successfully');
+          if (endedChannelId && typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('voiceCallEnded', { detail: { channelId: endedChannelId } })
+            );
+          }
         } catch (error) {
           console.error('Failed to end call:', error);
-          set({ error: error.message });
+          set({
+            error: error.message,
+            isInCall: false,
+            currentRoomId: null,
+            currentCall: null,
+            currentCallServerId: null,
+            callOnlyVoiceChannels: new Map(),
+            suppressVoiceAutoJoinForChannel: endedChannelId,
+          });
+          if (endedChannelId && typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('voiceCallEnded', { detail: { channelId: endedChannelId } })
+            );
+          }
         }
       },
       

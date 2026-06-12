@@ -33,6 +33,15 @@ import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoMo
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { UserAvatar } from '../../../shared/ui';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
+import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
+import { useMembers } from '../../../entities/member/hooks';
+import { useRoles } from '../../../entities/role/hooks';
+import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverrides';
+import { useServerHubConnection } from '../../../shared/lib/hooks/useServerHubConnection';
+import {
+  mapChatParticipantToListItem,
+  mapServerMemberToListItem,
+} from '../../../shared/lib/utils/memberListUtils';
 import {
   Call,
   Mic,
@@ -50,6 +59,7 @@ import {
   ForwardOutlined,
   EditOutlined,
   DeleteOutline,
+  People,
 } from '@mui/icons-material';
 import {
   canSendMessages,
@@ -71,6 +81,8 @@ const ChatRoom = ({
   onEndChatCall,
   userPermissions = {},
   isServerOwner = false,
+  serverId = null,
+  serverOwnerId = null,
   /** When messages load/update; parent debounces the server «mark chat read» call */
   onMessagesActivity
 }) => {
@@ -191,7 +203,66 @@ const ChatRoom = ({
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [stickerPanelWidth, setStickerPanelWidth] = useState(380);
   const [isSendingSticker, setIsSendingSticker] = useState(false);
+  const [showMemberList, setShowMemberList] = useState(true);
   const notificationConnectionRef = useRef(null);
+
+  const serverConnection = useServerHubConnection(isServerChat ? serverId : null);
+  const { members: serverMembers, isLoading: serverMembersLoading } = useMembers(
+    serverConnection,
+    isServerChat ? serverId : null,
+    userId
+  );
+  const { roles: serverRoles, fetchRoles: fetchServerRoles } = useRoles(
+    serverConnection,
+    isServerChat ? serverId : null,
+    userId
+  );
+  const { resolveStatus } = usePresenceOverrides(userId);
+
+  useEffect(() => {
+    if (isServerChat && serverConnection && serverId) {
+      fetchServerRoles();
+    }
+  }, [isServerChat, serverConnection, serverId, fetchServerRoles]);
+
+  const isStickerPanelOpen = stickerPickerOpen && !editingMessageId && canSend;
+  const showMembersSidebar =
+    (isServerChat || isGroupChat) && !isPrivateChat && showMemberList && !isStickerPanelOpen;
+
+  const handleMemberListToggle = useCallback(() => {
+    if (isStickerPanelOpen) {
+      setStickerPickerOpen(false);
+      setShowMemberList(true);
+      return;
+    }
+    setShowMemberList((open) => !open);
+  }, [isStickerPanelOpen]);
+
+  const handleStickerPickerToggle = useCallback(() => {
+    setStickerPickerOpen((open) => !open);
+  }, []);
+
+  const sidebarMembers = useMemo(() => {
+    if (isServerChat) {
+      return (serverMembers || []).map((member) =>
+        mapServerMemberToListItem(member, { serverOwnerId, resolveStatus, serverRoles })
+      );
+    }
+    if (isGroupChat) {
+      return (chatParticipants || []).map((participant) =>
+        mapChatParticipantToListItem(participant, { resolveStatus })
+      );
+    }
+    return [];
+  }, [
+    isServerChat,
+    isGroupChat,
+    serverMembers,
+    chatParticipants,
+    serverOwnerId,
+    resolveStatus,
+    serverRoles,
+  ]);
 
   const inputRef = useRef(null);
 
@@ -382,7 +453,7 @@ const ChatRoom = ({
 
     const handleGroupUpdated = (action, userId) => {
       console.log('ChatRoom - Group updated:', action, userId);
-      if (action === 'user_added' && showChatInfo && connection && chatId) {
+      if (action === 'user_added' && (showChatInfo || showMemberList) && connection && chatId) {
         console.log('ChatRoom - Reloading participants after user added');
         connection.invoke('GetChatParticipants', chatId).catch(error => {
           console.error('ChatRoom - Error reloading participants:', error);
@@ -432,17 +503,18 @@ const ChatRoom = ({
       connection.off('Error', handleError);
       connection.off('chatdeleted', handleChatDeleted);
     };
-  }, [connection, showChatInfo]);
+  }, [connection, showChatInfo, showMemberList, chatId]);
 
   useEffect(() => {
-    if (showChatInfo && !isPrivateChat && connection && chatId) {
-      console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
-      connection.invoke('GetChatParticipants', chatId).catch(error => {
-        console.error('ChatRoom - Error loading participants via SignalR:', error);
-        setChatParticipants([]);
-      });
-    }
-  }, [showChatInfo, isPrivateChat, chatId, connection]);
+    if (!isGroupChat || isPrivateChat || !connection || !chatId) return;
+    if (!showMemberList && !showChatInfo) return;
+
+    console.log('ChatRoom - Loading participants for member sidebar, chatId:', chatId);
+    connection.invoke('GetChatParticipants', chatId).catch((error) => {
+      console.error('ChatRoom - Error loading participants via SignalR:', error);
+      setChatParticipants([]);
+    });
+  }, [isGroupChat, isPrivateChat, chatId, connection, showMemberList, showChatInfo]);
 
   useEffect(() => {
     if (showChatInfo && connection && chatId) {
@@ -942,11 +1014,10 @@ const ChatRoom = ({
 
   return (
     <div
-      className={`group-chat-container ${stickerPickerOpen && !editingMessageId ? 'has-sticker-panel' : ''}`}
+      className={`group-chat-container ${isStickerPanelOpen ? 'has-sticker-panel' : ''}`}
       tabIndex={0}
       style={{ outline: 'none' }}
     >
-      <div className="chat-room-main">
       <div className="chat-header">
         <div className="header-left">
           <div className="user-info" onClick={() => setShowChatInfo(true)}>
@@ -954,7 +1025,6 @@ const ChatRoom = ({
           </div>
         </div>
         <div className="header-actions">
-
           {!isServerChat && (isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
             <button
               onClick={handleStartCall}
@@ -962,6 +1032,18 @@ const ChatRoom = ({
               title="Начать звонок"
             >
               <Call style={{ fontSize: '20px' }} />
+            </button>
+          )}
+
+          {(isServerChat || isGroupChat) && !isPrivateChat && (
+            <button
+              type="button"
+              className={`member-list-toggle ${showMembersSidebar ? 'active' : ''}`}
+              onClick={handleMemberListToggle}
+              title={showMembersSidebar ? 'Скрыть список участников' : 'Показать список участников'}
+              aria-pressed={showMembersSidebar}
+            >
+              <People style={{ fontSize: '20px' }} />
             </button>
           )}
 
@@ -981,6 +1063,9 @@ const ChatRoom = ({
           />
         </div>
       </div>
+
+      <div className="chat-room-body">
+      <div className="chat-room-main">
 
       {!isServerChat && isCallActiveInThisChat && (
         <ChatVoiceCall
@@ -1508,8 +1593,8 @@ const ChatRoom = ({
             )}
             <button
               type="button"
-              onClick={() => setStickerPickerOpen((open) => !open)}
-              className={`media-button ${stickerPickerOpen ? 'active' : ''}`}
+              onClick={handleStickerPickerToggle}
+              className={`media-button ${isStickerPanelOpen ? 'active' : ''}`}
               title="Стикеры"
               disabled={isSendingSticker}
             >
@@ -1522,13 +1607,24 @@ const ChatRoom = ({
       )}
       </div>
 
+      {showMembersSidebar && (
+        <MemberListSidebar
+          members={sidebarMembers}
+          isLoading={isServerChat ? serverMembersLoading : false}
+          emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
+          groupByRoles={isServerChat}
+          serverRoles={isServerChat ? serverRoles : []}
+        />
+      )}
+
       <StickerPicker
-        open={stickerPickerOpen && !editingMessageId && canSend}
+        open={isStickerPanelOpen}
         width={stickerPanelWidth}
         onResizeStart={handleStickerPanelResizeStart}
         onClose={() => setStickerPickerOpen(false)}
         onStickerSelect={handleSendSticker}
       />
+      </div>
 
       <ForwardModal />
 

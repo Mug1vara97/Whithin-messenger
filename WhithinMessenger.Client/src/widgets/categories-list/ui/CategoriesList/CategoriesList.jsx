@@ -61,7 +61,8 @@ const CategoriesList = ({
       mergeCallOnlyIntoCategories(
         localCategories,
         callOnlyVoiceChannels,
-        isInCall ? currentRoomId : null
+        currentRoomId,
+        isInCall
       ),
     [localCategories, callOnlyVoiceChannels, isInCall, currentRoomId]
   );

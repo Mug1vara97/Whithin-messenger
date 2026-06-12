@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.LeaveServer;
@@ -951,6 +952,159 @@ public class ServerHub : Hub
         catch (Exception ex)
         {
             await Clients.Caller.SendAsync("Error", $"Ошибка при удалении сервера: {ex.Message}");
+        }
+    }
+
+    public async Task GetIdeaBoardCards(Guid chatId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new GetIdeaBoardCardsQuery(chatId, userId.Value));
+            if (result.Success)
+            {
+                await Clients.Caller.SendAsync("IdeaBoardCardsLoaded", result.Cards);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при загрузке доски идей: {ex.Message}");
+        }
+    }
+
+    public async Task CreateIdeaBoardCard(
+        Guid chatId,
+        string title,
+        string body,
+        string? tag = null,
+        string? sourceUrl = null)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new CreateIdeaBoardCardCommand(
+                chatId, userId.Value, title, body, tag, sourceUrl));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(result.ServerId.Value.ToString())
+                    .SendAsync("IdeaBoardCardCreated", result.Card);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при создании идеи: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateIdeaBoardCard(
+        Guid cardId,
+        string title,
+        string body,
+        string? tag = null,
+        string? sourceUrl = null,
+        bool? isFiled = null)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new UpdateIdeaBoardCardCommand(
+                cardId, userId.Value, title, body, tag, sourceUrl, isFiled));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(result.ServerId.Value.ToString())
+                    .SendAsync("IdeaBoardCardUpdated", result.Card);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении идеи: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateIdeaBoardCardPosition(Guid cardId, double positionX, double positionY, double rotation)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new UpdateIdeaBoardCardPositionCommand(
+                cardId, userId.Value, positionX, positionY, rotation));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(result.ServerId.Value.ToString())
+                    .SendAsync("IdeaBoardCardPositionUpdated", result.Card);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при перемещении идеи: {ex.Message}");
+        }
+    }
+
+    public async Task DeleteIdeaBoardCard(Guid cardId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new DeleteIdeaBoardCardCommand(cardId, userId.Value));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(result.ServerId.Value.ToString())
+                    .SendAsync("IdeaBoardCardDeleted", result.Card);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при удалении идеи: {ex.Message}");
         }
     }
 

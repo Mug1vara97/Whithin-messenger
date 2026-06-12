@@ -7,6 +7,8 @@ import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
+import IdeasBoardView from '../../../widgets/ideas-board/ui/IdeasBoardView';
+import { isVoiceChannel, isIdeasBoardChannel } from '../../../shared/lib/constants/chatChannelTypes';
 import { useServer } from '../../../entities/server/hooks';
 import { useChatList } from '../../../entities/chat';
 import { useNotifications } from '../../../entities/notification';
@@ -19,8 +21,11 @@ import { UserAvatar } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
+import { findChannelInCategories } from '../../../shared/lib/voice/callOnlyVoiceChannels';
 import {
   canMuteMembers,
+  canManageMessages,
+  canSendMessages,
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
 } from '../../../entities/role/lib/serverPermissions';
@@ -645,6 +650,28 @@ const HomePage = () => {
     }
   }, [selectedServer, navigate]);
 
+  useEffect(() => {
+    const handleVoiceCallEnded = (event) => {
+      const endedChannelId = event.detail?.channelId;
+      if (!endedChannelId || !selectedChat) return;
+
+      const activeChatId = selectedChat.chatId || selectedChat.chat_id;
+      if (!activeChatId || String(activeChatId) !== String(endedChannelId)) return;
+
+      const currentServerData = serverDataFromPanel || serverData;
+      const channelInServer = findChannelInCategories(
+        currentServerData?.categories,
+        endedChannelId
+      );
+      if (!channelInServer) {
+        handleCloseSelectedChat();
+      }
+    };
+
+    window.addEventListener('voiceCallEnded', handleVoiceCallEnded);
+    return () => window.removeEventListener('voiceCallEnded', handleVoiceCallEnded);
+  }, [selectedChat, serverData, serverDataFromPanel, handleCloseSelectedChat]);
+
   const handleServerDataUpdated = useCallback((updatedServerData) => {
     console.log('HomePage: Server data updated from ServerPanel:', updatedServerData);
     console.log('HomePage: Updated categories:', updatedServerData.categories);
@@ -896,18 +923,7 @@ const HomePage = () => {
                   ) : selectedChat ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {/* Check if it's a voice channel */}
-                  {(selectedChat.chatType === 4 || 
-                    selectedChat.chatType === '4' ||
-                    selectedChat.chatTypeId === 4 ||
-                    selectedChat.chatTypeId === '4' ||
-                    selectedChat.chatTypeId === "44444444-4444-4444-4444-444444444444" ||
-                    selectedChat.typeId === 4 ||
-                    selectedChat.typeId === '4' ||
-                    selectedChat.TypeId === 4 ||
-                    selectedChat.TypeId === '4' ||
-                    selectedChat.typeId === "44444444-4444-4444-4444-444444444444" ||
-                    selectedChat.TypeId === "44444444-4444-4444-4444-444444444444") ? (
-                    console.log('HomePage: Rendering VoiceCallView with user:', user, 'selectedChat:', selectedChat),
+                  {isVoiceChannel(selectedChat) ? (
                     <VoiceCallView
                       channelId={selectedChat.chatId || selectedChat.chat_id}
                       channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
@@ -916,6 +932,15 @@ const HomePage = () => {
                       onClose={handleCloseSelectedChat}
                       serverId={selectedServer?.serverId}
                       canMuteMembers={userCanMuteMembers}
+                    />
+                  ) : isIdeasBoardChannel(selectedChat) ? (
+                    <IdeasBoardView
+                      channelId={selectedChat.chatId || selectedChat.chat_id}
+                      channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || selectedChat.username}
+                      serverId={selectedServer?.serverId}
+                      userId={user?.id || user?.userId}
+                      canCreate={canSendMessages(serverChannelPermissions, isActiveServerOwner)}
+                      canModerate={canManageMessages(serverChannelPermissions, isActiveServerOwner)}
                     />
                   ) : (
                     <ChatRoom
@@ -928,6 +953,8 @@ const HomePage = () => {
                       userId={user?.id}
                       userPermissions={serverChannelPermissions}
                       isServerOwner={isActiveServerOwner}
+                      serverId={selectedServer?.serverId}
+                      serverOwnerId={selectedServer?.ownerId ?? selectedServer?.OwnerId}
                       onJoinVoiceChannel={handleJoinVoiceChannel}
                       activeChatCall={activeChatCall}
                       onEndChatCall={handleEndChatCall}

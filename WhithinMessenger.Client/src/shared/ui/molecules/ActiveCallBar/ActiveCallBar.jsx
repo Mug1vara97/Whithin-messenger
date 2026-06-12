@@ -70,9 +70,8 @@ const ActiveCallBar = () => {
     videoParticipant.isAudioEnabled = participantAudioStates?.get(participantUserId) ?? participant.isAudioEnabled ?? true;
     videoParticipant.isGlobalAudioMuted = participantGlobalAudioStates?.get(participantUserId) ?? participant.isGlobalAudioMuted ?? false;
     const participantIsMuted = participantMuteStates?.get(participantUserId) ?? participant.isMuted ?? false;
-    const participantAudioOn = participantAudioStates?.get(participantUserId) !== false;
     videoParticipant.isSpeaking =
-      !participantIsMuted && participantAudioOn && (participantSpeakingStates?.get(participantUserId) || false);
+      !participantIsMuted && (participantSpeakingStates?.get(participantUserId) || false);
     
     return videoParticipant;
   });

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { FaCog, FaLock } from 'react-icons/fa';
+import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined';
 import { VolumeUp } from '@mui/icons-material';
 import { useCallStore } from '../../../lib/stores/callStore';
 import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
@@ -81,6 +82,11 @@ const ChannelItem = ({
     channel.typeId === 4 ||
     channel.TypeId === 4 ||
     channel.typeId === '44444444-4444-4444-4444-444444444444';
+  const isIdeasBoardChannel =
+    channel.chatType === 5 ||
+    channel.typeId === 5 ||
+    channel.TypeId === 5 ||
+    channel.typeId === '55555555-5555-5555-5555-555555555555';
   const isPrivate = channel.isPrivate === true || channel.IsPrivate === true;
   const isCallOnlyChannel = channel.isCallOnlyChannel === true;
   const channelId = channel.chatId || channel.ChatId;
@@ -135,6 +141,9 @@ const ChannelItem = ({
   const getChannelIcon = () => {
     if (isVoiceChannel) {
       return <VolumeUp sx={{ fontSize: 16, width: 16, height: 16 }} />;
+    }
+    if (isIdeasBoardChannel) {
+      return <ContentPasteOutlinedIcon sx={{ fontSize: 16, width: 16, height: 16 }} />;
     }
     return '#';
   };
@@ -223,7 +232,6 @@ const ChannelItem = ({
                       participantId,
                       {
                         isMuted: isMutedLive,
-                        audioEnabled: !isDeafenedLive,
                         channelParticipant: participant,
                       }
                     );

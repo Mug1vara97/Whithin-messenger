@@ -100,6 +100,9 @@ const VoiceCallView = ({
 
   const isServerMuted = useCallStore((state) => selectActiveServerMuted(state, serverId));
   const isServerDeafened = useCallStore((state) => selectActiveServerDeafened(state, serverId));
+  const suppressVoiceAutoJoinForChannel = useCallStore(
+    (state) => state.suppressVoiceAutoJoinForChannel
+  );
 
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const {
@@ -132,7 +135,6 @@ const VoiceCallView = ({
       (isSameVoiceChannel(currentRoomId, channelId) ||
         isSameVoiceChannel(currentCall?.channelId, channelId));
 
-    // После endCall isInCall=false — не переподключаемся, пока пользователь снова не откроет канал
     if (!alreadyInThisChannel && isInCall) {
       startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call start error:', err);
@@ -147,7 +149,12 @@ const VoiceCallView = ({
       return;
     }
 
-    if (!isInCall) {
+    const autoJoinSuppressed =
+      suppressVoiceAutoJoinForChannel != null &&
+      isSameVoiceChannel(suppressVoiceAutoJoinForChannel, channelId);
+
+    // После endCall не переподключаемся автоматически, пока пользователь снова не выберет канал
+    if (!isInCall && !autoJoinSuppressed) {
       startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call start error:', err);
       });

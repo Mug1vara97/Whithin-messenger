@@ -119,7 +119,6 @@ const ChatVoiceCall = ({
     remoteScreenShares,
     participantSpeakingStates,
     participantMuteStates,
-    participantAudioStates,
     isNoiseSuppressed,
     noiseSuppressionMode,
     startCall,
@@ -145,6 +144,9 @@ const ChatVoiceCall = ({
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
   const isServerMuted = useCallStore(selectActiveServerMuted);
   const isServerDeafened = useCallStore(selectActiveServerDeafened);
+  const suppressVoiceAutoJoinForChannel = useCallStore(
+    (state) => state.suppressVoiceAutoJoinForChannel
+  );
 
   const {
     showErrorBanner,
@@ -197,7 +199,11 @@ const ChatVoiceCall = ({
       return;
     }
 
-    if (!isInCall) {
+    const autoJoinSuppressed =
+      suppressVoiceAutoJoinForChannel != null &&
+      isSameVoiceChannel(suppressVoiceAutoJoinForChannel, chatId);
+
+    if (!isInCall && !autoJoinSuppressed) {
       startCall(chatId, chatName).catch((err) => {
         console.error('Call start error:', err);
       });
@@ -261,10 +267,8 @@ const ChatVoiceCall = ({
         participant.isGlobalAudioMuted ??
         false;
       videoParticipant.isAudioDisabled = participant.isAudioDisabled || participant.isDeafened || false;
-      const remoteAudioOn = participantAudioStates?.get(pid) !== false;
       videoParticipant.isSpeaking =
         !videoParticipant.isMuted &&
-        remoteAudioOn &&
         (participantSpeakingStates?.get(String(pid)) || false);
       videoParticipant.isVideoEnabled = participant.isVideoEnabled || false;
       videoParticipant.videoStream = participant.videoStream || null;
@@ -277,7 +281,6 @@ const ChatVoiceCall = ({
   }, [
     appendTestParticipants,
     currentUser,
-    participantAudioStates,
     participantGlobalAudioStatesLive,
     participantMuteStatesLive,
     participantSpeakingStates,
@@ -367,7 +370,6 @@ const ChatVoiceCall = ({
                 participant.id,
                 {
                   isMuted: isMutedLive,
-                  audioEnabled: participant.isAudioEnabled,
                 }
               );
               const participantIsServerMuted = getParticipantIsServerMuted(channelParticipant, {
