@@ -662,6 +662,28 @@
   width: 100%;
 }
 
+.settings-volume-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+}
+
+.settings-volume-control__range {
+  flex: 1 1 auto;
+  width: 100%;
+  accent-color: var(--primary, #5865f2);
+}
+
+.settings-volume-control__value {
+  flex: 0 0 auto;
+  min-width: 42px;
+  color: var(--text-muted, #b5bac1);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 @media (max-width: 768px) {
   .settings-modal {
     padding: 0;

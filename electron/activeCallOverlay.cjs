@@ -9,6 +9,9 @@ const HOST_PADDING = 16;
 const MAX_VISIBLE = 8;
 const MARGIN = 12;
 
+const OVERLAY_ALWAYS_ON_TOP_LEVEL = 'screen-saver';
+const OVERLAY_Z_ORDER_REASSERT_MS = 1500;
+
 let hostWindow = null;
 let activePayload = null;
 let overlayTheme = null;
@@ -20,6 +23,7 @@ let measuredSize = null;
 let powerSaveBlockerId = null;
 let getMainWindow = null;
 let overlaySyncIntervalId = null;
+let overlayZOrderIntervalId = null;
 const OVERLAY_SYNC_INTERVAL_MS = 80;
 
 function requestOverlayDataFromRenderer() {
@@ -95,17 +99,26 @@ function getEstimatedHeight(payload) {
   return count * ROW_HEIGHT + (count - 1) * ROW_GAP + HOST_PADDING;
 }
 
+function getOverlayDisplayArea() {
+  const display = screen.getPrimaryDisplay();
+  // bounds — весь экран; workArea обрезает таскбар и в exclusive fullscreen оверлей уезжает.
+  if (process.platform === 'win32' || process.platform === 'linux') {
+    return display.bounds;
+  }
+  return display.workArea;
+}
+
 function getHostBounds(payload, sizeOverride) {
-  const { workArea } = screen.getPrimaryDisplay();
+  const area = getOverlayDisplayArea();
   const coords = normalizeCoords(overlaySettings.coords);
   const width = sizeOverride?.width || measuredSize?.width || PANEL_WIDTH;
   const height = sizeOverride?.height || measuredSize?.height || getEstimatedHeight(payload);
 
-  const maxX = Math.max(0, workArea.width - width - MARGIN * 2);
-  const maxY = Math.max(0, workArea.height - height - MARGIN * 2);
+  const maxX = Math.max(0, area.width - width - MARGIN * 2);
+  const maxY = Math.max(0, area.height - height - MARGIN * 2);
 
-  let x = workArea.x + MARGIN + maxX * (coords.xPercent / 100);
-  let y = workArea.y + MARGIN + maxY * (coords.yPercent / 100);
+  let x = area.x + MARGIN + maxX * (coords.xPercent / 100);
+  let y = area.y + MARGIN + maxY * (coords.yPercent / 100);
 
   const notificationBounds = getActiveNotificationBounds();
   const notificationPosition = overlaySettings.notificationPosition || 'bottom-right';
@@ -114,10 +127,10 @@ function getHostBounds(payload, sizeOverride) {
   if (notificationBounds && rectsIntersect(overlayRect, notificationBounds)) {
     if (isBottomPosition(notificationPosition)) {
       y = notificationBounds.y - height - MARGIN;
-      y = Math.max(workArea.y + MARGIN, y);
+      y = Math.max(area.y + MARGIN, y);
     } else {
       y = notificationBounds.y + notificationBounds.height + MARGIN;
-      const maxYPos = workArea.y + workArea.height - height - MARGIN;
+      const maxYPos = area.y + area.height - height - MARGIN;
       y = Math.min(maxYPos, y);
     }
   }
@@ -132,7 +145,47 @@ function getHostBounds(payload, sizeOverride) {
 
 function applyAlwaysOnTop(win) {
   if (!win || win.isDestroyed()) return;
-  win.setAlwaysOnTop(true, 'floating');
+  try {
+    if (process.platform === 'win32' || process.platform === 'darwin') {
+      win.setAlwaysOnTop(true, OVERLAY_ALWAYS_ON_TOP_LEVEL, 1);
+    } else {
+      win.setAlwaysOnTop(true, OVERLAY_ALWAYS_ON_TOP_LEVEL);
+    }
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function applyOverlayMousePassthrough(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.setIgnoreMouseEvents(true, { forward: true });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function startOverlayZOrderWatch() {
+  if (overlayZOrderIntervalId != null) {
+    return;
+  }
+  overlayZOrderIntervalId = setInterval(() => {
+    if (!hostWindow || hostWindow.isDestroyed() || !activePayload) {
+      stopOverlayZOrderWatch();
+      return;
+    }
+    applyAlwaysOnTop(hostWindow);
+    applyOverlayMousePassthrough(hostWindow);
+  }, OVERLAY_Z_ORDER_REASSERT_MS);
+}
+
+function stopOverlayZOrderWatch() {
+  if (overlayZOrderIntervalId == null) {
+    return;
+  }
+  clearInterval(overlayZOrderIntervalId);
+  overlayZOrderIntervalId = null;
 }
 
 function startPowerSaveBlocker() {
@@ -166,6 +219,7 @@ function closeHostWindow() {
   stopPowerSaveBlocker();
   if (!activePayload) {
     stopOverlayRendererSync();
+    stopOverlayZOrderWatch();
   }
 }
 
@@ -196,12 +250,14 @@ function syncHostWindow() {
       minimizable: false,
       maximizable: false,
       closable: false,
+      fullscreenable: false,
       alwaysOnTop: true,
       skipTaskbar: true,
       focusable: false,
       show: false,
       hasShadow: false,
       thickFrame: false,
+      ...(process.platform === 'win32' ? { type: 'toolbar' } : {}),
       webPreferences: {
         preload: path.join(__dirname, 'active-call-overlay-preload.cjs'),
         nodeIntegration: false,
@@ -214,8 +270,8 @@ function syncHostWindow() {
     hostWindow.webContents.setBackgroundThrottling(false);
 
     hostWindow.setMenuBarVisibility(false);
-    hostWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     applyAlwaysOnTop(hostWindow);
+    applyOverlayMousePassthrough(hostWindow);
 
     hostWindow.on('closed', () => {
       hostWindow = null;
@@ -226,6 +282,7 @@ function syncHostWindow() {
       pushDataToHost();
       if (!hostWindow || hostWindow.isDestroyed()) return;
       applyAlwaysOnTop(hostWindow);
+      applyOverlayMousePassthrough(hostWindow);
       hostWindow.showInactive();
     });
 
@@ -234,6 +291,7 @@ function syncHostWindow() {
   }
 
   applyAlwaysOnTop(hostWindow);
+  applyOverlayMousePassthrough(hostWindow);
   applyHostBounds(activePayload);
   pushDataToHost();
 }
@@ -244,6 +302,7 @@ function showActiveCallOverlay(payload) {
   measuredSize = null;
   startPowerSaveBlocker();
   startOverlayRendererSync();
+  startOverlayZOrderWatch();
   syncHostWindow();
 }
 
@@ -274,6 +333,7 @@ function dismissActiveCallOverlay() {
   activePayload = null;
   measuredSize = null;
   stopOverlayRendererSync();
+  stopOverlayZOrderWatch();
   syncHostWindow();
 }
 
@@ -350,6 +410,7 @@ function registerActiveCallOverlayIpc(mainWindowGetter) {
 
 function shutdownActiveCallOverlay() {
   stopOverlayRendererSync();
+  stopOverlayZOrderWatch();
   dismissActiveCallOverlay();
 }
 

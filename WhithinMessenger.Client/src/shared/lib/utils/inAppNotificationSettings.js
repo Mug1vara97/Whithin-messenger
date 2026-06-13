@@ -1,6 +1,8 @@
 const STORAGE_KEYS = {
   enabled: 'inAppNotificationsEnabled',
   position: 'desktopNotificationPosition',
+  soundEnabled: 'soundNotificationsEnabled',
+  soundVolume: 'notificationSoundVolume',
   legacySystem: 'systemNotificationsEnabled',
   legacyToast: 'toastNotificationsEnabled',
 };
@@ -41,6 +43,55 @@ export function setInAppNotificationsEnabled(enabled) {
   window.dispatchEvent(
     new CustomEvent('notificationSettingsChanged', {
       detail: { inAppNotificationsEnabled: value },
+    }),
+  );
+}
+
+export function getSoundNotificationsEnabled() {
+  if (typeof window === 'undefined') return true;
+
+  const saved = localStorage.getItem(STORAGE_KEYS.soundEnabled);
+  return saved == null ? true : JSON.parse(saved);
+}
+
+export function setSoundNotificationsEnabled(enabled) {
+  if (typeof window === 'undefined') return;
+
+  const value = Boolean(enabled);
+  localStorage.setItem(STORAGE_KEYS.soundEnabled, JSON.stringify(value));
+  window.dispatchEvent(
+    new CustomEvent('notificationSettingsChanged', {
+      detail: { soundNotificationsEnabled: value },
+    }),
+  );
+}
+
+export function getNotificationSoundVolume() {
+  if (typeof window === 'undefined') return 100;
+
+  const saved = localStorage.getItem(STORAGE_KEYS.soundVolume);
+  if (saved == null) return 100;
+
+  const numeric = Number(saved);
+  if (!Number.isFinite(numeric)) return 100;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+}
+
+export function getNotificationSoundVolumeFactor() {
+  return getNotificationSoundVolume() / 100;
+}
+
+export function setNotificationSoundVolume(volume) {
+  if (typeof window === 'undefined') return;
+
+  const numeric = Number(volume);
+  const value = Number.isFinite(numeric)
+    ? Math.min(100, Math.max(0, Math.round(numeric)))
+    : 100;
+  localStorage.setItem(STORAGE_KEYS.soundVolume, String(value));
+  window.dispatchEvent(
+    new CustomEvent('notificationSettingsChanged', {
+      detail: { notificationSoundVolume: value },
     }),
   );
 }

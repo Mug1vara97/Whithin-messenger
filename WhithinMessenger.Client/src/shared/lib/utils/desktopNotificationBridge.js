@@ -62,6 +62,11 @@ export function dismissDesktopNotificationsByChatId(chatId) {
   window.electronAPI.dismissDesktopNotificationsByChatId?.(chatId);
 }
 
+export function dismissAllDesktopNotifications() {
+  if (!isElectronDesktop()) return;
+  window.electronAPI.dismissAllDesktopNotifications?.();
+}
+
 export function getActiveChatIdFromPathname(pathname) {
   if (!pathname) return null;
 

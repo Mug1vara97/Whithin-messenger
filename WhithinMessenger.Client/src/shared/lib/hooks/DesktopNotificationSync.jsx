@@ -32,6 +32,8 @@ import {
 
   dismissDesktopNotificationsByChatId,
 
+  dismissAllDesktopNotifications,
+
   getActiveChatIdFromPathname,
 
   isElectronDesktop,
@@ -179,6 +181,13 @@ export function DesktopNotificationSync() {
     const syncSettings = (event) => {
 
       enabledRef.current = getInAppNotificationsEnabled();
+
+      if (!enabledRef.current) {
+        dismissAllDesktopNotifications();
+        toastTimersRef.current.forEach((timer) => clearTimeout(timer));
+        toastTimersRef.current.clear();
+        setBrowserToasts([]);
+      }
 
       if (event?.detail?.position) {
 

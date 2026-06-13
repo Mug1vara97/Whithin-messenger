@@ -8,6 +8,11 @@ import {
   dismissDesktopNotificationById,
   dismissDesktopNotificationsByChatId,
 } from '../../../shared/lib/utils/desktopNotificationBridge';
+import {
+  getInAppNotificationsEnabled,
+  getNotificationSoundVolumeFactor,
+  getSoundNotificationsEnabled,
+} from '../../../shared/lib/utils/inAppNotificationSettings';
 
 export const useNotifications = () => {
   const { user } = useAuth();
@@ -15,11 +20,8 @@ export const useNotifications = () => {
   const notificationSoundRef = useRef(null);
   const lastSoundPlayedAtRef = useRef(0);
   const soundNotificationsEnabledRef = useRef(true);
-  const [soundNotificationsEnabled, setSoundNotificationsEnabled] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('soundNotificationsEnabled');
-    return saved == null ? true : JSON.parse(saved);
-  });
+  const notificationSoundVolumeRef = useRef(1);
+  const [soundNotificationsEnabled, setSoundNotificationsEnabled] = useState(() => getSoundNotificationsEnabled());
 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -116,6 +118,8 @@ export const useNotifications = () => {
   );
 
   const playNotificationSound = useCallback(() => {
+    if (!getInAppNotificationsEnabled()) return;
+
     const now = Date.now();
     if (now - lastSoundPlayedAtRef.current < 300) return;
     lastSoundPlayedAtRef.current = now;
@@ -123,7 +127,11 @@ export const useNotifications = () => {
     const audio = notificationSoundRef.current;
     if (!audio) return;
 
+    const volume = notificationSoundVolumeRef.current;
+    if (volume <= 0) return;
+
     try {
+      audio.volume = volume;
       audio.currentTime = 0;
       const playPromise = audio.play();
       if (playPromise?.catch) {
@@ -154,17 +162,24 @@ export const useNotifications = () => {
   }, [soundNotificationsEnabled]);
 
   useEffect(() => {
+    notificationSoundVolumeRef.current = getNotificationSoundVolumeFactor();
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const syncSetting = () => {
-      const saved = localStorage.getItem('soundNotificationsEnabled');
-      const enabled = saved == null ? true : JSON.parse(saved);
-      soundNotificationsEnabledRef.current = enabled;
-      setSoundNotificationsEnabled(enabled);
+      soundNotificationsEnabledRef.current = getSoundNotificationsEnabled();
+      notificationSoundVolumeRef.current = getNotificationSoundVolumeFactor();
+      setSoundNotificationsEnabled(soundNotificationsEnabledRef.current);
     };
 
     const onStorage = (event) => {
-      if (event.key === 'soundNotificationsEnabled') {
+      if (
+        event.key === 'soundNotificationsEnabled'
+        || event.key === 'notificationSoundVolume'
+        || event.key === 'inAppNotificationsEnabled'
+      ) {
         syncSetting();
       }
     };
@@ -200,7 +215,12 @@ export const useNotifications = () => {
 
       if (!isNewNotification) return;
 
-      if (soundNotificationsEnabledRef.current && !(normalized.isRead ?? false)) {
+      if (
+        getInAppNotificationsEnabled()
+        && soundNotificationsEnabledRef.current
+        && notificationSoundVolumeRef.current > 0
+        && !(normalized.isRead ?? false)
+      ) {
         playNotificationSound();
       }
 

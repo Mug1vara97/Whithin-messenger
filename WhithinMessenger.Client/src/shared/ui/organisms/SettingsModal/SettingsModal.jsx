@@ -26,15 +26,19 @@ import {
   setInAppNotificationsEnabled,
   getNotificationPosition,
   setNotificationPosition,
+  getSoundNotificationsEnabled,
+  setSoundNotificationsEnabled,
+  getNotificationSoundVolume,
+  setNotificationSoundVolume,
   NOTIFICATION_POSITION_OPTIONS,
 } from '../../../lib/utils/inAppNotificationSettings';
+import { syncDesktopNotificationSettings, dismissAllDesktopNotifications } from '../../../lib/utils/desktopNotificationBridge';
 import {
   getActiveCallOverlayEnabled,
   setActiveCallOverlayEnabled,
   getActiveCallOverlayCoords,
   setActiveCallOverlayCoords,
 } from '../../../lib/utils/activeCallOverlaySettings';
-import { syncDesktopNotificationSettings } from '../../../lib/utils/desktopNotificationBridge';
 import { syncDesktopActiveCallOverlaySettings } from '../../../lib/utils/desktopActiveCallOverlayBridge';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
@@ -101,10 +105,8 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   const [hotkeys, setHotkeys] = useState(() => hotkeyStorage.getHotkeys());
   const [editingHotkey, setEditingHotkey] = useState(null);
   const [tempKey, setTempKey] = useState('');
-  const [soundNotificationsEnabled, setSoundNotificationsEnabled] = useState(() => {
-    const saved = localStorage.getItem('soundNotificationsEnabled');
-    return saved == null ? true : JSON.parse(saved);
-  });
+  const [soundNotificationsEnabled, setSoundNotificationsEnabledState] = useState(() => getSoundNotificationsEnabled());
+  const [notificationSoundVolume, setNotificationSoundVolumeState] = useState(() => getNotificationSoundVolume());
   const [inAppNotificationsEnabled, setInAppNotificationsEnabledState] = useState(() => getInAppNotificationsEnabled());
   const [notificationPosition, setNotificationPositionState] = useState(() => getNotificationPosition());
   const [activeCallOverlayEnabled, setActiveCallOverlayEnabledState] = useState(() => getActiveCallOverlayEnabled());
@@ -167,16 +169,18 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   }, [noiseSuppression]);
 
   useEffect(() => {
-    localStorage.setItem('soundNotificationsEnabled', JSON.stringify(soundNotificationsEnabled));
-    window.dispatchEvent(
-      new CustomEvent('notificationSettingsChanged', {
-        detail: { soundNotificationsEnabled },
-      })
-    );
+    setSoundNotificationsEnabled(soundNotificationsEnabled);
   }, [soundNotificationsEnabled]);
 
   useEffect(() => {
+    setNotificationSoundVolume(notificationSoundVolume);
+  }, [notificationSoundVolume]);
+
+  useEffect(() => {
     setInAppNotificationsEnabled(inAppNotificationsEnabled);
+    if (!inAppNotificationsEnabled) {
+      dismissAllDesktopNotifications();
+    }
   }, [inAppNotificationsEnabled]);
 
   useEffect(() => {
@@ -559,8 +563,8 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
               id="settings-in-app-notifications"
               checked={inAppNotificationsEnabled}
               onChange={() => setInAppNotificationsEnabledState((prev) => !prev)}
-              label="Уведомления на рабочем столе"
-              description="Отдельные окна поверх рабочего стола, как в Telegram Desktop. Не используются системные уведомления Windows."
+              label="Уведомления в приложении"
+              description="Всплывающие карточки о новых сообщениях. В десктопе — отдельные окна поверх рабочего стола."
             />
             <SettingsRow
               title="Позиция уведомлений"
@@ -570,6 +574,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                 className="settings-select"
                 value={notificationPosition}
                 onChange={(e) => setNotificationPositionState(e.target.value)}
+                disabled={!inAppNotificationsEnabled}
               >
                 {NOTIFICATION_POSITION_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -613,10 +618,30 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
             <SettingsToggle
               id="settings-sound-notifications"
               checked={soundNotificationsEnabled}
-              onChange={() => setSoundNotificationsEnabled((prev) => !prev)}
-              label="Звуковые уведомления"
-              description="Воспроизводить звук в приложении при новых сообщениях."
+              onChange={() => setSoundNotificationsEnabledState((prev) => !prev)}
+              label="Звук уведомлений"
+              description="Звуковой сигнал при новых сообщениях."
+              disabled={!inAppNotificationsEnabled}
             />
+            <SettingsRow
+              title="Громкость уведомлений"
+              description="Насколько громко воспроизводить звук нового сообщения."
+            >
+              <div className="settings-volume-control">
+                <input
+                  id="settings-notification-sound-volume"
+                  className="settings-volume-control__range"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={notificationSoundVolume}
+                  disabled={!inAppNotificationsEnabled || !soundNotificationsEnabled}
+                  onChange={(e) => setNotificationSoundVolumeState(Number(e.target.value))}
+                />
+                <span className="settings-volume-control__value">{notificationSoundVolume}%</span>
+              </div>
+            </SettingsRow>
           </SettingsPanel>
         );
 
