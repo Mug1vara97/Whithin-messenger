@@ -60,14 +60,16 @@ const StickerPicker = ({
   useEffect(() => {
     if (!previewSticker) return undefined;
 
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        closePreview();
-      }
+    const onPointerUp = () => {
+      closePreview();
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
   }, [closePreview, previewSticker]);
 
   const handleStickerPointerDown = useCallback((sticker) => (event) => {
@@ -81,6 +83,16 @@ const StickerPicker = ({
   }, [clearLongPressTimer]);
 
   const handleStickerPointerEnd = useCallback(() => {
+    clearLongPressTimer();
+    if (longPressTriggeredRef.current) {
+      closePreview();
+    }
+  }, [clearLongPressTimer, closePreview]);
+
+  const handleStickerPointerLeave = useCallback(() => {
+    if (longPressTriggeredRef.current) {
+      return;
+    }
     clearLongPressTimer();
   }, [clearLongPressTimer]);
 
@@ -205,9 +217,9 @@ const StickerPicker = ({
                   onPointerDown={handleStickerPointerDown(sticker)}
                   onPointerUp={handleStickerPointerEnd}
                   onPointerCancel={handleStickerPointerEnd}
-                  onPointerLeave={handleStickerPointerEnd}
+                  onPointerLeave={handleStickerPointerLeave}
                   onClick={handleStickerClick(sticker)}
-                  title="Отправить стикер. Удерживайте для предпросмотра."
+                  title="Клик — отправить. Удерживайте для предпросмотра."
                 >
                   <StickerMessage sticker={sticker} size={64} />
                 </button>
@@ -248,16 +260,8 @@ const StickerPicker = ({
       </aside>
 
       {previewSticker && (
-        <div
-          className="sticker-preview-overlay"
-          onClick={closePreview}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Предпросмотр стикера"
-        >
-          <div className="sticker-preview-overlay__card" onClick={(event) => event.stopPropagation()}>
-            <StickerMessage sticker={previewSticker} size={240} />
-          </div>
+        <div className="sticker-preview-overlay" role="presentation" aria-hidden="true">
+          <StickerMessage sticker={previewSticker} size={300} className="sticker-preview-overlay__sticker" />
         </div>
       )}
 

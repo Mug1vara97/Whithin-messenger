@@ -263,18 +263,11 @@ body.is-resizing-sticker-panel {
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 
-.sticker-preview-overlay__card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: min(320px, 80vw);
-  max-height: min(320px, 70vh);
-  padding: 16px;
-  border-radius: 16px;
-  background: rgba(30, 31, 34, 0.92);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+.sticker-preview-overlay__sticker {
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
 }
 
 @media (max-width: 900px) {
