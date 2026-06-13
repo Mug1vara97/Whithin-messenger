@@ -85,8 +85,16 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     window.electronAPI.onGlobalShortcut(handleGlobalShortcut);
     console.log('✅ Слушатель глобальных горячих клавиш Electron зарегистрирован');
 
+    const onFallbackShortcut = (event) => {
+      if (event?.detail) {
+        handleGlobalShortcut(event.detail);
+      }
+    };
+    window.addEventListener('whithin-global-shortcut', onFallbackShortcut);
+
     return () => {
       window.electronAPI.removeGlobalShortcutListener?.();
+      window.removeEventListener('whithin-global-shortcut', onFallbackShortcut);
     };
   }, [handleGlobalShortcut]);
 

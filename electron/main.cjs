@@ -177,6 +177,15 @@ let win32GlobalMouseEvents = null;
 let win32GlobalMouseHookInitialized = false;
 let lastShortcutDispatch = { action: null, at: 0 };
 const DEFAULT_SHORTCUT_DEDUPE_MS = 200;
+/** Дефолты как в hotkeyStorage — main регистрирует до загрузки whithin.ru */
+const DEFAULT_VOICE_SHORTCUTS = {
+  'toggle-mic': 'F1',
+  'toggle-audio': 'F2',
+  'toggle-soundpad-panel': 'F3',
+};
+const RENDERER_HOTKEY_STORAGE_KEY = 'voiceChatHotkeys';
+const RENDERER_SOUNDPAD_CONFIG_KEY = 'whithinSoundpadConfig';
+const SOUNDPAD_ACTION_PREFIX = 'soundpad:';
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 
@@ -188,10 +197,21 @@ const ELECTRON_KEY_ALIASES = {
   Escape: 'Esc',
   '/': 'Slash',
   ' ': 'Space',
-  'Enter': 'Return',
-  'Delete': 'Delete',
-  'Backspace': 'Backspace',
-  'Tab': 'Tab'
+  Enter: 'Return',
+  Delete: 'Delete',
+  Backspace: 'Backspace',
+  Tab: 'Tab',
+  Home: 'Home',
+  End: 'End',
+  PageUp: 'PageUp',
+  PageDown: 'PageDown',
+  Insert: 'Insert',
+  CapsLock: 'Capslock',
+  NumLock: 'Numlock',
+  ScrollLock: 'Scrolllock',
+  PrintScreen: 'PrintScreen',
+  Pause: 'Pause',
+  ContextMenu: 'ContextMenu',
 };
 
 /**
@@ -443,13 +463,59 @@ function isBeforeInputKeyboardMatch(binding, input) {
   );
 }
 
+function getWinKeyServerPath() {
+  const candidates = [];
+  try {
+    const pkgRoot = path.dirname(require.resolve('node-global-key-listener/package.json'));
+    candidates.push(path.join(pkgRoot, 'bin', 'WinKeyServer.exe'));
+  } catch (_) {
+    /* ignore */
+  }
+
+  if (app.isPackaged) {
+    candidates.push(
+      path.join(
+        process.resourcesPath,
+        'app.asar.unpacked',
+        'node_modules',
+        'node-global-key-listener',
+        'bin',
+        'WinKeyServer.exe'
+      )
+    );
+  }
+
+  for (const candidate of candidates) {
+    let resolved = candidate;
+    if (
+      !fs.existsSync(resolved) &&
+      resolved.includes('app.asar') &&
+      !resolved.includes('app.asar.unpacked')
+    ) {
+      resolved = resolved.replace('app.asar', 'app.asar.unpacked');
+    }
+    if (fs.existsSync(resolved)) {
+      return resolved;
+    }
+  }
+
+  return null;
+}
+
 function ensureGlobalKeyboardListener() {
   if (globalKeyboardListener) {
     return globalKeyboardListener;
   }
   try {
     const { GlobalKeyboardListener } = require('node-global-key-listener');
-    globalKeyboardListener = new GlobalKeyboardListener();
+    const serverPath = getWinKeyServerPath();
+    const listenerConfig = serverPath ? { windows: { serverPath } } : {};
+    if (serverPath) {
+      console.log('[shortcuts] WinKeyServer path:', serverPath);
+    } else {
+      console.warn('[shortcuts] WinKeyServer.exe not found, global keyboard hook disabled');
+    }
+    globalKeyboardListener = new GlobalKeyboardListener(listenerConfig);
     globalKeyboardListener
       .addListener((event, isDown) => {
         if (!keyboardShortcutBindings.length) {
@@ -500,6 +566,17 @@ function dispatchShortcutAction(action, options = {}) {
 
   console.log('[mouse-bind-debug] dispatch action -> renderer:', action, 'targetId:', target.id);
   target.send('global-shortcut-triggered', action);
+
+  // Скрытое/свёрнутое окно: принудительно диспатчим событие в страницу (IPC может откладываться).
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    const detail = JSON.stringify(action);
+    target
+      .executeJavaScript(
+        `window.dispatchEvent(new CustomEvent('whithin-global-shortcut',{detail:${detail}}));`,
+        true
+      )
+      .catch(() => {});
+  }
 
   if (action === 'toggle-mic' || action === 'toggle-audio') {
     requestActiveCallOverlaySyncFromRenderer();
@@ -663,9 +740,71 @@ function openScreenPickerWindow(sources) {
 /** Шапка окна рендерится в React (ElectronTitlebar); здесь только хук для совместимости. */
 function installCustomTitlebarChrome(_webContents) {}
 
+function buildShortcutsFromRendererStorage(voiceRaw, soundpadRaw) {
+  const shortcuts = { ...DEFAULT_VOICE_SHORTCUTS };
+
+  if (voiceRaw) {
+    try {
+      const voice = JSON.parse(voiceRaw);
+      if (voice.toggleMic) shortcuts['toggle-mic'] = voice.toggleMic;
+      if (voice.toggleAudio) shortcuts['toggle-audio'] = voice.toggleAudio;
+      if (voice.toggleSoundpadPanel) {
+        shortcuts['toggle-soundpad-panel'] = voice.toggleSoundpadPanel;
+      }
+    } catch (err) {
+      console.warn('[shortcuts] parse voiceChatHotkeys failed:', err.message);
+    }
+  }
+
+  if (soundpadRaw) {
+    try {
+      const config = JSON.parse(soundpadRaw);
+      for (const slot of config.slots || []) {
+        if (slot.hotkey && slot.soundId) {
+          shortcuts[`${SOUNDPAD_ACTION_PREFIX}${slot.id}`] = slot.hotkey;
+        }
+      }
+    } catch (err) {
+      console.warn('[shortcuts] parse soundpad config failed:', err.message);
+    }
+  }
+
+  return shortcuts;
+}
+
+async function syncShortcutsFromRendererStorage(webContents) {
+  if (!webContents || webContents.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const payload = await webContents.executeJavaScript(
+      `(function(){
+        var out = { voice: null, soundpad: null };
+        try { out.voice = localStorage.getItem(${JSON.stringify(RENDERER_HOTKEY_STORAGE_KEY)}); } catch (e) {}
+        try { out.soundpad = localStorage.getItem(${JSON.stringify(RENDERER_SOUNDPAD_CONFIG_KEY)}); } catch (e) {}
+        return out;
+      })();`,
+      true
+    );
+    const shortcuts = buildShortcutsFromRendererStorage(payload?.voice, payload?.soundpad);
+    registerGlobalShortcuts(shortcuts);
+    console.log('[shortcuts] synced from renderer localStorage');
+  } catch (err) {
+    console.warn('[shortcuts] sync from renderer storage failed:', err.message);
+  }
+}
+
 function registerGlobalShortcuts(shortcuts = {}) {
   mouseShortcutBindings = [];
   keyboardShortcutBindings = [];
+
+  try {
+    globalShortcut.unregisterAll();
+  } catch (err) {
+    console.warn('[shortcuts] globalShortcut.unregisterAll failed:', err.message);
+  }
+
   console.log('[mouse-bind-debug] registerGlobalShortcuts payload:', shortcuts);
 
   Object.entries(shortcuts).forEach(([action, accelerator]) => {
@@ -688,13 +827,34 @@ function registerGlobalShortcuts(shortcuts = {}) {
     const keyboardBinding = parseKeyboardHotkey(String(accelerator));
     if (keyboardBinding) {
       keyboardShortcutBindings.push({ action, ...keyboardBinding });
-      console.log('[shortcuts] keyboard binding registered (passive):', {
+
+      const electronAccel = webHotkeyToElectronAccelerator(String(accelerator));
+      let registeredWithGlobalShortcut = false;
+      if (electronAccel) {
+        try {
+          registeredWithGlobalShortcut = globalShortcut.register(electronAccel, () => {
+            dispatchShortcutAction(action, { dedupeMs: 150 });
+          });
+          if (registeredWithGlobalShortcut) {
+            console.log('[shortcuts] globalShortcut registered:', { action, electronAccel });
+          } else {
+            console.warn('[shortcuts] globalShortcut.register returned false:', {
+              action,
+              electronAccel
+            });
+          }
+        } catch (err) {
+          console.warn('[shortcuts] globalShortcut.register error:', action, err.message);
+        }
+      }
+
+      console.log('[shortcuts] keyboard binding registered:', {
         action,
         accelerator,
         listenerKey: keyboardBinding.listenerKey,
-        modifiers: keyboardBinding.modifiers
+        modifiers: keyboardBinding.modifiers,
+        globalShortcut: registeredWithGlobalShortcut
       });
-      ensureGlobalKeyboardListener();
       return;
     }
 
@@ -704,6 +864,11 @@ function registerGlobalShortcuts(shortcuts = {}) {
 
     console.warn(`[shortcuts] Skip unsupported hotkey for "${action}":`, accelerator);
   });
+
+  // globalShortcut надёжен для F-клавиш; пассивный хук — для Ctrl+Key, букв, стрелок и т.д.
+  if (keyboardShortcutBindings.length > 0) {
+    ensureGlobalKeyboardListener();
+  }
 
   console.log('[mouse-bind-debug] total mouse bindings:', mouseShortcutBindings.length);
   console.log('[shortcuts] total keyboard bindings:', keyboardShortcutBindings.length);
@@ -990,7 +1155,10 @@ function createWindow() {
   ['minimize', 'restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
     mainWindow.on(eventName, emitMainWindowVisibility);
   });
-  mainWindow.webContents.on('did-finish-load', emitMainWindowVisibility);
+  mainWindow.webContents.on('did-finish-load', () => {
+    emitMainWindowVisibility();
+    syncShortcutsFromRendererStorage(mainWindow.webContents);
+  });
 
   mainWindow.on('close', (e) => {
     if (allowAppQuit) {
@@ -1099,6 +1267,8 @@ if (!gotSingleInstanceLock) {
 
   createWindow();
   createTray();
+  registerGlobalShortcuts(DEFAULT_VOICE_SHORTCUTS);
+  console.log('[shortcuts] default voice shortcuts registered in main process');
 
   app.on('activate', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1141,11 +1311,9 @@ ipcMain.on('electron:window-toggle-maximize', (event) => {
 
 ipcMain.on('electron:window-close', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (!win || win.isDestroyed()) {
-    return;
+  if (win && !win.isDestroyed()) {
+    win.close();
   }
-  allowAppQuit = true;
-  win.close();
 });
 
 ipcMain.on('electron:sync-window-background', (event, color) => {
