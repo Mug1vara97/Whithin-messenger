@@ -159,4 +159,22 @@ public class ServerPermissionChecker
 
         return (true, null);
     }
+
+    public async Task<(bool Allowed, string? ErrorMessage)> ValidatePinMessageAsync(
+        Guid? serverId,
+        Guid actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!serverId.HasValue)
+        {
+            return (true, null);
+        }
+
+        if (!await HasPermissionAsync(serverId.Value, actorUserId, "manageMessages", cancellationToken))
+        {
+            return (false, "Недостаточно прав для закрепления сообщений");
+        }
+
+        return (true, null);
+    }
 }

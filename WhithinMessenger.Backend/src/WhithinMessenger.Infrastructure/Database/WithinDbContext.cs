@@ -36,6 +36,9 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<PendingPasswordChange> PendingPasswordChanges { get; set; }
     public DbSet<PendingPasswordReset> PendingPasswordResets { get; set; }
     public DbSet<IdeaBoardCard> IdeaBoardCards { get; set; }
+    public DbSet<MessagePoll> MessagePolls { get; set; }
+    public DbSet<PollOption> PollOptions { get; set; }
+    public DbSet<PollVote> PollVotes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

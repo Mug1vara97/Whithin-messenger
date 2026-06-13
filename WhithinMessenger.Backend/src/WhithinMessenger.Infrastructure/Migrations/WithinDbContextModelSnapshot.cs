@@ -612,6 +612,15 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Property<string>("ForwardedMessageContent")
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("PinnedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PinnedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("RepliedToMessageId")
                         .HasColumnType("uuid");
 
@@ -623,19 +632,21 @@ namespace WhithinMessenger.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChatId");
-
                     b.HasIndex("ForwardedByUserId");
 
                     b.HasIndex("ForwardedFromChatId");
 
                     b.HasIndex("ForwardedFromMessageId");
 
+                    b.HasIndex("PinnedByUserId");
+
                     b.HasIndex("RepliedToMessageId");
 
                     b.HasIndex("StickerId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("ChatId", "IsPinned");
 
                     b.ToTable("Messages");
                 });
@@ -665,6 +676,34 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("MessageDeliveries");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.MessagePoll", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowMultiple")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique();
+
+                    b.ToTable("MessagePolls");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.MessageRead", b =>
@@ -801,6 +840,57 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("PendingPasswordResets");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.PollOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PollId");
+
+                    b.ToTable("PollOptions");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.PollVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("PollOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PollOptionId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("PollVotes");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.RefreshToken", b =>
@@ -1342,6 +1432,11 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .HasForeignKey("ForwardedFromMessageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "PinnedByUser")
+                        .WithMany()
+                        .HasForeignKey("PinnedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("WhithinMessenger.Domain.Models.Message", "RepliedToMessage")
                         .WithMany("Replies")
                         .HasForeignKey("RepliedToMessageId")
@@ -1365,6 +1460,8 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("ForwardedFromChat");
 
                     b.Navigation("ForwardedFromMessage");
+
+                    b.Navigation("PinnedByUser");
 
                     b.Navigation("RepliedToMessage");
 
@@ -1390,6 +1487,17 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("Message");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.MessagePoll", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.Message", "Message")
+                        .WithOne("Poll")
+                        .HasForeignKey("WhithinMessenger.Domain.Models.MessagePoll", "MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Message");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.MessageRead", b =>
@@ -1433,6 +1541,36 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("Chat");
 
                     b.Navigation("Message");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.PollOption", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.MessagePoll", "Poll")
+                        .WithMany("Options")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Poll");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.PollVote", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.PollOption", "PollOption")
+                        .WithMany("Votes")
+                        .HasForeignKey("PollOptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PollOption");
 
                     b.Navigation("User");
                 });
@@ -1658,7 +1796,19 @@ namespace WhithinMessenger.Infrastructure.Migrations
 
                     b.Navigation("MessageReads");
 
+                    b.Navigation("Poll");
+
                     b.Navigation("Replies");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.MessagePoll", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.PollOption", b =>
+                {
+                    b.Navigation("Votes");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.Server", b =>

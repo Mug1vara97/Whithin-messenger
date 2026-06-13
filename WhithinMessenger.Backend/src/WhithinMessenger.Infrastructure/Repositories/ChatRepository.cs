@@ -3,6 +3,7 @@ using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Application.DTOs;
 using WhithinMessenger.Application.Interfaces;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Infrastructure.Database;
 
 namespace WhithinMessenger.Infrastructure.Repositories
@@ -94,10 +95,64 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 })
                 .ToListAsync(cancellationToken);
 
-            return oneOnOneChats
+            var chats = oneOnOneChats
                 .Concat(groupChats)
                 .OrderByDescending(c => c.LastMessageTime)
                 .ToList();
+
+            await ApplyLastMessagePreviewsAsync(chats, cancellationToken);
+            return chats;
+        }
+
+        private async Task ApplyLastMessagePreviewsAsync(List<ChatInfo> chats, CancellationToken cancellationToken)
+        {
+            if (chats.Count == 0)
+            {
+                return;
+            }
+
+            var chatIds = chats.Select(c => c.ChatId).ToList();
+
+            var lastMessages = await _context.Messages
+                .AsNoTracking()
+                .Include(m => m.MediaFiles)
+                .Include(m => m.Poll)
+                .Where(m => chatIds.Contains(m.ChatId))
+                .Where(m => m.CreatedAt == _context.Messages
+                    .Where(m2 => m2.ChatId == m.ChatId)
+                    .Max(m2 => m2.CreatedAt))
+                .ToListAsync(cancellationToken);
+
+            if (lastMessages.Count == 0)
+            {
+                return;
+            }
+
+            var previewByChatId = lastMessages
+                .GroupBy(m => m.ChatId)
+                .ToDictionary(g => g.Key, g => BuildLastMessagePreview(g.First()));
+
+            foreach (var chat in chats)
+            {
+                if (previewByChatId.TryGetValue(chat.ChatId, out var preview))
+                {
+                    chat.LastMessage = preview;
+                }
+            }
+        }
+
+        private static string BuildLastMessagePreview(Message message)
+        {
+            var media = message.MediaFiles.FirstOrDefault();
+            var textContent = string.Equals(message.ContentType, "poll", StringComparison.OrdinalIgnoreCase)
+                ? message.Poll?.Question
+                : message.Content;
+
+            return ChatMessagePreviewBuilder.BuildPreviewText(
+                message.ContentType,
+                textContent,
+                media?.ContentType,
+                media?.IsVideoNote ?? false);
         }
 
         public async Task<CreatePrivateChatResult> CreatePrivateChatAsync(Guid userId, Guid targetUserId, CancellationToken cancellationToken = default)

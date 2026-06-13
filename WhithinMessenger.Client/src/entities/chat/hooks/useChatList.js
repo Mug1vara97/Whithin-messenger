@@ -1,7 +1,34 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
+import tokenManager from '../../../shared/lib/services/tokenManager';
 import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
+
+const sortChats = (items) => [...items].sort((a, b) => {
+  const timeA = new Date(a.lastMessageTime || 0).getTime();
+  const timeB = new Date(b.lastMessageTime || 0).getTime();
+  return timeB - timeA;
+});
+
+const normalizeChatListItem = (chat) => {
+  if (!chat || typeof chat !== 'object') {
+    return chat;
+  }
+
+  return {
+    ...chat,
+    chatId: chat.chatId ?? chat.ChatId,
+    username: chat.username ?? chat.Username ?? '',
+    userId: chat.userId ?? chat.UserId,
+    avatarUrl: chat.avatarUrl ?? chat.AvatarUrl ?? null,
+    avatarColor: chat.avatarColor ?? chat.AvatarColor ?? null,
+    userStatus: chat.userStatus ?? chat.UserStatus ?? null,
+    isGroupChat: Boolean(chat.isGroupChat ?? chat.IsGroupChat),
+    lastMessage: chat.lastMessage ?? chat.LastMessage ?? '',
+    lastMessageTime: chat.lastMessageTime ?? chat.LastMessageTime ?? null,
+    unreadCount: chat.unreadCount ?? chat.UnreadCount ?? 0,
+  };
+};
 
 export const useChatList = (userId, onChatCreated = null) => {
   const navigate = useNavigate();
@@ -16,7 +43,115 @@ export const useChatList = (userId, onChatCreated = null) => {
     return chat?.unreadCount ?? chat?.UnreadCount ?? chat?.unread_count ?? 0;
   }, []);
   const connectionRef = useRef(null);
+  const onChatCreatedRef = useRef(onChatCreated);
+  const navigateRef = useRef(navigate);
+  const userIdRef = useRef(userId);
 
+  useEffect(() => {
+    onChatCreatedRef.current = onChatCreated;
+  }, [onChatCreated]);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  const bindConnectionHandlers = useCallback((conn) => {
+    const handleReceiveChats = (receivedChats) => {
+      setInitialChatsLoaded(true);
+      if (!Array.isArray(receivedChats)) {
+        return;
+      }
+
+      setChats(sortChats(receivedChats.map(normalizeChatListItem)));
+    };
+
+    const handleSearchResults = (results) => {
+      const filteredResults = Array.isArray(results)
+        ? results.filter((user) => user.isFriend === true || user.hasExistingChat === true)
+        : [];
+      setSearchResults(filteredResults);
+    };
+
+    const handleChatCreated = async (createdUserId, chatResult) => {
+      const currentUserId = userIdRef.current;
+      const isParticipant = createdUserId === currentUserId || chatResult?.targetUserId === currentUserId;
+
+      if (!isParticipant) {
+        return;
+      }
+
+      try {
+        await conn.invoke('GetUserChats');
+      } catch (err) {
+        console.error('Error getting chats after creation:', err);
+      }
+    };
+
+    const handlePrivateChatCreated = async (chatResult) => {
+      try {
+        await conn.invoke('GetUserChats');
+
+        if (onChatCreatedRef.current && chatResult?.chatId) {
+          onChatCreatedRef.current(chatResult.chatId);
+        }
+      } catch (err) {
+        console.error('Error getting chats after private chat creation:', err);
+      }
+    };
+
+    const handleChatDeleted = (data) => {
+      if (typeof data === 'object' && data.chatId) {
+        setChats((prev) => prev.filter((chat) => chat.chatId !== data.chatId));
+        navigateRef.current('/channels/@me');
+        return;
+      }
+
+      if (typeof data === 'string') {
+        setChats((prev) => prev.filter((chat) => chat.chatId !== data));
+        navigateRef.current('/channels/@me');
+      }
+    };
+
+    const handleChatUpdated = (chatId, lastMessage, lastMessageTime) => {
+      setChats((prevChats) => sortChats(
+        prevChats.map((chat) => {
+          if (String(chat.chatId) !== String(chatId)) {
+            return chat;
+          }
+
+          return {
+            ...chat,
+            lastMessage,
+            lastMessageTime,
+          };
+        }),
+      ));
+    };
+
+    const handleError = (errorMessage) => {
+      console.error('SignalR error:', errorMessage);
+    };
+
+    conn.off('receivechats');
+    conn.off('receivesearchresults');
+    conn.off('chatcreated');
+    conn.off('privatechatcreated');
+    conn.off('chatdeleted');
+    conn.off('chatupdated');
+    conn.off('error');
+
+    conn.on('receivechats', handleReceiveChats);
+    conn.on('receivesearchresults', handleSearchResults);
+    conn.on('chatcreated', handleChatCreated);
+    conn.on('privatechatcreated', handlePrivateChatCreated);
+    conn.on('chatdeleted', handleChatDeleted);
+    conn.on('chatupdated', handleChatUpdated);
+    conn.on('error', handleError);
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -24,29 +159,33 @@ export const useChatList = (userId, onChatCreated = null) => {
         connectionRef.current.stop();
         connectionRef.current = null;
       }
+      setConnection(null);
+      setIsConnected(false);
       setInitialChatsLoaded(false);
       setChats([]);
-      return;
+      return undefined;
     }
 
-    setInitialChatsLoaded(false);
-    const createConnection = async () => {
-      if (connectionRef.current && connectionRef.current.state === signalR.HubConnectionState.Connected) {
-        console.log('useChatList: Connection already exists and is connected, skipping creation');
-        return;
-      }
+    let cancelled = false;
 
+    const createConnection = async () => {
       if (connectionRef.current) {
-        await connectionRef.current.stop();
+        try {
+          await connectionRef.current.stop();
+        } catch (error) {
+          console.error('useChatList: failed to stop previous connection:', error);
+        }
         connectionRef.current = null;
       }
 
-      const hubUrl = `${BASE_URL}${HUB_ENDPOINTS.CHAT_LIST_HUB}?userId=${userId}`;
+      setInitialChatsLoaded(false);
 
+      const hubUrl = `${BASE_URL}${HUB_ENDPOINTS.CHAT_LIST_HUB}?userId=${userId}`;
       const newConnection = new signalR.HubConnectionBuilder()
         .withUrl(hubUrl, {
           skipNegotiation: true,
-          transport: signalR.HttpTransportType.WebSockets
+          transport: signalR.HttpTransportType.WebSockets,
+          accessTokenFactory: () => tokenManager.getToken() || '',
         })
         .withAutomaticReconnect()
         .configureLogging(signalR.LogLevel.Warning)
@@ -55,8 +194,8 @@ export const useChatList = (userId, onChatCreated = null) => {
       newConnection.on('chatunreadupdated', (chatId, unreadCount) => {
         setChats((prevChats) =>
           prevChats.map((chat) =>
-            chat.chatId === chatId ? { ...chat, unreadCount } : chat
-          )
+            String(chat.chatId) === String(chatId) ? { ...chat, unreadCount } : chat,
+          ),
         );
       });
 
@@ -70,173 +209,65 @@ export const useChatList = (userId, onChatCreated = null) => {
         setIsConnected(false);
       });
 
-      newConnection.onreconnected((connectionId) => {
+      newConnection.onreconnected(async (connectionId) => {
         console.log('SignalR reconnected:', connectionId);
         setIsConnected(true);
+        bindConnectionHandlers(newConnection);
+        try {
+          await newConnection.invoke('GetUserChats');
+        } catch (err) {
+          console.error('Error reloading chats after reconnect:', err);
+        }
       });
+
+      bindConnectionHandlers(newConnection);
 
       try {
         await newConnection.start();
+        if (cancelled) {
+          await newConnection.stop();
+          return;
+        }
+
         connectionRef.current = newConnection;
         setConnection(newConnection);
         setIsConnected(true);
         console.log('SignalR ChatListHub соединение установлено');
+
+        await newConnection.invoke('GetUserChats');
       } catch (err) {
         console.error('Ошибка подключения к ChatListHub:', err);
-        setIsConnected(false);
+        if (!cancelled) {
+          setIsConnected(false);
+          setConnection(null);
+        }
       }
     };
 
     createConnection();
 
     return () => {
+      cancelled = true;
       if (connectionRef.current) {
         connectionRef.current.stop();
+        connectionRef.current = null;
       }
+      setConnection(null);
+      setIsConnected(false);
     };
-  }, [userId]);
-
-  useEffect(() => {
-    if (!connection) return;
-
-    const handleReceiveChats = (receivedChats) => {
-      setInitialChatsLoaded(true);
-      if (Array.isArray(receivedChats)) {
-        const sortedChats = [...receivedChats].sort((a, b) => {
-          const timeA = new Date(a.lastMessageTime || 0).getTime();
-          const timeB = new Date(b.lastMessageTime || 0).getTime();
-          return timeB - timeA;
-        });
-        setChats(sortedChats);
-      }
-    };
-
-    const handleSearchResults = (results) => {
-      console.log('Received search results:', results);
-      // Фильтруем: только друзья или пользователи с существующими чатами
-      const filteredResults = Array.isArray(results) 
-        ? results.filter(user => user.isFriend === true || user.hasExistingChat === true)
-        : [];
-      console.log('Filtered search results (friends or existing chats):', filteredResults);
-      setSearchResults(filteredResults);
-    };
-
-
-    const handleChatCreated = async (createdUserId, chatResult) => {
-      console.log('Chat created:', { createdUserId, chatResult, currentUserId: userId });
-      
-      const isParticipant = createdUserId === userId || chatResult?.targetUserId === userId;
-      
-      if (isParticipant) {
-        console.log('Current user is participant, updating chat list');
-        try {
-          await connection.invoke("GetUserChats");
-        } catch (err) {
-          console.error('Error getting chats after creation:', err);
-        }
-      } else {
-        console.log('Current user is not participant, ignoring chat creation');
-      }
-    };
-
-    const handlePrivateChatCreated = async (chatResult) => {
-      console.log('Private chat created:', chatResult);
-      try {
-        await connection.invoke("GetUserChats");
-        
-        if (onChatCreated && chatResult?.chatId) {
-          onChatCreated(chatResult.chatId);
-        }
-      } catch (err) {
-        console.error('Error getting chats after private chat creation:', err);
-      }
-    };
-
-    const handleChatDeleted = (data) => {
-      if (typeof data === 'object' && data.chatId) {
-        setChats(prev => prev.filter(chat => chat.chatId !== data.chatId));
-        navigate('/channels/@me');
-      }
-      else if (typeof data === 'string') {
-        setChats(prev => prev.filter(chat => chat.chatId !== data));
-        navigate('/channels/@me');
-      }
-    };
-
-    const handleChatUpdated = (chatId, lastMessage, lastMessageTime) => {
-      console.log('Chat updated:', { chatId, lastMessage, lastMessageTime });
-      
-      setChats(prevChats => {
-        const updatedChats = prevChats.map(chat => {
-          if (chat.chatId === chatId) {
-            console.log(`Updating chat ${chatId}: old lastMessage=${chat.lastMessage}, new lastMessage=${lastMessage}`);
-            return {
-              ...chat,
-              lastMessage: lastMessage,
-              lastMessageTime: lastMessageTime
-            };
-          }
-          return chat;
-        });
-        
-        const sortedChats = updatedChats.sort((a, b) => {
-          const timeA = new Date(a.lastMessageTime || 0).getTime();
-          const timeB = new Date(b.lastMessageTime || 0).getTime();
-          return timeB - timeA;
-        });
-        
-        console.log('Chats after sorting:', sortedChats.map(c => ({ id: c.chatId, lastMessage: c.lastMessage, lastMessageTime: c.lastMessageTime })));
-        return sortedChats;
-      });
-    };
-
-    const handleError = (errorMessage) => {
-      console.error('SignalR error:', errorMessage);
-    };
-
-    connection.off("receivechats", handleReceiveChats);
-    connection.off("receivesearchresults", handleSearchResults);
-    connection.off("chatcreated", handleChatCreated);
-    connection.off("privatechatcreated", handlePrivateChatCreated);
-    connection.off("chatdeleted", handleChatDeleted);
-    connection.off("chatupdated", handleChatUpdated);
-    connection.off("error", handleError);
-
-    connection.on("receivechats", handleReceiveChats);
-    connection.on("receivesearchresults", handleSearchResults);
-    connection.on("chatcreated", handleChatCreated);
-    connection.on("privatechatcreated", handlePrivateChatCreated);
-    connection.on("chatdeleted", handleChatDeleted);
-    connection.on("chatupdated", handleChatUpdated);
-    
-    connection.on("error", handleError);
-
-    return () => {
-      connection.off("receivechats", handleReceiveChats);
-      connection.off("receivesearchresults", handleSearchResults);
-      connection.off("chatcreated", handleChatCreated);
-      connection.off("privatechatcreated", handlePrivateChatCreated);
-      connection.off("chatdeleted", handleChatDeleted);
-      connection.off("chatupdated", handleChatUpdated);
-      connection.off("error", handleError);
-    };
-  }, [connection, userId, navigate, onChatCreated]);
+  }, [userId, bindConnectionHandlers]);
 
   const refreshChats = useCallback(async () => {
-    if (!connection || !isConnected) return;
+    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+      return;
+    }
+
     try {
-      await connection.invoke('GetUserChats');
+      await connectionRef.current.invoke('GetUserChats');
     } catch (err) {
       console.error('Error refreshing chats:', err);
     }
-  }, [connection, isConnected]);
-
-  useEffect(() => {
-    if (connection && isConnected) {
-      connection.invoke("GetUserChats")
-        .catch(err => console.error('Error loading initial chats:', err));
-    }
-  }, [connection, isConnected]);
+  }, []);
 
   const searchUsers = useCallback(async (query) => {
     if (!query.trim()) {
@@ -244,42 +275,46 @@ export const useChatList = (userId, onChatCreated = null) => {
       setSearchResults([]);
       return;
     }
-    
+
     setIsSearching(true);
-    
-    if (connection && isConnected) {
+
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
       try {
-        await connection.invoke("SearchUsers", query.trim());
+        await connectionRef.current.invoke('SearchUsers', query.trim());
       } catch (error) {
         console.error('Error searching users:', error);
       }
     } else {
       setIsSearching(false);
     }
-  }, [connection, isConnected]);
+  }, []);
 
   const createPrivateChat = useCallback(async (targetUserId) => {
-    if (!connection || !isConnected) return;
-    
+    if (connectionRef.current?.state !== signalR.HubConnectionState.Connected) {
+      return undefined;
+    }
+
     try {
-      const existingChat = chats.find(chat => 
-        !chat.isGroupChat && chat.userId === targetUserId
+      const existingChat = chats.find(
+        (chat) => !chat.isGroupChat && String(chat.userId) === String(targetUserId),
       );
-      
+
       if (existingChat) {
-        if (onChatCreated && existingChat.chatId) {
-          onChatCreated(existingChat.chatId);
+        if (onChatCreatedRef.current && existingChat.chatId) {
+          onChatCreatedRef.current(existingChat.chatId);
         }
         return existingChat;
       }
 
       const targetUserIdGuid = typeof targetUserId === 'string' ? targetUserId : targetUserId.toString();
-      await connection.invoke("CreatePrivateChat", targetUserIdGuid);
+      await connectionRef.current.invoke('CreatePrivateChat', targetUserIdGuid);
     } catch (error) {
       console.error('Error creating private chat:', error);
       throw error;
     }
-  }, [connection, isConnected, chats, onChatCreated]);
+
+    return undefined;
+  }, [chats]);
 
   const createGroupChat = useCallback(async () => {
     throw new Error('Group chat creation not implemented yet');
@@ -305,6 +340,6 @@ export const useChatList = (userId, onChatCreated = null) => {
     isConnected,
     searchUsers,
     createPrivateChat,
-    createGroupChat
+    createGroupChat,
   };
 };

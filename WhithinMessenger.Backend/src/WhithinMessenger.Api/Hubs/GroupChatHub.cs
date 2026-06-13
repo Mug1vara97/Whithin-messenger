@@ -6,6 +6,11 @@ using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessageById;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.EditMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.PinMessage;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.UnpinMessage;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.CreatePoll;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.VotePoll;
+using WhithinMessenger.Application.CommandsAndQueries.Messages.GetPinnedMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.SearchMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipants;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetAvailableUsers;
@@ -546,6 +551,210 @@ public class GroupChatHub : Hub
             {
                 _logger.LogError(ex, $"DeleteMessage: Exception occurred");
                 await Clients.Caller.SendAsync("Error", $"Ошибка при удалении сообщения: {ex.Message}");
+            }
+        }
+
+        public async Task PinMessage(Guid messageId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new PinMessageCommand(messageId, userId.Value));
+                if (!result.Success || !result.ChatId.HasValue)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось закрепить сообщение");
+                    return;
+                }
+
+                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                    "MessagePinned",
+                    new
+                    {
+                        messageId,
+                        chatId = result.ChatId.Value,
+                        pinnedAt = result.PinnedAt,
+                    });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при закреплении сообщения: {ex.Message}");
+            }
+        }
+
+        public async Task UnpinMessage(Guid messageId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new UnpinMessageCommand(messageId, userId.Value));
+                if (!result.Success || !result.ChatId.HasValue)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось открепить сообщение");
+                    return;
+                }
+
+                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                    "MessageUnpinned",
+                    new
+                    {
+                        messageId,
+                        chatId = result.ChatId.Value,
+                    });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при откреплении сообщения: {ex.Message}");
+            }
+        }
+
+        public async Task GetPinnedMessages(string chatId)
+        {
+            try
+            {
+                if (!Guid.TryParse(chatId, out var parsedChatId))
+                {
+                    await Clients.Caller.SendAsync("Error", $"Invalid chatId format: {chatId}");
+                    return;
+                }
+
+                var userId = GetCurrentUserId();
+                var result = await _mediator.Send(new GetPinnedMessagesQuery(parsedChatId, userId));
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                    return;
+                }
+
+                await Clients.Caller.SendAsync("ReceivePinnedMessages", result.Messages);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при загрузке закреплённых сообщений: {ex.Message}");
+            }
+        }
+
+        public async Task CreatePoll(string chatId, string question, string[] options, bool allowMultiple, bool isAnonymous = true)
+        {
+            try
+            {
+                if (!Guid.TryParse(chatId, out var parsedChatId))
+                {
+                    await Clients.Caller.SendAsync("Error", $"Invalid chatId format: {chatId}");
+                    return;
+                }
+
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new CreatePollCommand(
+                    userId.Value,
+                    parsedChatId,
+                    question,
+                    options ?? Array.Empty<string>(),
+                    allowMultiple,
+                    isAnonymous));
+
+                if (!result.Success || !result.MessageId.HasValue)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось создать опрос");
+                    return;
+                }
+
+                var messageResult = await _mediator.Send(new GetMessageByIdQuery(result.MessageId.Value));
+                if (!messageResult.Success || messageResult.Message == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Опрос создан, но не удалось загрузить сообщение");
+                    return;
+                }
+
+                var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
+                var message = messageResult.Message;
+                var username = message.User?.UserName ?? "Unknown";
+
+                await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", new
+                {
+                    messageId = message.Id,
+                    senderId = userId.Value,
+                    content = message.Content,
+                    username,
+                    chatId = parsedChatId,
+                    contentType = message.ContentType,
+                    avatarUrl = userProfile?.Avatar,
+                    avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value),
+                    poll = BuildPollPayload(message.Poll, userId.Value),
+                    isPinned = false,
+                    status = MessageStatusHelper.Sent,
+                });
+
+                await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+                    parsedChatId,
+                    message.Id,
+                    userId.Value);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при создании опроса: {ex.Message}");
+            }
+        }
+
+        public async Task VotePoll(Guid messageId, Guid[] optionIds)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var result = await _mediator.Send(new VotePollCommand(
+                    userId.Value,
+                    messageId,
+                    optionIds ?? Array.Empty<Guid>()));
+
+                if (!result.Success || !result.ChatId.HasValue || !result.MessageId.HasValue)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось проголосовать");
+                    return;
+                }
+
+                var messageResult = await _mediator.Send(new GetMessageByIdQuery(result.MessageId.Value));
+                if (!messageResult.Success || messageResult.Message?.Poll == null)
+                {
+                    return;
+                }
+
+                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                    "PollUpdated",
+                    new
+                    {
+                        messageId = result.MessageId.Value,
+                        chatId = result.ChatId.Value,
+                        poll = BuildPollPayload(messageResult.Message.Poll, null),
+                        viewerUserId = userId.Value,
+                        viewerVotedOptionIds = PollDtoMapper.Map(messageResult.Message.Poll, userId.Value)?.VotedOptionIds ?? new List<Guid>(),
+                    });
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("Error", $"Ошибка при голосовании: {ex.Message}");
             }
         }
 
@@ -1108,6 +1317,39 @@ public class GroupChatHub : Hub
                     createdAt = mf.CreatedAt,
                     isVideoNote = mf.IsVideoNote
                 }).ToList()
+            };
+        }
+
+        private static object? BuildPollPayload(Domain.Models.MessagePoll? poll, Guid? viewerUserId)
+        {
+            var dto = PollDtoMapper.Map(poll, viewerUserId);
+            if (dto == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                id = dto.Id,
+                question = dto.Question,
+                allowMultiple = dto.AllowMultiple,
+                isAnonymous = dto.IsAnonymous,
+                totalVotes = dto.TotalVotes,
+                votedOptionIds = dto.VotedOptionIds,
+                options = dto.Options.Select(o => new
+                {
+                    id = o.Id,
+                    text = o.Text,
+                    sortOrder = o.SortOrder,
+                    voteCount = o.VoteCount,
+                    voters = o.Voters.Select(v => new
+                    {
+                        userId = v.UserId,
+                        username = v.Username,
+                        avatarUrl = v.AvatarUrl,
+                        avatarColor = v.AvatarColor,
+                    }).ToList(),
+                }).ToList(),
             };
         }
     }

@@ -29,10 +29,14 @@ import { categorizeMessageMedia } from '../../../shared/lib/utils/messageMediaHe
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
 import StickerMessage from '../../../shared/ui/molecules/StickerMessage/StickerMessage';
 import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPicker';
+import ChatAttachMenu from '../../../shared/ui/molecules/ChatAttachMenu/ChatAttachMenu';
+import CreatePollModal from '../../../shared/ui/molecules/CreatePollModal/CreatePollModal';
+import PollMessage from '../../../shared/ui/molecules/PollMessage/PollMessage';
 import { stickerApi } from '../../../entities/sticker/api';
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { ForwardMessageModal } from '../../../shared/ui/molecules/ForwardMessageModal';
+import { getPinnedMessagePreview } from '../../../shared/lib/utils/pinnedMessageHelpers';
 import { UserAvatar } from '../../../shared/ui';
 import { VoiceParticipantStatusIcons } from '../../../shared/ui/atoms/VoiceParticipantStatusIcons';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
@@ -49,7 +53,7 @@ import {
   Call,
   Mic,
   Stop,
-  AttachFile,
+  PushPin,
   Image as ImageIcon,
   Videocam,
   FolderZip,
@@ -104,6 +108,7 @@ const ChatRoom = ({
   );
   const {
     messages,
+    pinnedMessages,
     connection,
     isLoading,
     isLoadingOlder,
@@ -115,6 +120,10 @@ const ChatRoom = ({
     editMessage,
     deleteMessage,
     forwardMessage,
+    pinMessage,
+    unpinMessage,
+    createPoll,
+    votePoll,
     scrollToBottom,
     typingUsers,
     handleComposerTextChange,
@@ -124,10 +133,58 @@ const ChatRoom = ({
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
 
+  const visiblePinnedMessages = useMemo(() => {
+    const byId = new Map();
+    pinnedMessages.forEach((msg) => {
+      byId.set(String(msg.messageId), msg);
+    });
+    messages
+      .filter((msg) => msg.isPinned)
+      .forEach((msg) => {
+        const key = String(msg.messageId);
+        byId.set(key, { ...byId.get(key), ...msg, isPinned: true });
+      });
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(a.pinnedAt || a.createdAt) - new Date(b.pinnedAt || b.createdAt),
+    );
+  }, [messages, pinnedMessages]);
+
+  const [activePinnedIndex, setActivePinnedIndex] = useState(0);
+
+  useEffect(() => {
+    setActivePinnedIndex(0);
+  }, [chatId, visiblePinnedMessages.length]);
+
+  const activePinnedMessage = visiblePinnedMessages[activePinnedIndex] ?? visiblePinnedMessages[0] ?? null;
+  const activePinnedPreview = useMemo(
+    () => getPinnedMessagePreview(activePinnedMessage),
+    [activePinnedMessage],
+  );
+
+  const PIN_INDICATOR_VISIBLE_COUNT = 5;
+  const PIN_INDICATOR_SLOT_PX = 6;
+
+  const pinnedIndicatorOffset = useMemo(() => {
+    const total = visiblePinnedMessages.length;
+    if (total <= PIN_INDICATOR_VISIBLE_COUNT) {
+      return 0;
+    }
+
+    const maxOffset = total - PIN_INDICATOR_VISIBLE_COUNT;
+    const centeredStart = activePinnedIndex - Math.floor(PIN_INDICATOR_VISIBLE_COUNT / 2);
+    const start = Math.max(0, Math.min(centeredStart, maxOffset));
+    return start * PIN_INDICATOR_SLOT_PX;
+  }, [activePinnedIndex, visiblePinnedMessages.length]);
+
+  const canScrollPinnedIndicator = visiblePinnedMessages.length > PIN_INDICATOR_VISIBLE_COUNT;
+
   const canSend = !isServerChat || canSendMessages(userPermissions, isServerOwner);
   const canAttach = !isServerChat || canAttachFiles(userPermissions, isServerOwner);
   const canVoice = !isServerChat || canSendVoiceMessages(userPermissions, isServerOwner);
   const canModerateMessages = isServerChat && canManageMessages(userPermissions, isServerOwner);
+  const canPinMessages = canModerateMessages || !isServerChat;
+  const [isPollModalOpen, setPollModalOpen] = useState(false);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
 
   const messagesTailKey = useMemo(() => {
     if (!messages?.length) return '0:';
@@ -150,6 +207,16 @@ const ChatRoom = ({
     clearSearch,
     scrollToMessage
   } = useMessageSearch(chatId, connection);
+
+  const handlePinnedBarClick = useCallback(async () => {
+    if (!activePinnedMessage?.messageId) return;
+
+    await scrollToMessage(activePinnedMessage.messageId);
+
+    if (visiblePinnedMessages.length > 1) {
+      setActivePinnedIndex((index) => (index + 1) % visiblePinnedMessages.length);
+    }
+  }, [activePinnedMessage, visiblePinnedMessages.length, scrollToMessage]);
 
   const {
     isRecording,
@@ -765,6 +832,15 @@ const ChatRoom = ({
     closeContextMenu();
   };
 
+  const handleCreatePoll = async ({ question, options, allowMultiple, isAnonymous }) => {
+    setIsCreatingPoll(true);
+    try {
+      return await createPoll({ question, options, allowMultiple, isAnonymous });
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  };
+
   const handleContextMenuClick = (e, messageId) => {
     const message = messages.find(m => m.messageId === messageId);
     const isOwnMessage = message?.senderUsername === username;
@@ -1093,6 +1169,46 @@ const ChatRoom = ({
         </div>
       )}
 
+      {!isLoading && visiblePinnedMessages.length > 0 && (
+        <button
+          type="button"
+          className="chat-pinned-bar"
+          onClick={() => { void handlePinnedBarClick(); }}
+          title={
+            visiblePinnedMessages.length > 1
+              ? 'Перейти к закрепу и показать следующий'
+              : 'Перейти к закреплённому сообщению'
+          }
+        >
+          <div
+            className={`chat-pinned-bar__indicator ${canScrollPinnedIndicator ? 'chat-pinned-bar__indicator--scrollable' : ''}`}
+            aria-hidden="true"
+          >
+            <div className="chat-pinned-bar__indicator-viewport">
+              <div
+                className="chat-pinned-bar__indicator-track"
+                style={{ transform: `translateY(-${pinnedIndicatorOffset}px)` }}
+              >
+                {visiblePinnedMessages.map((pinned, index) => (
+                  <span
+                    key={pinned.messageId}
+                    className={`chat-pinned-bar__indicator-segment ${index === activePinnedIndex ? 'is-active' : ''}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <span className="chat-pinned-bar__body">
+            <span className="chat-pinned-bar__title">
+              {visiblePinnedMessages.length > 1
+                ? `Закреплённое сообщение #${activePinnedIndex + 1}`
+                : 'Закреплённое сообщение'}
+            </span>
+            <span className="chat-pinned-bar__preview">{activePinnedPreview}</span>
+          </span>
+        </button>
+      )}
+
       <div
         className="messages"
         ref={messagesContainerRef}
@@ -1140,7 +1256,8 @@ const ChatRoom = ({
           const isOwn = msg.senderUsername === username;
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
           const isStickerMessage = !msg.forwardedMessage && msg.contentType === 'sticker' && msg.sticker;
-          const hasTextContent = Boolean(msg.content?.trim());
+          const isPollMessage = !msg.forwardedMessage && msg.contentType === 'poll' && msg.poll;
+          const hasTextContent = Boolean(msg.content?.trim()) && !isPollMessage;
           const isForwardedSticker = msg.forwardedMessage?.contentType === 'sticker' && msg.forwardedMessage?.sticker;
           const hasMedia = Boolean(msg.mediaFiles?.length);
           const isMediaOnly = hasMedia && !hasTextContent && !msg.repliedMessage && !msg.forwardedMessage && !isStickerMessage;
@@ -1234,13 +1351,20 @@ const ChatRoom = ({
                   </div>
                 )}
 
-                {!msg.forwardedMessage && !isStickerMessage && !msg.mediaFiles?.length && hasTextContent && (
+                {isPollMessage && (
+                  <PollMessage
+                    poll={msg.poll}
+                    onVote={(optionIds) => votePoll(msg.messageId, optionIds)}
+                  />
+                )}
+
+                {!msg.forwardedMessage && !isStickerMessage && !isPollMessage && !msg.mediaFiles?.length && hasTextContent && (
                   <div className="message-text">
                     {renderTextWithLinks(msg.content, `${msg.messageId}-content`)}
                   </div>
                 )}
                 
-                {!msg.forwardedMessage && !isStickerMessage && msg.mediaFiles?.length > 0 && (
+                {!msg.forwardedMessage && !isStickerMessage && !isPollMessage && msg.mediaFiles?.length > 0 && (
                   <MessageMediaContent
                     mediaFiles={msg.mediaFiles}
                     timestamp={formatShortMessageTime(msg.createdAt)}
@@ -1261,7 +1385,9 @@ const ChatRoom = ({
               id={`message-${msg.messageId}`}
               className={`message ${isOwn ? 'my-message' : 'user-message'} ${
                 isStickerMessage ? 'message--sticker' : ''
-              } ${isMediaOnly ? 'message--media-only' : ''} ${
+              } ${isPollMessage ? 'message--poll' : ''} ${isMediaOnly ? 'message--media-only' : ''} ${
+                msg.isPinned ? 'message--pinned' : ''
+              } ${
                 highlightedMessageId === msg.messageId ? 'highlighted' : ''
               }`}
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
@@ -1334,6 +1460,28 @@ const ChatRoom = ({
               </span>
               Переслать
             </button>
+            {canPinMessages && (() => {
+              const message = messages.find((m) => m.messageId === contextMenu.messageId);
+              const isPinned = Boolean(message?.isPinned);
+              return (
+                <button
+                  onClick={async () => {
+                    if (isPinned) {
+                      await unpinMessage(contextMenu.messageId);
+                    } else {
+                      await pinMessage(contextMenu.messageId);
+                    }
+                    closeContextMenu();
+                  }}
+                  className="context-menu-button"
+                >
+                  <span className="context-menu-button-icon" aria-hidden="true">
+                    <PushPin fontSize="inherit" />
+                  </span>
+                  {isPinned ? 'Открепить' : 'Закрепить'}
+                </button>
+              );
+            })()}
             {contextMenu.canEdit && (() => {
               const message = messages.find(m => m.messageId === contextMenu.messageId);
               const isSticker = message?.contentType === 'sticker' && message?.sticker;
@@ -1533,27 +1681,12 @@ const ChatRoom = ({
             </div>
             )}
             {canAttach && (
-            <>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                if (e.target.files?.length) {
-                  queueMediaSend(e.target.files);
-                }
-                e.target.value = '';
-              }}
-              multiple
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current.click()}
-              className="media-button"
-            >
-              <AttachFile />
-            </button>
-            </>
+              <ChatAttachMenu
+                disabled={!canSend}
+                onMediaSelect={queueMediaSend}
+                onDocumentSelect={queueMediaSend}
+                onPollClick={() => setPollModalOpen(true)}
+              />
             )}
             <button
               type="button"
@@ -1665,6 +1798,13 @@ const ChatRoom = ({
         chatId={chatId}
         onUserAdded={handleUserAdded}
         connection={connection}
+      />
+
+      <CreatePollModal
+        isOpen={isPollModalOpen}
+        onClose={() => setPollModalOpen(false)}
+        onSubmit={handleCreatePoll}
+        isSubmitting={isCreatingPoll}
       />
     </div>
   );

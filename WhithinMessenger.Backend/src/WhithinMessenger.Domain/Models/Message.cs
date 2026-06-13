@@ -46,5 +46,15 @@ public class Message
 
     public Sticker? Sticker { get; set; }
 
+    public bool IsPinned { get; set; }
+
+    public DateTimeOffset? PinnedAt { get; set; }
+
+    public Guid? PinnedByUserId { get; set; }
+
+    public ApplicationUser? PinnedByUser { get; set; }
+
+    public MessagePoll? Poll { get; set; }
+
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
 }

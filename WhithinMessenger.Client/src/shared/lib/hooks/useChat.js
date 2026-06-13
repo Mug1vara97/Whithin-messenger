@@ -29,7 +29,8 @@ export const useChat = (chatId, username, userId) => {
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const [error, setError] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
-  
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+
   const connectionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -192,6 +193,30 @@ export const useChat = (chatId, username, userId) => {
     };
   }, []);
 
+  const normalizePoll = useCallback((raw) => {
+    if (!raw) return null;
+    return {
+      id: raw.id ?? raw.Id ?? null,
+      question: raw.question ?? raw.Question ?? '',
+      allowMultiple: Boolean(raw.allowMultiple ?? raw.AllowMultiple),
+      isAnonymous: Boolean(raw.isAnonymous ?? raw.IsAnonymous ?? true),
+      totalVotes: raw.totalVotes ?? raw.TotalVotes ?? 0,
+      votedOptionIds: (raw.votedOptionIds ?? raw.VotedOptionIds ?? []).map((id) => String(id)),
+      options: (raw.options ?? raw.Options ?? []).map((option) => ({
+        id: option.id ?? option.Id,
+        text: option.text ?? option.Text ?? '',
+        sortOrder: option.sortOrder ?? option.SortOrder ?? 0,
+        voteCount: option.voteCount ?? option.VoteCount ?? 0,
+        voters: (option.voters ?? option.Voters ?? []).map((voter) => ({
+          userId: voter.userId ?? voter.UserId,
+          username: voter.username ?? voter.Username ?? '',
+          avatarUrl: voter.avatarUrl ?? voter.AvatarUrl ?? null,
+          avatarColor: voter.avatarColor ?? voter.AvatarColor ?? null,
+        })),
+      })),
+    };
+  }, []);
+
   const normalizeMediaFile = useCallback((raw) => {
     if (!raw) return raw;
     return {
@@ -249,12 +274,15 @@ export const useChat = (chatId, username, userId) => {
       forwardedMessage: normalizeForwardedMessage(msg.forwardedMessage ?? msg.ForwardedMessage),
       createdAt: msg.createdAt ?? msg.CreatedAt ?? new Date().toISOString(),
       mediaFiles: (msg.mediaFiles ?? msg.MediaFiles ?? []).map(normalizeMediaFile),
+      poll: normalizePoll(msg.poll ?? msg.Poll),
+      isPinned: Boolean(msg.isPinned ?? msg.IsPinned),
+      pinnedAt: msg.pinnedAt ?? msg.PinnedAt ?? null,
       isEdited: msg.isEdited ?? msg.IsEdited ?? false,
       status: own
         ? normalizeMessageStatus(rawStatus ?? MessageStatus.SENT)
         : null,
     };
-  }, [normalizeForwardedMessage, normalizeMediaFile, normalizeSticker, userId, username]);
+  }, [normalizeForwardedMessage, normalizeMediaFile, normalizePoll, normalizeSticker, userId, username]);
 
   const isPersistedMessageId = useCallback((messageId) => (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(messageId ?? ''))
@@ -309,6 +337,7 @@ export const useChat = (chatId, username, userId) => {
     const loadGen = ++loadGenerationRef.current;
 
     setMessages([]);
+    setPinnedMessages([]);
     setIsLoading(true);
     setIsLoadingOlder(false);
     setHasMoreOlder(false);
@@ -341,6 +370,10 @@ export const useChat = (chatId, username, userId) => {
       conn.off('ReceiveMessagesMeta');
       conn.off('UserTyping');
       conn.off('UserStoppedTyping');
+      conn.off('MessagePinned');
+      conn.off('MessageUnpinned');
+      conn.off('ReceivePinnedMessages');
+      conn.off('PollUpdated');
       conn.off('Error');
     };
 
@@ -436,6 +469,89 @@ export const useChat = (chatId, username, userId) => {
         const messageDeletedHandler = (messageId) => {
           if (loadGenerationRef.current !== loadGen) return;
           setMessages((prev) => prev.filter((msg) => String(msg.messageId) !== String(messageId)));
+          setPinnedMessages((prev) => prev.filter((msg) => String(msg.messageId) !== String(messageId)));
+        };
+
+        const messagePinnedHandler = async (payload) => {
+          if (loadGenerationRef.current !== loadGen) return;
+          const messageId = payload?.messageId ?? payload?.MessageId;
+          const pinnedAt = payload?.pinnedAt ?? payload?.PinnedAt ?? new Date().toISOString();
+          if (!messageId) return;
+
+          setMessages((prev) => {
+            const updated = prev.map((msg) => (
+              String(msg.messageId) === String(messageId)
+                ? { ...msg, isPinned: true, pinnedAt }
+                : msg
+            ));
+            const pinnedMessage = updated.find((msg) => String(msg.messageId) === String(messageId));
+            if (pinnedMessage) {
+              setPinnedMessages((prevPinned) => {
+                const rest = prevPinned.filter((msg) => String(msg.messageId) !== String(messageId));
+                return [{ ...pinnedMessage, isPinned: true, pinnedAt }, ...rest].sort(
+                  (a, b) => new Date(b.pinnedAt || b.createdAt) - new Date(a.pinnedAt || a.createdAt),
+                );
+              });
+            }
+            return updated;
+          });
+
+          try {
+            await newConnection.invoke('GetPinnedMessages', chatId);
+          } catch (err) {
+            console.warn('GetPinnedMessages after pin failed:', err);
+          }
+        };
+
+        const messageUnpinnedHandler = async (payload) => {
+          if (loadGenerationRef.current !== loadGen) return;
+          const messageId = payload?.messageId ?? payload?.MessageId;
+          if (!messageId) return;
+
+          setMessages((prev) => prev.map((msg) => (
+            String(msg.messageId) === String(messageId)
+              ? { ...msg, isPinned: false, pinnedAt: null }
+              : msg
+          )));
+          setPinnedMessages((prev) => prev.filter((msg) => String(msg.messageId) !== String(messageId)));
+
+          try {
+            await newConnection.invoke('GetPinnedMessages', chatId);
+          } catch (err) {
+            console.warn('GetPinnedMessages after unpin failed:', err);
+          }
+        };
+
+        const receivePinnedMessagesHandler = (items) => {
+          if (loadGenerationRef.current !== loadGen) return;
+          const processed = (Array.isArray(items) ? items : [])
+            .map((msg) => normalizeMessage(msg))
+            .filter(Boolean);
+          setPinnedMessages(processed);
+        };
+
+        const pollUpdatedHandler = (payload) => {
+          if (loadGenerationRef.current !== loadGen) return;
+          const messageId = payload?.messageId ?? payload?.MessageId;
+          const poll = normalizePoll(payload?.poll ?? payload?.Poll);
+          const viewerUserId = payload?.viewerUserId ?? payload?.ViewerUserId;
+          const viewerVotedOptionIds = payload?.viewerVotedOptionIds ?? payload?.ViewerVotedOptionIds;
+          if (!messageId || !poll) return;
+
+          const applyPollUpdate = (msg) => {
+            if (String(msg.messageId) !== String(messageId)) return msg;
+            const nextPoll = {
+              ...poll,
+              votedOptionIds:
+                viewerUserId && String(viewerUserId) === String(userId) && Array.isArray(viewerVotedOptionIds)
+                  ? viewerVotedOptionIds.map(String)
+                  : (msg.poll?.votedOptionIds ?? poll.votedOptionIds ?? []),
+            };
+            return { ...msg, poll: nextPoll };
+          };
+
+          setMessages((prev) => prev.map(applyPollUpdate));
+          setPinnedMessages((prev) => prev.map(applyPollUpdate));
         };
 
         const messageStatusChangedHandler = (messageId, status) => {
@@ -471,6 +587,12 @@ export const useChat = (chatId, username, userId) => {
             });
           } else {
             setMessages(processedMessages);
+            const pinnedFromMessages = processedMessages
+              .filter((msg) => msg.isPinned)
+              .sort((a, b) => new Date(b.pinnedAt || b.createdAt) - new Date(a.pinnedAt || a.createdAt));
+            if (pinnedFromMessages.length > 0) {
+              setPinnedMessages(pinnedFromMessages);
+            }
           }
           acknowledgeIncomingMessages(processedMessages);
         });
@@ -483,6 +605,14 @@ export const useChat = (chatId, username, userId) => {
         newConnection.on('MessageDeleted', messageDeletedHandler);
         newConnection.off('MessageStatusChanged', messageStatusChangedHandler);
         newConnection.on('MessageStatusChanged', messageStatusChangedHandler);
+        newConnection.off('MessagePinned', messagePinnedHandler);
+        newConnection.on('MessagePinned', messagePinnedHandler);
+        newConnection.off('MessageUnpinned', messageUnpinnedHandler);
+        newConnection.on('MessageUnpinned', messageUnpinnedHandler);
+        newConnection.off('ReceivePinnedMessages', receivePinnedMessagesHandler);
+        newConnection.on('ReceivePinnedMessages', receivePinnedMessagesHandler);
+        newConnection.off('PollUpdated', pollUpdatedHandler);
+        newConnection.on('PollUpdated', pollUpdatedHandler);
 
         newConnection.on('UserTyping', (eventChatId, typingUserId, typingUsername) => {
           if (String(eventChatId) !== chatIdStr) return;
@@ -501,6 +631,7 @@ export const useChat = (chatId, username, userId) => {
 
         await newConnection.invoke('JoinGroup', chatId);
         await newConnection.invoke('GetMessages', chatId, 50, '');
+        await newConnection.invoke('GetPinnedMessages', chatId);
 
         if (loadGenerationRef.current !== loadGen) return;
 
@@ -754,8 +885,68 @@ export const useChat = (chatId, username, userId) => {
     }
   }, [connection, username]);
 
+  const pinMessage = useCallback(async (messageId) => {
+    if (!connection) return false;
+    try {
+      await connection.invoke('PinMessage', messageId);
+      return true;
+    } catch (error) {
+      console.error('Error pinning message:', error);
+      setError('Ошибка закрепления сообщения');
+      return false;
+    }
+  }, [connection]);
+
+  const unpinMessage = useCallback(async (messageId) => {
+    if (!connection) return false;
+    try {
+      await connection.invoke('UnpinMessage', messageId);
+      return true;
+    } catch (error) {
+      console.error('Error unpinning message:', error);
+      setError('Ошибка открепления сообщения');
+      return false;
+    }
+  }, [connection]);
+
+  const createPoll = useCallback(async ({ question, options, allowMultiple, isAnonymous = true }) => {
+    if (!connection || !chatId) return false;
+    try {
+      await connection.invoke(
+        'CreatePoll',
+        String(chatId),
+        question,
+        options,
+        Boolean(allowMultiple),
+        Boolean(isAnonymous),
+      );
+      return true;
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      setError('Ошибка создания опроса');
+      return false;
+    }
+  }, [connection, chatId]);
+
+  const votePoll = useCallback(async (messageId, optionIds) => {
+    if (!connection) return false;
+    try {
+      await connection.invoke(
+        'VotePoll',
+        messageId,
+        (optionIds ?? []).map((id) => String(id)),
+      );
+      return true;
+    } catch (error) {
+      console.error('Error voting in poll:', error);
+      setError('Ошибка голосования');
+      return false;
+    }
+  }, [connection]);
+
   return {
     messages,
+    pinnedMessages,
     connection,
     isConnected,
     isLoading,
@@ -773,6 +964,10 @@ export const useChat = (chatId, username, userId) => {
     editMessage,
     deleteMessage,
     forwardMessage,
+    pinMessage,
+    unpinMessage,
+    createPoll,
+    votePoll,
     scrollToBottom
   };
 };

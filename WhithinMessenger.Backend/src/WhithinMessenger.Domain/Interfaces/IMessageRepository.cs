@@ -35,5 +35,6 @@ namespace WhithinMessenger.Domain.Interfaces
             IReadOnlyList<Guid> messageIds,
             int recipientCount,
             CancellationToken cancellationToken = default);
+        Task<List<Message>> GetPinnedByChatIdAsync(Guid chatId, CancellationToken cancellationToken = default);
     }
 }

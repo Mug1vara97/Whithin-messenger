@@ -18,6 +18,11 @@ public static class ChatMessagePreviewBuilder
     {
         var caption = textContent?.Trim() ?? string.Empty;
 
+        if (string.Equals(contentType, "poll", StringComparison.OrdinalIgnoreCase))
+        {
+            return (TypeText, string.IsNullOrWhiteSpace(caption) ? "Опрос" : caption);
+        }
+
         if (string.Equals(contentType, "sticker", StringComparison.OrdinalIgnoreCase))
         {
             return (TypeSticker, "Стикер");
@@ -57,6 +62,16 @@ public static class ChatMessagePreviewBuilder
         }
 
         return (TypeText, "Новое сообщение");
+    }
+
+    public static string BuildPreviewText(
+        string? contentType,
+        string? textContent,
+        string? mediaContentType,
+        bool isVideoNote = false)
+    {
+        var (_, preview) = Build(contentType, textContent, mediaContentType, isVideoNote);
+        return preview;
     }
 
     public static string BuildPublicMediaUrl(string? relativePath, string publicBaseUrl = "https://whithin.ru")

@@ -15,6 +15,9 @@ public class MessageDto
     public string? ContentType { get; set; }
     public StickerMessageDto? Sticker { get; set; }
     public List<MediaFileDto> MediaFiles { get; set; } = new();
+    public bool IsPinned { get; set; }
+    public DateTimeOffset? PinnedAt { get; set; }
+    public PollDto? Poll { get; set; }
 }
 
 public class StickerMessageDto

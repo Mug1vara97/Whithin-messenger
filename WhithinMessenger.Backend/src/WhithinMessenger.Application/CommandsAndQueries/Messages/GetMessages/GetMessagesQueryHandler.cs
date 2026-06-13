@@ -56,71 +56,11 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
 
             var messageDtos = messages.Select(m =>
             {
-                var dto = new MessageDto
+                var dto = MessageDtoMapper.Map(m, request.UserId);
+                if (request.UserId.HasValue && m.UserId == request.UserId.Value)
                 {
-                    MessageId = m.Id,
-                    SenderId = m.UserId,
-                    Content = m.Content,
-                    ContentType = m.ContentType,
-                    CreatedAt = m.CreatedAt,
-                    SenderUsername = m.User.UserName ?? "Unknown",
-                    AvatarUrl = m.User.UserProfile?.Avatar,
-                    AvatarColor = !string.IsNullOrEmpty(m.User.UserProfile?.AvatarColor)
-                        ? m.User.UserProfile.AvatarColor
-                        : GenerateAvatarColor(m.UserId),
-                    Status = request.UserId.HasValue && m.UserId == request.UserId.Value
-                        ? statuses.GetValueOrDefault(m.Id, MessageStatusHelper.Sent)
-                        : null,
-                    RepliedMessage = m.RepliedToMessageId != null && m.RepliedToMessage != null
-                        ? new ReplyMessageDto
-                        {
-                            MessageId = m.RepliedToMessage.Id,
-                            Content = m.RepliedToMessage.Content,
-                            SenderUsername = m.RepliedToMessage.User?.UserName ?? "Unknown",
-                            MediaFiles = m.RepliedToMessage.MediaFiles?.Select(mf => new MediaFileDto
-                            {
-                                Id = mf.Id,
-                                FileName = mf.FileName,
-                                OriginalFileName = mf.OriginalFileName,
-                                FilePath = mf.FilePath,
-                                ContentType = mf.ContentType,
-                                FileSize = mf.FileSize,
-                                ThumbnailPath = mf.ThumbnailPath,
-                                CreatedAt = mf.CreatedAt,
-                                IsVideoNote = mf.IsVideoNote
-                            }).ToList() ?? new List<MediaFileDto>()
-                        }
-                        : null,
-                    ForwardedMessage = m.ForwardedFromMessageId != null
-                        ? ForwardedMessageDtoMapper.Map(
-                            m.ForwardedFromMessage,
-                            m.ForwardedFromChat?.Name,
-                            m.ForwardedByUser?.UserName,
-                            m.ForwardedMessageContent)
-                        : null,
-                    Sticker = m.Sticker == null
-                        ? null
-                        : new StickerMessageDto
-                        {
-                            Id = m.Sticker.Id,
-                            StickerPackId = m.Sticker.StickerPackId,
-                            FilePath = m.Sticker.FilePath,
-                            ContentType = m.Sticker.ContentType
-                        },
-                    MediaFiles = m.MediaFiles?.Select(mf => new MediaFileDto
-                    {
-                        Id = mf.Id,
-                        FileName = mf.FileName,
-                        OriginalFileName = mf.OriginalFileName,
-                        FilePath = mf.FilePath,
-                        ContentType = mf.ContentType,
-                        FileSize = mf.FileSize,
-                        ThumbnailPath = mf.ThumbnailPath,
-                        CreatedAt = mf.CreatedAt,
-                        IsVideoNote = mf.IsVideoNote
-                    }).ToList() ?? new List<MediaFileDto>()
-                };
-
+                    dto.Status = statuses.GetValueOrDefault(m.Id, MessageStatusHelper.Sent);
+                }
                 return dto;
             }).ToList();
 
@@ -139,12 +79,5 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
                 ErrorMessage = ex.Message
             };
         }
-    }
-
-    private static string GenerateAvatarColor(Guid userId) 
-    {
-        string[] colors = { "#5865F2", "#EB459E", "#ED4245", "#FEE75C", "#57F287", "#FAA61A" };
-        int index = Math.Abs(userId.GetHashCode()) % colors.Length;
-        return colors[index];
     }
 }

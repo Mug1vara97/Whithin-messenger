@@ -31,6 +31,11 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
                 .Include(m => m.Sticker)
+                .Include(m => m.Poll)
+                    .ThenInclude(p => p!.Options.OrderBy(o => o.SortOrder))
+                        .ThenInclude(o => o.Votes)
+                            .ThenInclude(v => v.User)
+                                .ThenInclude(u => u.UserProfile)
                 .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
         }
 
@@ -111,7 +116,19 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Include(m => m.RepliedToMessage)
                     .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
-                .Include(m => m.Sticker);
+                .Include(m => m.Sticker)
+                .Include(m => m.Poll)
+                    .ThenInclude(p => p!.Options.OrderBy(o => o.SortOrder))
+                        .ThenInclude(o => o.Votes)
+                            .ThenInclude(v => v.User)
+                                .ThenInclude(u => u.UserProfile);
+
+        public async Task<List<Message>> GetPinnedByChatIdAsync(Guid chatId, CancellationToken cancellationToken = default)
+        {
+            return await ApplyMessageIncludes(_context.Messages.Where(m => m.ChatId == chatId && m.IsPinned))
+                .OrderByDescending(m => m.PinnedAt)
+                .ToListAsync(cancellationToken);
+        }
 
         public async Task<Message> AddAsync(Message message, CancellationToken cancellationToken = default)
         {

@@ -59,5 +59,13 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .WithMany()
             .HasForeignKey(d => d.StickerId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder
+            .HasOne(d => d.PinnedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.PinnedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(e => new { e.ChatId, e.IsPinned });
     }
 }

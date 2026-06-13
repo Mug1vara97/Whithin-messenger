@@ -32,7 +32,7 @@ namespace WhithinMessenger.Domain.Interfaces
         public string UserStatus { get; init; } = "offline";
         public DateTimeOffset? LastSeen { get; init; }
         public bool IsGroupChat { get; init; }
-        public string? LastMessage { get; init; }
+        public string? LastMessage { get; set; }
         public DateTimeOffset LastMessageTime { get; init; }
         public int UnreadCount { get; init; }
     }

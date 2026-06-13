@@ -68,12 +68,31 @@ export const useMessageSearch = (chatId, connection) => {
   }, []);
 
   const scrollToMessage = useCallback((messageId) => {
-    const messageElement = document.getElementById(`message-${messageId}`);
-    if (messageElement) {
+    return new Promise((resolve) => {
+      const messageElement = document.getElementById(`message-${messageId}`);
+      if (!messageElement) {
+        resolve(false);
+        return;
+      }
+
       messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       messageElement.classList.add('highlighted');
       setTimeout(() => messageElement.classList.remove('highlighted'), 2000);
-    }
+
+      const scrollContainer = messageElement.closest('.messages');
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve(true);
+      };
+
+      if (scrollContainer && 'onscrollend' in scrollContainer) {
+        scrollContainer.addEventListener('scrollend', finish, { once: true });
+      }
+
+      setTimeout(finish, 650);
+    });
   }, []);
 
   useEffect(() => {

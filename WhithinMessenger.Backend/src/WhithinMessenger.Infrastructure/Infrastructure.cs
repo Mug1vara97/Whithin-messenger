@@ -42,6 +42,7 @@ public static class Infrastructure
         services.AddScoped<IPendingPasswordResetRepository, PendingPasswordResetRepository>();
         services.AddScoped<IUserRepositoryExtensions, UserRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<IPollRepository, PollRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();
         services.AddScoped<IServerRepository, ServerRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

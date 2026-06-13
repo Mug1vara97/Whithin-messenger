@@ -63,9 +63,11 @@ const HomePage = () => {
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
-  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers } = useChatList(user?.id || null, (chatId) => {
-    navigate(`/channels/@me/${chatId}`);
-  });
+  const handleChatCreatedNavigate = useCallback((createdChatId) => {
+    navigate(`/channels/@me/${createdChatId}`);
+  }, [navigate]);
+
+  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers } = useChatList(user?.id || null, handleChatCreatedNavigate);
   const { createServer, fetchServers, servers, createConnection } = useServerContext();
   const {
     notifications,
@@ -646,7 +648,14 @@ const HomePage = () => {
 
     if (foundChat) {
       privateChatRouteResolveRef.current.refreshCalls = 0;
-      setSelectedChat(foundChat);
+      setSelectedChat((prev) => {
+        const prevId = String(prev?.chatId || prev?.chat_id || '');
+        const nextId = String(foundChat.chatId || foundChat.chat_id || '');
+        if (prevId === nextId) {
+          return prev;
+        }
+        return foundChat;
+      });
       setSelectedServer(null);
       return;
     }

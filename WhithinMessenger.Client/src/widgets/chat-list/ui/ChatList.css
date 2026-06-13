@@ -192,7 +192,16 @@
   gap: 2px;
 }
 
+.chat-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .chat-name {
+  flex: 1;
+  min-width: 0;
   font-weight: 500;
   color: var(--text);
   font-size: 16px;
@@ -202,14 +211,34 @@
   white-space: nowrap;
 }
 
+.chat-last-time {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.chat-last-message,
 .group-indicator,
 .chat-status {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-item.has-unread .chat-name,
+.chat-item.has-unread .chat-last-time {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chat-item.has-unread .chat-last-message {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .group-indicator {

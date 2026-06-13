@@ -7,6 +7,8 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { getUserStatusColor, getUserStatusLabel } from '../../../shared/lib/utils/userStatus';
+import { formatChatListLastMessage } from '../../../shared/lib/utils/formatChatListLastMessage';
+import { formatChatListMessageTime } from '../../../shared/lib/utils/formatChatListMessageTime';
 import './ChatList.css';
 
 const ChatList = ({
@@ -172,10 +174,19 @@ const ChatList = ({
             chats.map((chat, index) => {
               const unreadForChat = unreadCountByChat[chat.chatId] || unreadCountByChat[chat.chat_id] || 0;
               const chatPresenceStatus = getChatPresenceStatus(chat);
+              const hasUnread = unreadForChat > 0;
+              const lastMessageRaw = chat.lastMessage ?? chat.LastMessage ?? '';
+              const lastMessagePreview = formatChatListLastMessage(lastMessageRaw);
+              const lastMessageTimeLabel = formatChatListMessageTime(
+                chat.lastMessageTime ?? chat.LastMessageTime
+              );
+              const subtitle = lastMessagePreview
+                ?? (chat.isGroupChat ? 'Групповой чат' : null);
+
               return (
               <li
                 key={`${chat.chatId}-${chat.lastMessageTime}-${index}`}
-                className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''}`}
+                className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}`}
                 onClick={() => handleChatSelection(chat)}
               >
                 <div className="chat-avatar-container">
@@ -205,10 +216,21 @@ const ChatList = ({
                   )}
                 </div>
                 <div className="chat-info">
-                  <div className="chat-name">
-                    {chat.username}
+                  <div className="chat-name-row">
+                    <div className="chat-name">
+                      {chat.username}
+                    </div>
+                    {lastMessageTimeLabel && (
+                      <div className="chat-last-time">
+                        {lastMessageTimeLabel}
+                      </div>
+                    )}
                   </div>
-                  {chat.isGroupChat && <div className="group-indicator">(Group)</div>}
+                  {subtitle && (
+                    <div className="chat-last-message">
+                      {subtitle}
+                    </div>
+                  )}
                 </div>
                 {unreadForChat > 0 && (
                   <div className="chat-unread-badge">
