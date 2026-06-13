@@ -938,6 +938,13 @@ function emitMainWindowVisibility() {
   const visible = mainWindow.isVisible();
   const focused = mainWindow.isFocused();
 
+  try {
+    // Главный рендерер питает оверлей и голос — не замедляем его в фоне.
+    mainWindow.webContents.setBackgroundThrottling(false);
+  } catch (_) {
+    /* ignore */
+  }
+
   mainWindow.webContents.send('electron:window-visibility-changed', {
     minimized,
     visible,
@@ -976,6 +983,7 @@ function showMainWindow() {
   }
   mainWindow.show();
   mainWindow.focus();
+  emitMainWindowVisibility();
 }
 
 function hideMainWindow() {
@@ -983,19 +991,6 @@ function hideMainWindow() {
     return;
   }
   mainWindow.hide();
-}
-
-/** Сворачивание в трей вместо minimize — как «Скрыть», меньше нагрузки на оверлей. */
-function minimizeMainWindowToTray() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return;
-  }
-  if (tray) {
-    hideMainWindow();
-    emitMainWindowVisibility();
-    return;
-  }
-  mainWindow.minimize();
   emitMainWindowVisibility();
 }
 
@@ -1262,15 +1257,7 @@ function createWindow() {
 
   mainWindow.loadURL(rendererUrl);
 
-  mainWindow.on('minimize', (event) => {
-    if (!tray || isQuitting) {
-      return;
-    }
-    event.preventDefault();
-    minimizeMainWindowToTray();
-  });
-
-  ['restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
+  ['minimize', 'restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
     mainWindow.on(eventName, emitMainWindowVisibility);
   });
 
@@ -1412,10 +1399,6 @@ ipcMain.handle('electron:open-external', async (_, url) => {
 ipcMain.on('electron:window-minimize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || win.isDestroyed()) {
-    return;
-  }
-  if (tray && mainWindow && win.id === mainWindow.id) {
-    minimizeMainWindowToTray();
     return;
   }
   win.minimize();

@@ -126,10 +126,12 @@ export function DesktopActiveCallOverlaySync() {
     const unsubscribe = useCallStore.subscribe(syncOverlay);
     // Пока оверлей виден — только события; интервал нужен лишь для появления оверлея.
     const intervalId = window.setInterval(() => {
-      if (!overlayVisibleRef.current) {
-        syncOverlay();
+      const inCall = useCallStore.getState().isInCall;
+      if (!inCall && !overlayVisibleRef.current) {
+        return;
       }
-    }, 500);
+      syncOverlay();
+    }, 100);
 
     return () => {
       unsubscribe();

@@ -19,18 +19,35 @@ let overlaySettings = {
 let measuredSize = null;
 let powerSaveBlockerId = null;
 let getMainWindow = null;
+let overlaySyncIntervalId = null;
+const OVERLAY_SYNC_INTERVAL_MS = 80;
 
-function applyMainWindowThrottleForOverlay(overlayActive) {
+function requestOverlayDataFromRenderer() {
   const main = typeof getMainWindow === 'function' ? getMainWindow() : null;
   if (!main || main.isDestroyed()) {
     return;
   }
-  try {
-    // Освобождаем CPU для оверлея и голоса, пока главное окно в фоне.
-    main.webContents.setBackgroundThrottling(Boolean(overlayActive));
-  } catch (_) {
-    /* ignore */
+  const wc = main.webContents;
+  if (!wc || wc.isDestroyed()) {
+    return;
   }
+  wc.send('electron:force-active-call-overlay-sync');
+}
+
+function startOverlayRendererSync() {
+  if (overlaySyncIntervalId != null) {
+    return;
+  }
+  requestOverlayDataFromRenderer();
+  overlaySyncIntervalId = setInterval(requestOverlayDataFromRenderer, OVERLAY_SYNC_INTERVAL_MS);
+}
+
+function stopOverlayRendererSync() {
+  if (overlaySyncIntervalId == null) {
+    return;
+  }
+  clearInterval(overlaySyncIntervalId);
+  overlaySyncIntervalId = null;
 }
 
 const VALID_NOTIFICATION_POSITIONS = new Set(['top-right', 'top-left', 'bottom-right', 'bottom-left']);
@@ -148,7 +165,7 @@ function closeHostWindow() {
   measuredSize = null;
   stopPowerSaveBlocker();
   if (!activePayload) {
-    applyMainWindowThrottleForOverlay(false);
+    stopOverlayRendererSync();
   }
 }
 
@@ -226,7 +243,7 @@ function showActiveCallOverlay(payload) {
   activePayload = payload;
   measuredSize = null;
   startPowerSaveBlocker();
-  applyMainWindowThrottleForOverlay(true);
+  startOverlayRendererSync();
   syncHostWindow();
 }
 
@@ -256,7 +273,7 @@ function updateActiveCallOverlay(payload) {
 function dismissActiveCallOverlay() {
   activePayload = null;
   measuredSize = null;
-  applyMainWindowThrottleForOverlay(false);
+  stopOverlayRendererSync();
   syncHostWindow();
 }
 
@@ -332,6 +349,7 @@ function registerActiveCallOverlayIpc(mainWindowGetter) {
 }
 
 function shutdownActiveCallOverlay() {
+  stopOverlayRendererSync();
   dismissActiveCallOverlay();
 }
 
