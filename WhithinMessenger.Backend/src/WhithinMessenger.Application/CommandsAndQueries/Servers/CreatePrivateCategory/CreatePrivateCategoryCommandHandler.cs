@@ -11,15 +11,18 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
     private readonly IServerRepository _serverRepository;
     private readonly ICategoryRepository _categoryRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public CreatePrivateCategoryCommandHandler(
         IServerRepository serverRepository,
         ICategoryRepository categoryRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<CreatePrivateCategoryResult> Handle(CreatePrivateCategoryCommand request, CancellationToken cancellationToken)
@@ -79,6 +82,15 @@ public class CreatePrivateCategoryCommandHandler : IRequestHandler<CreatePrivate
             };
 
             var createdCategory = await _categoryRepository.CreateAsync(newCategory, cancellationToken);
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.CategoryCreate,
+                AuditLogTargetTypes.Category,
+                createdCategory.Id,
+                new { targetName = createdCategory.CategoryName, isPrivate = true },
+                cancellationToken);
 
             return new CreatePrivateCategoryResult
             {

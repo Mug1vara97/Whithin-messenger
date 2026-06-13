@@ -1,0 +1,83 @@
+/**
+ * Дополнения для светлой темы — правки hardcoded тёмных цветов в layout-компонентах.
+ */
+
+[data-theme-mode='light'] {
+  color-scheme: light;
+}
+
+[data-theme-mode='light'] .app,
+[data-theme-mode='light'] body,
+[data-theme-mode='light'] .loading-container,
+[data-theme-mode='light'] .loading-spinner {
+  background-color: var(--background) !important;
+  color: var(--text) !important;
+}
+
+[data-theme-mode='light'] .home-page,
+[data-theme-mode='light'] .main-layout,
+[data-theme-mode='light'] .content-area {
+  background-color: var(--background-primary) !important;
+}
+
+[data-theme-mode='light'] .home-content {
+  color: var(--text);
+}
+
+[data-theme-mode='light'] .spinner {
+  border-color: var(--border);
+  border-top-color: var(--primary);
+}
+
+[data-theme-mode='light'] .server-info h3,
+[data-theme-mode='light'] .server-info .dropdown-arrow {
+  color: var(--text);
+  text-shadow: none;
+}
+
+[data-theme-mode='light'] .server-info:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+[data-theme-mode='light'] [class*='username'] {
+  color: var(--text) !important;
+}
+
+[data-theme-mode='light'] [class*='user-status-text'] {
+  color: var(--text-muted) !important;
+}
+
+[data-theme-mode='light'] [class*='user-identity-button']:hover [class*='username'] {
+  color: var(--text) !important;
+}
+
+[data-theme-mode='light'] [class*='user-identity-button']:hover [class*='user-status-text'] {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme-mode='light'] [class*='user-avatar-status'] {
+  border-color: var(--surface) !important;
+}
+
+[data-theme-mode='light'] [class*='status-menu'] {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme-mode='light'] [class*='status-menu-item'] {
+  color: var(--text) !important;
+}
+
+[data-theme-mode='light'] [class*='voice-control-button']:not([class*='Muted']):not([class*='Moderated']) {
+  background: var(--surface-hover) !important;
+  color: var(--text) !important;
+}
+
+[data-theme-mode='light'] [class*='voice-control-button']:not([class*='Muted']):not([class*='Moderated']):hover {
+  background: var(--border) !important;
+}
+
+[data-theme-mode='light'] .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.45);
+}

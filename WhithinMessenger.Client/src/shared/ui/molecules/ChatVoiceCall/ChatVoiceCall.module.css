@@ -4,17 +4,19 @@
   width: 100%;
   height: 50%;
   flex: 0 0 auto;
-  background: #000000;
+  background: var(--background, #000000);
   display: flex;
   flex-direction: column;
   min-height: 230px;
   max-height: 80vh;
   border-radius: 0;
   overflow: hidden;
-  border: 1px solid #2b2d31;
+  border: 1px solid var(--border, #2b2d31);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 12px 32px rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 color-mix(in srgb, var(--text, #ffffff) 3%, transparent),
+    0 12px 32px color-mix(in srgb, var(--background, #000000) 35%, transparent);
+  color: var(--text);
+  color-scheme: light dark;
 }
 
 .resizeHandle {
@@ -36,7 +38,7 @@
   transform: translateX(-50%);
   width: 48px;
   height: 5px;
-  background: linear-gradient(90deg, transparent 0%, #707bf5 20%, #707bf5 80%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--primary, #707bf5) 20%, var(--primary, #707bf5) 80%, transparent 100%);
   opacity: 0.45;
   transition: opacity 0.2s ease;
   border-radius: 999px;
@@ -92,6 +94,8 @@
   align-items: center;
   gap: 10px;
   min-width: 100px;
+  min-height: 132px;
+  flex-shrink: 0;
 }
 
 .currentUserParticipant .avatarCircle {
@@ -119,21 +123,10 @@
 
 .participantItem.participantSpeaking .participantAvatarContainer::after {
   opacity: 1;
-  border-color: #23a55a;
-  box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 16px rgba(35, 165, 90, 0.45);
-  animation: voiceRingOneToOne 1.2s ease-in-out infinite;
-}
-
-@keyframes voiceRingOneToOne {
-  0%,
-  100% {
-    box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35), 0 0 12px rgba(35, 165, 90, 0.4);
-    border-color: #23a55a;
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(45, 199, 112, 0.45), 0 0 20px rgba(35, 165, 90, 0.55);
-    border-color: #2dc770;
-  }
+  border-color: var(--voice-speaking-color, var(--success, #43b581));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 35%, transparent),
+    0 0 14px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 40%, transparent);
 }
 
 .participantAvatar {
@@ -148,15 +141,15 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: #4e5058;
+  background: var(--primary, #4e5058);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   font-weight: 700;
   font-size: 26px;
   border: none;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--background, #000000) 35%, transparent);
 }
 
 .avatarImage {
@@ -181,35 +174,38 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   font-size: 10px;
-  border: 2px solid #1b1d28;
+  border: 2px solid var(--background, #1b1d28);
 }
 
 .muteIndicator {
-  background: #ed4245;
+  background: var(--danger, #ed4245);
 }
 
 .audioMutedIndicator {
-  background: #f0b132;
+  background: var(--warning, #f0b132);
 }
 
 .participantName {
   max-width: 120px;
   font-size: 13px;
   line-height: 1.2;
-  color: #f2f3f5;
+  color: var(--text, #f2f3f5);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--background, #000000) 45%, transparent);
 }
 
 .participantStatusRow {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 24px;
+  flex-shrink: 0;
 }
 
 .participantStatusPill {
@@ -223,15 +219,15 @@
 }
 
 .statusOn {
-  color: #f2f3f5;
-  background: rgba(49, 51, 56, 0.9);
-  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text, #f2f3f5);
+  background: color-mix(in srgb, var(--surface-hover, #313338) 90%, transparent);
+  border-color: color-mix(in srgb, var(--text, #ffffff) 8%, transparent);
 }
 
 .statusOff {
-  color: #ffffff;
-  background: rgba(237, 66, 69, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-on-primary, #ffffff);
+  background: color-mix(in srgb, var(--danger, #ed4245) 90%, transparent);
+  border-color: color-mix(in srgb, var(--text, #ffffff) 10%, transparent);
 }
 
 
@@ -263,11 +259,6 @@
 /* Индикатор говорения — кольцо вокруг аватара (см. .participantAvatarContainer::after) */
 .participantItem.participantSpeaking {
   animation: none;
-}
-
-/* Темная тема */
-.voiceCallContainer {
-  color-scheme: dark;
 }
 
 /* Screen Share Container */
@@ -316,10 +307,10 @@
   align-items: center;
   gap: 16px;
   padding: 32px;
-  background: rgba(88, 101, 242, 0.1);
-  border: 2px dashed #5865f2;
+  background: color-mix(in srgb, var(--primary, #5865f2) 10%, transparent);
+  border: 2px dashed var(--primary, #5865f2);
   border-radius: 16px;
-  color: #5865f2;
+  color: var(--primary, #5865f2);
 }
 
 /* Screen Share Video Container */
@@ -363,7 +354,7 @@
   min-width: 150px;
   max-width: 250px;
   aspect-ratio: 16 / 9;
-  background: #1e1f22;
+  background: var(--surface, #1e1f22);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
@@ -383,15 +374,15 @@
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  background: #5865f2;
+  background: var(--primary, #5865f2);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--text-on-primary, #ffffff);
   font-weight: 600;
   font-size: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid color-mix(in srgb, var(--text, #ffffff) 20%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--background, #000000) 30%, transparent);
 }
 
 .screenShareStatusIndicators {
@@ -413,18 +404,18 @@
 }
 
 .screenShareMuteIndicator {
-  background: #f04747;
-  color: #ffffff;
+  background: var(--danger, #f04747);
+  color: var(--text-on-primary, #ffffff);
 }
 
 .screenShareAudioMutedIndicator {
-  background: #faa61a;
-  color: #ffffff;
+  background: var(--warning, #faa61a);
+  color: var(--text-on-primary, #ffffff);
 }
 
 .focusIcon {
   font-size: 24px !important;
-  color: #5865f2;
+  color: var(--primary, #5865f2);
 }
 
 .focusText {

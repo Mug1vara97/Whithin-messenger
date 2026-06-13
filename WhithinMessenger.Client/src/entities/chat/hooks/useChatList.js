@@ -52,6 +52,14 @@ export const useChatList = (userId, onChatCreated = null) => {
         .configureLogging(signalR.LogLevel.Warning)
         .build();
 
+      newConnection.on('chatunreadupdated', (chatId, unreadCount) => {
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.chatId === chatId ? { ...chat, unreadCount } : chat
+          )
+        );
+      });
+
       newConnection.onclose((error) => {
         console.log('SignalR connection closed:', error);
         setIsConnected(false);
@@ -182,16 +190,6 @@ export const useChatList = (userId, onChatCreated = null) => {
       });
     };
 
-    const handleChatUnreadUpdated = (chatId, unreadCount) => {
-      setChats(prevChats =>
-        prevChats.map(chat =>
-          chat.chatId === chatId
-            ? { ...chat, unreadCount }
-            : chat
-        )
-      );
-    };
-
     const handleError = (errorMessage) => {
       console.error('SignalR error:', errorMessage);
     };
@@ -202,7 +200,6 @@ export const useChatList = (userId, onChatCreated = null) => {
     connection.off("privatechatcreated", handlePrivateChatCreated);
     connection.off("chatdeleted", handleChatDeleted);
     connection.off("chatupdated", handleChatUpdated);
-    connection.off("chatunreadupdated", handleChatUnreadUpdated);
     connection.off("error", handleError);
 
     connection.on("receivechats", handleReceiveChats);
@@ -211,7 +208,6 @@ export const useChatList = (userId, onChatCreated = null) => {
     connection.on("privatechatcreated", handlePrivateChatCreated);
     connection.on("chatdeleted", handleChatDeleted);
     connection.on("chatupdated", handleChatUpdated);
-    connection.on("chatunreadupdated", handleChatUnreadUpdated);
     
     connection.on("error", handleError);
 
@@ -222,7 +218,6 @@ export const useChatList = (userId, onChatCreated = null) => {
       connection.off("privatechatcreated", handlePrivateChatCreated);
       connection.off("chatdeleted", handleChatDeleted);
       connection.off("chatupdated", handleChatUpdated);
-      connection.off("chatunreadupdated", handleChatUnreadUpdated);
       connection.off("error", handleError);
     };
   }, [connection, userId, navigate, onChatCreated]);

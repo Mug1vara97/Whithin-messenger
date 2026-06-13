@@ -10,8 +10,70 @@ const getAuthHeaders = () => {
   const token = tokenManager.getToken();
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
+
+const readPrivateFlag = (obj) => {
+  if (obj?.isPrivate !== undefined && obj?.isPrivate !== null) return obj.isPrivate === true;
+  if (obj?.IsPrivate !== undefined && obj?.IsPrivate !== null) return obj.IsPrivate === true;
+  return undefined;
+};
+
+const mergeCategoryFromEvent = (category, updatedCategory) => {
+  const isPrivate = readPrivateFlag(updatedCategory);
+  const categoryName =
+    updatedCategory.categoryName ??
+    updatedCategory.CategoryName ??
+    category.categoryName ??
+    category.CategoryName;
+
+  return {
+    ...category,
+    categoryName,
+    CategoryName: categoryName,
+    isPrivate: isPrivate ?? category.isPrivate ?? category.IsPrivate ?? false,
+    IsPrivate: isPrivate ?? category.IsPrivate ?? category.isPrivate ?? false,
+    allowedRoleIds:
+      updatedCategory.allowedRoleIds ??
+      updatedCategory.AllowedRoleIds ??
+      category.allowedRoleIds ??
+      category.AllowedRoleIds,
+    allowedUserIds:
+      updatedCategory.allowedUserIds ??
+      updatedCategory.AllowedUserIds ??
+      category.allowedUserIds ??
+      category.AllowedUserIds,
+  };
+};
+
+const mergeChatFromEvent = (chat, updatedChat) => ({
+  ...chat,
+  ...updatedChat,
+  chatId: updatedChat.chatId ?? updatedChat.ChatId ?? chat.chatId ?? chat.ChatId,
+  name: updatedChat.name ?? updatedChat.Name ?? chat.name ?? chat.Name,
+  categoryId: updatedChat.categoryId ?? updatedChat.CategoryId ?? chat.categoryId ?? chat.CategoryId,
+  chatOrder: updatedChat.chatOrder ?? updatedChat.ChatOrder ?? chat.chatOrder ?? chat.ChatOrder,
+  typeId: updatedChat.typeId ?? updatedChat.TypeId ?? chat.typeId ?? chat.TypeId,
+  isPrivate: readPrivateFlag(updatedChat) ?? readPrivateFlag(chat) ?? false,
+  allowedRoleIds:
+    updatedChat.allowedRoleIds ??
+    updatedChat.AllowedRoleIds ??
+    chat.allowedRoleIds ??
+    chat.AllowedRoleIds,
+  members: updatedChat.members ?? updatedChat.Members ?? chat.members ?? chat.Members ?? [],
+});
+
+const findChatInCategories = (categories, chatId) => {
+  if (!chatId) return null;
+  for (const category of categories || []) {
+    const chats = category.chats || category.Chats || [];
+    const chat = chats.find((item) => String(item.chatId ?? item.ChatId) === String(chatId));
+    if (chat) return chat;
+  }
+  return null;
+};
 import { CategoriesList } from '../../categories-list';
 import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, UserPanel, AddMemberModal } from '../../../shared/ui/molecules';
+
+const EMPTY_GUID_LIST = [];
 import {
   canManageChannels,
   canManageServer,
@@ -81,9 +143,17 @@ const ServerPanel = ({
       });
       
       if (response.ok) {
-        const serverData = await response.json();
+        const raw = await response.json();
+        const serverData = {
+          ...raw,
+          serverId: raw.serverId ?? raw.ServerId,
+          categories: raw.categories ?? raw.Categories ?? [],
+        };
         console.log('ServerPanel: Received server data:', serverData);
         setServer(serverData);
+        if (onServerDataUpdated) {
+          onServerDataUpdated(serverData);
+        }
         return serverData;
       } else {
         console.error('ServerPanel: Failed to fetch server data, status:', response.status);
@@ -93,7 +163,7 @@ const ServerPanel = ({
       console.error('Error fetching server data:', error);
       return null;
     }
-  }, [selectedServer?.serverId]);
+  }, [selectedServer?.serverId, onServerDataUpdated]);
 
   const findChannelInServer = useCallback((serverData, chatId) => {
     if (!serverData?.categories) return null;
@@ -175,17 +245,7 @@ const ServerPanel = ({
       setServer(prev => {
         if (!prev) return prev;
 
-        const processedChat = {
-          ...newChat,
-          chatId: newChat.chatId || newChat.ChatId,
-          name: newChat.name || newChat.Name,
-          categoryId: newChat.categoryId || newChat.CategoryId,
-          chatOrder: newChat.chatOrder || newChat.ChatOrder,
-          typeId: newChat.typeId || newChat.TypeId,
-          isPrivate: newChat.isPrivate || newChat.IsPrivate,
-          allowedRoleIds: newChat.allowedRoleIds || newChat.AllowedRoleIds,
-          members: newChat.members || newChat.Members || []
-        };
+        const processedChat = mergeChatFromEvent({}, newChat);
 
         const isPrivate = processedChat.isPrivate === true;
         if (isPrivate) {
@@ -273,35 +333,44 @@ const ServerPanel = ({
 
     const handleChatUpdated = (updatedChat) => {
       console.log('ServerPanel: ChatUpdated event received:', updatedChat);
-      setServer(prev => {
+      const chatId = updatedChat.chatId ?? updatedChat.ChatId;
+      const hasPrivacyPayload =
+        (updatedChat.isPrivate !== undefined && updatedChat.isPrivate !== null) ||
+        (updatedChat.IsPrivate !== undefined && updatedChat.IsPrivate !== null);
+
+      if (hasPrivacyPayload) {
+        setTimeout(() => fetchServerData(), 0);
+      }
+
+      setServer((prev) => {
         if (!prev) return prev;
-        
-        const processedChat = {
-          ...updatedChat,
-          chatId: updatedChat.chatId || updatedChat.ChatId,
-          name: updatedChat.name || updatedChat.Name,
-          categoryId: updatedChat.categoryId || updatedChat.CategoryId,
-          chatOrder: updatedChat.chatOrder || updatedChat.ChatOrder,
-          typeId: updatedChat.typeId || updatedChat.TypeId,
-          isPrivate: updatedChat.isPrivate || updatedChat.IsPrivate,
-          allowedRoleIds: updatedChat.allowedRoleIds || updatedChat.AllowedRoleIds,
-          members: updatedChat.members || updatedChat.Members || []
-        };
-        
-        const updatedCategories = [...(prev.categories || [])].map(cat => ({
+
+        const oldChat = findChatInCategories(prev.categories ?? prev.Categories, chatId);
+        const processedChat = mergeChatFromEvent(oldChat || {}, updatedChat);
+
+        const prevCategories = prev.categories ?? prev.Categories ?? [];
+        const updatedCategories = [...prevCategories].map((cat) => ({
           ...cat,
-          chats: (cat.chats || cat.Chats || []).map(chat => 
-            (chat.chatId || chat.ChatId) === (processedChat.chatId || processedChat.ChatId) ? processedChat : chat
-          )
+          chats: (cat.chats || cat.Chats || []).map((chat) =>
+            String(chat.chatId ?? chat.ChatId) === String(processedChat.chatId)
+              ? mergeChatFromEvent(chat, processedChat)
+              : chat
+          ),
         }));
-        
+
         const updatedServer = { ...prev, categories: updatedCategories };
-        
+
         if (onServerDataUpdated) {
           onServerDataUpdated(updatedServer);
         }
-        
+
         return updatedServer;
+      });
+
+      setSelectedChannelForSettings((prev) => {
+        if (!prev) return prev;
+        if (String(prev.chatId ?? prev.ChatId) !== String(chatId)) return prev;
+        return mergeChatFromEvent(prev, updatedChat);
       });
     };
 
@@ -315,7 +384,7 @@ const ServerPanel = ({
           categoryId: newCategory.categoryId || newCategory.CategoryId,
           categoryName: newCategory.categoryName || newCategory.CategoryName,
           categoryOrder: newCategory.categoryOrder || newCategory.CategoryOrder,
-          isPrivate: newCategory.isPrivate || newCategory.IsPrivate,
+          isPrivate: readPrivateFlag(newCategory) ?? false,
           allowedRoleIds: newCategory.allowedRoleIds || newCategory.AllowedRoleIds,
           allowedUserIds: newCategory.allowedUserIds || newCategory.AllowedUserIds,
           chats: (newCategory.chats || newCategory.Chats || []).map(chat => ({
@@ -325,7 +394,7 @@ const ServerPanel = ({
             categoryId: chat.categoryId || chat.CategoryId,
             chatOrder: chat.chatOrder || chat.ChatOrder,
             typeId: chat.typeId || chat.TypeId,
-            isPrivate: chat.isPrivate || chat.IsPrivate,
+            isPrivate: readPrivateFlag(chat) ?? false,
             allowedRoleIds: chat.allowedRoleIds || chat.AllowedRoleIds,
             members: chat.members || chat.Members || []
           }))
@@ -364,21 +433,18 @@ const ServerPanel = ({
 
     const handleCategoryUpdated = (updatedCategory) => {
       console.log('ServerPanel: CategoryUpdated event received:', updatedCategory);
-      setServer(prev => {
+
+      setServer((prev) => {
         if (!prev) return prev;
 
-        const updatedCategories = (prev.categories || []).map(cat => {
-          const catId = cat.categoryId || cat.CategoryId;
-          const updatedId = updatedCategory.categoryId || updatedCategory.CategoryId;
-          if (catId !== updatedId) {
+        const updatedCategories = (prev.categories || []).map((cat) => {
+          const catId = cat.categoryId ?? cat.CategoryId;
+          const updatedId = updatedCategory.categoryId ?? updatedCategory.CategoryId;
+          if (String(catId) !== String(updatedId)) {
             return cat;
           }
 
-          return {
-            ...cat,
-            categoryName: updatedCategory.categoryName || updatedCategory.CategoryName,
-            CategoryName: updatedCategory.categoryName || updatedCategory.CategoryName
-          };
+          return mergeCategoryFromEvent(cat, updatedCategory);
         });
 
         const updatedServer = { ...prev, categories: updatedCategories };
@@ -389,6 +455,8 @@ const ServerPanel = ({
 
         return updatedServer;
       });
+
+      fetchServerData();
     };
 
     console.log('ServerPanel: Registering SignalR handlers, serverConnection:', serverConnection);
@@ -662,12 +730,13 @@ const ServerPanel = ({
 
 
   const memoizedCategories = useMemo(() => {
-    return server?.categories || currentServer?.categories || [];
-  }, [server?.categories, currentServer?.categories]);
+    return server?.categories ?? server?.Categories ?? currentServer?.categories ?? currentServer?.Categories ?? [];
+  }, [server?.categories, server?.Categories, currentServer?.categories, currentServer?.Categories]);
 
   const handleChatClick = useCallback((chatId, groupName, chatType) => {
     if (onChatSelected) {
       const chat = {
+        chatId: chatId,
         chat_id: chatId,
         groupName: groupName,
         username: groupName, 
@@ -741,34 +810,48 @@ const ServerPanel = ({
   }, []);
 
   const handleChannelSettings = useCallback((channel) => {
-    setSelectedChannelForSettings(channel);
+    const channelId = channel.chatId ?? channel.ChatId;
+    const categories = server?.categories ?? server?.Categories ?? [];
+    const freshChannel = findChatInCategories(categories, channelId) || channel;
+    setSelectedChannelForSettings(freshChannel);
     setShowChannelSettingsModal(true);
-  }, []);
+  }, [server?.categories, server?.Categories]);
 
   const handleCloseChannelSettingsModal = useCallback(() => {
     setShowChannelSettingsModal(false);
     setSelectedChannelForSettings(null);
   }, []);
 
-  const handleUpdateChannel = useCallback(async (channelId, newName) => {
+  const handleUpdateChannel = useCallback(async (channelId, updates) => {
     if (!serverConnection) {
       throw new Error('SignalR connection not available');
     }
 
     try {
       const serverId = selectedServer?.serverId || currentServer?.serverId;
-      
-      await serverConnection.invoke("UpdateChatName", 
-        serverId,
-        channelId,
-        newName
-      );
+
+      if (updates?.name) {
+        await serverConnection.invoke('UpdateChatName', serverId, channelId, updates.name);
+      }
+
+      if (updates?.isPrivate !== undefined || updates?.allowedRoleIds !== undefined) {
+        const roleIds = (updates.allowedRoleIds || []).map((id) => String(id));
+        await serverConnection.invoke(
+          'UpdateChatPrivacy',
+          serverId,
+          channelId,
+          updates.isPrivate ?? false,
+          (updates.memberIds || []).map((id) => String(id)),
+          roleIds
+        );
+      }
+
       console.log('Канал обновлен успешно');
     } catch (error) {
       console.error('Ошибка обновления канала:', error);
       throw error;
     }
-  }, [server?.serverId, serverConnection]);
+  }, [selectedServer?.serverId, currentServer?.serverId, serverConnection]);
 
   const handleDeleteChannel = useCallback(async (channelId) => {
     if (!serverConnection) {
@@ -842,9 +925,14 @@ const ServerPanel = ({
   }, []);
 
   const handleEditCategory = useCallback((category) => {
-    setSelectedCategoryForEdit(category);
+    const categoryId = category.categoryId ?? category.CategoryId;
+    const categories = server?.categories ?? server?.Categories ?? [];
+    const freshCategory =
+      categories.find((item) => String(item.categoryId ?? item.CategoryId) === String(categoryId)) ||
+      category;
+    setSelectedCategoryForEdit(freshCategory);
     setShowEditCategoryModal(true);
-  }, []);
+  }, [server?.categories, server?.Categories]);
 
   const handleUpdateCategorySubmit = useCallback(async (categoryData) => {
     if (!serverConnection || serverConnection.state !== 'Connected') {
@@ -857,7 +945,18 @@ const ServerPanel = ({
     }
 
     const serverId = selectedServer?.serverId || currentServer?.serverId;
-    await serverConnection.invoke("UpdateCategory", serverId, categoryId, categoryData.categoryName);
+    const roleIds = (categoryData.allowedRoleIds || []).map((id) => String(id));
+    const userIds = (categoryData.allowedUserIds || []).map((id) => String(id));
+
+    await serverConnection.invoke(
+      'UpdateCategory',
+      serverId,
+      categoryId,
+      categoryData.categoryName,
+      categoryData.isPrivate ?? false,
+      roleIds,
+      userIds
+    );
     setShowEditCategoryModal(false);
     setSelectedCategoryForEdit(null);
   }, [serverConnection, selectedCategoryForEdit, selectedServer?.serverId, currentServer?.serverId]);
@@ -887,32 +986,34 @@ const ServerPanel = ({
     }
   }, [serverConnection, server?.serverId]);
 
-  const handleCategoriesReordered = useCallback((updatedCategories) => {
-    console.log('CategoriesReordered callback received:', updatedCategories);
-    setServer(prev => {
-      if (!prev) return prev;
-      return { ...prev, Categories: updatedCategories };
-    });
-  }, []);
+  const handleCategoriesReordered = useCallback(() => {
+    fetchServerData();
+  }, [fetchServerData]);
 
-  const handleChatsReordered = useCallback((updatedCategories) => {
-    console.log('ChatsReordered callback received:', updatedCategories);
-    setServer(prev => {
-      if (!prev) return prev;
-      return { ...prev, Categories: updatedCategories };
-    });
-  }, []);
+  const handleChatsReordered = useCallback(() => {
+    fetchServerData();
+  }, [fetchServerData]);
 
 
   const handleCreateCategorySubmit = useCallback(async (categoryData) => {
     try {
       if (serverConnection && serverConnection.state === 'Connected') {
         const serverId = selectedServer?.serverId || currentServer?.serverId;
-        
-        await serverConnection.invoke("CreateCategory", 
-          serverId,
-          categoryData.categoryName
-        );
+        const roleIds = (categoryData.allowedRoleIds || []).map((id) => String(id));
+        const userIds = (categoryData.allowedUserIds || []).map((id) => String(id));
+
+        if (categoryData.isPrivate) {
+          await serverConnection.invoke(
+            'CreatePrivateCategory',
+            serverId,
+            categoryData.categoryName,
+            roleIds,
+            userIds
+          );
+        } else {
+          await serverConnection.invoke('CreateCategory', serverId, categoryData.categoryName);
+        }
+
         console.log('Категория создана успешно через SignalR');
         setShowCreateCategoryModal(false);
       } else {
@@ -924,7 +1025,7 @@ const ServerPanel = ({
       console.error('Ошибка создания категории:', error);
       throw error;
     }
-  }, [serverConnection, createCategory, server?.serverId]);
+  }, [serverConnection, createCategory, server?.serverId, selectedServer?.serverId, currentServer?.serverId]);
 
   const handleAddMember = useCallback(() => {
     setShowAddMemberModal(true);
@@ -1204,17 +1305,19 @@ const ServerPanel = ({
         onClose={handleCloseChannelSettingsModal}
         channel={selectedChannelForSettings}
         serverId={currentServer?.serverId ?? selectedServer?.serverId}
+        serverConnection={serverConnection}
         onUpdateChannel={handleUpdateChannel}
         onDeleteChannel={handleDeleteChannel}
         onAddMemberToChannel={handleAddMemberToChannel}
         onRemoveMemberFromChannel={handleRemoveMemberFromChannel}
-        currentUserId={user?.id}
       />
 
       <CreateCategoryModal
         isOpen={showCreateCategoryModal}
         onClose={() => setShowCreateCategoryModal(false)}
         onSubmit={handleCreateCategorySubmit}
+        serverId={currentServer?.serverId ?? selectedServer?.serverId}
+        serverConnection={serverConnection}
       />
 
       <CreateCategoryModal
@@ -1225,9 +1328,14 @@ const ServerPanel = ({
         }}
         onSubmit={handleUpdateCategorySubmit}
         initialName={selectedCategoryForEdit?.categoryName || selectedCategoryForEdit?.CategoryName || ''}
+        initialIsPrivate={readPrivateFlag(selectedCategoryForEdit) === true}
+        initialAllowedRoleIds={selectedCategoryForEdit?.allowedRoleIds || selectedCategoryForEdit?.AllowedRoleIds || EMPTY_GUID_LIST}
+        initialAllowedUserIds={selectedCategoryForEdit?.allowedUserIds || selectedCategoryForEdit?.AllowedUserIds || EMPTY_GUID_LIST}
         title="Настройки категории"
         submitButtonText="Сохранить"
         submitLoadingText="Сохранение..."
+        serverId={currentServer?.serverId ?? selectedServer?.serverId}
+        serverConnection={serverConnection}
       />
 
       <ContextMenu

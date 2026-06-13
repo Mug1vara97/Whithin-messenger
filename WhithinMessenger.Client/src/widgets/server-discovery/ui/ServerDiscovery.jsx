@@ -1,200 +1,242 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ServerIcon } from '../../../shared/ui';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined';
+import PublicOutlinedIcon from '@mui/icons-material/PublicOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
-import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import './ServerDiscovery.css';
 
+const resolveMediaUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
+const ServerDiscoveryCard = ({
+  server,
+  isMember,
+  isJoining,
+  onJoin,
+}) => {
+  const [avatarError, setAvatarError] = useState(false);
+  const bannerUrl = resolveMediaUrl(server.banner);
+  const avatarUrl = resolveMediaUrl(server.avatar);
+  const bannerColor = server.bannerColor || '#5865f2';
+  const initials = server.name?.charAt(0)?.toUpperCase() || '?';
+
+  return (
+    <article className="server-discovery__card">
+      <div
+        className="server-discovery__card-banner"
+        style={{
+          backgroundColor: bannerColor,
+          backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
+        }}
+      >
+        <div className="server-discovery__card-banner-shade" />
+        <div
+          className="server-discovery__card-icon"
+          style={{ backgroundColor: avatarUrl && !avatarError ? 'transparent' : bannerColor }}
+        >
+          {avatarUrl && !avatarError ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="server-discovery__card-body">
+        <div className="server-discovery__card-head">
+          <h3 className="server-discovery__card-title">{server.name}</h3>
+          {server.isPublic && (
+            <span className="server-discovery__badge">
+              <PublicOutlinedIcon sx={{ fontSize: 14 }} />
+              Публичный
+            </span>
+          )}
+        </div>
+
+        {server.description ? (
+          <p className="server-discovery__card-desc">{server.description}</p>
+        ) : (
+          <p className="server-discovery__card-desc server-discovery__card-desc--empty">
+            Описание не указано
+          </p>
+        )}
+
+        <div className="server-discovery__card-meta">
+          <GroupsOutlinedIcon sx={{ fontSize: 16 }} />
+          <span>{server.memberCount || 0} участников</span>
+        </div>
+      </div>
+
+      <div className="server-discovery__card-actions">
+        {isMember ? (
+          <button type="button" className="server-discovery__btn server-discovery__btn--joined" disabled>
+            <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
+            Вы участник
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="server-discovery__btn server-discovery__btn--join"
+            disabled={isJoining}
+            onClick={() => onJoin(server)}
+          >
+            {isJoining ? 'Присоединение…' : 'Присоединиться'}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+};
+
 const ServerDiscovery = ({ onServerSelected, onClose }) => {
-  const { user } = useAuthContext();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredServers, setFilteredServers] = useState([]);
   const [joiningServer, setJoiningServer] = useState(null);
-  
+
   const {
     publicServers,
     isLoading,
     error,
     joinPublicServer,
     isUserMember,
-    fetchPublicServers
+    fetchPublicServers,
   } = useServerContext();
-  
-  useEffect(() => {
-    console.log('ServerDiscovery: user =', user);
-    console.log('ServerDiscovery: user.id =', user?.id);
-    fetchPublicServers();
-  }, [fetchPublicServers, user]);
 
   useEffect(() => {
-    if (!publicServers) return;
-    
-    const filtered = publicServers.filter(server => {
-      const matchesSearch = searchQuery === '' || 
-        server.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (server.description && server.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesSearch;
+    fetchPublicServers();
+  }, [fetchPublicServers]);
+
+  const filteredServers = useMemo(() => {
+    if (!publicServers?.length) return [];
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return publicServers;
+
+    return publicServers.filter((server) => {
+      const nameMatch = server.name?.toLowerCase().includes(query);
+      const descMatch = server.description?.toLowerCase().includes(query);
+      return nameMatch || descMatch;
     });
-    
-    setFilteredServers(filtered);
   }, [publicServers, searchQuery]);
 
-  useEffect(() => {
-    if (publicServers.length === 0) {
-      
-    }
-  }, [publicServers]);
-
-  const handleJoinServer = useCallback(async (server) => {
-    try {
-      setJoiningServer(server.serverId);
-      await joinPublicServer(server.serverId);
-      console.log('ServerDiscovery: Successfully joined server:', server.serverId);
-      
-      if (onServerSelected) {
-        onServerSelected(server);
+  const handleJoinServer = useCallback(
+    async (server) => {
+      try {
+        setJoiningServer(server.serverId);
+        await joinPublicServer(server.serverId);
+        onServerSelected?.(server);
+        onClose?.();
+      } catch (joinError) {
+        console.error('Error joining server:', joinError);
+        alert(`Ошибка при присоединении к серверу: ${joinError.message}`);
+      } finally {
+        setJoiningServer(null);
       }
-      
-      if (onClose) {
-        onClose();
-      }
-      
-    } catch (error) {
-      console.error('Error joining server:', error);
-      alert('Ошибка при присоединении к серверу: ' + error.message);
-    } finally {
-      setJoiningServer(null);
+    },
+    [joinPublicServer, onServerSelected, onClose]
+  );
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="server-discovery__state">
+          <div className="server-discovery__loader" aria-hidden="true" />
+          <p>Загружаем публичные серверы…</p>
+        </div>
+      );
     }
-  }, [joinPublicServer, onServerSelected, onClose]);
 
-  const handleSearchChange = useCallback((e) => {
-    setSearchQuery(e.target.value);
-  }, []);
+    if (error) {
+      return (
+        <div className="server-discovery__state server-discovery__state--error">
+          <p>Не удалось загрузить серверы</p>
+          <span>{error}</span>
+          <button type="button" className="server-discovery__btn server-discovery__btn--ghost" onClick={fetchPublicServers}>
+            Повторить
+          </button>
+        </div>
+      );
+    }
 
-  if (isLoading) {
+    if (filteredServers.length === 0) {
+      return (
+        <div className="server-discovery__state">
+          <ExploreOutlinedIcon sx={{ fontSize: 48, opacity: 0.35 }} />
+          <h3>Серверы не найдены</h3>
+          <p>
+            {searchQuery.trim()
+              ? 'Попробуйте другой запрос или очистите поиск.'
+              : 'Публичных серверов пока нет.'}
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="server-discovery">
-        <div className="server-discovery-loading">Загрузка серверов...</div>
+      <div className="server-discovery__grid">
+        {filteredServers.map((server) => (
+          <ServerDiscoveryCard
+            key={server.serverId}
+            server={server}
+            isMember={isUserMember(server.serverId)}
+            isJoining={joiningServer === server.serverId}
+            onJoin={handleJoinServer}
+          />
+        ))}
       </div>
     );
-  }
-
-  if (error) {
-    return (
-      <div className="server-discovery">
-        <div className="server-discovery-error">Ошибка: {error}</div>
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="server-discovery">
-      <div className="server-discovery-header">
-        <h1>Обнаружить серверы</h1>
-        <p>От одного сообщества к другому, есть место для каждого.</p>
-        
-        <div className="search-container">
-          <input 
-            type="text" 
-            placeholder="Поиск серверов..." 
-            className="search-input"
-            value={searchQuery}
-            onChange={handleSearchChange}
-          />
-        </div>
-      </div>
-
-      <div className="servers-grid">
-        {filteredServers.length > 0 ? (
-          filteredServers.map((server) => (
-            <div key={server.serverId} className="server-card">
-              <div 
-                className="server-discovery-banner"
-                style={{
-                  backgroundImage: server.banner ? `url(${BASE_URL}${server.banner})` : 'none',
-                  backgroundColor: server.bannerColor || '#3f3f3f'
-                }}
-                onError={(e) => {
-                  // Если баннер не загрузился, убираем backgroundImage
-                  e.target.style.backgroundImage = 'none';
-                }}
-              >
-                {!server.banner && (
-                  <div className="server-name-placeholder">
-                    {server.avatar ? (
-                      <img 
-                        src={`${BASE_URL}${server.avatar}`}
-                        alt={server.name}
-                        className="server-avatar"
-                        onError={(e) => {
-                          // Если аватар не загрузился, показываем инициалы
-                          e.target.style.display = 'none';
-                          const parent = e.target.parentElement;
-                          if (parent && !parent.querySelector('.server-initials')) {
-                            const initials = document.createElement('div');
-                            initials.className = 'server-initials';
-                            initials.textContent = server.name?.charAt(0)?.toUpperCase() || '?';
-                            parent.appendChild(initials);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="server-initials">
-                        {server.name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <div className="server-info">
-                <h3 className="server-name">{server.name}</h3>
-                {server.description && (
-                  <p className="server-description">{server.description}</p>
-                )}
-                <div className="server-stats">
-                  <span className="member-count">
-                    {server.memberCount || 0} участников
-                  </span>
-                  {server.isPublic && (
-                    <span className="server-type">Публичный</span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="server-actions">
-                {isUserMember(server.serverId) ? (
-                  <button 
-                    className="joined-button"
-                    disabled
-                  >
-                    Присоединен
-                  </button>
-                ) : joiningServer === server.serverId ? (
-                  <button 
-                    className="join-button"
-                    disabled
-                  >
-                    Присоединяемся...
-                  </button>
-                ) : (
-                  <button 
-                    className="join-button"
-                    onClick={() => handleJoinServer(server)}
-                  >
-                    Присоединиться
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-servers">
-            <h3>Серверы не найдены</h3>
-            <p>Попробуйте изменить поисковый запрос</p>
+      <header className="server-discovery__header">
+        <div className="server-discovery__header-main">
+          <div className="server-discovery__header-icon">
+            <ExploreOutlinedIcon />
           </div>
+          <div>
+            <h1 className="server-discovery__title">Обнаружение серверов</h1>
+            <p className="server-discovery__subtitle">
+              Найдите сообщества Whithin и присоединяйтесь к публичным серверам.
+            </p>
+          </div>
+        </div>
+
+        {onClose && (
+          <button type="button" className="server-discovery__close" onClick={onClose} aria-label="Закрыть">
+            <CloseIcon fontSize="small" />
+          </button>
+        )}
+      </header>
+
+      <div className="server-discovery__toolbar">
+        <label className="server-discovery__search">
+          <SearchIcon className="server-discovery__search-icon" sx={{ fontSize: 20 }} />
+          <input
+            type="search"
+            placeholder="Поиск по названию или описанию…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </label>
+        {!isLoading && !error && (
+          <span className="server-discovery__count">
+            {filteredServers.length}{' '}
+            {filteredServers.length === 1 ? 'сервер' : filteredServers.length < 5 ? 'сервера' : 'серверов'}
+          </span>
         )}
       </div>
+
+      <div className="server-discovery__content">{renderContent()}</div>
     </div>
   );
 };

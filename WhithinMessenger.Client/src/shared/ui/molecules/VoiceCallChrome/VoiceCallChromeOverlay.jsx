@@ -16,7 +16,7 @@ export function VoiceCallChromeOverlay({
   controlProps
 }) {
   return (
-    <div className={`video-controls${showHeader ? '' : ' video-controls--no-header'}`}>
+    <div className={`voice-call-chrome video-controls${showHeader ? '' : ' video-controls--no-header'}`}>
       {showHeader && <div className="gradient-top" />}
       <div className="gradient-bottom" />
 

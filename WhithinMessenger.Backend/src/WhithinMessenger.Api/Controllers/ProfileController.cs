@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Domain.Utils;
+using WhithinMessenger.Infrastructure.Database;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -10,12 +13,19 @@ namespace WhithinMessenger.Api.Controllers;
 [Route("api/profile")]
 public class ProfileController : ControllerBase
 {
+    private const int MaxDescriptionLength = 190;
+
     private readonly IUserProfileRepository _userProfileRepository;
+    private readonly WithinDbContext _context;
     private readonly IWebHostEnvironment _environment;
 
-    public ProfileController(IUserProfileRepository userProfileRepository, IWebHostEnvironment environment)
+    public ProfileController(
+        IUserProfileRepository userProfileRepository,
+        WithinDbContext context,
+        IWebHostEnvironment environment)
     {
         _userProfileRepository = userProfileRepository;
+        _context = context;
         _environment = environment;
     }
 
@@ -41,14 +51,19 @@ public class ProfileController : ControllerBase
                 await _userProfileRepository.CreateAsync(userProfile);
             }
 
+            var user = await _context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
             return Ok(new
             {
                 userId = userProfile.UserId,
+                username = user?.UserName,
                 avatar = userProfile.Avatar,
                 avatarColor = userProfile.AvatarColor,
                 description = userProfile.Description,
                 banner = userProfile.Banner,
-                createdAt = DateTimeOffset.UtcNow
+                status = user?.Status.ToString().ToLowerInvariant(),
+                createdAt = user?.CreatedAt ?? DateTimeOffset.UtcNow
             });
         }
         catch (Exception ex)
@@ -58,6 +73,7 @@ public class ProfileController : ControllerBase
     }
 
     [HttpPost("update-avatar")]
+    [RequireAuth]
     public async Task<IActionResult> UpdateAvatar([FromBody] UpdateAvatarRequest request)
     {
         try
@@ -81,6 +97,7 @@ public class ProfileController : ControllerBase
     }
 
     [HttpPost("update-banner")]
+    [RequireAuth]
     public async Task<IActionResult> UpdateBanner([FromBody] UpdateBannerRequest request)
     {
         try
@@ -103,7 +120,131 @@ public class ProfileController : ControllerBase
         }
     }
 
+    [HttpPost("update-description")]
+    [RequireAuth]
+    public async Task<IActionResult> UpdateDescription([FromBody] UpdateDescriptionRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var description = request.Description?.Trim();
+            if (description != null && description.Length > MaxDescriptionLength)
+            {
+                return BadRequest(new { error = $"Описание не может быть длиннее {MaxDescriptionLength} символов" });
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { description = userProfile.Description });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при обновлении описания: " + ex.Message });
+        }
+    }
+
+    [HttpPost("update-avatar-color")]
+    [RequireAuth]
+    public async Task<IActionResult> UpdateAvatarColor([FromBody] UpdateAvatarColorRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.AvatarColor))
+            {
+                return BadRequest(new { error = "Цвет не указан" });
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.AvatarColor = request.AvatarColor.Trim();
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { avatarColor = userProfile.AvatarColor });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при обновлении цвета: " + ex.Message });
+        }
+    }
+
+    [HttpPost("remove-avatar")]
+    [RequireAuth]
+    public async Task<IActionResult> RemoveAvatar([FromBody] ProfileUserRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.Avatar = null;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { avatar = userProfile.Avatar });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при удалении аватара: " + ex.Message });
+        }
+    }
+
+    [HttpPost("remove-banner")]
+    [RequireAuth]
+    public async Task<IActionResult> RemoveBanner([FromBody] ProfileUserRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.Banner = null;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { banner = userProfile.Banner });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при удалении баннера: " + ex.Message });
+        }
+    }
+
     [HttpPost("upload/avatar")]
+    [RequireAuth]
     public async Task<IActionResult> UploadAvatar(IFormFile file)
     {
         try
@@ -148,6 +289,7 @@ public class ProfileController : ControllerBase
     }
 
     [HttpPost("upload/banner")]
+    [RequireAuth]
     public async Task<IActionResult> UploadBanner(IFormFile file)
     {
         try
@@ -190,6 +332,25 @@ public class ProfileController : ControllerBase
             return StatusCode(500, new { error = "Ошибка при загрузке файла: " + ex.Message });
         }
     }
+
+    private bool EnsureOwnProfile(Guid targetUserId, out IActionResult? forbidResult)
+    {
+        var userId = HttpContext.Items["UserId"] as Guid?;
+        if (!userId.HasValue)
+        {
+            forbidResult = Unauthorized(new { error = "Требуется авторизация" });
+            return false;
+        }
+
+        if (userId.Value != targetUserId)
+        {
+            forbidResult = Forbid();
+            return false;
+        }
+
+        forbidResult = null;
+        return true;
+    }
 }
 
 public class UpdateAvatarRequest
@@ -202,4 +363,21 @@ public class UpdateBannerRequest
 {
     public Guid UserId { get; set; }
     public string Banner { get; set; } = string.Empty;
+}
+
+public class UpdateDescriptionRequest
+{
+    public Guid UserId { get; set; }
+    public string? Description { get; set; }
+}
+
+public class UpdateAvatarColorRequest
+{
+    public Guid UserId { get; set; }
+    public string AvatarColor { get; set; } = string.Empty;
+}
+
+public class ProfileUserRequest
+{
+    public Guid UserId { get; set; }
 }

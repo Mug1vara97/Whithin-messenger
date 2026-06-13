@@ -138,6 +138,48 @@ export const useChat = (chatId, username, userId) => {
 
   const acknowledgedDeliveriesRef = useRef(new Set());
   const pendingOptimisticIdRef = useRef(null);
+  const pendingConfirmedMessageRef = useRef(null);
+
+  const replaceOwnOptimisticMessage = useCallback((prev, confirmedMessage) => {
+    const pendingId = pendingOptimisticIdRef.current;
+
+    if (pendingId) {
+      const pendingIndex = prev.findIndex((msg) => String(msg.messageId) === String(pendingId));
+      if (pendingIndex >= 0) {
+        pendingOptimisticIdRef.current = null;
+        pendingConfirmedMessageRef.current = null;
+        return prev.map((msg) => (
+          String(msg.messageId) === String(pendingId)
+            ? {
+                ...confirmedMessage,
+                status: pickHigherMessageStatus(MessageStatus.SENT, confirmedMessage.status),
+              }
+            : msg
+        ));
+      }
+    }
+
+    const optimisticIndex = prev.findIndex((msg) => (
+      String(msg.messageId).startsWith('temp-')
+      && msg.status === MessageStatus.SENDING
+      && isOwnMessage(msg, userId, username)
+    ));
+
+    if (optimisticIndex >= 0) {
+      pendingOptimisticIdRef.current = null;
+      pendingConfirmedMessageRef.current = null;
+      return prev.map((msg, index) => (
+        index === optimisticIndex
+          ? {
+              ...confirmedMessage,
+              status: pickHigherMessageStatus(MessageStatus.SENT, confirmedMessage.status),
+            }
+          : msg
+      ));
+    }
+
+    return null;
+  }, [userId, username]);
 
   const normalizeSticker = useCallback((raw) => {
     if (!raw) return null;
@@ -280,6 +322,8 @@ export const useChat = (chatId, username, userId) => {
     clearTypingHeartbeat();
     lastTypingSentRef.current = false;
     acknowledgedDeliveriesRef.current.clear();
+    pendingOptimisticIdRef.current = null;
+    pendingConfirmedMessageRef.current = null;
     if (typingIdleTimerRef.current) {
       clearTimeout(typingIdleTimerRef.current);
       typingIdleTimerRef.current = null;
@@ -362,14 +406,16 @@ export const useChat = (chatId, username, userId) => {
               ));
             }
 
-            const pendingId = pendingOptimisticIdRef.current;
-            if (own && pendingId) {
-              pendingOptimisticIdRef.current = null;
-              return prev.map((msg) => (
-                String(msg.messageId) === pendingId
-                  ? { ...newMessage, status: pickHigherMessageStatus(MessageStatus.SENT, newMessage.status) }
-                  : msg
-              ));
+            if (own) {
+              const replaced = replaceOwnOptimisticMessage(prev, newMessage);
+              if (replaced) {
+                return replaced;
+              }
+
+              if (pendingOptimisticIdRef.current) {
+                pendingConfirmedMessageRef.current = newMessage;
+                return prev;
+              }
             }
 
             return [...prev, newMessage];
@@ -429,9 +475,13 @@ export const useChat = (chatId, username, userId) => {
           acknowledgeIncomingMessages(processedMessages);
         });
 
+        newConnection.off('MessageSent', receiveMessageHandler);
         newConnection.on('MessageSent', receiveMessageHandler);
+        newConnection.off('MessageEdited', messageEditedHandler);
         newConnection.on('MessageEdited', messageEditedHandler);
+        newConnection.off('MessageDeleted', messageDeletedHandler);
         newConnection.on('MessageDeleted', messageDeletedHandler);
+        newConnection.off('MessageStatusChanged', messageStatusChangedHandler);
         newConnection.on('MessageStatusChanged', messageStatusChangedHandler);
 
         newConnection.on('UserTyping', (eventChatId, typingUserId, typingUsername) => {
@@ -509,7 +559,7 @@ export const useChat = (chatId, username, userId) => {
 
       cleanup();
     };
-  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, normalizeMessage, removeTypingUser, updateMessageStatus]);
+  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, updateMessageStatus]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -607,7 +657,25 @@ export const useChat = (chatId, username, userId) => {
 
     if (optimisticMessage) {
       pendingOptimisticIdRef.current = tempId;
-      setMessages((prev) => [...prev, optimisticMessage]);
+      setMessages((prev) => {
+        const confirmed = pendingConfirmedMessageRef.current;
+        if (confirmed) {
+          pendingConfirmedMessageRef.current = null;
+          pendingOptimisticIdRef.current = null;
+          const withoutDuplicate = prev.filter(
+            (msg) => String(msg.messageId) !== String(confirmed.messageId),
+          );
+          return [
+            ...withoutDuplicate,
+            {
+              ...confirmed,
+              status: pickHigherMessageStatus(MessageStatus.SENT, confirmed.status),
+            },
+          ];
+        }
+
+        return [...prev, optimisticMessage];
+      });
     }
 
     try {
@@ -626,6 +694,8 @@ export const useChat = (chatId, username, userId) => {
       return true;
     } catch (error) {
       console.error('Error sending message:', error);
+      pendingOptimisticIdRef.current = null;
+      pendingConfirmedMessageRef.current = null;
       setMessages((prev) => prev.map((msg) => (
         String(msg.messageId) === tempId
           ? { ...msg, status: MessageStatus.FAILED }
@@ -664,14 +734,17 @@ export const useChat = (chatId, username, userId) => {
   }, [connection, username]);
 
   const forwardMessage = useCallback(async (messageId, targetChatId, comment = '') => {
-    if (!connection) return;
+    if (!connection) return false;
 
     try {
-      await connection.invoke('ForwardMessage', 
-        messageId, 
-        targetChatId, 
+      const payload = (comment ?? '').trim() || ' ';
+      await connection.invoke(
+        'SendMessage',
+        payload,
         username,
-        comment
+        String(targetChatId),
+        null,
+        messageId,
       );
       return true;
     } catch (error) {

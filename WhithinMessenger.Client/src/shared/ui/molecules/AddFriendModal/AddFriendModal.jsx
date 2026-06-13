@@ -1,20 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { Search, PersonAdd, Close } from '@mui/icons-material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, PersonAdd, Close, PersonSearch } from '@mui/icons-material';
 import { userApi } from '@/entities/user/api';
 import UserAvatar from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
-import { FormField } from '../../atoms/FormField';
-import { getUserStatusLabel } from '../../../lib/utils/userStatus';
+import { getUserStatusColor, getUserStatusLabel } from '../../../lib/utils/userStatus';
 import './AddFriendModal.css';
+
+const getFriendshipMeta = (user) => {
+  if (user.isFriend) {
+    return { label: 'Уже друзья', tone: 'success', canAdd: false };
+  }
+  if (user.friendshipStatus === 'Pending') {
+    return { label: 'Запрос отправлен', tone: 'pending', canAdd: false };
+  }
+  if (user.friendshipStatus === 'Blocked') {
+    return { label: 'Заблокирован', tone: 'danger', canAdd: false };
+  }
+  if (user.friendshipStatus === 'Declined') {
+    return { label: 'Запрос отклонён', tone: 'muted', canAdd: false };
+  }
+  return {
+    label: getUserStatusLabel(user.userStatus),
+    tone: 'status',
+    canAdd: true,
+  };
+};
 
 const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
 
-  const searchUsers = async (query) => {
-    if (!query || typeof query !== 'string' || !query.trim()) {
+  const searchUsers = useCallback(async (query) => {
+    if (!query?.trim()) {
       setSearchResults([]);
       return;
     }
@@ -25,112 +45,184 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
       const results = await userApi.searchUsers(query);
       setSearchResults(Array.isArray(results) ? results : []);
     } catch (err) {
-      setError('Ошибка при поиске пользователей');
+      setError('Не удалось выполнить поиск. Попробуйте ещё раз.');
       console.error('Error searching users:', err);
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setSearchResults([]);
+      setError(null);
+      setLoading(false);
+      setSendingId(null);
+      return undefined;
+    }
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
     const timeoutId = setTimeout(() => {
-      const query = String(searchQuery || '');
-      searchUsers(query);
+      searchUsers(String(searchQuery || ''));
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [searchQuery, isOpen, searchUsers]);
 
   const handleSendRequest = async (userId) => {
     try {
+      setSendingId(userId);
+      setError(null);
       await onSendRequest(userId);
       onClose();
     } catch (err) {
-      setError('Ошибка при отправке запроса');
+      setError('Не удалось отправить запрос в друзья');
       console.error('Error sending friend request:', err);
+    } finally {
+      setSendingId(null);
     }
   };
 
   if (!isOpen) return null;
 
+  const trimmedQuery = searchQuery.trim();
+  const showEmptyResults = !loading && trimmedQuery && searchResults.length === 0;
+  const showResults = !loading && searchResults.length > 0;
+
   return (
-    <div className="add-friend-modal-overlay" onClick={onClose}>
-      <div className="add-friend-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="add-friend-modal__header">
-          <h3>Добавить в друзья</h3>
-          <button className="add-friend-modal__close" onClick={onClose}>
-            <Close />
-          </button>
-        </div>
-        
-        <div className="add-friend-modal__content">
-          <FormField
-            label="Поиск пользователей"
+    <div className="add-friend-modal" role="dialog" aria-modal="true" aria-labelledby="add-friend-modal-title">
+      <button
+        type="button"
+        className="add-friend-modal__backdrop"
+        onClick={onClose}
+        aria-label="Закрыть"
+      />
+
+      <div className="add-friend-modal__dialog" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="add-friend-modal__close"
+          onClick={onClose}
+          aria-label="Закрыть"
+        >
+          <Close fontSize="small" />
+        </button>
+
+        <header className="add-friend-modal__header">
+          <div className="add-friend-modal__icon-wrap" aria-hidden="true">
+            <PersonAdd />
+          </div>
+          <h2 id="add-friend-modal-title" className="add-friend-modal__title">
+            Добавить в друзья
+          </h2>
+          <p className="add-friend-modal__subtitle">
+            Найдите пользователя по имени и отправьте запрос
+          </p>
+        </header>
+
+        <div className="add-friend-modal__search">
+          <Search className="add-friend-modal__search-icon" aria-hidden="true" />
+          <input
+            type="text"
+            className="add-friend-modal__search-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Введите имя пользователя..."
-            icon={<Search />}
+            autoFocus
+            autoComplete="off"
           />
-          
-          {error && (
-            <div className="add-friend-modal__error">{error}</div>
+        </div>
+
+        {error && (
+          <div className="add-friend-modal__error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <div className="add-friend-modal__body">
+          {loading && (
+            <div className="add-friend-modal__state">
+              <div className="add-friend-modal__spinner" aria-hidden="true" />
+              <span>Поиск...</span>
+            </div>
           )}
-          
-          <div className="add-friend-modal__results">
-            {loading && (
-              <div className="add-friend-modal__loading">Поиск...</div>
-            )}
-            
-            {!loading && searchResults.length === 0 && searchQuery && (
-              <div className="add-friend-modal__empty">Пользователи не найдены</div>
-            )}
-            
-            {!loading && searchResults.length > 0 && (
-              <div className="add-friend-modal__users">
-                {searchResults.map(user => {
-                  const isFriend = user.isFriend;
-                  const isPending = user.friendshipStatus === 'Pending';
-                  const isBlocked = user.friendshipStatus === 'Blocked';
-                  const isDeclined = user.friendshipStatus === 'Declined';
-                  
-                  return (
-                    <div key={user.userId} className="add-friend-modal__user">
+
+          {!loading && !trimmedQuery && (
+            <div className="add-friend-modal__state add-friend-modal__state--hint">
+              <PersonSearch className="add-friend-modal__state-icon" aria-hidden="true" />
+              <span>Начните вводить имя — результаты появятся здесь</span>
+            </div>
+          )}
+
+          {showEmptyResults && (
+            <div className="add-friend-modal__state">
+              <span>Пользователи не найдены</span>
+            </div>
+          )}
+
+          {showResults && (
+            <ul className="add-friend-modal__list">
+              {searchResults.map((user) => {
+                const meta = getFriendshipMeta(user);
+                const isSending = sendingId === user.userId;
+
+                return (
+                  <li key={user.userId} className="add-friend-modal__row">
+                    <div className="add-friend-modal__avatar-wrap">
                       <UserAvatar
                         username={user.username}
                         avatarUrl={user.avatarUrl}
                         avatarColor={user.avatarColor}
                         size="medium"
                       />
-                      <div className="add-friend-modal__user-info">
-                        <div className="add-friend-modal__user-name">{user.username}</div>
-                        <div className="add-friend-modal__user-status">
-                          {isFriend ? 'Уже друзья' : 
-                           isPending ? 'Запрос отправлен' :
-                           isBlocked ? 'Заблокирован' :
-                           isDeclined ? 'Запрос отклонен' :
-                           getUserStatusLabel(user.userStatus)}
-                        </div>
-                      </div>
-                      {!isFriend && !isPending && !isBlocked && (
-                        <Button
-                          variant="primary"
-                          size="small"
-                          onClick={() => handleSendRequest(user.userId)}
-                          icon={<PersonAdd />}
-                        >
-                          Добавить
-                        </Button>
-                      )}
-                      {isFriend && (
-                        <div className="add-friend-modal__friend-badge">Друг</div>
+                      {meta.tone === 'status' && (
+                        <span
+                          className="add-friend-modal__status-dot"
+                          style={{ backgroundColor: getUserStatusColor(user.userStatus) }}
+                          title={meta.label}
+                        />
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+
+                    <div className="add-friend-modal__user-info">
+                      <span className="add-friend-modal__user-name">{user.username}</span>
+                      <span className={`add-friend-modal__user-status add-friend-modal__user-status--${meta.tone}`}>
+                        {meta.label}
+                      </span>
+                    </div>
+
+                    {meta.canAdd ? (
+                      <Button
+                        variant="primary"
+                        size="small"
+                        className="add-friend-modal__add-btn"
+                        disabled={isSending}
+                        onClick={() => handleSendRequest(user.userId)}
+                      >
+                        <PersonAdd sx={{ fontSize: 16 }} />
+                        {isSending ? 'Отправка...' : 'Добавить'}
+                      </Button>
+                    ) : (
+                      <span className={`add-friend-modal__badge add-friend-modal__badge--${meta.tone}`}>
+                        {user.isFriend ? 'Друг' : meta.label}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </div>

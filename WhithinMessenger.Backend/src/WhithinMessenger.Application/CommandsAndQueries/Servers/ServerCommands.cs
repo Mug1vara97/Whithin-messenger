@@ -29,13 +29,26 @@ public class UpdateCategoryCommand : IRequest<UpdateCategoryResult>
     public Guid CategoryId { get; set; }
     public string CategoryName { get; set; }
     public Guid UserId { get; set; }
+    public bool IsPrivate { get; set; }
+    public List<Guid> AllowedRoleIds { get; set; } = new();
+    public List<Guid> AllowedUserIds { get; set; } = new();
 
-    public UpdateCategoryCommand(Guid serverId, Guid categoryId, string categoryName, Guid userId)
+    public UpdateCategoryCommand(
+        Guid serverId,
+        Guid categoryId,
+        string categoryName,
+        Guid userId,
+        bool isPrivate = false,
+        List<Guid>? allowedRoleIds = null,
+        List<Guid>? allowedUserIds = null)
     {
         ServerId = serverId;
         CategoryId = categoryId;
         CategoryName = categoryName;
         UserId = userId;
+        IsPrivate = isPrivate;
+        AllowedRoleIds = allowedRoleIds ?? new List<Guid>();
+        AllowedUserIds = allowedUserIds ?? new List<Guid>();
     }
 }
 
@@ -97,6 +110,39 @@ public class UpdateChatNameCommand : IRequest<UpdateChatNameResult>
 }
 
 public class UpdateChatNameResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public object? Chat { get; set; }
+}
+
+public class UpdateChatPrivacyCommand : IRequest<UpdateChatPrivacyResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid ChatId { get; set; }
+    public bool IsPrivate { get; set; }
+    public List<Guid>? MemberIds { get; set; }
+    public List<Guid>? AllowedRoleIds { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateChatPrivacyCommand(
+        Guid serverId,
+        Guid chatId,
+        bool isPrivate,
+        Guid userId,
+        List<Guid>? memberIds = null,
+        List<Guid>? allowedRoleIds = null)
+    {
+        ServerId = serverId;
+        ChatId = chatId;
+        IsPrivate = isPrivate;
+        UserId = userId;
+        MemberIds = memberIds ?? new List<Guid>();
+        AllowedRoleIds = allowedRoleIds ?? new List<Guid>();
+    }
+}
+
+public class UpdateChatPrivacyResult
 {
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
@@ -341,6 +387,46 @@ public class UpdateServerNameCommand : IRequest<UpdateServerNameResult>
 }
 
 public class UpdateServerNameResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+public class UpdateServerDescriptionCommand : IRequest<UpdateServerDescriptionResult>
+{
+    public Guid ServerId { get; set; }
+    public string? Description { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateServerDescriptionCommand(Guid serverId, string? description, Guid userId)
+    {
+        ServerId = serverId;
+        Description = description;
+        UserId = userId;
+    }
+}
+
+public class UpdateServerDescriptionResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+public class UpdateServerPrivacyCommand : IRequest<UpdateServerPrivacyResult>
+{
+    public Guid ServerId { get; set; }
+    public bool IsPublic { get; set; }
+    public Guid UserId { get; set; }
+
+    public UpdateServerPrivacyCommand(Guid serverId, bool isPublic, Guid userId)
+    {
+        ServerId = serverId;
+        IsPublic = isPublic;
+        UserId = userId;
+    }
+}
+
+public class UpdateServerPrivacyResult
 {
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }

@@ -14,11 +14,13 @@
 }
 
 .server-panel-header {
-  border-bottom: 1px solid var(--border);
   background: var(--surface);
   position: relative;
   overflow: visible;
-  min-height: 51px;
+  height: 52px;
+  min-height: 52px;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .server-panel-header.with-banner {
@@ -55,12 +57,22 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  padding: 12px;
+  padding: 9px;
   transition: background-color 0.2s ease;
   position: relative;
   z-index: 10;
-  height: 51px;
+  height: 52px;
+  min-height: 52px;
   width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.server-panel-header.with-banner .server-info {
+  border-bottom: none;
+  background: transparent;
 }
 
 .server-info:hover {

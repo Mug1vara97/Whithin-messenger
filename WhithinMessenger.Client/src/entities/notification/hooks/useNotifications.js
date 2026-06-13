@@ -3,13 +3,18 @@ import { notificationApi } from '../api';
 import { normalizeNotification } from '../lib/notificationDisplay';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuth } from '../../../shared/lib/hooks/useAuth';
+import { dispatchNotificationReceived } from '../../../shared/lib/utils/notificationRealtimeBridge';
+import {
+  dismissDesktopNotificationById,
+  dismissDesktopNotificationsByChatId,
+} from '../../../shared/lib/utils/desktopNotificationBridge';
 
 export const useNotifications = () => {
   const { user } = useAuth();
   const connectionContext = useConnectionContext();
-  const connectionRef = useRef(null);
   const notificationSoundRef = useRef(null);
   const lastSoundPlayedAtRef = useRef(0);
+  const soundNotificationsEnabledRef = useRef(true);
   const [soundNotificationsEnabled, setSoundNotificationsEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('soundNotificationsEnabled');
@@ -64,6 +69,10 @@ export const useNotifications = () => {
         setNotifications((prev) =>
           prev.filter((item) => (item.id || item.Id) !== notificationId)
         );
+        dismissDesktopNotificationById(notificationId);
+        window.dispatchEvent(
+          new CustomEvent('notificationRead', { detail: { notificationId } }),
+        );
         await refreshUnreadCount();
       } catch (err) {
         setError(err?.message || 'Не удалось отметить уведомление как прочитанное');
@@ -78,6 +87,10 @@ export const useNotifications = () => {
         await notificationApi.markChatAsRead(chatId);
         setNotifications((prev) =>
           prev.filter((item) => (item.chatId || item.ChatId) !== chatId)
+        );
+        dismissDesktopNotificationsByChatId(chatId);
+        window.dispatchEvent(
+          new CustomEvent('notificationRead', { detail: { chatId } }),
         );
         await refreshUnreadCount();
       } catch (err) {
@@ -137,11 +150,17 @@ export const useNotifications = () => {
   }, []);
 
   useEffect(() => {
+    soundNotificationsEnabledRef.current = soundNotificationsEnabled;
+  }, [soundNotificationsEnabled]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const syncSetting = () => {
       const saved = localStorage.getItem('soundNotificationsEnabled');
-      setSoundNotificationsEnabled(saved == null ? true : JSON.parse(saved));
+      const enabled = saved == null ? true : JSON.parse(saved);
+      soundNotificationsEnabledRef.current = enabled;
+      setSoundNotificationsEnabled(enabled);
     };
 
     const onStorage = (event) => {
@@ -160,29 +179,46 @@ export const useNotifications = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.id || !connectionContext?.getConnection) return;
+    if (!user?.id || !connectionContext?.getConnection) return undefined;
+
     let mounted = true;
+    let connection = null;
+
+    const onReceiveNotification = (payload) => {
+      const normalized = normalizeNotification(payload);
+      const notificationId = normalized.id;
+      if (!notificationId) return;
+
+      let isNewNotification = false;
+      setNotifications((prev) => {
+        if (prev.some((item) => (item.id || item.Id) === notificationId)) {
+          return prev;
+        }
+        isNewNotification = true;
+        return sortByDate([normalized, ...prev]);
+      });
+
+      if (!isNewNotification) return;
+
+      if (soundNotificationsEnabledRef.current && !(normalized.isRead ?? false)) {
+        playNotificationSound();
+      }
+
+      dispatchNotificationReceived(normalized);
+    };
+
+    const onUnreadCountChanged = (count) => {
+      setUnreadCount(typeof count === 'number' ? count : 0);
+    };
 
     const setupRealtime = async () => {
       try {
-        const connection = await connectionContext.getConnection('notificationhub', user.id);
-        if (!mounted) return;
-        connectionRef.current = connection;
+        connection = await connectionContext.getConnection('notificationhub', user.id);
+        if (!mounted || !connection) return;
 
-        const onReceiveNotification = (payload) => {
-          const normalized = normalizeNotification(payload);
-          setNotifications((prev) => sortByDate([normalized, ...prev]));
-          setUnreadCount((prev) => prev + 1);
-          if (soundNotificationsEnabled && !(normalized.isRead ?? false)) {
-            playNotificationSound();
-          }
-        };
-
-        const onUnreadCountChanged = (count) => {
-          setUnreadCount(typeof count === 'number' ? count : 0);
-        };
-
+        connection.off('ReceiveNotification', onReceiveNotification);
         connection.on('ReceiveNotification', onReceiveNotification);
+        connection.off('UnreadCountChanged', onUnreadCountChanged);
         connection.on('UnreadCountChanged', onUnreadCountChanged);
       } catch (err) {
         console.error('Failed to setup notification realtime', err);
@@ -193,12 +229,12 @@ export const useNotifications = () => {
 
     return () => {
       mounted = false;
-      if (connectionRef.current) {
-        connectionRef.current.off('ReceiveNotification');
-        connectionRef.current.off('UnreadCountChanged');
+      if (connection) {
+        connection.off('ReceiveNotification', onReceiveNotification);
+        connection.off('UnreadCountChanged', onUnreadCountChanged);
       }
     };
-  }, [user?.id, connectionContext, sortByDate, playNotificationSound, soundNotificationsEnabled]);
+  }, [user?.id, connectionContext, sortByDate, playNotificationSound]);
 
   const hasUnread = useMemo(() => unreadCount > 0, [unreadCount]);
   const unreadCountByChat = useMemo(() => {

@@ -13,6 +13,14 @@
     display: flex;
     flex-direction: column;
     position: relative;
+    color: var(--text);
+    --vc-tile-bg: var(--surface, #1e1f22);
+    --vc-tile-hover: var(--surface-hover, #2e3035);
+    --vc-panel-text: var(--text, #f2f3f5);
+    --vc-panel-text-muted: var(--text-muted, #b5bac1);
+    --vc-panel-text-secondary: var(--text-secondary, #dbdee1);
+    --vc-control-bg: var(--surface-hover, #4e5058);
+    --vc-control-hover: var(--hover, #5c5e66);
   }
   
   .root-idle {
@@ -63,14 +71,14 @@
   }
   
   .scroller::-webkit-scrollbar-thumb {
-    background: #1e1f22;
+    background: var(--vc-tile-bg);
     border: 4px solid transparent;
     background-clip: padding-box;
     border-radius: 8px;
   }
   
   .scroller::-webkit-scrollbar-thumb:hover {
-    background: #2e3035;
+    background: var(--vc-tile-hover);
     border: 4px solid transparent;
     background-clip: padding-box;
   }
@@ -97,13 +105,13 @@
   }
   
   .error-banner {
-    background: #f23f42;
-    color: #ffffff;
+    background: var(--danger, #f23f42);
+    color: var(--text-on-primary, #ffffff);
   }
   
   .audio-blocked-banner {
-    background: #faa61a;
-    color: #060607;
+    background: var(--warning, #faa61a);
+    color: var(--text, #060607);
   }
   
   .audio-blocked-text {
@@ -123,8 +131,8 @@
     align-self: flex-start;
     padding: 2px 16px;
     height: 32px;
-    background: #060607;
-    color: #faa61a;
+    background: var(--text, #060607);
+    color: var(--warning, #faa61a);
     border: none;
     border-radius: 3px;
     font-size: 14px;
@@ -134,7 +142,7 @@
   }
   
   .enable-audio-btn:hover {
-    background: #000000;
+    background: var(--background, #000000);
   }
   
   @keyframes slideIn {
@@ -177,7 +185,7 @@
     bottom: 0;
     border-radius: 8px;
     overflow: hidden;
-    background: #1e1f22;
+    background: var(--vc-tile-bg);
     transition: all 0.15s ease;
   }
   
@@ -226,7 +234,7 @@
   }
   
   .tile-background {
-    background-color: rgb(36, 36, 36);
+    background-color: var(--background-secondary, rgb(36, 36, 36));
     width: 100%;
     height: 100%;
     display: flex;
@@ -288,7 +296,7 @@
   .overlay-title {
     font-size: 14px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-on-primary, #ffffff);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   
@@ -316,7 +324,7 @@
     height: 32px;
     border: none;
     background: rgba(0, 0, 0, 0.6);
-    color: #ffffff;
+    color: var(--text-on-primary, #ffffff);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -381,8 +389,8 @@
     gap: 8px;
     padding: 8px 16px;
     height: 38px;
-    background: #4e5058;
-    color: #ffffff;
+    background: var(--vc-control-bg);
+    color: var(--text-on-primary, #ffffff);
     border: none;
     border-radius: 3px;
     font-size: 14px;
@@ -392,7 +400,7 @@
   }
   
   .empty-button:hover {
-    background: #5c5e66;
+    background: var(--vc-control-hover);
   }
   
   .empty-button svg {
@@ -468,12 +476,12 @@
     gap: 8px;
     font-size: 16px;
     font-weight: 600;
-    color: #f2f3f5;
+    color: var(--vc-panel-text);
   }
   
   .channel-title svg {
     flex-shrink: 0;
-    color: #b5bac1;
+    color: var(--vc-panel-text-muted);
   }
   
   .toolbar {
@@ -489,19 +497,19 @@
     height: 32px;
     border: none;
     background: transparent;
-    color: #b5bac1;
+    color: var(--vc-panel-text-muted);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
   }
   
   .toolbar-button:hover {
-    background: rgba(79, 84, 92, 0.32);
-    color: #dbdee1;
+    background: color-mix(in srgb, var(--hover, #4f545c) 32%, transparent);
+    color: var(--vc-panel-text-secondary);
   }
   
   .toolbar-button:active {
-    background: rgba(79, 84, 92, 0.48);
+    background: color-mix(in srgb, var(--hover, #4f545c) 48%, transparent);
   }
   
   /* Bottom Controls */
@@ -579,8 +587,8 @@
     justify-content: center;
     width: 32px;
     height: 56px;
-    background: #3c3f45;
-    color: #f2f3f5;
+    background: var(--surface-hover, #3c3f45);
+    color: var(--vc-panel-text);
     cursor: pointer;
     transition: background-color 0.17s ease;
     border-top-right-radius: 28px;
@@ -589,16 +597,16 @@
   }
 
   .context-menu-caret:hover {
-    background: #4e5058;
+    background: var(--vc-control-bg);
   }
 
   .context-menu-caret.muted {
-    background: #f23f42;
+    background: var(--danger, #f23f42);
     color: white;
   }
 
   .context-menu-caret.muted:hover {
-    background: #da373c;
+    background: var(--danger-hover, #da373c);
   }
   
   /* Center Button - Discord Style */
@@ -609,8 +617,8 @@
     width: 56px;
     height: 56px;
     border: none;
-    background: #3c3f45;
-    color: #f2f3f5;
+    background: var(--surface-hover, #3c3f45);
+    color: var(--vc-panel-text);
     border-radius: 50%;
     cursor: pointer;
     transition: background-color 0.17s ease, transform 0.17s ease, box-shadow 0.17s ease;
@@ -619,7 +627,7 @@
   }
   
   .center-button:hover {
-    background: #4e5058;
+    background: var(--vc-control-bg);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
   
@@ -629,12 +637,12 @@
   }
   
   .center-button.muted {
-    background: #f23f42;
+    background: var(--danger, #f23f42);
     color: white;
   }
   
   .center-button.muted:hover {
-    background: #da373c;
+    background: var(--danger-hover, #da373c);
   }
   
   .center-button svg {
@@ -647,14 +655,14 @@
   }
   
   .center-button.disconnect {
-    background: #f23f42;
+    background: var(--danger, #f23f42);
     color: white;
     width: 64px;
     height: 64px;
   }
   
   .center-button.disconnect:hover {
-    background: #da373c;
+    background: var(--danger-hover, #da373c);
     box-shadow: 0 4px 8px rgba(242, 63, 66, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
   
@@ -676,19 +684,19 @@
     height: 32px;
     border: none;
     background: transparent;
-    color: #b5bac1;
+    color: var(--vc-panel-text-muted);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
   }
   
   .right-tray-icon:hover {
-    background: rgba(79, 84, 92, 0.32);
-    color: #dbdee1;
+    background: color-mix(in srgb, var(--hover, #4f545c) 32%, transparent);
+    color: var(--vc-panel-text-secondary);
   }
   
   .right-tray-icon:active {
-    background: rgba(79, 84, 92, 0.48);
+    background: color-mix(in srgb, var(--hover, #4f545c) 48%, transparent);
   }
   
   .right-tray-icon svg {
@@ -788,8 +796,8 @@
     bottom: calc(100% + 12px);
     left: 50%;
     transform: translateX(-50%);
-    background: #111214;
-    color: #dbdee1;
+    background: var(--background, #111214);
+    color: var(--vc-panel-text-secondary);
     padding: 8px 12px;
     border-radius: 4px;
     font-size: 14px;
@@ -810,7 +818,7 @@
     transform: translateX(-50%) rotate(45deg);
     width: 8px;
     height: 8px;
-    background: #111214;
+    background: var(--background, #111214);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;

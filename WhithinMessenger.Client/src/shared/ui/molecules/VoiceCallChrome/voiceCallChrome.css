@@ -1,3 +1,21 @@
+.voice-call-chrome {
+  --vc-text: var(--text, #f2f3f5);
+  --vc-text-muted: var(--text-muted, #b5bac1);
+  --vc-surface: var(--surface, #111214);
+  --vc-surface-glass: color-mix(in srgb, var(--vc-surface) 88%, transparent);
+  --vc-border: color-mix(in srgb, var(--border, #40444b) 55%, transparent);
+  --vc-btn-bg: color-mix(in srgb, var(--surface-hover, #40444b) 65%, transparent);
+  --vc-btn-hover: color-mix(in srgb, var(--hover, #4f545c) 75%, transparent);
+  --vc-icon: var(--primary, #5865f2);
+  --vc-icon-hover: var(--primary-hover, #4752c4);
+  --vc-danger: var(--danger, #ed4245);
+  --vc-danger-hover: color-mix(in srgb, var(--vc-danger) 88%, #000);
+  --vc-accent: var(--primary, #5865f2);
+  --vc-accent-hover: var(--primary-hover, #4752c4);
+  --vc-on-accent: var(--text-on-primary, #ffffff);
+  --vc-bg: var(--background, #08090b);
+}
+
 .call-banner-stack {
   position: absolute;
   top: 56px;
@@ -193,8 +211,8 @@
   bottom: 0;
   background: linear-gradient(
     to top,
-    rgba(8, 9, 11, 0.88) 0%,
-    rgba(8, 9, 11, 0.42) 50%,
+    color-mix(in srgb, var(--vc-bg) 88%, transparent) 0%,
+    color-mix(in srgb, var(--vc-bg) 42%, transparent) 50%,
     transparent 100%
   );
 }
@@ -214,8 +232,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  padding: 0 16px;
+  height: auto;
+  min-height: 44px;
+  padding: 10px 16px;
   background: transparent;
 }
 
@@ -226,22 +245,25 @@
   min-width: 0;
 }
 
-.channel-title {
+.voice-call-title {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  height: auto;
   font-size: 16px;
   font-weight: 600;
-  color: #f2f3f5;
+  line-height: 1.25;
+  color: var(--vc-text);
+  background: transparent;
 }
 
-.channel-title svg {
+.voice-call-title svg {
   flex-shrink: 0;
-  color: #b5bac1;
+  color: var(--vc-text-muted);
 }
 
-.channel-title span {
+.voice-call-title span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -276,13 +298,13 @@
   overflow: visible;
   padding: 10px 12px;
   border-radius: 22px;
-  background: rgba(17, 18, 20, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--vc-surface-glass);
+  border: 1px solid var(--vc-border);
   backdrop-filter: blur(20px) saturate(1.25);
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   box-shadow:
     0 14px 40px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 color-mix(in srgb, var(--vc-text) 6%, transparent);
 }
 
 .button-section {
@@ -311,23 +333,23 @@
   gap: 0;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  background: var(--vc-btn-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vc-text) 4%, transparent);
 }
 
 .attached-caret-button-container:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--vc-btn-hover);
 }
 
 .attached-caret-button-container:has(.center-button.muted),
 .attached-caret-button-container:has(.context-menu-caret.muted) {
-  background: rgba(242, 63, 66, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(242, 63, 66, 0.28);
+  background: color-mix(in srgb, var(--vc-danger) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vc-danger) 28%, transparent);
 }
 
 .attached-caret-button-container:has(.center-button.active) {
-  background: rgba(88, 101, 242, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(88, 101, 242, 0.35);
+  background: var(--vc-btn-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vc-icon) 35%, transparent);
 }
 
 .attached-button {
@@ -343,19 +365,19 @@
   width: 28px;
   min-height: 48px;
   background: transparent;
-  color: #b5bac1;
+  color: var(--vc-icon);
   cursor: pointer;
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
     transform 0.25s cubic-bezier(0.34, 1.45, 0.64, 1);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--vc-border);
   transform-origin: center center;
 }
 
 .context-menu-caret:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f2f3f5;
+  background: var(--vc-btn-hover);
+  color: var(--vc-icon-hover);
   transform: scaleY(1.04);
 }
 
@@ -379,8 +401,8 @@
   width: 48px;
   height: 48px;
   border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e3e5e8;
+  background: var(--vc-btn-bg);
+  color: var(--vc-icon);
   border-radius: 14px;
   cursor: pointer;
   transition:
@@ -388,15 +410,15 @@
     transform 0.25s cubic-bezier(0.34, 1.45, 0.64, 1),
     color 0.2s ease,
     box-shadow 0.2s ease;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vc-text) 4%, transparent);
   position: relative;
   transform-origin: center center;
   will-change: transform;
 }
 
 .center-button:hover {
-  background: rgba(255, 255, 255, 0.11);
-  color: #fff;
+  background: var(--vc-btn-hover);
+  color: var(--vc-icon-hover);
   transform: translateY(-2px) scale(1.05);
 }
 
@@ -405,23 +427,23 @@
 }
 
 .center-button.muted {
-  background: #ed4245;
+  background: var(--vc-danger);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 8%, transparent);
 }
 
 .center-button.muted:hover {
-  background: #d83b3e;
+  background: var(--vc-danger-hover);
 }
 
 .center-button.server-moderated {
-  background: #f0b232;
-  color: #1e1f22;
+  background: var(--warning, #f0b232);
+  color: var(--text-on-primary, #1e1f22);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
 .center-button.server-moderated:hover {
-  background: #d9a02d;
+  background: color-mix(in srgb, var(--warning, #f0b232) 88%, #000);
 }
 
 .center-button.server-moderated:disabled {
@@ -430,23 +452,25 @@
 }
 
 .center-button.active {
-  background: #5865f2;
-  color: #fff;
+  background: var(--vc-btn-hover);
+  color: var(--vc-icon);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 0 18px rgba(88, 101, 242, 0.35);
+    inset 0 0 0 1px color-mix(in srgb, var(--vc-icon) 45%, transparent),
+    0 0 14px color-mix(in srgb, var(--vc-icon) 22%, transparent);
 }
 
 .center-button.active:hover {
-  background: #4752c4;
+  background: var(--vc-btn-hover);
+  color: var(--vc-icon-hover);
 }
 
 .center-button svg {
   flex-shrink: 0;
+  color: inherit;
 }
 
 .center-button.disconnect {
-  background: linear-gradient(180deg, #f04747 0%, #d83b3e 100%);
+  background: linear-gradient(180deg, var(--vc-danger) 0%, var(--vc-danger-hover) 100%);
   color: #fff;
   width: 52px;
   height: 52px;
@@ -457,7 +481,11 @@
 }
 
 .center-button.disconnect:hover {
-  background: linear-gradient(180deg, #f25555 0%, #e04447 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--vc-danger) 92%, #fff) 0%,
+    var(--vc-danger) 100%
+  );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 10px 26px rgba(237, 66, 69, 0.42);
@@ -479,11 +507,11 @@
   bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
-  background: rgba(17, 18, 20, 0.95);
-  color: #e3e5e8;
+  background: var(--vc-surface-glass);
+  color: var(--vc-text);
   padding: 7px 11px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--vc-border);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;

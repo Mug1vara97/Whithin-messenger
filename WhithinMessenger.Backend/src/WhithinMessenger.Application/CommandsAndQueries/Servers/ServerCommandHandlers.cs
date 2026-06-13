@@ -92,11 +92,16 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public DeleteCategoryCommandHandler(ICategoryRepository categoryRepository, ServerPermissionChecker permissionChecker)
+    public DeleteCategoryCommandHandler(
+        ICategoryRepository categoryRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _categoryRepository = categoryRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<DeleteCategoryResult> Handle(DeleteCategoryCommand request, CancellationToken cancellationToken)
@@ -122,6 +127,15 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
 
             await _categoryRepository.DeleteAsync(request.CategoryId, cancellationToken);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.CategoryDelete,
+                AuditLogTargetTypes.Category,
+                request.CategoryId,
+                new { targetName = category.CategoryName },
+                cancellationToken);
+
             return new DeleteCategoryResult { Success = true };
         }
         catch (Exception ex)
@@ -135,11 +149,16 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public UpdateCategoryCommandHandler(ICategoryRepository categoryRepository, ServerPermissionChecker permissionChecker)
+    public UpdateCategoryCommandHandler(
+        ICategoryRepository categoryRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _categoryRepository = categoryRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<UpdateCategoryResult> Handle(UpdateCategoryCommand request, CancellationToken cancellationToken)
@@ -175,8 +194,70 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
                 return new UpdateCategoryResult { Success = false, ErrorMessage = "Категория с таким названием уже существует" };
             }
 
+            var oldName = category.CategoryName;
+            var wasPrivate = category.IsPrivate;
+            var oldAllowedRoleIds = category.AllowedRoleIds;
+            var oldAllowedUserIds = category.AllowedUserIds;
+
             category.CategoryName = categoryName;
+            category.IsPrivate = request.IsPrivate;
+            if (request.IsPrivate)
+            {
+                category.AllowedRoleIds = JsonSerializer.Serialize(request.AllowedRoleIds);
+                category.AllowedUserIds = JsonSerializer.Serialize(request.AllowedUserIds);
+            }
+            else
+            {
+                category.AllowedRoleIds = null;
+                category.AllowedUserIds = null;
+            }
+
             var updatedCategory = await _categoryRepository.UpdateAsync(category, cancellationToken);
+
+            var nameChanged = !string.Equals(oldName, categoryName, StringComparison.OrdinalIgnoreCase);
+            var privacyChanged = wasPrivate != request.IsPrivate;
+            var accessChanged = request.IsPrivate && wasPrivate && (
+                category.AllowedRoleIds != oldAllowedRoleIds ||
+                category.AllowedUserIds != oldAllowedUserIds);
+
+            if (privacyChanged || accessChanged)
+            {
+                string detail;
+                if (privacyChanged)
+                {
+                    detail = request.IsPrivate ? "Сделана приватной" : "Сделана публичной";
+                }
+                else
+                {
+                    detail = "Обновлён список доступа";
+                }
+
+                await _auditLog.LogAsync(
+                    request.ServerId,
+                    request.UserId,
+                    AuditLogActionTypes.CategoryPrivacyUpdate,
+                    AuditLogTargetTypes.Category,
+                    updatedCategory.Id,
+                    new
+                    {
+                        targetName = updatedCategory.CategoryName,
+                        isPrivate = request.IsPrivate,
+                        detail,
+                    },
+                    cancellationToken);
+            }
+
+            if (nameChanged)
+            {
+                await _auditLog.LogAsync(
+                    request.ServerId,
+                    request.UserId,
+                    AuditLogActionTypes.CategoryUpdate,
+                    AuditLogTargetTypes.Category,
+                    updatedCategory.Id,
+                    new { targetName = updatedCategory.CategoryName, field = "name" },
+                    cancellationToken);
+            }
 
             return new UpdateCategoryResult
             {
@@ -210,6 +291,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
     private readonly IServerRepository _serverRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public CreateChatCommandHandler(
         IChatRepository chatRepository,
@@ -218,7 +300,8 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
         IUserRepository userRepository,
         IServerRepository serverRepository,
         IServerMemberRepository serverMemberRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
@@ -227,6 +310,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<CreateChatResult> Handle(CreateChatCommand request, CancellationToken cancellationToken)
@@ -368,6 +452,15 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 members = memberUserIds.Select(uid => new { userId = uid }).ToList()
             };
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ChannelCreate,
+                AuditLogTargetTypes.Channel,
+                chat.Id,
+                new { targetName = chat.Name, isPrivate = chat.IsPrivate, chatType = request.ChatType },
+                cancellationToken);
+
             return new CreateChatResult
             {
                 Success = true,
@@ -386,11 +479,16 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
 {
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public DeleteChatCommandHandler(IChatRepository chatRepository, ServerPermissionChecker permissionChecker)
+    public DeleteChatCommandHandler(
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<DeleteChatResult> Handle(DeleteChatCommand request, CancellationToken cancellationToken)
@@ -418,6 +516,15 @@ public class DeleteChatCommandHandler : IRequestHandler<DeleteChatCommand, Delet
 
             await _chatRepository.DeleteAsync(request.ChatId, cancellationToken);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ChannelDelete,
+                AuditLogTargetTypes.Channel,
+                request.ChatId,
+                new { targetName = chat.Name },
+                cancellationToken);
+
             return new DeleteChatResult { Success = true, CategoryId = categoryId };
         }
         catch (Exception ex)
@@ -431,11 +538,16 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
 {
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public UpdateChatNameCommandHandler(IChatRepository chatRepository, ServerPermissionChecker permissionChecker)
+    public UpdateChatNameCommandHandler(
+        IChatRepository chatRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<UpdateChatNameResult> Handle(UpdateChatNameCommand request, CancellationToken cancellationToken)
@@ -462,6 +574,15 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
             chat.Name = request.NewName;
             await _chatRepository.UpdateAsync(chat, cancellationToken);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ChannelUpdate,
+                AuditLogTargetTypes.Channel,
+                chat.Id,
+                new { targetName = chat.Name, field = "name" },
+                cancellationToken);
+
             var result = new
             {
                 chatId = chat.Id,
@@ -481,6 +602,193 @@ public class UpdateChatNameCommandHandler : IRequestHandler<UpdateChatNameComman
             return new UpdateChatNameResult { Success = false, ErrorMessage = $"Ошибка при обновлении названия чата: {ex.Message}" };
         }
     }
+}
+
+public class UpdateChatPrivacyCommandHandler : IRequestHandler<UpdateChatPrivacyCommand, UpdateChatPrivacyResult>
+{
+    private readonly IChatRepository _chatRepository;
+    private readonly IChatMemberRepository _chatMemberRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
+
+    public UpdateChatPrivacyCommandHandler(
+        IChatRepository chatRepository,
+        IChatMemberRepository chatMemberRepository,
+        IUserRepository userRepository,
+        IServerRepository serverRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
+    {
+        _chatRepository = chatRepository;
+        _chatMemberRepository = chatMemberRepository;
+        _userRepository = userRepository;
+        _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
+    }
+
+    public async Task<UpdateChatPrivacyResult> Handle(UpdateChatPrivacyCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat == null)
+            {
+                return new UpdateChatPrivacyResult { Success = false, ErrorMessage = "Чат не найден" };
+            }
+
+            if (chat.ServerId != request.ServerId)
+            {
+                return new UpdateChatPrivacyResult { Success = false, ErrorMessage = "Чат не принадлежит указанному серверу" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageChannels", cancellationToken))
+            {
+                return new UpdateChatPrivacyResult { Success = false, ErrorMessage = "Недостаточно прав для управления каналами" };
+            }
+
+            var wasPrivate = chat.IsPrivate;
+            var oldAllowedRoleIds = chat.AllowedRoleIds;
+
+            if (wasPrivate == request.IsPrivate && request.IsPrivate)
+            {
+                chat.AllowedRoleIds = JsonSerializer.Serialize(request.AllowedRoleIds ?? new List<Guid>());
+                await _chatRepository.UpdateAsync(chat, cancellationToken);
+
+                var existingMembers = await _chatMemberRepository.GetByChatIdAsync(chat.Id, cancellationToken);
+                if (oldAllowedRoleIds != chat.AllowedRoleIds)
+                {
+                    await _auditLog.LogAsync(
+                        request.ServerId,
+                        request.UserId,
+                        AuditLogActionTypes.ChannelPrivacyUpdate,
+                        AuditLogTargetTypes.Channel,
+                        chat.Id,
+                        new
+                        {
+                            targetName = chat.Name,
+                            isPrivate = true,
+                            detail = "Обновлён список доступа",
+                        },
+                        cancellationToken);
+                }
+
+                return new UpdateChatPrivacyResult
+                {
+                    Success = true,
+                    Chat = BuildChatResult(chat, existingMembers)
+                };
+            }
+
+            chat.IsPrivate = request.IsPrivate;
+            if (request.IsPrivate)
+            {
+                chat.AllowedRoleIds = JsonSerializer.Serialize(request.AllowedRoleIds ?? new List<Guid>());
+            }
+            else
+            {
+                chat.AllowedRoleIds = null;
+            }
+
+            await _chatRepository.UpdateAsync(chat, cancellationToken);
+
+            if (!request.IsPrivate)
+            {
+                var membersToRemove = await _chatMemberRepository.GetByChatIdAsync(chat.Id, cancellationToken);
+                foreach (var member in membersToRemove)
+                {
+                    await _chatMemberRepository.DeleteAsync(member.Id, cancellationToken);
+                }
+            }
+            else if (request.IsPrivate)
+            {
+                var memberUserIds = new List<Guid> { request.UserId };
+                foreach (var uid in request.MemberIds ?? new List<Guid>())
+                {
+                    if (uid == request.UserId) continue;
+                    var onServer = await _serverRepository.IsUserMemberAsync(request.ServerId, uid, cancellationToken);
+                    if (onServer && !memberUserIds.Contains(uid))
+                    {
+                        memberUserIds.Add(uid);
+                    }
+                }
+
+                var chatLoaded = await _chatRepository.GetByIdAsync(chat.Id, cancellationToken) ?? chat;
+                var membersToAdd = new List<Member>();
+
+                foreach (var uid in memberUserIds)
+                {
+                    if (await _chatMemberRepository.IsMemberAsync(chat.Id, uid, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    var appUser = await _userRepository.GetByIdAsync(uid, cancellationToken);
+                    if (appUser == null) continue;
+
+                    membersToAdd.Add(new Member
+                    {
+                        Id = Guid.NewGuid(),
+                        ChatId = chat.Id,
+                        UserId = uid,
+                        JoinedAt = DateTimeOffset.UtcNow,
+                        Chat = chatLoaded,
+                        User = appUser
+                    });
+                }
+
+                if (membersToAdd.Count > 0)
+                {
+                    await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
+                }
+            }
+
+            if (wasPrivate != request.IsPrivate)
+            {
+                await _auditLog.LogAsync(
+                    request.ServerId,
+                    request.UserId,
+                    AuditLogActionTypes.ChannelPrivacyUpdate,
+                    AuditLogTargetTypes.Channel,
+                    chat.Id,
+                    new
+                    {
+                        targetName = chat.Name,
+                        isPrivate = request.IsPrivate,
+                        detail = request.IsPrivate ? "Сделан приватным" : "Сделан публичным",
+                    },
+                    cancellationToken);
+            }
+
+            var members = await _chatMemberRepository.GetByChatIdAsync(chat.Id, cancellationToken);
+            return new UpdateChatPrivacyResult
+            {
+                Success = true,
+                Chat = BuildChatResult(chat, members)
+            };
+        }
+        catch (Exception ex)
+        {
+            return new UpdateChatPrivacyResult { Success = false, ErrorMessage = $"Ошибка при обновлении приватности канала: {ex.Message}" };
+        }
+    }
+
+    private static object BuildChatResult(Chat chat, List<Member> members) => new
+    {
+        chatId = chat.Id,
+        name = chat.Name,
+        serverId = chat.ServerId,
+        categoryId = chat.CategoryId,
+        typeId = chat.TypeId,
+        createdAt = chat.CreatedAt,
+        isPrivate = chat.IsPrivate,
+        chatOrder = chat.ChatOrder,
+        allowedRoleIds = chat.AllowedRoleIds,
+        members = members.Select(m => new { userId = m.UserId }).ToList()
+    };
 }
 
 
@@ -522,11 +830,16 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public CreateRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
+    public CreateRoleCommandHandler(
+        IRoleRepository roleRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _roleRepository = roleRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<CreateRoleResult> Handle(CreateRoleCommand request, CancellationToken cancellationToken)
@@ -561,6 +874,15 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Creat
                 CreatedAt = DateTimeOffset.UtcNow
             }, cancellationToken);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.RoleCreate,
+                AuditLogTargetTypes.Role,
+                createdRole.Id,
+                new { targetName = createdRole.RoleName, color = createdRole.Color },
+                cancellationToken);
+
             return new CreateRoleResult
             {
                 Success = true,
@@ -586,11 +908,16 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public UpdateRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
+    public UpdateRoleCommandHandler(
+        IRoleRepository roleRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _roleRepository = roleRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<UpdateRoleResult> Handle(UpdateRoleCommand request, CancellationToken cancellationToken)
@@ -636,6 +963,15 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Updat
                 });
             }
 
+            await _auditLog.LogAsync(
+                updatedRole.ServerId,
+                request.UserId,
+                AuditLogActionTypes.RoleUpdate,
+                AuditLogTargetTypes.Role,
+                updatedRole.Id,
+                new { targetName = updatedRole.RoleName, color = updatedRole.Color },
+                cancellationToken);
+
             return new UpdateRoleResult
             {
                 Success = true,
@@ -663,11 +999,16 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public DeleteRoleCommandHandler(IRoleRepository roleRepository, ServerPermissionChecker permissionChecker)
+    public DeleteRoleCommandHandler(
+        IRoleRepository roleRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _roleRepository = roleRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<DeleteRoleResult> Handle(DeleteRoleCommand request, CancellationToken cancellationToken)
@@ -687,6 +1028,15 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Delet
             }
 
             await _roleRepository.DeleteAsync(request.RoleId, cancellationToken);
+
+            await _auditLog.LogAsync(
+                existingRole.ServerId,
+                request.UserId,
+                AuditLogActionTypes.RoleDelete,
+                AuditLogTargetTypes.Role,
+                existingRole.Id,
+                new { targetName = existingRole.RoleName },
+                cancellationToken);
 
             return new DeleteRoleResult { Success = true, ServerId = existingRole.ServerId };
         }
@@ -744,18 +1094,24 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
     private readonly IRoleRepository _roleRepository;
     private readonly IServerRepository _serverRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public AssignRoleCommandHandler(
         IRoleRepository roleRepository,
         IServerRepository serverRepository,
         IServerMemberRepository serverMemberRepository,
-        ServerPermissionChecker permissionChecker)
+        IUserRepository userRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _roleRepository = roleRepository;
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
+        _userRepository = userRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<AssignRoleResult> Handle(AssignRoleCommand request, CancellationToken cancellationToken)
@@ -788,6 +1144,20 @@ public class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand, Assig
             if (!await _roleRepository.UserHasRoleAsync(request.UserId, role.ServerId, request.RoleId, cancellationToken))
             {
                 await _roleRepository.AssignRoleToUserAsync(request.UserId, request.RoleId, cancellationToken);
+
+                var targetUser = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+                await _auditLog.LogAsync(
+                    role.ServerId,
+                    request.CurrentUserId,
+                    AuditLogActionTypes.MemberRoleAdd,
+                    AuditLogTargetTypes.Member,
+                    request.UserId,
+                    new
+                    {
+                        targetName = targetUser?.UserName ?? request.UserId.ToString(),
+                        detail = role.RoleName,
+                    },
+                    cancellationToken);
             }
 
             var targetPermissions = await _permissionChecker.GetMergedPermissionsAsync(
@@ -819,16 +1189,22 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
 {
     private readonly IRoleRepository _roleRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public RemoveRoleCommandHandler(
         IRoleRepository roleRepository,
         IServerRepository serverRepository,
-        ServerPermissionChecker permissionChecker)
+        IUserRepository userRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _roleRepository = roleRepository;
         _serverRepository = serverRepository;
+        _userRepository = userRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<RemoveRoleResult> Handle(RemoveRoleCommand request, CancellationToken cancellationToken)
@@ -854,6 +1230,20 @@ public class RemoveRoleCommandHandler : IRequestHandler<RemoveRoleCommand, Remov
             }
 
             await _roleRepository.RemoveRoleFromUserAsync(request.UserId, request.RoleId, cancellationToken);
+
+            var targetUser = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+            await _auditLog.LogAsync(
+                role.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.MemberRoleRemove,
+                AuditLogTargetTypes.Member,
+                request.UserId,
+                new
+                {
+                    targetName = targetUser?.UserName ?? request.UserId.ToString(),
+                    detail = role.RoleName,
+                },
+                cancellationToken);
 
             var remainingRoles = await _roleRepository.GetUserRolesAsync(
                 request.UserId,
@@ -891,16 +1281,22 @@ public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickM
 {
     private readonly IServerMemberRepository _serverMemberRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public KickMemberCommandHandler(
         IServerMemberRepository serverMemberRepository,
         IServerRepository serverRepository,
-        ServerPermissionChecker permissionChecker)
+        IUserRepository userRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverMemberRepository = serverMemberRepository;
         _serverRepository = serverRepository;
+        _userRepository = userRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<KickMemberResult> Handle(KickMemberCommand request, CancellationToken cancellationToken)
@@ -936,6 +1332,17 @@ public class KickMemberCommandHandler : IRequestHandler<KickMemberCommand, KickM
 
             await _serverMemberRepository.DeleteByServerAndUserAsync(
                 request.ServerId, request.UserId, cancellationToken);
+
+            var kickedUser = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.MemberKick,
+                AuditLogTargetTypes.Member,
+                request.UserId,
+                new { targetName = kickedUser?.UserName ?? request.UserId.ToString() },
+                cancellationToken);
+
             return new KickMemberResult { Success = true };
         }
         catch (Exception ex)
@@ -986,11 +1393,16 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
 {
     private readonly IServerRepository _serverRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
-    public UpdateServerNameCommandHandler(IServerRepository serverRepository, ServerPermissionChecker permissionChecker)
+    public UpdateServerNameCommandHandler(
+        IServerRepository serverRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverRepository = serverRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<UpdateServerNameResult> Handle(UpdateServerNameCommand request, CancellationToken cancellationToken)
@@ -1012,11 +1424,151 @@ public class UpdateServerNameCommandHandler : IRequestHandler<UpdateServerNameCo
             server.Name = request.NewName;
             await _serverRepository.UpdateAsync(server);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                request.ServerId,
+                new { targetName = server.Name, field = "name" },
+                cancellationToken);
+
             return new UpdateServerNameResult { Success = true };
         }
         catch (Exception ex)
         {
             return new UpdateServerNameResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
+}
+
+public class UpdateServerDescriptionCommandHandler : IRequestHandler<UpdateServerDescriptionCommand, UpdateServerDescriptionResult>
+{
+    private const int MaxDescriptionLength = 500;
+    private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
+
+    public UpdateServerDescriptionCommandHandler(
+        IServerRepository serverRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
+    {
+        _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
+    }
+
+    public async Task<UpdateServerDescriptionResult> Handle(UpdateServerDescriptionCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var server = await _serverRepository.GetByIdAsync(request.ServerId);
+            if (server == null)
+            {
+                return new UpdateServerDescriptionResult { Success = false, ErrorMessage = "Сервер не найден" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageServer", cancellationToken))
+            {
+                return new UpdateServerDescriptionResult { Success = false, ErrorMessage = "Недостаточно прав для управления сервером" };
+            }
+
+            var description = request.Description?.Trim();
+            if (string.IsNullOrEmpty(description))
+            {
+                description = null;
+            }
+            else if (description.Length > MaxDescriptionLength)
+            {
+                return new UpdateServerDescriptionResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Описание не должно превышать {MaxDescriptionLength} символов",
+                };
+            }
+
+            server.Description = description;
+            await _serverRepository.UpdateAsync(server);
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                request.ServerId,
+                new { targetName = server.Name, field = "description" },
+                cancellationToken);
+
+            return new UpdateServerDescriptionResult { Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new UpdateServerDescriptionResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
+}
+
+public class UpdateServerPrivacyCommandHandler : IRequestHandler<UpdateServerPrivacyCommand, UpdateServerPrivacyResult>
+{
+    private readonly IServerRepository _serverRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
+
+    public UpdateServerPrivacyCommandHandler(
+        IServerRepository serverRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
+    {
+        _serverRepository = serverRepository;
+        _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
+    }
+
+    public async Task<UpdateServerPrivacyResult> Handle(UpdateServerPrivacyCommand request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+            if (server == null)
+            {
+                return new UpdateServerPrivacyResult { Success = false, ErrorMessage = "Сервер не найден" };
+            }
+
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageServer", cancellationToken))
+            {
+                return new UpdateServerPrivacyResult { Success = false, ErrorMessage = "Недостаточно прав для управления сервером" };
+            }
+
+            if (server.IsPublic == request.IsPublic)
+            {
+                return new UpdateServerPrivacyResult { Success = true };
+            }
+
+            server.IsPublic = request.IsPublic;
+            await _serverRepository.UpdateAsync(server, cancellationToken);
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ServerPrivacyUpdate,
+                AuditLogTargetTypes.Server,
+                request.ServerId,
+                new
+                {
+                    targetName = server.Name,
+                    isPublic = request.IsPublic,
+                    detail = request.IsPublic ? "Сделан публичным" : "Сделан приватным",
+                },
+                cancellationToken);
+
+            return new UpdateServerPrivacyResult { Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new UpdateServerPrivacyResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -1078,22 +1630,104 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
 
 public class GetAuditLogQueryHandler : IRequestHandler<GetAuditLogQuery, GetAuditLogResult>
 {
-    private readonly IServerRepository _serverRepository;
+    private readonly IAuditLogRepository _auditLogRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
 
-    public GetAuditLogQueryHandler(IServerRepository serverRepository)
+    public GetAuditLogQueryHandler(
+        IAuditLogRepository auditLogRepository,
+        ServerPermissionChecker permissionChecker)
     {
-        _serverRepository = serverRepository;
+        _auditLogRepository = auditLogRepository;
+        _permissionChecker = permissionChecker;
     }
 
-    public Task<GetAuditLogResult> Handle(GetAuditLogQuery request, CancellationToken cancellationToken)
+    public async Task<GetAuditLogResult> Handle(GetAuditLogQuery request, CancellationToken cancellationToken)
     {
         try
         {
-            return Task.FromResult(new GetAuditLogResult { Success = true, AuditLogs = new List<object>() });
+            if (!await _permissionChecker.HasPermissionAsync(
+                    request.ServerId, request.UserId, "manageServer", cancellationToken))
+            {
+                return new GetAuditLogResult
+                {
+                    Success = false,
+                    ErrorMessage = "Недостаточно прав для просмотра журнала аудита",
+                };
+            }
+
+            var (items, totalCount) = await _auditLogRepository.GetByServerIdAsync(
+                request.ServerId,
+                request.Page,
+                request.PageSize,
+                cancellationToken);
+
+            var entries = items.Select(item =>
+            {
+                object? changes = null;
+                string? targetName = null;
+                string? detail = null;
+
+                if (!string.IsNullOrWhiteSpace(item.Changes))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(item.Changes);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("targetName", out var targetNameEl) && targetNameEl.ValueKind == JsonValueKind.String)
+                        {
+                            targetName = targetNameEl.GetString();
+                        }
+                        else if (root.TryGetProperty("name", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                        {
+                            targetName = nameEl.GetString();
+                        }
+
+                        if (root.TryGetProperty("detail", out var detailEl) && detailEl.ValueKind == JsonValueKind.String)
+                        {
+                            detail = detailEl.GetString();
+                        }
+
+                        changes = JsonSerializer.Deserialize<object>(item.Changes);
+                    }
+                    catch
+                    {
+                        changes = item.Changes;
+                    }
+                }
+
+                return new
+                {
+                    id = item.Id,
+                    actionType = item.ActionType,
+                    actionLabel = AuditLogLabels.Get(item.ActionType),
+                    targetType = item.TargetType,
+                    targetId = item.TargetId,
+                    targetName,
+                    detail,
+                    changes,
+                    userId = item.UserId,
+                    username = item.User?.UserName ?? "Unknown",
+                    avatar = item.User?.UserProfile?.Avatar,
+                    avatarColor = item.User?.UserProfile?.AvatarColor,
+                    createdAt = item.CreatedAt,
+                };
+            }).ToList<object>();
+
+            return new GetAuditLogResult
+            {
+                Success = true,
+                AuditLogs = new
+                {
+                    entries,
+                    totalCount,
+                    page = Math.Max(1, request.Page),
+                    pageSize = Math.Clamp(request.PageSize, 1, 100),
+                },
+            };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new GetAuditLogResult { Success = false, ErrorMessage = ex.Message });
+            return new GetAuditLogResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 }
@@ -1104,17 +1738,20 @@ public class AddMemberToChannelCommandHandler : IRequestHandler<AddMemberToChann
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly IUserRepository _userRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IServerAuditLogService _auditLog;
 
     public AddMemberToChannelCommandHandler(
         IChatRepository chatRepository,
         IChatMemberRepository chatMemberRepository,
         IUserRepository userRepository,
-        IServerRepository serverRepository)
+        IServerRepository serverRepository,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _chatMemberRepository = chatMemberRepository;
         _userRepository = userRepository;
         _serverRepository = serverRepository;
+        _auditLog = auditLog;
     }
 
     public async Task<AddMemberToChannelResult> Handle(AddMemberToChannelCommand request, CancellationToken cancellationToken)
@@ -1173,6 +1810,20 @@ public class AddMemberToChannelCommandHandler : IRequestHandler<AddMemberToChann
                 User = appUser
             }, cancellationToken);
 
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.ChannelMemberAdd,
+                AuditLogTargetTypes.Channel,
+                request.ChatId,
+                new
+                {
+                    targetName = chat.Name,
+                    detail = appUser.UserName,
+                    memberId = request.UserIdToAdd,
+                },
+                cancellationToken);
+
             return new AddMemberToChannelResult { Success = true };
         }
         catch (Exception ex)
@@ -1187,15 +1838,21 @@ public class RemoveMemberFromChannelCommandHandler : IRequestHandler<RemoveMembe
     private readonly IChatRepository _chatRepository;
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IServerAuditLogService _auditLog;
 
     public RemoveMemberFromChannelCommandHandler(
         IChatRepository chatRepository,
         IChatMemberRepository chatMemberRepository,
-        IServerRepository serverRepository)
+        IServerRepository serverRepository,
+        IUserRepository userRepository,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _chatMemberRepository = chatMemberRepository;
         _serverRepository = serverRepository;
+        _userRepository = userRepository;
+        _auditLog = auditLog;
     }
 
     public async Task<RemoveMemberFromChannelResult> Handle(RemoveMemberFromChannelCommand request, CancellationToken cancellationToken)
@@ -1225,6 +1882,15 @@ public class RemoveMemberFromChannelCommandHandler : IRequestHandler<RemoveMembe
                 if (member != null)
                 {
                     await _chatMemberRepository.DeleteAsync(member.Id, cancellationToken);
+                    var selfUser = await _userRepository.GetByIdAsync(request.CurrentUserId, cancellationToken);
+                    await _auditLog.LogAsync(
+                        request.ServerId,
+                        request.CurrentUserId,
+                        AuditLogActionTypes.ChannelMemberRemove,
+                        AuditLogTargetTypes.Channel,
+                        request.ChatId,
+                        new { targetName = chat.Name, detail = selfUser?.UserName, memberId = request.CurrentUserId },
+                        cancellationToken);
                 }
                 return new RemoveMemberFromChannelResult { Success = true };
             }
@@ -1243,6 +1909,22 @@ public class RemoveMemberFromChannelCommandHandler : IRequestHandler<RemoveMembe
                 return new RemoveMemberFromChannelResult { Success = true };
             }
             await _chatMemberRepository.DeleteAsync(toRemove.Id, cancellationToken);
+
+            var removedUser = await _userRepository.GetByIdAsync(request.UserIdToRemove, cancellationToken);
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.ChannelMemberRemove,
+                AuditLogTargetTypes.Channel,
+                request.ChatId,
+                new
+                {
+                    targetName = chat.Name,
+                    detail = removedUser?.UserName,
+                    memberId = request.UserIdToRemove,
+                },
+                cancellationToken);
+
             return new RemoveMemberFromChannelResult { Success = true };
         }
         catch (Exception ex)

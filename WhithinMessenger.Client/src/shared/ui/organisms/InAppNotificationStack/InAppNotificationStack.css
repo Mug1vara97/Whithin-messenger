@@ -1,0 +1,195 @@
+.in-app-notifications {
+  position: fixed;
+  z-index: 10500;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(360px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.in-app-notifications--top-right {
+  top: 12px;
+  right: 12px;
+}
+
+.in-app-notifications--top-left {
+  top: 12px;
+  left: 12px;
+}
+
+.in-app-notifications--bottom-right {
+  bottom: 12px;
+  right: 12px;
+}
+
+.in-app-notifications--bottom-left {
+  bottom: 12px;
+  left: 12px;
+}
+
+.in-app-notifications__hide-all {
+  pointer-events: auto;
+  align-self: stretch;
+  border: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--in-app-notif-bg, var(--surface, #2f3136));
+  color: var(--primary, #5865f2);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.in-app-notifications__hide-all:hover {
+  background: color-mix(in srgb, var(--in-app-notif-bg, var(--surface, #2f3136)) 88%, var(--primary, #5865f2) 12%);
+}
+
+.in-app-notifications__list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.38),
+    0 0 0 1px color-mix(in srgb, var(--border, #4f545c) 80%, transparent);
+}
+
+.in-app-notification-card {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 36px 12px 14px;
+  background: var(--in-app-notif-bg, var(--surface, #2f3136));
+  border-top: 1px solid color-mix(in srgb, var(--border, #4f545c) 70%, transparent);
+  cursor: pointer;
+  text-align: left;
+  animation: inAppNotificationIn 0.22s ease-out;
+  transition: background-color 0.15s ease;
+}
+
+.in-app-notification-card:first-child {
+  border-top: none;
+}
+
+.in-app-notification-card:hover {
+  background: color-mix(in srgb, var(--in-app-notif-bg, var(--surface, #2f3136)) 90%, var(--text, #dcddde) 10%);
+}
+
+.in-app-notification-card__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8e9297);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.in-app-notification-card__close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--text, #dcddde) 8%, transparent);
+  color: var(--text-secondary, #b9bbbe);
+}
+
+.in-app-notification-card__avatar {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.in-app-notification-card__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.in-app-notification-card__title {
+  color: var(--text, #dcddde);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.in-app-notification-card__subtitle {
+  margin-top: 2px;
+  color: var(--primary, #5865f2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.in-app-notification-card__message {
+  margin-top: 3px;
+  color: var(--text-muted, #8e9297);
+  font-size: 13px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+@keyframes inAppNotificationIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+body.electron-titlebar-chrome .in-app-notifications--top-right,
+body.electron-titlebar-chrome .in-app-notifications--top-left {
+  top: calc(var(--electron-titlebar-height) + 12px);
+}
+
+@media (max-width: 520px) {
+  .in-app-notifications--top-right {
+    top: 8px;
+    right: 8px;
+  }
+
+  .in-app-notifications--top-left {
+    top: 8px;
+    left: 8px;
+  }
+
+  .in-app-notifications--bottom-right {
+    bottom: 8px;
+    right: 8px;
+  }
+
+  .in-app-notifications--bottom-left {
+    bottom: 8px;
+    left: 8px;
+  }
+
+  .in-app-notifications {
+    width: min(360px, calc(100vw - 16px));
+  }
+
+  body.electron-titlebar-chrome .in-app-notifications--top-right,
+  body.electron-titlebar-chrome .in-app-notifications--top-left {
+    top: calc(var(--electron-titlebar-height) + 8px);
+  }
+}

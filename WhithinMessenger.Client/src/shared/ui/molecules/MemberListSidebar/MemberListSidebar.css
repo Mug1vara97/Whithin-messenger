@@ -5,11 +5,10 @@
   max-width: 280px;
   align-self: stretch;
   min-height: 0;
-  background: #2b2d31;
-  border-left: 1px solid #1e1f22;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  min-height: 0;
   overflow: hidden;
 }
 
@@ -26,7 +25,7 @@
 }
 
 .member-list-scroll::-webkit-scrollbar-thumb {
-  background: #1a1b1e;
+  background: var(--border);
   border-radius: 4px;
 }
 
@@ -41,7 +40,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #949ba4;
+  color: var(--text-muted);
 }
 
 .member-list-section-title--role {
@@ -68,7 +67,7 @@
 }
 
 .member-list-item:hover {
-  background: #35373c;
+  background: var(--surface-hover);
 }
 
 .member-list-avatar-wrap {
@@ -85,12 +84,12 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid #2b2d31;
+  border: 2px solid var(--surface);
   z-index: 1;
 }
 
 .member-list-item:hover .member-list-status-dot {
-  border-color: #35373c;
+  border-color: var(--surface-hover);
 }
 
 .member-list-name {
@@ -98,25 +97,25 @@
   min-width: 0;
   font-size: 15px;
   font-weight: 500;
-  color: #dbdee1;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .member-list-section-items--offline .member-list-name {
-  color: #949ba4;
+  color: var(--text-muted);
 }
 
 .member-list-owner-icon {
   flex-shrink: 0;
   width: 16px !important;
   height: 16px !important;
-  color: #f0b232;
+  color: var(--warning, #f0b232);
 }
 
 .member-list-empty {
   padding: 12px 8px;
   font-size: 13px;
-  color: #949ba4;
+  color: var(--text-muted);
 }

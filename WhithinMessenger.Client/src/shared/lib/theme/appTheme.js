@@ -76,7 +76,8 @@ function hexToRgbTriplet(hex) {
 }
 
 export function getMergedTheme() {
-  const base = getBaseThemeForPreset(getThemePresetId(), DEFAULT_THEME);
+  const presetId = getThemePresetId();
+  const base = getBaseThemeForPreset(presetId, DEFAULT_THEME);
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
@@ -85,6 +86,33 @@ export function getMergedTheme() {
       Object.keys(DEFAULT_THEME).forEach((k) => {
         if (saved[k] != null && saved[k] !== '') base[k] = saved[k];
       });
+    }
+    if (
+      presetId === THEME_PRESET_IDS.LIGHT_CREAM &&
+      (base['--primary'] === '#e60012' || base['--primary-hover'] === '#b8000e')
+    ) {
+      const presetColors = THEME_PRESETS[THEME_PRESET_IDS.LIGHT_CREAM].colors;
+      base['--primary'] = presetColors['--primary'];
+      base['--primary-hover'] = presetColors['--primary-hover'];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, ...base }));
+    }
+    if (presetId === THEME_PRESET_IDS.NIGHT_CITY) {
+      const nc = THEME_PRESETS[THEME_PRESET_IDS.NIGHT_CITY].colors;
+      base['--text'] = nc['--text'];
+      base['--text-muted'] = nc['--text-muted'];
+      base['--text-secondary'] = nc['--text-secondary'];
+    }
+    if (presetId === THEME_PRESET_IDS.CYBERPUNK) {
+      const cp = THEME_PRESETS[THEME_PRESET_IDS.CYBERPUNK].colors;
+      base['--text'] = cp['--text'];
+      base['--text-muted'] = cp['--text-muted'];
+      base['--text-secondary'] = cp['--text-secondary'];
+      base['--icon'] = cp['--icon'];
+      base['--icon-hover'] = cp['--icon-hover'];
+      if (base['--background'] === '#0c0814' || base['--text'] === '#e8192e') {
+        Object.assign(base, cp);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...(saved || {}), ...base }));
+      }
     }
   } catch {
     /* ignore */
@@ -108,7 +136,7 @@ export { getThemePresetId, THEME_PRESET_LIST, THEME_PRESET_IDS } from './themePr
 export function applyThemeToRoot(theme) {
   const root = document.documentElement;
   const merged = { ...DEFAULT_THEME, ...theme };
-  Object.keys(DEFAULT_THEME).forEach((key) => {
+  Object.keys(merged).forEach((key) => {
     const value = merged[key];
     if (value) root.style.setProperty(key, value);
   });
@@ -125,6 +153,12 @@ export function applyThemeToRoot(theme) {
   if (bg) {
     root.style.setProperty('--bottom', bg);
   }
+  const textColor = merged['--text'];
+  if (textColor) {
+    root.style.setProperty('--text-normal', textColor);
+  }
+  root.style.setProperty('--icon', merged['--icon'] || merged['--text-secondary'] || merged['--text']);
+  root.style.setProperty('--icon-hover', merged['--icon-hover'] || merged['--text']);
 }
 
 export function applySavedTheme() {

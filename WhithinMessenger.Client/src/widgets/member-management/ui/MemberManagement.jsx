@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, memo, useCallback, useMemo } from 'react';
+import { Search, SwapVert, MoreVert } from '@mui/icons-material';
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
 import { canManageRoles } from '../../../entities/role/lib/serverPermissions';
@@ -8,18 +9,21 @@ import { Button } from '../../../shared/ui/atoms/Button';
 import UserAvatar from '../../../shared/ui/atoms/UserAvatar';
 import './MemberManagement.css';
 
-const MemberManagement = ({ 
-  connection, 
-  serverId, 
-  userId, 
-  userPermissions, 
+const MemberManagement = ({
+  connection,
+  serverId,
+  userId,
+  userPermissions,
   isServerOwner,
-  onNavigateToChat 
+  onNavigateToChat,
 }) => {
   const { members, fetchMembers, kickMember, openPrivateChat } = useMembers(connection, serverId, userId);
   const { roles, fetchRoles, assignRole, removeRole } = useRoles(connection, serverId, userId);
   const { friends, fetchFriends } = useFriends();
   const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortAsc, setSortAsc] = useState(true);
 
   const friendActionForMember = useCallback(
     (memberId) => {
@@ -32,8 +36,26 @@ const MemberManagement = ({
       if (sentRequests.some((r) => String(r.addresseeId) === mid)) return { kind: 'outgoing' };
       return { kind: 'stranger' };
     },
-    [friends, pendingRequests, sentRequests, userId]
+    [friends, pendingRequests, sentRequests, userId],
   );
+
+  const filteredMembers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let list = [...members];
+    if (query) {
+      list = list.filter((m) => (m.username || '').toLowerCase().includes(query));
+    }
+    list.sort((a, b) => {
+      const cmp = (a.username || '').localeCompare(b.username || '', 'ru', { sensitivity: 'base' });
+      return sortAsc ? cmp : -cmp;
+    });
+    return list;
+  }, [members, searchQuery, sortAsc]);
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSortAsc(true);
+  };
 
   const handleAddFriend = async (memberId) => {
     try {
@@ -58,19 +80,22 @@ const MemberManagement = ({
   const userCanManageMemberRoles = isServerOwner || canManageRoles(userPermissions, isServerOwner);
   const userCanKickMembers = isServerOwner || userPermissions?.kickMembers;
 
-  const memberHasMenuActions = useCallback((member) => {
-    const fa = friendActionForMember(member.userId);
-    if (fa.kind !== 'self') return true;
-    if (userCanManageMemberRoles) return true;
-    if (userCanKickMembers && String(member.userId) !== String(userId)) return true;
-    return false;
-  }, [friendActionForMember, userCanManageMemberRoles, userCanKickMembers, userId]);
+  const memberHasMenuActions = useCallback(
+    (member) => {
+      const fa = friendActionForMember(member.userId);
+      if (fa.kind !== 'self') return true;
+      if (userCanManageMemberRoles) return true;
+      if (userCanKickMembers && String(member.userId) !== String(userId)) return true;
+      return false;
+    },
+    [friendActionForMember, userCanManageMemberRoles, userCanKickMembers, userId],
+  );
 
   const [contextMenu, setContextMenu] = useState({
     visible: false,
     x: 0,
     y: 0,
-    memberId: null
+    memberId: null,
   });
 
   const [showKickModal, setShowKickModal] = useState(false);
@@ -78,7 +103,7 @@ const MemberManagement = ({
   const [showRoleManagement, setShowRoleManagement] = useState({
     visible: false,
     x: 0,
-    y: 0
+    y: 0,
   });
   const [selectedMemberForRoles, setSelectedMemberForRoles] = useState(null);
 
@@ -121,7 +146,7 @@ const MemberManagement = ({
   useEffect(() => {
     if (!selectedMemberForRoles) return;
     const updatedMember = members.find(
-      (member) => String(member.userId) === String(selectedMemberForRoles.userId)
+      (member) => String(member.userId) === String(selectedMemberForRoles.userId),
     );
     if (updatedMember) {
       setSelectedMemberForRoles(updatedMember);
@@ -143,36 +168,33 @@ const MemberManagement = ({
     }
   };
 
+  const openRoleModal = (member, x, y) => {
+    setSelectedMemberForRoles(member);
+    setShowRoleManagement({
+      visible: true,
+      x: Math.max(8, x - 230),
+      y,
+    });
+  };
+
   const ContextMenu = () => {
     if (!contextMenu.visible) return null;
 
     const member = members.find((m) => String(m.userId) === String(contextMenu.memberId));
     if (!member) return null;
 
-    const calculatePosition = (x, y) => {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const menuWidth = 200;
-      const menuHeight = 100;
-      
-      return {
-        x: x + menuWidth > viewportWidth ? x - menuWidth : x,
-        y: y + menuHeight > viewportHeight ? y - menuHeight : y
-      };
-    };
-
-    const { x, y } = calculatePosition(contextMenu.x, contextMenu.y);
+    const menuWidth = 220;
+    const menuHeight = 160;
+    const x =
+      contextMenu.x + menuWidth > window.innerWidth ? contextMenu.x - menuWidth : contextMenu.x;
+    const y =
+      contextMenu.y + menuHeight > window.innerHeight ? contextMenu.y - menuHeight : contextMenu.y;
 
     return (
-      <div 
+      <div
         ref={contextMenuRef}
         className="context-menu"
-        style={{
-          position: 'fixed',
-          left: x,
-          top: y,
-          zIndex: 1000
-        }}
+        style={{ position: 'fixed', left: x, top: y, zIndex: 1000 }}
       >
         <div className="context-menu-content">
           {(() => {
@@ -218,23 +240,20 @@ const MemberManagement = ({
             );
           })()}
           {(isServerOwner || canManageRoles(userPermissions, isServerOwner)) && (
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              setSelectedMemberForRoles(member);
-              setShowRoleManagement({
-                visible: true,
-                x: x - 230,
-                y: y
-              });
-              setContextMenu((prev) => ({ ...prev, visible: false }));
-            }}
-          >
-            Роли
-          </button>
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={() => {
+                openRoleModal(member, x, y);
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+            >
+              Роли
+            </button>
           )}
           {(isServerOwner || userPermissions?.kickMembers) && String(member.userId) !== String(userId) && (
             <button
+              type="button"
               className="context-menu-item danger"
               onClick={() => {
                 setSelectedMember(member);
@@ -255,21 +274,16 @@ const MemberManagement = ({
 
     const memberRoles = selectedMemberForRoles.roles || [];
     const selectedRoleIds = memberRoles.map((role) => String(role.roleId));
-    
-    console.log('RoleManagementModal - roles:', roles);
-    console.log('RoleManagementModal - selectedMemberForRoles:', selectedMemberForRoles);
-    console.log('RoleManagementModal - memberRoles:', memberRoles);
-    console.log('RoleManagementModal - selectedRoleIds:', selectedRoleIds);
 
     return (
-      <div 
+      <div
         ref={roleModalRef}
         className="role-management-modal"
         style={{
           position: 'fixed',
           left: showRoleManagement.x,
           top: showRoleManagement.y,
-          zIndex: 1001
+          zIndex: 1001,
         }}
       >
         <div className="modal-content">
@@ -278,7 +292,8 @@ const MemberManagement = ({
               <h4>Управление ролями</h4>
               <p className="member-name">{selectedMemberForRoles.username}</p>
             </div>
-            <button 
+            <button
+              type="button"
               className="close-button"
               onClick={() => setShowRoleManagement({ visible: false, x: 0, y: 0 })}
             >
@@ -289,20 +304,17 @@ const MemberManagement = ({
             {roles.length === 0 ? (
               <div className="no-roles">
                 <p>Роли не найдены</p>
-                <p>Создайте роли в разделе "Роли"</p>
+                <p>Создайте роли в разделе «Роли»</p>
               </div>
             ) : (
-              roles.map(role => (
+              roles.map((role) => (
                 <label key={role.roleId} className="role-item">
                   <input
                     type="checkbox"
                     checked={selectedRoleIds.includes(String(role.roleId))}
                     onChange={(e) => handleRoleToggle(role.roleId, e.target.checked)}
                   />
-                  <div 
-                    className="role-color-indicator" 
-                    style={{ backgroundColor: role.color }}
-                  />
+                  <div className="role-color-indicator" style={{ backgroundColor: role.color }} />
                   <span className="role-name">{role.roleName}</span>
                 </label>
               ))
@@ -321,16 +333,10 @@ const MemberManagement = ({
         <div className="modal-content">
           <h3>Вы уверены, что хотите удалить {selectedMember.username} с сервера?</h3>
           <div className="modal-actions">
-            <Button 
-              variant="secondary"
-              onClick={() => setShowKickModal(false)}
-            >
+            <Button variant="secondary" onClick={() => setShowKickModal(false)}>
               Отмена
             </Button>
-            <Button 
-              variant="danger"
-              onClick={() => handleKickMember(selectedMember.userId)}
-            >
+            <Button variant="danger" onClick={() => handleKickMember(selectedMember.userId)}>
               Удалить
             </Button>
           </div>
@@ -346,7 +352,7 @@ const MemberManagement = ({
       const isKickModal = e.target.closest('.kick-confirmation-modal');
 
       if (!isContextMenu && !isRoleModal && !isKickModal) {
-        setContextMenu(prev => ({ ...prev, visible: false }));
+        setContextMenu((prev) => ({ ...prev, visible: false }));
         setShowRoleManagement({ visible: false, x: 0, y: 0 });
         setShowKickModal(false);
       }
@@ -354,7 +360,7 @@ const MemberManagement = ({
 
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
-        setContextMenu(prev => ({ ...prev, visible: false }));
+        setContextMenu((prev) => ({ ...prev, visible: false }));
         setShowRoleManagement({ visible: false, x: 0, y: 0 });
         setShowKickModal(false);
       }
@@ -369,69 +375,119 @@ const MemberManagement = ({
     };
   }, []);
 
-
-  console.log('MemberManagement - members:', members);
-  console.log('MemberManagement - roles:', roles);
-  console.log('MemberManagement - connection:', connection);
-  console.log('MemberManagement - serverId:', serverId);
+  const primaryRoleColor = (member) => member.roles?.[0]?.color;
 
   return (
     <div className="member-management">
-      <div className="member-management-header">
-        <h2>Участники сервера</h2>
-        <span className="member-count">{members.length} участников</span>
-      </div>
-      <div className="members-list">
-        {members.length === 0 ? (
-          <div className="no-members">
-            <p>Участники не найдены</p>
-            <p>Connection: {connection ? 'Connected' : 'Not connected'}</p>
-            <p>ServerId: {serverId}</p>
-          </div>
-        ) : (
-          members.map(member => (
-          <div key={member.userId} className="member-item">
-            <div className="member-info">
-              <UserAvatar 
-                username={member.username}
-                avatarUrl={member.avatar ? `${BASE_URL}${member.avatar}` : null}
-                avatarColor={member.avatarColor}
-                size={40}
+      <div className="members-table-card">
+        <div className="members-table-toolbar">
+          <h3 className="members-table-toolbar__title">Участники сервера</h3>
+          <div className="members-table-toolbar__actions">
+            <label className="members-search">
+              <Search className="members-search__icon" />
+              <input
+                type="text"
+                className="members-search__input"
+                placeholder="Поиск по имени пользователя"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <div className="member-details">
-                <span className="member-name">{member.username}</span>
-                <div className="member-roles">
-                  {member.roles?.map(role => (
-                    <div 
-                      key={role.roleId}
-                      className="member-role"
-                      style={{ backgroundColor: role.color }}
-                    >
-                      {role.roleName}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {memberHasMenuActions(member) && (
-            <button 
-              className="member-menu-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setContextMenu({
-                  visible: true,
-                  x: e.clientX,
-                  y: e.clientY,
-                  memberId: member.userId
-                });
-              }}
+            </label>
+            <button
+              type="button"
+              className="members-toolbar-btn"
+              onClick={() => setSortAsc((v) => !v)}
             >
-              ⋮
+              <SwapVert fontSize="small" />
+              Сортировать
             </button>
+            <button type="button" className="members-toolbar-btn members-toolbar-btn--muted" onClick={handleClearFilters}>
+              Очистить
+            </button>
+          </div>
+        </div>
+
+        <div className="members-table">
+          <div className="members-table-head">
+            <div className="members-table-cell members-table-cell--name">Имя</div>
+            <div className="members-table-cell members-table-cell--roles">Роли</div>
+            <div className="members-table-cell members-table-cell--actions" />
+          </div>
+
+          <div className="members-table-body">
+            {filteredMembers.length === 0 ? (
+              <div className="no-members">
+                <p>{searchQuery.trim() ? 'Никого не найдено' : 'Участники не найдены'}</p>
+              </div>
+            ) : (
+              filteredMembers.map((member) => (
+                <div key={member.userId} className="members-table-row">
+                  <div className="members-table-cell members-table-cell--name">
+                    <UserAvatar
+                      username={member.username}
+                      avatarUrl={member.avatar ? `${BASE_URL}${member.avatar}` : null}
+                      avatarColor={member.avatarColor}
+                      size={36}
+                    />
+                    <div className="member-name-block">
+                      <span
+                        className="member-display-name"
+                        style={primaryRoleColor(member) ? { color: primaryRoleColor(member) } : undefined}
+                      >
+                        {member.username}
+                      </span>
+                      <span className="member-handle">{member.username}</span>
+                    </div>
+                  </div>
+                  <div className="members-table-cell members-table-cell--roles">
+                    {member.roles?.length ? (
+                      member.roles.map((role) => (
+                        <span
+                          key={role.roleId}
+                          className="member-role-pill"
+                          style={{
+                            color: role.color,
+                            backgroundColor: `${role.color}22`,
+                            borderColor: `${role.color}55`,
+                          }}
+                        >
+                          <span className="member-role-pill__dot" style={{ backgroundColor: role.color }} />
+                          {role.roleName}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="member-role-empty">—</span>
+                    )}
+                  </div>
+                  <div className="members-table-cell members-table-cell--actions">
+                    {memberHasMenuActions(member) && (
+                      <button
+                        type="button"
+                        className="member-action-btn"
+                        title="Действия"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setContextMenu({
+                            visible: true,
+                            x: e.clientX,
+                            y: e.clientY,
+                            memberId: member.userId,
+                          });
+                        }}
+                      >
+                        <MoreVert fontSize="small" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
           </div>
-        ))
-        )}
+        </div>
+
+        <div className="members-table-footer">
+          Показаны {filteredMembers.length} участников
+        </div>
       </div>
 
       <ContextMenu />

@@ -37,29 +37,23 @@ const logError = (...args) => console.error('[Soundpad:Electron]', ...args);
 
 
 function getBridgeExecutablePath() {
-
+  const packagedPath = path.join(process.resourcesPath, 'audio-bridge-bin', 'Whithin.AudioBridge.exe');
   const devPath = path.join(__dirname, 'audio-bridge-bin', 'Whithin.AudioBridge.exe');
+  const runningFromAsar = __dirname.includes('app.asar');
+
+  if (runningFromAsar) {
+    return packagedPath;
+  }
 
   if (fs.existsSync(devPath)) {
-
     return devPath;
-
   }
-
-
-
-  const packagedPath = path.join(process.resourcesPath, 'audio-bridge-bin', 'Whithin.AudioBridge.exe');
 
   if (fs.existsSync(packagedPath)) {
-
     return packagedPath;
-
   }
 
-
-
   return devPath;
-
 }
 
 
@@ -212,6 +206,17 @@ async function spawnBridgeProcess() {
 
   });
 
+  let spawnError = null;
+
+  child.once('error', (error) => {
+    spawnError = error;
+    logError('bridge spawn error', error.message);
+    if (bridgeProcess === child) {
+      bridgeProcess = null;
+      bridgeReady = false;
+    }
+  });
+
 
 
   log('spawned pid', child.pid);
@@ -275,6 +280,10 @@ async function spawnBridgeProcess() {
   const startedAt = Date.now();
 
   while (!bridgeReady && Date.now() - startedAt < 8000) {
+
+    if (spawnError) {
+      throw spawnError;
+    }
 
     if (await pingBridge()) {
 

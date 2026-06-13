@@ -101,6 +101,30 @@ class VoiceCallApi {
     this.eventHandlers = new Map();
     this.hadSocketSession = false;
     this.suppressReconnectEvent = false;
+    this.recentPeerJoinedAt = new Map();
+  }
+
+  resetPeerJoinedDedupe() {
+    this.recentPeerJoinedAt.clear();
+  }
+
+  emitPeerJoinedOnce(data) {
+    const userId = data?.userId ?? data?.peerId ?? data?.id;
+    if (!userId) return;
+
+    const key = String(userId);
+    const now = Date.now();
+    const lastEmittedAt = this.recentPeerJoinedAt.get(key) ?? 0;
+    if (now - lastEmittedAt < 5000) {
+      return;
+    }
+
+    this.recentPeerJoinedAt.set(key, now);
+    this.emit('peerJoined', {
+      ...data,
+      peerId: data.peerId || data.id,
+      userId: data.userId ?? userId,
+    });
   }
 
   getPublicationMediaType(publication) {
@@ -210,11 +234,7 @@ class VoiceCallApi {
     });
 
     this.socket.on('peerJoined', (data) => {
-      this.emit('peerJoined', {
-        ...data,
-        peerId: data.peerId || data.id,
-        userId: data.userId,
-      });
+      this.emitPeerJoinedOnce(data);
     });
 
     this.socket.on('peerLeft', (data) => {
@@ -468,6 +488,8 @@ class VoiceCallApi {
       };
     }
 
+    this.resetPeerJoinedDedupe();
+
     // Если уже есть активная комната, выходим из неё перед присоединением к новой (await — иначе старый захват микрофона может пересекаться с новым)
     if (this.room && this.roomId !== roomId) {
       console.log(`joinRoom: Leaving current room (${this.roomId}) before joining new room (${roomId})`);
@@ -674,7 +696,7 @@ class VoiceCallApi {
         }
       });
       
-      this.emit('peerJoined', {
+      this.emitPeerJoinedOnce({
         peerId: participant.identity,
         name: participant.name || participant.identity,
         userId: participant.identity,

@@ -9,7 +9,17 @@ import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { getUserStatusColor, getUserStatusLabel } from '../../../shared/lib/utils/userStatus';
 import './ChatList.css';
 
-const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} }) => {
+const ChatList = ({
+  onChatSelected,
+  onFriendsSelected,
+  unreadCountByChat = {},
+  chats: chatsProp,
+  searchResults: searchResultsProp,
+  isSearching: isSearchingProp,
+  isLoading: isLoadingProp,
+  searchUsers: searchUsersProp,
+  createPrivateChat: createPrivateChatProp,
+}) => {
   const { user } = useAuthContext();
   const { getConnection } = useConnectionContext();
   const location = useLocation();
@@ -17,15 +27,18 @@ const ChatList = ({ onChatSelected, onFriendsSelected, unreadCountByChat = {} })
   const [showModal, setShowModal] = useState(false);
   const [statusOverrides, setStatusOverrides] = useState({});
   const notificationConnectionRef = useRef(null);
-  
-  const {
-    chats,
-    searchResults,
-    isSearching,
-    isLoading,
-    searchUsers,
-    createPrivateChat
-  } = useChatList(user?.id);
+
+  const useParentChatList = chatsProp !== undefined;
+  const internalChatList = useChatList(useParentChatList ? null : user?.id);
+
+  const chats = useParentChatList ? chatsProp : internalChatList.chats;
+  const searchResults = useParentChatList ? (searchResultsProp ?? []) : internalChatList.searchResults;
+  const isSearching = useParentChatList ? Boolean(isSearchingProp) : internalChatList.isSearching;
+  const isLoading = useParentChatList ? Boolean(isLoadingProp) : internalChatList.isLoading;
+  const searchUsers = useParentChatList ? (searchUsersProp ?? (() => {})) : internalChatList.searchUsers;
+  const createPrivateChat = useParentChatList
+    ? (createPrivateChatProp ?? (async () => {}))
+    : internalChatList.createPrivateChat;
 
   const handleSearchChange = useCallback((query) => {
     searchUsers(query);

@@ -10,15 +10,18 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
     private readonly IChatRepository _chatRepository;
     private readonly ICategoryRepository _categoryRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public MoveChatCommandHandler(
         IChatRepository chatRepository,
         ICategoryRepository categoryRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _chatRepository = chatRepository;
         _categoryRepository = categoryRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<MoveChatResult> Handle(MoveChatCommand request, CancellationToken cancellationToken)
@@ -91,6 +94,15 @@ public class MoveChatCommandHandler : IRequestHandler<MoveChatCommand, MoveChatR
             }
 
             await _chatRepository.UpdateAsync(chat, cancellationToken);
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.ChannelMove,
+                AuditLogTargetTypes.Channel,
+                chat.Id,
+                new { targetName = chat.Name, position = request.NewPosition },
+                cancellationToken);
 
             var categories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var chats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);

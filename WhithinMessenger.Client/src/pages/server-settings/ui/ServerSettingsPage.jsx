@@ -1,14 +1,41 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { HubConnectionBuilder } from '@microsoft/signalr';
+import {
+  ArrowBack,
+  Badge,
+  Description,
+  People,
+  Security,
+} from '@mui/icons-material';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL, API_ENDPOINTS, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
 import { RoleManagement } from '../../../widgets/role-management';
 import { MemberManagement } from '../../../widgets/member-management';
 import { ServerSettings } from '../../../widgets/server-settings';
+import { AuditLogPanel } from '../../../widgets/audit-log';
 import { Button } from '../../../shared/ui/atoms/Button';
 import { canManageRoles, canManageServer } from '../../../entities/role/lib/serverPermissions';
 import './ServerSettingsPage.css';
+
+const TAB_META = {
+  profile: {
+    title: 'Профиль сервера',
+    description: 'Название, значок и баннер — то, как сервер выглядит для участников.',
+  },
+  members: {
+    title: 'Участники',
+    description: 'Список участников сервера, роли и действия с ними.',
+  },
+  roles: {
+    title: 'Роли',
+    description: 'Создавайте роли и настраивайте права доступа.',
+  },
+  'audit-log': {
+    title: 'Журнал аудита',
+    description: 'История изменений на сервере.',
+  },
+};
 
 const ServerSettingsPage = () => {
   const { serverId } = useParams();
@@ -246,9 +273,11 @@ const ServerSettingsPage = () => {
     navigate(`/server/${serverId}`);
   };
 
+  const pageMeta = TAB_META[activeTab] || TAB_META.members;
+
   return (
     <div className="server-settings-page">
-      <div className="server-settings-sidebar">
+      <aside className="server-settings-sidebar">
         <div className="server-header">
           <div className="server-avatar">
             {server.avatar ? (
@@ -275,81 +304,76 @@ const ServerSettingsPage = () => {
           <h2 className="server-name">{server.name}</h2>
         </div>
 
-        {/* Кнопка возврата на сервер */}
-        <button 
+        <button
+          type="button"
           className="back-to-server-btn"
           onClick={handleBackToServer}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
+          <ArrowBack />
           Вернуться на сервер
         </button>
 
         <nav className="settings-nav">
           {userCanManageServer && (
-          <div className="nav-section">
-            <button
-              className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
-              onClick={() => setActiveTab('profile')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2M21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z"/>
-              </svg>
-              Профиль сервера
-            </button>
-          </div>
+            <div className="nav-section">
+              <h3 className="nav-section-title">Сервер</h3>
+              <button
+                type="button"
+                className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+                onClick={() => setActiveTab('profile')}
+              >
+                <Badge />
+                Профиль сервера
+              </button>
+            </div>
           )}
 
-          {userCanManageServer && <div className="nav-divider"></div>}
-
           <div className="nav-section">
-            <h3 className="nav-section-title">ЛЮДИ</h3>
+            <h3 className="nav-section-title">Люди</h3>
             <button
+              type="button"
               className={`settings-nav-item ${activeTab === 'members' ? 'active' : ''}`}
               onClick={() => setActiveTab('members')}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 4C18.2 4 20 5.8 20 8S18.2 12 16 12 12 10.2 12 8 13.8 4 16 4M16 13C18.67 13 24 14.33 24 17V20H8V17C8 14.33 13.33 13 16 13M8 12C10.2 12 12 10.2 12 8S10.2 4 8 4 4 5.8 4 8 5.8 12 8 12M8 13C5.33 13 0 14.33 0 17V20H6V17C6 15.9 6.4 14.9 7 14.1C5.8 13.4 4.3 13 8 13Z"/>
-              </svg>
+              <People />
               Участники
             </button>
-            
             {userCanManageRoles && (
-            <button
-              className={`settings-nav-item ${activeTab === 'roles' ? 'active' : ''}`}
-              onClick={() => setActiveTab('roles')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2M21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z"/>
-              </svg>
-              Роли
-            </button>
+              <button
+                type="button"
+                className={`settings-nav-item ${activeTab === 'roles' ? 'active' : ''}`}
+                onClick={() => setActiveTab('roles')}
+              >
+                <Security />
+                Роли
+              </button>
             )}
           </div>
 
           {userCanManageServer && (
-          <>
-          <div className="nav-divider"></div>
-
-          <div className="nav-section">
-            <h3 className="nav-section-title">БЕЗОПАСНОСТЬ</h3>
-            <button
-              className={`settings-nav-item ${activeTab === 'audit-log' ? 'active' : ''}`}
-              onClick={() => setActiveTab('audit-log')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-              </svg>
-              Журнал аудита
-            </button>
-          </div>
-          </>
+            <div className="nav-section">
+              <h3 className="nav-section-title">Безопасность</h3>
+              <button
+                type="button"
+                className={`settings-nav-item ${activeTab === 'audit-log' ? 'active' : ''}`}
+                onClick={() => setActiveTab('audit-log')}
+              >
+                <Description />
+                Журнал аудита
+              </button>
+            </div>
           )}
-          </nav>
-        </div>
+        </nav>
+      </aside>
 
-        <div className="server-settings-main">
+      <div className="server-settings-main">
+        {activeTab !== 'roles' && (
+        <header className="server-settings-page-header">
+          <h1>{pageMeta.title}</h1>
+        </header>
+        )}
+
+        <div className="server-settings-scroll">
         {activeTab === 'profile' && userCanManageServer && (
           <ServerSettings
             connection={connectionRef.current}
@@ -383,12 +407,10 @@ const ServerSettingsPage = () => {
           />
         )}
 
-        {activeTab === 'audit-log' && userCanManageServer && (
-          <div className="settings-content">
-            <h1>Журнал аудита</h1>
-            <p>Журнал аудита будет здесь</p>
-          </div>
+        {activeTab === 'audit-log' && userCanManageServer && connectionRef.current && (
+          <AuditLogPanel connection={connectionRef.current} serverId={serverId} />
         )}
+        </div>
       </div>
     </div>
   );

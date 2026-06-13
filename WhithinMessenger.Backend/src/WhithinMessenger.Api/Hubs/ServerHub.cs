@@ -179,7 +179,7 @@ public class ServerHub : Hub
         }
     }
 
-    public async Task UpdateCategory(Guid serverId, Guid categoryId, string categoryName)
+    public async Task UpdateCategory(Guid serverId, Guid categoryId, string categoryName, bool isPrivate = false, List<Guid>? allowedRoleIds = null, List<Guid>? allowedUserIds = null)
     {
         try
         {
@@ -190,7 +190,14 @@ public class ServerHub : Hub
                 return;
             }
 
-            var command = new UpdateCategoryCommand(serverId, categoryId, categoryName, userId.Value);
+            var command = new UpdateCategoryCommand(
+                serverId,
+                categoryId,
+                categoryName,
+                userId.Value,
+                isPrivate,
+                allowedRoleIds,
+                allowedUserIds);
             var result = await _mediator.Send(command);
 
             if (result.Success)
@@ -301,6 +308,35 @@ public class ServerHub : Hub
         catch (Exception ex)
         {
             await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении названия чата: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateChatPrivacy(Guid serverId, Guid chatId, bool isPrivate, List<Guid>? memberIds = null, List<Guid>? allowedRoleIds = null)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var command = new UpdateChatPrivacyCommand(serverId, chatId, isPrivate, userId.Value, memberIds, allowedRoleIds);
+            var result = await _mediator.Send(command);
+
+            if (result.Success)
+            {
+                await Clients.Group(serverId.ToString()).SendAsync("ChatUpdated", result.Chat);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении приватности канала: {ex.Message}");
         }
     }
 
@@ -744,6 +780,72 @@ public class ServerHub : Hub
         catch (Exception ex)
         {
             await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении имени сервера: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateServerDescription(Guid serverId, string? description)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var command = new UpdateServerDescriptionCommand(serverId, description, userId.Value);
+            var result = await _mediator.Send(command);
+
+            if (result.Success)
+            {
+                var infoResult = await _mediator.Send(new GetServerInfoQuery(serverId, userId.Value));
+                if (infoResult.Success && infoResult.ServerInfo != null)
+                {
+                    await Clients.Group(serverId.ToString()).SendAsync("ServerUpdated", infoResult.ServerInfo);
+                }
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении описания сервера: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateServerPrivacy(Guid serverId, bool isPublic)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var command = new UpdateServerPrivacyCommand(serverId, isPublic, userId.Value);
+            var result = await _mediator.Send(command);
+
+            if (result.Success)
+            {
+                var infoResult = await _mediator.Send(new GetServerInfoQuery(serverId, userId.Value));
+                if (infoResult.Success && infoResult.ServerInfo != null)
+                {
+                    await Clients.Group(serverId.ToString()).SendAsync("ServerUpdated", infoResult.ServerInfo);
+                }
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении приватности сервера: {ex.Message}");
         }
     }
 

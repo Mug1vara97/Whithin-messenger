@@ -4,10 +4,13 @@ import { AppRouter } from './app/router';
 import ThemeAppRouter from './app/router/ThemeAppRouter';
 import { GlobalCallManager } from './shared/ui/organisms';
 import { ElectronHotkeysBridge } from './shared/lib/hooks/ElectronHotkeysBridge';
+import { ElectronTitlebar } from './shared/ui/molecules/ElectronTitlebar';
 import { useGlobalTextScramble } from './shared/lib/hooks/useGlobalTextScramble';
 import { useAppLifecycleCleanup } from './shared/lib/hooks/useAppLifecycleCleanup';
 import { setupThemeWindowSync } from './shared/lib/theme/appTheme';
 import { isThemeColorsWindow } from './shared/lib/theme/themeWindow';
+import { AppBadgeSync } from './shared/lib/hooks/AppBadgeSync';
+import './shared/lib/styles/profileOpenTrigger.css';
 import './App.css';
 
 function MainApp() {
@@ -21,6 +24,8 @@ function MainApp() {
 
   return (
     <AppProviders>
+      <AppBadgeSync />
+      <ElectronTitlebar />
       <ElectronHotkeysBridge />
       <AppRouter />
       <GlobalCallManager />

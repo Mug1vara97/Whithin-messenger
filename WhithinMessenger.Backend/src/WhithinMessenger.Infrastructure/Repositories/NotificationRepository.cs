@@ -55,6 +55,12 @@ public class NotificationRepository : INotificationRepository
                 ChatName = n.Chat.Name,
                 ServerName = n.Chat.Server != null ? n.Chat.Server.Name : null,
                 SenderName = n.Message != null ? n.Message.User.UserName : null,
+                SenderAvatarUrl = n.Message != null && n.Message.User.UserProfile != null
+                    ? n.Message.User.UserProfile.Avatar
+                    : null,
+                SenderAvatarColor = n.Message != null && n.Message.User.UserProfile != null
+                    ? n.Message.User.UserProfile.AvatarColor
+                    : null,
                 MessageContent = n.Message != null ? n.Message.Content : null
             })
             .ToListAsync(cancellationToken);

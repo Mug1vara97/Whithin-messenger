@@ -136,5 +136,29 @@ export const serverApi = {
     }
 
     return response.json();
-  }
+  },
+
+  uploadServerAvatar: async (serverId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers = {};
+    const token = tokenManager.getToken();
+    if (token && tokenManager.isTokenValid()) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${BASE_URL}/api/server/${serverId}/avatar`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Не удалось загрузить значок сервера');
+    }
+
+    return response.json();
+  },
 };

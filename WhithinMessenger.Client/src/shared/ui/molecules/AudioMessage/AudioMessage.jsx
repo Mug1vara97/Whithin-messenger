@@ -23,7 +23,19 @@ const formatTime = (time) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
+const readWaveformColors = (rootElement) => {
+  const styles = getComputedStyle(rootElement ?? document.documentElement);
+  const pick = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+
+  return {
+    waveColor: pick('--am-wave-color', '#b9bbbe'),
+    progressColor: pick('--am-progress-color', '#5865f2'),
+    cursorColor: pick('--am-cursor-color', '#ffffff'),
+  };
+};
+
 const AudioMessage = ({ mediaFile }) => {
+  const rootRef = useRef(null);
   const waveformRef = useRef(null);
   const wavesurferRef = useRef(null);
   const audioRef = useRef(null);
@@ -155,12 +167,13 @@ const AudioMessage = ({ mediaFile }) => {
         if (isStale()) return;
 
         const waveDuration = durationRef.current > 0 ? durationRef.current : 0;
+        const waveformColors = readWaveformColors(rootRef.current);
 
         wavesurfer = WaveSurfer.create({
           container: waveformRef.current,
-          waveColor: '#b9bbbe',
-          progressColor: '#5865f2',
-          cursorColor: '#ffffff',
+          waveColor: waveformColors.waveColor,
+          progressColor: waveformColors.progressColor,
+          cursorColor: waveformColors.cursorColor,
           barWidth: 2,
           barHeight: 0.7,
           height: 40,
@@ -322,7 +335,7 @@ const AudioMessage = ({ mediaFile }) => {
     duration > 0 ? formatTime(duration) : isPlaying ? '…' : '0:00';
 
   return (
-    <div className={`audio-message ${isPlaying ? 'playing' : ''}`}>
+    <div ref={rootRef} className={`audio-message ${isPlaying ? 'playing' : ''}`}>
       {error ? (
         <div className="error-message">{error}</div>
       ) : (
@@ -335,9 +348,9 @@ const AudioMessage = ({ mediaFile }) => {
             aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
           >
             {isPlaying ? (
-              <PauseIcon sx={{ width: 24, height: 24, color: '#5865f2' }} />
+              <PauseIcon sx={{ width: 24, height: 24 }} />
             ) : (
-              <PlayArrowIcon sx={{ width: 24, height: 24, color: '#5865f2' }} />
+              <PlayArrowIcon sx={{ width: 24, height: 24 }} />
             )}
           </button>
           <div ref={waveformRef} className="waveform-container" />

@@ -53,8 +53,8 @@
   align-items: center;
   gap: 22px;
   margin: 0;
-  border-bottom: 1px solid #40444b;
-  background: #000000;
+  border-bottom: 1px solid var(--border);
+  background: var(--background-primary, var(--background));
   min-height: 260px;
   max-height: 80vh;
   position: relative;
@@ -72,7 +72,13 @@
   width: 48px;
   height: 5px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent 0%, #707bf5 20%, #707bf5 80%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--primary) 20%,
+    var(--primary) 80%,
+    transparent 100%
+  );
   opacity: 0.45;
   transition: opacity 0.2s ease;
 }
@@ -102,7 +108,7 @@
   min-width: 68px;
   min-height: 68px;
   border-radius: 50%;
-  border: 3px solid #000;
+  border: 3px solid var(--background-primary, var(--background));
   margin-left: -14px;
 }
 
@@ -117,9 +123,9 @@
   min-height: 68px;
   margin-left: -14px;
   border-radius: 50%;
-  border: 3px solid #000;
-  background: #2f3136;
-  color: #f2f3f5;
+  border: 3px solid var(--background-primary, var(--background));
+  background: var(--surface);
+  color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -130,7 +136,7 @@
 .join-preview-title {
   font-size: 16px;
   font-weight: 700;
-  color: #f2f3f5;
+  color: var(--text);
 }
 
 .join-preview-users-grid {
@@ -156,25 +162,52 @@
   flex-direction: column;
   align-items: center;
   min-width: 96px;
+  min-height: 126px;
   flex: 0 0 auto;
+  flex-shrink: 0;
 }
 
 .join-preview-user-avatar {
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  transition: transform 0.2s ease;
+  position: relative;
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+  overflow: visible;
 }
 
-.join-preview-user-avatar.speaking {
-  transform: scale(1.03);
+.join-preview-user-avatar .user-avatar {
+  width: 74px !important;
+  height: 74px !important;
+  min-width: 74px !important;
+  min-height: 74px !important;
+}
+
+.join-preview-user-avatar::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  box-sizing: border-box;
+}
+
+.join-preview-user-avatar.speaking::after {
+  opacity: 1;
+  border-color: var(--voice-speaking-color, var(--success, #43b581));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 40%, transparent);
 }
 
 .join-preview-user-name {
   margin-top: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #e7eaf1;
+  color: var(--text);
   max-width: 110px;
   text-align: center;
   white-space: nowrap;
@@ -186,14 +219,16 @@
   margin-top: 6px;
   display: flex;
   gap: 6px;
+  min-height: 24px;
+  flex-shrink: 0;
 }
 
 .join-preview-user-more {
   width: 74px;
   height: 74px;
   border-radius: 50%;
-  border: 2px dashed rgba(255, 255, 255, 0.22);
-  color: #cfd4df;
+  border: 2px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,15 +251,15 @@
 }
 
 .join-preview-status-pill.on {
-  color: #f2f3f5;
-  background: rgba(49, 51, 56, 0.9);
-  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 90%, var(--text) 10%);
+  border-color: var(--border);
 }
 
 .join-preview-status-pill.off {
   color: #ffffff;
-  background: rgba(237, 66, 69, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--danger) 90%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
 }
 
 .join-preview-controls {
@@ -233,8 +268,8 @@
   gap: 14px;
   padding: 12px 16px;
   border-radius: 16px;
-  border: 1px solid #2f3136;
-  background: rgba(16, 17, 22, 0.75);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background-primary, var(--background)) 75%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -253,12 +288,12 @@
 }
 
 .join-preview-btn.disabled {
-  background: #2f3136;
-  color: #8e9297;
+  background: var(--surface);
+  color: var(--text-muted);
 }
 
 .join-preview-btn.join {
-  background: #3ba55d;
+  background: var(--success);
 }
 
 .join-preview-btn:hover {
@@ -270,7 +305,7 @@
 }
 
 .chat-call-join-button {
-  background: #3ba55d;
+  background: var(--success);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -282,7 +317,7 @@
 }
 
 .chat-call-join-button:hover {
-  background: #2f8b4d;
+  background: color-mix(in srgb, var(--success) 85%, #000);
 }
 
 .chat-call-join-button:active {
@@ -321,22 +356,12 @@
   position: relative;
   padding: 9px;
   background: var(--background);
-  border-bottom: 1px solid var(--borderBottom);
+  border-bottom: 1px solid var(--border);
   color: var(--text);
   height: 52px;
   min-height: 52px;
   box-sizing: border-box;
   z-index: 4;
-}
-
-.chat-header::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: var(--border);
 }
 
 .chat-typing-indicator {
@@ -437,7 +462,7 @@
 }
 
 .media-upload-container {
-  border-top: 1px solid var(--borderBottom);
+  border-top: 1px solid var(--border);
   background: var(--background);
   max-height: 400px;
   overflow-y: auto;
@@ -454,7 +479,7 @@
   padding: 0;
   background: #00000000;
   border: none;
-  color: #ffffff;
+  color: var(--icon, var(--text-secondary));
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.2s, color 0.2s, transform 0.1s;
@@ -462,6 +487,7 @@
 
 .voice-call-button:hover {
   background: var(--hover);
+  color: var(--icon-hover, var(--text));
   transform: scale(1.05);
 }
 
@@ -487,7 +513,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--icon, var(--text-muted));
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.2s, color 0.2s;
@@ -495,12 +521,12 @@
 
 .member-list-toggle:hover,
 .member-list-toggle.active {
-  color: #f2f3f5;
-  background: var(--hover, #35373c);
+  color: var(--icon-hover, var(--text));
+  background: var(--surface-hover);
 }
 
 .member-list-toggle.active {
-  background: #404249;
+  background: var(--surface-hover);
 }
 
 .add-member-button {
@@ -688,7 +714,9 @@
   color: var(--text);
   display: inline;
   margin-bottom: 0;
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.375rem;
 }
 
 .bot-message {
@@ -1260,20 +1288,21 @@
 .call-mode-modal {
   max-width: 400px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(165deg, rgba(37, 40, 49, 0.95), rgba(30, 33, 42, 0.95));
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
 }
 
 .call-mode-modal h3 {
   margin: 0;
-  color: #f3f4f8;
+  color: var(--text);
   font-size: 20px;
   font-weight: 700;
 }
 
 .call-mode-modal p {
   margin: 10px 0 0 0;
-  color: #b7becd;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -1284,9 +1313,9 @@
 }
 
 .call-mode-button {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-  color: #f3f4f8;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, var(--text) 8%);
+  color: var(--text);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
@@ -1300,8 +1329,8 @@
 }
 
 .call-mode-button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: var(--hover);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--text) 40%);
 }
 
 .call-mode-button:active {
@@ -1309,13 +1338,13 @@
 }
 
 .call-mode-button.notify {
-  border-color: rgba(67, 181, 129, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(67, 181, 129, 0.2);
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 20%, transparent);
 }
 
 .call-mode-button.direct {
-  border-color: rgba(88, 101, 242, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(88, 101, 242, 0.2);
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .incoming-call-overlay {
@@ -1332,8 +1361,8 @@
   pointer-events: auto;
   width: min(330px, calc(100vw - 32px));
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #1f222b;
+  border: 1px solid var(--border);
+  background: var(--surface);
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
   padding: 20px 22px 24px;
   display: flex;
@@ -1342,14 +1371,14 @@
 }
 
 .incoming-call-avatar-ring {
-  border: 3px solid rgba(255, 255, 255, 0.28);
+  border: 3px solid color-mix(in srgb, var(--text) 28%, transparent);
   border-radius: 999px;
   padding: 5px;
 }
 
 .incoming-call-user {
   margin-top: 14px;
-  color: #ffffff;
+  color: var(--text);
   font-weight: 700;
   font-size: clamp(24px, 7vw, 34px);
   line-height: 1;
@@ -1360,7 +1389,7 @@
 
 .incoming-call-text {
   margin-top: 10px;
-  color: #d0d4df;
+  color: var(--text-secondary);
   font-size: clamp(18px, 6vw, 30px);
   line-height: 1.05;
   text-align: center;
@@ -1396,11 +1425,11 @@
 }
 
 .incoming-call-button.decline {
-  background: #d83b46;
+  background: var(--danger);
 }
 
 .incoming-call-button.accept {
-  background: #3fa96b;
+  background: var(--success);
 }
 
 .modal-overlay {

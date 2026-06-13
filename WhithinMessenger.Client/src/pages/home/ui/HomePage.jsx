@@ -10,12 +10,14 @@ import { VoiceCallView } from '../../../widgets/voice-call';
 import IdeasBoardView from '../../../widgets/ideas-board/ui/IdeasBoardView';
 import { isVoiceChannel, isIdeasBoardChannel } from '../../../shared/lib/constants/chatChannelTypes';
 import { useServer } from '../../../entities/server/hooks';
+import { serverApi } from '../../../entities/server/api/serverApi';
 import { useChatList } from '../../../entities/chat';
-import { useNotifications } from '../../../entities/notification';
+import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { NotificationsModal, SettingsModal, SoundpadSoundsModal } from '../../../shared/ui/organisms';
+import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
+import { NotificationsModal, SoundpadSoundsModal, CreateServerModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
 import { UserAvatar } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
@@ -37,6 +39,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
+  const { openSettings, closeSettings, isSettingsOpen } = useProfileModal();
   const connectionContext = useConnectionContext();
   const getConnection = connectionContext?.getConnection;
   
@@ -45,20 +48,24 @@ const HomePage = () => {
   const [serverDataFromPanel, setServerDataFromPanel] = useState(null);
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState('account');
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showSoundpadModal, setShowSoundpadModal] = useState(false);
   const isElectronApp = soundpadBridge.isElectronAvailable();
   
   const showFriends = location.pathname === '/channels/@me/friends';
 
+  useEffect(() => {
+    if (chatId || channelId || showFriends) {
+      setShowDiscovery(false);
+    }
+  }, [chatId, channelId, showFriends]);
+
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
-  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats } = useChatList(user?.id || null, (chatId) => {
+  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers } = useChatList(user?.id || null, (chatId) => {
     navigate(`/channels/@me/${chatId}`);
   });
-  const { createServer, servers, createConnection } = useServerContext();
+  const { createServer, fetchServers, servers, createConnection } = useServerContext();
   const {
     notifications,
     unreadCount,
@@ -69,12 +76,13 @@ const HomePage = () => {
     deleteNotification,
     refreshNotifications,
     refreshUnreadCount
-  } = useNotifications();
+  } = useNotificationContext();
   const markReadTimerRef = useRef(null);
 
   // Состояние для активного звонка в чате
   const [activeChatCall, setActiveChatCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [desktopCallOverlayActive, setDesktopCallOverlayActive] = useState(false);
   const [groupChatConnection, setGroupChatConnection] = useState(null);
   const ringtoneAudioRef = useRef(null);
   const joinedChatGroupsRef = useRef(new Set());
@@ -340,6 +348,19 @@ const HomePage = () => {
     }
   }, [activeChatCall]);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('incomingCallChanged', { detail: incomingCall }));
+  }, [incomingCall]);
+
+  useEffect(() => {
+    const onDesktopCallOverlayActive = (event) => {
+      setDesktopCallOverlayActive(Boolean(event.detail?.active));
+    };
+
+    window.addEventListener('desktopCallOverlayActive', onDesktopCallOverlayActive);
+    return () => window.removeEventListener('desktopCallOverlayActive', onDesktopCallOverlayActive);
+  }, []);
+
   const handleAcceptIncomingCall = useCallback(() => {
     if (!incomingCall || !user?.id) return;
 
@@ -360,6 +381,19 @@ const HomePage = () => {
   const handleDeclineIncomingCall = useCallback(() => {
     setIncomingCall(null);
   }, []);
+
+  useEffect(() => {
+    const onOverlayAction = (event) => {
+      if (event.detail?.action === 'accept') {
+        handleAcceptIncomingCall();
+      } else if (event.detail?.action === 'decline') {
+        handleDeclineIncomingCall();
+      }
+    };
+
+    window.addEventListener('incomingCallOverlayAction', onOverlayAction);
+    return () => window.removeEventListener('incomingCallOverlayAction', onOverlayAction);
+  }, [handleAcceptIncomingCall, handleDeclineIncomingCall]);
 
   React.useEffect(() => {
     if (user?.id) {
@@ -629,6 +663,8 @@ const HomePage = () => {
   }, [chatId, chats, navigate, initialChatsLoaded, refreshChats]);
 
   const handleChatSelected = (chat) => {
+    setShowDiscovery(false);
+
     if (chat && !chat.isServerChat) {
       setSelectedChat(chat);
       setSelectedServer(null);
@@ -696,6 +732,7 @@ const HomePage = () => {
   }, []);
 
   const handleFriendsSelected = useCallback(() => {
+    setShowDiscovery(false);
     navigate('/channels/@me/friends');
   }, [navigate]);
 
@@ -704,27 +741,40 @@ const HomePage = () => {
   }, []);
 
   const handleCreateServer = useCallback(async (serverData) => {
-    try {
-      await createServer(serverData);
-      setShowCreateServerModal(false);
-    } catch (error) {
-      console.error('Error creating server:', error);
-      alert('Ошибка при создании сервера: ' + error.message);
+    const newServer = await createServer({
+      serverName: serverData.serverName,
+      description: serverData.description || '',
+      isPublic: serverData.isPublic || false,
+    });
+
+    if (serverData.avatarFile && newServer?.serverId) {
+      try {
+        await serverApi.uploadServerAvatar(newServer.serverId, serverData.avatarFile);
+        await fetchServers();
+      } catch (avatarError) {
+        console.error('Error uploading server icon:', avatarError);
+      }
     }
-  }, [createServer]);
+
+    setShowCreateServerModal(false);
+
+    if (newServer?.serverId) {
+      const channelPath = newServer.defaultChannelId
+        ? `/server/${newServer.serverId}/channel/${newServer.defaultChannelId}`
+        : `/server/${newServer.serverId}`;
+      navigate(channelPath);
+    }
+
+    return newServer;
+  }, [createServer, fetchServers, navigate]);
 
   const handleCloseCreateServerModal = useCallback(() => {
     setShowCreateServerModal(false);
   }, []);
 
   const handleSettingsClick = useCallback(() => {
-    setSettingsInitialTab('account');
-    setShowSettingsModal(true);
-  }, []);
-
-  const handleCloseSettingsModal = useCallback(() => {
-    setShowSettingsModal(false);
-  }, []);
+    openSettings('account');
+  }, [openSettings]);
 
   const handleNotificationsClick = useCallback(() => {
     setShowNotificationsModal(true);
@@ -830,9 +880,9 @@ const HomePage = () => {
         setShowCreateServerModal(false);
         return;
       }
-      if (showSettingsModal) {
+      if (isSettingsOpen) {
         e.preventDefault();
-        setShowSettingsModal(false);
+        closeSettings();
         return;
       }
       if (showNotificationsModal) {
@@ -856,7 +906,8 @@ const HomePage = () => {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [
     showCreateServerModal,
-    showSettingsModal,
+    isSettingsOpen,
+    closeSettings,
     showNotificationsModal,
     showSoundpadModal,
     selectedChat,
@@ -901,6 +952,12 @@ const HomePage = () => {
                   onFriendsSelected={handleFriendsSelected}
                   selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
                   unreadCountByChat={messageUnreadCountByChat}
+                  chats={chats}
+                  searchResults={searchResults}
+                  isSearching={isSearching}
+                  isLoading={isLoading}
+                  searchUsers={searchUsers}
+                  createPrivateChat={createPrivateChat}
                 />
               )}
             </ResizableSidebarShell>
@@ -978,38 +1035,10 @@ const HomePage = () => {
         </div>
       </div>
 
-      {showCreateServerModal && (
-        <div 
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCloseCreateServerModal();
-            }
-          }}
-        >
-          <div className="create-modal">
-            <div className="modal-header">
-              <h3>Создать новый сервер</h3>
-              <button 
-                className="modal-close-button"
-                onClick={handleCloseCreateServerModal}
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <CreateServerForm
-              onClose={handleCloseCreateServerModal}
-              onCreate={handleCreateServer}
-            />
-          </div>
-        </div>
-      )}
-
-      <SettingsModal
-        isOpen={showSettingsModal}
-        onClose={handleCloseSettingsModal}
-        initialTab={settingsInitialTab}
+      <CreateServerModal
+        isOpen={showCreateServerModal}
+        onClose={handleCloseCreateServerModal}
+        onCreate={handleCreateServer}
       />
 
       {isElectronApp && (
@@ -1030,7 +1059,7 @@ const HomePage = () => {
         onDeleteNotification={handleDeleteNotification}
       />
 
-      {incomingCall && (
+      {incomingCall && !desktopCallOverlayActive && (
         <div className="global-incoming-call-overlay">
           <div className="global-incoming-call-card">
             <div className="global-incoming-call-avatar-ring">
@@ -1042,6 +1071,9 @@ const HomePage = () => {
               />
             </div>
             <div className="global-incoming-call-user">{incomingCall.callerName}</div>
+            {incomingCall.chatName && incomingCall.chatName !== incomingCall.callerName ? (
+              <div className="global-incoming-call-chat-name">{incomingCall.chatName}</div>
+            ) : null}
             <div className="global-incoming-call-text">Входящий звонок...</div>
             <div className="global-incoming-call-actions">
               <button
@@ -1065,77 +1097,6 @@ const HomePage = () => {
         </div>
       )}
     </div>
-  );
-};
-
-const CreateServerForm = ({ onClose, onCreate }) => {
-  const [serverName, setServerName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (serverName.trim()) {
-      onCreate({
-        serverName: serverName.trim(),
-        description: description.trim(),
-        isPublic
-      });
-    }
-  };
-
-  const resetModalState = () => {
-    setServerName('');
-    setDescription('');
-    setIsPublic(false);
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        value={serverName}
-        onChange={(e) => setServerName(e.target.value)}
-        placeholder="Название сервера"
-        className="modal-input"
-      />
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Описание сервера"
-        className="modal-input"
-        rows={3}
-      />
-      <div className="server-type-toggle">
-        <label className="toggle-label">
-          <input
-            type="checkbox"
-            checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-          />
-          <span className="toggle-text">
-            {isPublic ? 'Публичный сервер' : 'Приватный сервер'}
-          </span>
-        </label>
-        <p className="toggle-description">
-          {isPublic 
-            ? 'Сервер будет виден в поиске и доступен всем' 
-            : 'Сервер будет доступен только по приглашению'}
-        </p>
-      </div>
-      <div className="modal-actions">
-        <button
-          onClick={handleSubmit}
-          disabled={!serverName.trim()}
-        >
-          Создать
-        </button>
-        <button onClick={resetModalState}>
-          Отмена
-        </button>
-      </div>
-    </form>
   );
 };
 

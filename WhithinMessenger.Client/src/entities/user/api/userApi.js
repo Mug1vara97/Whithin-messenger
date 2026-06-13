@@ -1,35 +1,100 @@
 import apiClient from '../../../shared/lib/api/apiClient';
 
+const extractError = (error, fallback) =>
+  error.response?.data?.error || error.response?.data?.Error || fallback;
+
 export const userApi = {
   async getProfile(userId) {
     const response = await apiClient.get(`/profile/${userId}/profile`);
     return response.data;
   },
 
-  async updateProfile(userId, userData) {
-    const response = await apiClient.put(`/user/profile/${userId}`, userData);
-    return response.data;
-  },
-
-  async updateStatus(userId, status) {
-    const response = await apiClient.put(`/user/status/${userId}`, { status });
-    return response.data;
-  },
-
-  async uploadAvatar(userId, file) {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    
-    const response = await apiClient.post(`/user/avatar/${userId}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  async updateProfileAvatar(userId, avatar) {
+    const response = await apiClient.post('/profile/update-avatar', {
+      UserId: userId,
+      Avatar: avatar,
     });
     return response.data;
   },
 
-  async deleteAvatar(userId) {
-    const response = await apiClient.delete(`/user/avatar/${userId}`);
+  async updateProfileBanner(userId, banner) {
+    const response = await apiClient.post('/profile/update-banner', {
+      UserId: userId,
+      Banner: banner,
+    });
+    return response.data;
+  },
+
+  async updateDescription(userId, description) {
+    try {
+      const response = await apiClient.post('/profile/update-description', {
+        UserId: userId,
+        Description: description,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось обновить описание'));
+    }
+  },
+
+  async updateAvatarColor(userId, avatarColor) {
+    try {
+      const response = await apiClient.post('/profile/update-avatar-color', {
+        UserId: userId,
+        AvatarColor: avatarColor,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось обновить цвет'));
+    }
+  },
+
+  async removeProfileAvatar(userId) {
+    try {
+      const response = await apiClient.post('/profile/remove-avatar', { UserId: userId });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось удалить аватар'));
+    }
+  },
+
+  async removeProfileBanner(userId) {
+    try {
+      const response = await apiClient.post('/profile/remove-banner', { UserId: userId });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось удалить баннер'));
+    }
+  },
+
+  async uploadProfileAvatar(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post('/profile/upload/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось загрузить аватар'));
+    }
+  },
+
+  async uploadProfileBanner(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post('/profile/upload/banner', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось загрузить баннер'));
+    }
+  },
+
+  async updateStatus(userId, status) {
+    const response = await apiClient.put(`/user/status/${userId}`, { status });
     return response.data;
   },
 
@@ -46,7 +111,7 @@ export const userApi = {
       });
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось сменить пароль');
+      throw new Error(extractError(error, 'Не удалось сменить пароль'));
     }
   },
 
@@ -58,31 +123,7 @@ export const userApi = {
       });
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.error || error.response?.data?.Error || 'Не удалось сменить email');
+      throw new Error(extractError(error, 'Не удалось сменить email'));
     }
   },
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

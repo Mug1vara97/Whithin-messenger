@@ -35,7 +35,7 @@
   flex-shrink: 0;
   width: 18px !important;
   height: 18px !important;
-  color: var(--text-muted, #949ba4);
+  color: var(--icon, var(--text-muted, #949ba4));
 }
 
 .message-search-input {
@@ -66,14 +66,14 @@
   border: none;
   border-radius: 3px;
   background: transparent;
-  color: var(--text-muted, #949ba4);
+  color: var(--icon, var(--text-muted, #949ba4));
   cursor: pointer;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .message-search-clear:hover,
 .message-search-results-close:hover {
-  color: var(--text, #dbdee1);
+  color: var(--icon-hover, var(--text, #dbdee1));
   background: var(--hover, #35373c);
 }
 

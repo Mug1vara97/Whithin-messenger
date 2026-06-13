@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { WorkspacePremium } from '@mui/icons-material';
 
 import UserAvatar from '../../atoms/UserAvatar';
+import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 
 import {
 
@@ -44,6 +45,8 @@ const MemberListSidebar = ({
 
 }) => {
 
+  const { openProfile } = useProfileModal();
+
   const grouped = useMemo(() => {
 
     if (groupByRoles && serverRoles.length > 0) {
@@ -72,7 +75,20 @@ const MemberListSidebar = ({
 
     return (
 
-      <div key={String(member.userId)} className="member-list-item" title={member.username}>
+      <div
+        key={String(member.userId)}
+        className="member-list-item member-list-item--clickable"
+        title={member.username}
+        role="button"
+        tabIndex={0}
+        onClick={() => openProfile(member.userId, member.username, member.status)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openProfile(member.userId, member.username, member.status);
+          }
+        }}
+      >
 
         <div className="member-list-avatar-wrap">
 

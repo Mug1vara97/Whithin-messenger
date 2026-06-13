@@ -1,4 +1,5 @@
 export * from './AddFriendModal';
+export * from './ForwardMessageModal';
 export * from './AddMemberModal';
 export * from './SearchBar';
 export * from './MessageItem';

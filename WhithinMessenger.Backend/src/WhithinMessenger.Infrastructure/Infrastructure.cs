@@ -54,6 +54,7 @@ public static class Infrastructure
         services.AddScoped<IStickerPackRepository, StickerPackRepository>();
         services.AddScoped<IIdeaBoardRepository, IdeaBoardRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserPushTokenStore, UserPushTokenStore>();
         
         // JWT Services

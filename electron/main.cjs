@@ -19,6 +19,21 @@ const {
   applySoundpadAudioConfig,
 } = require('./audioBridge.cjs');
 const { readSoundpadAudioConfig } = require('./soundpadElectronConfig.cjs');
+const {
+  registerDesktopNotificationIpc,
+  shutdownDesktopNotifications,
+} = require('./desktopNotifications.cjs');
+const {
+  registerCallOverlayIpc,
+  shutdownCallOverlay,
+} = require('./callOverlay.cjs');
+const {
+  registerActiveCallOverlayIpc,
+  shutdownActiveCallOverlay,
+  dismissActiveCallOverlay,
+} = require('./activeCallOverlay.cjs');
+
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
 
@@ -90,7 +105,8 @@ const SERVER_LIST_BAR_COLOR = '#1e1f22';
 
 /** Подпись в левой части кастомной шапки (Win/Linux) */
 const APP_DISPLAY_NAME = 'Whithin';
-const APP_ICON_PATH = path.join(__dirname, 'app-icon.png');
+const APP_ICON_PNG_PATH = path.join(__dirname, 'app-icon.png');
+const APP_ICON_ICO_PATH = path.join(__dirname, 'app-icon.ico');
 
 /** Высота полоски шапки; синхронно с preload.cjs TITLE_BAR_OVERLAY_HEIGHT */
 const TITLE_BAR_OVERLAY_HEIGHT = 32;
@@ -99,6 +115,56 @@ const TITLE_BAR_OVERLAY_HEIGHT = 32;
 const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 176;
 
 let mainWindow = null;
+
+function createWindowsBadgeOverlay(count) {
+  const label = count > 99 ? '99+' : String(count);
+  const fontSize = label.length > 2 ? 6 : label.length > 1 ? 7 : 8;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <circle cx="8" cy="8" r="7.5" fill="#ED4245"/>
+    <text x="8" y="11" text-anchor="middle" fill="#FFFFFF" font-size="${fontSize}" font-family="Segoe UI, Arial, sans-serif" font-weight="700">${label}</text>
+  </svg>`;
+  const image = nativeImage.createFromDataURL(
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  );
+  if (image.isEmpty()) {
+    return null;
+  }
+  return image.getSize().width === 16 ? image : image.resize({ width: 16, height: 16 });
+}
+
+function setAppBadgeCount(count) {
+  const normalized = typeof count === 'number' && count > 0 ? Math.min(Math.floor(count), 9999) : 0;
+
+  try {
+    if (typeof app.setBadgeCount === 'function') {
+      app.setBadgeCount(normalized);
+    }
+  } catch (error) {
+    console.warn('[badge] setBadgeCount failed:', error);
+  }
+
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  if (!win) {
+    return;
+  }
+
+  try {
+    if (normalized > 0) {
+      const overlay = createWindowsBadgeOverlay(normalized);
+      if (overlay) {
+        win.setOverlayIcon(overlay, `${normalized} непрочитанных`);
+      }
+    } else {
+      win.setOverlayIcon(null, '');
+    }
+  } catch (error) {
+    console.warn('[badge] setOverlayIcon failed:', error);
+  }
+}
 let shortcutCallbackWebContents = null;
 let selectedScreenSource = null;
 let lastSelectedScreenSource = null;
@@ -417,7 +483,32 @@ function dispatchShortcutAction(action, options = {}) {
 
   console.log('[mouse-bind-debug] dispatch action -> renderer:', action, 'targetId:', target.id);
   target.send('global-shortcut-triggered', action);
+
+  if (action === 'toggle-mic' || action === 'toggle-audio') {
+    requestActiveCallOverlaySyncFromRenderer();
+  }
+
   return true;
+}
+
+function requestActiveCallOverlaySyncFromRenderer() {
+  const target =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  if (!target || target.isDestroyed()) {
+    return;
+  }
+
+  target.send('electron:force-active-call-overlay-sync');
+  setTimeout(() => {
+    if (!target.isDestroyed()) {
+      target.send('electron:force-active-call-overlay-sync');
+    }
+  }, 120);
+  setTimeout(() => {
+    if (!target.isDestroyed()) {
+      target.send('electron:force-active-call-overlay-sync');
+    }
+  }, 350);
 }
 
 function getWin32GlobalMouseEvents() {
@@ -552,314 +643,8 @@ function openScreenPickerWindow(sources) {
   });
 }
 
-/**
- * Только Electron shell: безрамное окно + шапка без правок веб-клиента.
- */
-function buildElectronTitlebarChromeCss(h, reserve, barColor) {
-  return `
-html { height: 100%; overflow: hidden; }
-/* На всю ширину под шапкой окна */
-#electron-titlebar-fill {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: ${h}px !important;
-  background: ${barColor} !important;
-  z-index: 2147483646 !important;
-  pointer-events: none !important;
-}
-body.electron-titlebar-chrome {
-  margin: 0;
-  height: 100vh;
-  box-sizing: border-box;
-  padding-top: ${h}px;
-  overflow: hidden;
-}
-body.electron-titlebar-chrome #root {
-  height: 100% !important;
-  min-height: 0 !important;
-  padding-top: 0 !important;
-}
-body.electron-titlebar-chrome #root .app,
-body.electron-titlebar-chrome .app {
-  min-height: 100% !important;
-  height: 100% !important;
-}
-body.electron-titlebar-chrome .home-page {
-  height: 100% !important;
-  min-height: 0 !important;
-}
-body.electron-titlebar-chrome .loading-container {
-  min-height: 100% !important;
-  height: 100% !important;
-}
-body.electron-titlebar-chrome .friends-page,
-body.electron-titlebar-chrome .friends-panel {
-  height: 100% !important;
-}
-body.electron-titlebar-chrome .auth-container {
-  min-height: 100% !important;
-}
-body.electron-titlebar-chrome .server-discovery {
-  min-height: 100% !important;
-}
-body.electron-titlebar-chrome .role-management,
-body.electron-titlebar-chrome .role-management-content {
-  height: 100% !important;
-  min-height: 0 !important;
-}
-body.electron-titlebar-chrome .server-settings-page,
-body.electron-titlebar-chrome .server-settings-loading,
-body.electron-titlebar-chrome .server-settings-error {
-  min-height: 100% !important;
-}
-/* Кнопки окна: сами пиктограммы цветом «светофора», без залитого фона */
-#electron-window-controls {
-  position: fixed !important;
-  top: 0 !important;
-  right: 10px !important;
-  height: ${h}px !important;
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 4px !important;
-  z-index: 2147483647 !important;
-  -webkit-app-region: no-drag !important;
-  pointer-events: auto !important;
-}
-button.electron-tl {
-  width: 30px !important;
-  height: 24px !important;
-  min-width: 30px !important;
-  border-radius: 4px !important;
-  border: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  cursor: pointer !important;
-  flex-shrink: 0 !important;
-  box-sizing: border-box !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: transparent !important;
-}
-button.electron-tl svg {
-  display: block !important;
-  pointer-events: none !important;
-}
-button.electron-nav svg {
-  display: block !important;
-  pointer-events: none !important;
-}
-button.electron-nav {
-  color: #9aa1ac !important;
-}
-button.electron-nav:hover {
-  color: #d2d6de !important;
-}
-button.electron-reload-pill {
-  width: 30px !important;
-  min-width: 30px !important;
-  height: 24px !important;
-  margin-right: 6px !important;
-  border-radius: 4px !important;
-  border: none !important;
-  background: transparent !important;
-  color: #9aa1ac !important;
-}
-button.electron-reload-pill:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #d2d6de !important;
-}
-button.electron-reload-pill:active {
-  background: rgba(0, 0, 0, 0.12) !important;
-}
-button.electron-tl:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  filter: none !important;
-}
-button.electron-tl:active {
-  background: rgba(0, 0, 0, 0.12) !important;
-}
-#electron-titlebar-drag-shim {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: ${reserve}px !important;
-  height: ${h}px !important;
-  display: flex !important;
-  align-items: center !important;
-  padding-left: 12px !important;
-  box-sizing: border-box !important;
-  -webkit-app-region: drag !important;
-  app-region: drag !important;
-  z-index: 2147483647 !important;
-}
-#electron-titlebar-drag-shim .electron-titlebar-app-name {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.01em !important;
-  color: #dcddde !important;
-  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif !important;
-  pointer-events: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  min-width: 0 !important;
-}
-`.trim();
-}
-
-/**
- * Шапка без системных кнопок: заливка, drag, кастомные «светофоры» через preload IPC.
- */
-function installCustomTitlebarChrome(webContents) {
-  if (process.platform !== 'win32' && process.platform !== 'linux') {
-    return;
-  }
-
-  const h = TITLE_BAR_OVERLAY_HEIGHT;
-  const reserve = TITLEBAR_DRAG_RIGHT_RESERVE_PX;
-  const chromeCss = buildElectronTitlebarChromeCss(h, reserve, SERVER_LIST_BAR_COLOR);
-  const appTitleJson = JSON.stringify(APP_DISPLAY_NAME);
-
-  webContents.on('dom-ready', async () => {
-    try {
-      await webContents.executeJavaScript(`
-        (function () {
-          var appTitle = ${appTitleJson};
-          var css = ${JSON.stringify(chromeCss)};
-          document.body.classList.add('electron-titlebar-chrome');
-          var st = document.getElementById('electron-titlebar-style');
-          if (!st) {
-            st = document.createElement('style');
-            st.id = 'electron-titlebar-style';
-            document.head.appendChild(st);
-          }
-          st.textContent = css;
-          var prevFill = document.getElementById('electron-titlebar-fill');
-          if (prevFill) prevFill.remove();
-          var fill = document.createElement('div');
-          fill.id = 'electron-titlebar-fill';
-          fill.setAttribute('aria-hidden', 'true');
-          document.body.appendChild(fill);
-          var prev = document.getElementById('electron-titlebar-drag-shim');
-          if (prev) prev.remove();
-          var shim = document.createElement('div');
-          shim.id = 'electron-titlebar-drag-shim';
-          var titleEl = document.createElement('span');
-          titleEl.className = 'electron-titlebar-app-name';
-          titleEl.textContent = appTitle;
-          shim.appendChild(titleEl);
-          document.body.appendChild(shim);
-          var prevCtr = document.getElementById('electron-window-controls');
-          if (prevCtr) prevCtr.remove();
-          if (window.electronAPI && typeof window.electronAPI.windowClose === 'function') {
-            var cMax = '#28c840';
-            var cMin = '#ffbd2e';
-            var cClose = '#ff5f57';
-            var cNav = '#9aa1ac';
-            var sw = '1.35';
-            var iconReload =
-              '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
-              '<path d="M9.2 3.2A4.2 4.2 0 106 10.2" fill="none" stroke="' +
-              cNav +
-              '" stroke-width="' +
-              sw +
-              '" stroke-linecap="round"/>' +
-              '<path d="M9.2 3.2v2.4H6.8" fill="none" stroke="' +
-              cNav +
-              '" stroke-width="' +
-              sw +
-              '" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            var iconMax =
-              '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
-              '<rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1" fill="none" stroke="' +
-              cMax +
-              '" stroke-width="' +
-              sw +
-              '"/></svg>';
-            var iconMin =
-              '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
-              '<path stroke="' +
-              cMin +
-              '" stroke-width="' +
-              sw +
-              '" stroke-linecap="round" d="M2.25 9h7.5"/></svg>';
-            var iconClose =
-              '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
-              '<path stroke="' +
-              cClose +
-              '" stroke-width="' +
-              sw +
-              '" stroke-linecap="round" d="M3 3l6 6M9 3L3 9"/></svg>';
-            var ctr = document.createElement('div');
-            ctr.id = 'electron-window-controls';
-            function addTl(cls, label, fn, svgHtml) {
-              var b = document.createElement('button');
-              b.type = 'button';
-              b.className = 'electron-tl ' + cls;
-              b.title = label;
-              b.setAttribute('aria-label', label);
-              b.innerHTML = svgHtml;
-              b.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                fn();
-              });
-              ctr.appendChild(b);
-            }
-            addTl(
-              'electron-nav electron-reload-pill',
-              'Перезагрузить',
-              function () {
-                try {
-                  window.location.reload();
-                } catch (_) {
-                  if (window.electronAPI.navigationReload) {
-                    window.electronAPI.navigationReload();
-                  }
-                }
-              },
-              iconReload
-            );
-            addTl(
-              'electron-tl-max',
-              'Развернуть',
-              function () {
-                window.electronAPI.windowToggleMaximize();
-              },
-              iconMax
-            );
-            addTl(
-              'electron-tl-min',
-              'Свернуть',
-              function () {
-                window.electronAPI.windowMinimize();
-              },
-              iconMin
-            );
-            addTl(
-              'electron-tl-close',
-              'Закрыть',
-              function () {
-                window.electronAPI.windowClose();
-              },
-              iconClose
-            );
-            document.body.appendChild(ctr);
-          }
-        })();
-      `);
-    } catch (err) {
-      console.error('installCustomTitlebarChrome:', err);
-    }
-  });
-}
+/** Шапка окна рендерится в React (ElectronTitlebar); здесь только хук для совместимости. */
+function installCustomTitlebarChrome(_webContents) {}
 
 function registerGlobalShortcuts(shortcuts = {}) {
   mouseShortcutBindings = [];
@@ -908,24 +693,91 @@ function registerGlobalShortcuts(shortcuts = {}) {
   syncWin32GlobalMouseHook();
 }
 
+function getWindowIconPath() {
+  if (process.platform === 'win32' && fs.existsSync(APP_ICON_ICO_PATH)) {
+    return APP_ICON_ICO_PATH;
+  }
+  if (fs.existsSync(APP_ICON_PNG_PATH)) {
+    return APP_ICON_PNG_PATH;
+  }
+  return undefined;
+}
+
+function loadIconFromPath(iconPath, size) {
+  if (!iconPath) {
+    return null;
+  }
+
+  const icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    return null;
+  }
+
+  if (!size) {
+    return icon;
+  }
+
+  const resized = icon.resize({ width: size, height: size, quality: 'best' });
+  return resized.isEmpty() ? icon : resized;
+}
+
+function getAppIconImage(size) {
+  const iconPath = getWindowIconPath();
+  return loadIconFromPath(iconPath, size);
+}
+
 function getTrayImage() {
+  const trayIcon = getAppIconImage(16);
+  if (trayIcon) {
+    return trayIcon;
+  }
+
   const iconPath = path.join(__dirname, 'tray.png');
   if (fs.existsSync(iconPath)) {
     const img = nativeImage.createFromPath(iconPath);
     if (!img.isEmpty()) {
-      return img;
+      return img.resize({ width: 16, height: 16 });
     }
   }
+
   return nativeImage.createFromDataURL(
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   );
 }
 
-function getWindowIconPath() {
-  if (fs.existsSync(APP_ICON_PATH)) {
-    return APP_ICON_PATH;
+function emitMainWindowVisibility() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const minimized = mainWindow.isMinimized();
+  const visible = mainWindow.isVisible();
+  const focused = mainWindow.isFocused();
+
+  mainWindow.webContents.send('electron:window-visibility-changed', {
+    minimized,
+    visible,
+    focused,
+  });
+
+  if (visible && focused && !minimized) {
+    dismissActiveCallOverlay();
   }
-  return undefined;
+}
+
+function applyWindowIcon(win) {
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+
+  const iconPath = getWindowIconPath();
+  if (iconPath) {
+    win.setIcon(iconPath);
+    return;
+  }
+
+  const icon = getAppIconImage(process.platform === 'win32' ? 32 : undefined);
+  if (icon) {
+    win.setIcon(icon);
+  }
 }
 
 function showMainWindow() {
@@ -952,7 +804,14 @@ function createTray() {
     return;
   }
   try {
-    const icon = getTrayImage();
+    const iconPath = getWindowIconPath();
+    let icon = iconPath ? nativeImage.createFromPath(iconPath) : getTrayImage();
+    if (icon.isEmpty()) {
+      icon = getTrayImage();
+    }
+    if (!icon.isEmpty() && icon.getSize().width !== 16) {
+      icon = icon.resize({ width: 16, height: 16, quality: 'best' });
+    }
     if (icon.isEmpty()) {
       console.warn('Tray: пустая иконка, трей отключён');
       return;
@@ -988,9 +847,9 @@ function createTray() {
 }
 
 function createWindow() {
+  const iconPath = getWindowIconPath();
   const windowOptions = {
     title: APP_DISPLAY_NAME,
-    icon: getWindowIconPath(),
     width: 1400,
     height: 900,
     minWidth: 1100,
@@ -1001,9 +860,19 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false,
     }
   };
+
+  if (iconPath) {
+    windowOptions.icon = iconPath;
+  } else {
+    const appIcon = getAppIconImage(process.platform === 'win32' ? 32 : undefined);
+    if (appIcon) {
+      windowOptions.icon = appIcon;
+    }
+  }
 
   /* Без рамки: свои кнопки «светофор»; thickFrame — края для ресайза на Windows */
   if (process.platform === 'win32' || process.platform === 'linux') {
@@ -1012,6 +881,8 @@ function createWindow() {
   }
 
   mainWindow = new BrowserWindow(windowOptions);
+  applyWindowIcon(mainWindow);
+  mainWindow.webContents.setBackgroundThrottling(false);
 
   mainWindow.webContents.on('before-input-event', (_event, input) => {
     const key = String(input.key || '').toLowerCase();
@@ -1089,6 +960,11 @@ function createWindow() {
 
   mainWindow.loadURL(rendererUrl);
 
+  ['minimize', 'restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
+    mainWindow.on(eventName, emitMainWindowVisibility);
+  });
+  mainWindow.webContents.on('did-finish-load', emitMainWindowVisibility);
+
   mainWindow.on('close', (e) => {
     if (allowAppQuit) {
       return;
@@ -1112,6 +988,10 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('ru.whithin.desktop');
+  }
+
   app.on('second-instance', () => {
     showMainWindow();
   });
@@ -1205,6 +1085,10 @@ if (!gotSingleInstanceLock) {
 
 registerAudioBridgeIpc(ipcMain);
 
+registerDesktopNotificationIpc(() => mainWindow, showMainWindow);
+registerCallOverlayIpc(() => mainWindow, showMainWindow);
+registerActiveCallOverlayIpc();
+
 ipcMain.handle('electron:open-external', async (_, url) => {
   await shell.openExternal(url);
 });
@@ -1233,6 +1117,30 @@ ipcMain.on('electron:window-close', (event) => {
   if (win && !win.isDestroyed()) {
     win.close();
   }
+});
+
+ipcMain.on('electron:sync-window-background', (event, color) => {
+  if (typeof color !== 'string' || !color.trim()) {
+    return;
+  }
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+  try {
+    win.setBackgroundColor(color.trim());
+  } catch (err) {
+    console.warn('electron:sync-window-background failed:', err);
+  }
+});
+
+ipcMain.on('electron:set-badge-count', (_event, count) => {
+  const value = Number(count);
+  setAppBadgeCount(Number.isFinite(value) ? value : 0);
+});
+
+ipcMain.on('electron:focus-window', () => {
+  showMainWindow();
 });
 
 ipcMain.on('electron:navigation-back', (event) => {
@@ -1332,6 +1240,10 @@ app.on('before-quit', (event) => {
 });
 
 app.on('will-quit', () => {
+  shutdownDesktopNotifications();
+  shutdownCallOverlay();
+  shutdownActiveCallOverlay();
+  setAppBadgeCount(0);
   globalShortcut.unregisterAll();
   if (globalKeyboardListener) {
     try {

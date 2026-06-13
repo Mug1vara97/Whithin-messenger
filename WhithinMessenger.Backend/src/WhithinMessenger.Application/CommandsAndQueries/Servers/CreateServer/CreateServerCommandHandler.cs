@@ -55,41 +55,6 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             var createdServer = await _serverRepository.CreateAsync(server, cancellationToken);
 
-            var category = new ChatCategory
-            {
-                Id = Guid.NewGuid(),
-                CategoryName = "Текстовые каналы",
-                ServerId = createdServer.Id,
-                CategoryOrder = 0,
-                IsPrivate = false
-            };
-
-            var createdCategory = await _categoryRepository.CreateAsync(category, cancellationToken);
-
-            var chatType = await _chatRepository.GetChatTypeByNameAsync("TextChannel", cancellationToken);
-            if (chatType == null)
-            {
-                return new CreateServerResult
-                {
-                    Success = false,
-                    ErrorMessage = "Тип чата не найден"
-                };
-            }
-
-            var chat = new Chat
-            {
-                Id = Guid.NewGuid(),
-                Name = "Основной",
-                TypeId = chatType.Id,
-                CategoryId = createdCategory.Id,
-                ServerId = createdServer.Id,
-                CreatedAt = DateTimeOffset.UtcNow,
-                ChatOrder = 0
-            };
-
-            await _chatRepository.CreateAsync(chat, cancellationToken);
-            var createdChat = chat;
-
             var serverMember = new ServerMember
             {
                 Id = Guid.NewGuid(),
@@ -100,17 +65,88 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             await _serverMemberRepository.CreateAsync(serverMember, cancellationToken);
 
-            var chatMember = new Member
+            var textChatType = await _chatRepository.GetChatTypeByNameAsync("TextChannel", cancellationToken);
+            var voiceChatType = await _chatRepository.GetChatTypeByNameAsync("VoiceChannel", cancellationToken);
+            if (textChatType == null || voiceChatType == null)
+            {
+                return new CreateServerResult
+                {
+                    Success = false,
+                    ErrorMessage = "Тип чата не найден"
+                };
+            }
+
+            var textCategory = new ChatCategory
             {
                 Id = Guid.NewGuid(),
-                ChatId = createdChat.Id,
+                CategoryName = "Текстовые каналы",
+                ServerId = createdServer.Id,
+                CategoryOrder = 0,
+                IsPrivate = false
+            };
+
+            var createdTextCategory = await _categoryRepository.CreateAsync(textCategory, cancellationToken);
+
+            var textChat = new Chat
+            {
+                Id = Guid.NewGuid(),
+                Name = "Основной",
+                TypeId = textChatType.Id,
+                CategoryId = createdTextCategory.Id,
+                ServerId = createdServer.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ChatOrder = 0
+            };
+
+            await _chatRepository.CreateAsync(textChat, cancellationToken);
+
+            var voiceCategory = new ChatCategory
+            {
+                Id = Guid.NewGuid(),
+                CategoryName = "Голосовые каналы",
+                ServerId = createdServer.Id,
+                CategoryOrder = 1,
+                IsPrivate = false
+            };
+
+            var createdVoiceCategory = await _categoryRepository.CreateAsync(voiceCategory, cancellationToken);
+
+            var voiceChat = new Chat
+            {
+                Id = Guid.NewGuid(),
+                Name = "Общий",
+                TypeId = voiceChatType.Id,
+                CategoryId = createdVoiceCategory.Id,
+                ServerId = createdServer.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ChatOrder = 0
+            };
+
+            await _chatRepository.CreateAsync(voiceChat, cancellationToken);
+
+            var textChatMember = new Member
+            {
+                Id = Guid.NewGuid(),
+                ChatId = textChat.Id,
                 UserId = request.OwnerId,
                 JoinedAt = DateTimeOffset.UtcNow,
-                Chat = createdChat,
+                Chat = textChat,
                 User = owner
             };
 
-            await _chatMemberRepository.CreateAsync(chatMember, cancellationToken);
+            await _chatMemberRepository.CreateAsync(textChatMember, cancellationToken);
+
+            var voiceChatMember = new Member
+            {
+                Id = Guid.NewGuid(),
+                ChatId = voiceChat.Id,
+                UserId = request.OwnerId,
+                JoinedAt = DateTimeOffset.UtcNow,
+                Chat = voiceChat,
+                User = owner
+            };
+
+            await _chatMemberRepository.CreateAsync(voiceChatMember, cancellationToken);
 
             return new CreateServerResult
             {
@@ -126,7 +162,7 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
                     avatar = createdServer.Avatar,
                     banner = createdServer.Banner,
                     bannerColor = createdServer.BannerColor,
-                    defaultChannelId = createdChat.Id,
+                    defaultChannelId = textChat.Id,
                     position = 0
                 }
             };

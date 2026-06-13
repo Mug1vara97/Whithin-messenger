@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whithin call overlay</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .host {
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--call-bg, #17212b);
+      border: 1px solid color-mix(in srgb, var(--call-border, #2b3945) 80%, transparent);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 18px 16px 16px;
+    }
+
+    .badge {
+      color: var(--call-primary, #23a559);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .avatar-wrap {
+      position: relative;
+      width: 78px;
+      height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .avatar-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid var(--call-primary, #23a559);
+      animation: ringPulse 1.6s ease-in-out infinite;
+    }
+
+    .avatar-ring::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid color-mix(in srgb, var(--call-primary, #23a559) 45%, transparent);
+      animation: ringPulseOuter 1.6s ease-in-out infinite;
+    }
+
+    @keyframes ringPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.72; }
+    }
+
+    @keyframes ringPulseOuter {
+      0%, 100% { transform: scale(1); opacity: 0.45; }
+      50% { transform: scale(1.12); opacity: 0.15; }
+    }
+
+    .avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 24px;
+      background: #5865f2;
+      position: relative;
+      z-index: 1;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .caller {
+      margin-top: 14px;
+      color: var(--call-text, #ffffff);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--call-text-muted, #8b9bab);
+      font-size: 13px;
+      line-height: 1.25;
+      text-align: center;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      margin-top: auto;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding-top: 16px;
+    }
+
+    .action {
+      flex: 1;
+      max-width: 118px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: filter 0.15s ease, transform 0.15s ease;
+    }
+
+    .action:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .action.decline {
+      background: #ed4245;
+    }
+
+    .action.accept {
+      background: #23a559;
+    }
+
+    [data-theme-preset='cyberpunk'] .host {
+      box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.5),
+        0 0 0 1px var(--call-cp-red, #ff2a6d);
+    }
+
+    [data-theme-preset='cyberpunk'] .badge,
+    [data-theme-preset='cyberpunk'] .avatar-ring {
+      border-color: var(--call-cp-cyan, #00f0ff);
+      color: var(--call-cp-cyan, #00f0ff);
+      text-shadow: var(--call-cp-glow-cyan, none);
+    }
+
+    [data-theme-preset='cyberpunk'] .caller {
+      color: var(--call-cp-yellow, #fff);
+      text-shadow: var(--call-cp-glow-yellow, none);
+    }
+
+    [data-theme-preset='night-city'] .caller {
+      text-shadow: var(--call-nc-text-glow, none);
+    }
+  </style>
+</head>
+<body>
+  <div class="host" id="host" hidden>
+    <div class="badge">Входящий звонок</div>
+    <div class="avatar-wrap">
+      <div class="avatar-ring" aria-hidden="true"></div>
+      <div class="avatar" id="avatar"></div>
+    </div>
+    <div class="caller" id="caller"></div>
+    <div class="subtitle" id="subtitle"></div>
+    <div class="actions">
+      <button type="button" class="action decline" id="declineBtn">Отклонить</button>
+      <button type="button" class="action accept" id="acceptBtn">Принять</button>
+    </div>
+  </div>
+
+  <script>
+    const hostEl = document.getElementById('host');
+    const avatarEl = document.getElementById('avatar');
+    const callerEl = document.getElementById('caller');
+    const subtitleEl = document.getElementById('subtitle');
+    const acceptBtn = document.getElementById('acceptBtn');
+    const declineBtn = document.getElementById('declineBtn');
+    let call = null;
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function applyTheme(theme) {
+      if (!theme) return;
+
+      const root = document.documentElement;
+      if (theme.presetId) {
+        root.setAttribute('data-theme-preset', theme.presetId);
+      }
+
+      const vars = theme.vars || {};
+      const map = {
+        bg: '--call-bg',
+        text: '--call-text',
+        textMuted: '--call-text-muted',
+        primary: '--call-primary',
+        border: '--call-border',
+        cpCyan: '--call-cp-cyan',
+        cpYellow: '--call-cp-yellow',
+        cpRed: '--call-cp-red',
+        cpGlowCyan: '--call-cp-glow-cyan',
+        cpGlowYellow: '--call-cp-glow-yellow',
+        ncTextGlow: '--call-nc-text-glow',
+      };
+
+      Object.entries(map).forEach(([key, cssVar]) => {
+        const value = vars[key];
+        if (value) {
+          root.style.setProperty(cssVar, value);
+        }
+      });
+    }
+
+    function renderAvatar(item) {
+      const name = item.callerName || item.chatName || '?';
+      const initial = name.charAt(0).toUpperCase();
+      const bg = item.avatarColor || '#5865f2';
+
+      avatarEl.style.background = bg;
+      avatarEl.dataset.initial = initial;
+      avatarEl.textContent = '';
+
+      if (item.avatarUrl) {
+        const img = document.createElement('img');
+        img.src = item.avatarUrl;
+        img.alt = '';
+        img.onerror = () => {
+          img.remove();
+          avatarEl.textContent = initial;
+        };
+        avatarEl.appendChild(img);
+        return;
+      }
+
+      avatarEl.textContent = initial;
+    }
+
+    function render() {
+      if (!call) {
+        hostEl.hidden = true;
+        return;
+      }
+
+      hostEl.hidden = false;
+      renderAvatar(call);
+      callerEl.textContent = call.callerName || call.chatName || 'Неизвестный';
+      subtitleEl.textContent = call.chatName && call.chatName !== call.callerName
+        ? call.chatName
+        : 'Звонок в Whithin';
+    }
+
+    acceptBtn.addEventListener('click', () => {
+      window.callOverlayHostAPI.accept();
+    });
+
+    declineBtn.addEventListener('click', () => {
+      window.callOverlayHostAPI.decline();
+    });
+
+    window.callOverlayHostAPI.onData((data) => {
+      if (data?.theme) {
+        applyTheme(data.theme);
+      }
+      call = data?.call || null;
+      render();
+    });
+  </script>
+</body>
+</html>

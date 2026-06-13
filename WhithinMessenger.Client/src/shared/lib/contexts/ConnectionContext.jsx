@@ -77,6 +77,11 @@ export const ConnectionProvider = ({ children }) => {
 
       await connection.start();
       connectionRefs.current[connectionKey] = connection;
+
+      if (hubName.toLowerCase() === 'chatlisthub') {
+        connection.on('chatunreadupdated', () => {});
+      }
+
       setConnections(prev => ({ ...prev, [connectionKey]: connection }));
       console.log(`Connection ${connectionKey} established successfully`);
       return connection;

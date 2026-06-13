@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Mic, Headset, GraphicEq, RestartAlt, Check, Close } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import HeadsetIcon from '@mui/icons-material/Headset';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import TuneIcon from '@mui/icons-material/Tune';
+import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
+import KeyboardOutlinedIcon from '@mui/icons-material/KeyboardOutlined';
+import { Mic, Headset, GraphicEq, RestartAlt, Check } from '@mui/icons-material';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
@@ -7,24 +15,84 @@ import { userApi } from '../../../../entities/user/api/userApi';
 import { SoundpadConfigSection } from '../SoundpadConfigSection';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import { ParticipantVolumeSettings } from '../../molecules/ParticipantVolumeSettings';
+import { ProfileCustomizeSection } from '../../molecules/ProfileCustomizeSection';
 import {
   getThemePresetId,
   persistThemePreset,
   THEME_PRESET_LIST,
 } from '../../../lib/theme/appTheme';
+import {
+  getInAppNotificationsEnabled,
+  setInAppNotificationsEnabled,
+  getNotificationPosition,
+  setNotificationPosition,
+  NOTIFICATION_POSITION_OPTIONS,
+} from '../../../lib/utils/inAppNotificationSettings';
+import {
+  getActiveCallOverlayEnabled,
+  setActiveCallOverlayEnabled,
+  getActiveCallOverlayCoords,
+  setActiveCallOverlayCoords,
+} from '../../../lib/utils/activeCallOverlaySettings';
+import { syncDesktopNotificationSettings } from '../../../lib/utils/desktopNotificationBridge';
+import { syncDesktopActiveCallOverlaySettings } from '../../../lib/utils/desktopActiveCallOverlayBridge';
+import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
 
 const BASE_TABS = [
-  { id: 'account', label: 'Аккаунт' },
-  { id: 'audio', label: 'Аудио' },
-  { id: 'soundpad', label: 'Саундпад', electronOnly: true },
-  { id: 'interface', label: 'Интерфейс' },
-  { id: 'notifications', label: 'Уведомления' },
-  { id: 'hotkeys', label: 'Горячие клавиши' },
+  { id: 'account', label: 'Аккаунт', icon: PersonOutlineIcon },
+  { id: 'appearance', label: 'Оформление', icon: PaletteOutlinedIcon },
+  { id: 'audio', label: 'Аудио', icon: HeadsetIcon },
+  { id: 'soundpad', label: 'Саундпад', icon: GraphicEqIcon, electronOnly: true },
+  { id: 'interface', label: 'Интерфейс', icon: TuneIcon },
+  { id: 'notifications', label: 'Уведомления', icon: NotificationsOutlinedIcon },
+  { id: 'hotkeys', label: 'Горячие клавиши', icon: KeyboardOutlinedIcon },
 ];
 
-const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
+const SettingsPanel = ({ title, description, children }) => (
+  <section className="settings-panel">
+    {title && <h3 className="settings-panel__title">{title}</h3>}
+    {description && <p className="settings-panel__desc">{description}</p>}
+    <div className="settings-panel__card">{children}</div>
+  </section>
+);
+
+const SettingsRow = ({ title, description, children, icon }) => (
+  <div className="settings-row">
+    <div className="settings-row__info">
+      {title && (
+        <span className={`settings-row__title${icon ? ' settings-row__title--with-icon' : ''}`}>
+          {icon}
+          {title}
+        </span>
+      )}
+      {description && <p className="settings-row__desc">{description}</p>}
+    </div>
+    {children && <div className="settings-row__control">{children}</div>}
+  </div>
+);
+
+const SettingsToggle = ({ id, checked, onChange, label, description, disabled = false }) => (
+  <div className="settings-row">
+    <div className="settings-row__info">
+      <label htmlFor={id} className="settings-row__title">
+        {label}
+      </label>
+      {description && <p className="settings-row__desc">{description}</p>}
+    </div>
+    <label className={`settings-switch${disabled ? ' settings-switch--disabled' : ''}`} htmlFor={id}>
+      <input id={id} type="checkbox" checked={checked} onChange={onChange} disabled={disabled} />
+      <span className="settings-switch__slider" />
+    </label>
+  </div>
+);
+
+const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdated }) => {
   const { user } = useAuthContext();
+  const userId = user?.id || user?.Id;
+  const username = user?.username || user?.Username || user?.userName || 'Пользователь';
+  const userEmail = user?.email || user?.Email;
+
   const [noiseSuppression, setNoiseSuppression] = useState(() => {
     const saved = localStorage.getItem('noiseSuppression');
     return saved ? JSON.parse(saved) : false;
@@ -37,6 +105,10 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     const saved = localStorage.getItem('soundNotificationsEnabled');
     return saved == null ? true : JSON.parse(saved);
   });
+  const [inAppNotificationsEnabled, setInAppNotificationsEnabledState] = useState(() => getInAppNotificationsEnabled());
+  const [notificationPosition, setNotificationPositionState] = useState(() => getNotificationPosition());
+  const [activeCallOverlayEnabled, setActiveCallOverlayEnabledState] = useState(() => getActiveCallOverlayEnabled());
+  const [activeCallOverlayCoords, setActiveCallOverlayCoordsState] = useState(() => getActiveCallOverlayCoords());
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -59,6 +131,8 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     [isElectron]
   );
 
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -74,10 +148,22 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
   }, [isOpen, initialTab, tabs]);
 
   useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     localStorage.setItem('noiseSuppression', JSON.stringify(noiseSuppression));
-    window.dispatchEvent(new CustomEvent('noiseSuppressionChanged', {
-      detail: { enabled: noiseSuppression },
-    }));
+    window.dispatchEvent(
+      new CustomEvent('noiseSuppressionChanged', {
+        detail: { enabled: noiseSuppression },
+      })
+    );
   }, [noiseSuppression]);
 
   useEffect(() => {
@@ -89,13 +175,23 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     );
   }, [soundNotificationsEnabled]);
 
-  const handleNoiseSuppressionToggle = () => {
-    setNoiseSuppression(!noiseSuppression);
-  };
+  useEffect(() => {
+    setInAppNotificationsEnabled(inAppNotificationsEnabled);
+  }, [inAppNotificationsEnabled]);
 
-  const handleSoundNotificationsToggle = () => {
-    setSoundNotificationsEnabled((prev) => !prev);
-  };
+  useEffect(() => {
+    setNotificationPosition(notificationPosition);
+    syncDesktopNotificationSettings();
+  }, [notificationPosition]);
+
+  useEffect(() => {
+    setActiveCallOverlayEnabled(activeCallOverlayEnabled);
+  }, [activeCallOverlayEnabled]);
+
+  useEffect(() => {
+    setActiveCallOverlayCoords(activeCallOverlayCoords);
+    syncDesktopActiveCallOverlaySettings();
+  }, [activeCallOverlayCoords]);
 
   const handleHotkeyEdit = (action) => {
     setEditingHotkey(action);
@@ -179,7 +275,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
     try {
       const response = await userApi.changePassword({ currentPassword, newPassword });
       const confirmationEmail =
-        response?.confirmationEmail || response?.ConfirmationEmail || user?.email || user?.Email;
+        response?.confirmationEmail || response?.ConfirmationEmail || userEmail;
       setPasswordMessage(
         response?.message ||
           `Письмо с подтверждением отправлено на ${confirmationEmail || 'ваш email'}`
@@ -231,19 +327,12 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
   };
 
   const renderHotkeyRow = (action, icon, title, description) => (
-    <div className="setting-item" key={action}>
-      <div className="setting-item-info">
-        <span className="setting-text setting-text-with-icon">
-          {icon}
-          {title}
-        </span>
-        <p className="setting-description">{description}</p>
-      </div>
+    <SettingsRow key={action} title={title} description={description} icon={icon}>
       {editingHotkey === action ? (
-        <div className="hotkey-edit-container">
+        <>
           <input
             type="text"
-            className="hotkey-input"
+            className="settings-hotkey-input"
             value={hotkeyStorage.formatKey(tempKey)}
             onKeyDown={handleHotkeyKeyDown}
             onMouseDown={handleHotkeyMouseDown}
@@ -252,131 +341,179 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
             autoFocus
             readOnly
           />
-          <button className="hotkey-save-btn" type="button" onClick={() => handleHotkeySave(action)} aria-label="Сохранить">
+          <button
+            className="settings-icon-btn settings-icon-btn--save"
+            type="button"
+            onClick={() => handleHotkeySave(action)}
+            aria-label="Сохранить"
+          >
             <Check fontSize="small" />
           </button>
-          <button className="hotkey-cancel-btn" type="button" onClick={handleHotkeyCancel} aria-label="Отмена">
-            <Close fontSize="small" />
+          <button
+            className="settings-icon-btn settings-icon-btn--cancel"
+            type="button"
+            onClick={handleHotkeyCancel}
+            aria-label="Отмена"
+          >
+            <CloseIcon fontSize="small" />
           </button>
-        </div>
+        </>
       ) : (
-        <div className="hotkey-display-container">
-          <span className="hotkey-display">{hotkeyStorage.formatKey(hotkeys[action])}</span>
-          <button className="hotkey-edit-btn" type="button" onClick={() => handleHotkeyEdit(action)}>
+        <>
+          <span className="settings-hotkey">{hotkeyStorage.formatKey(hotkeys[action])}</span>
+          <button
+            className="settings-btn settings-btn--ghost"
+            type="button"
+            onClick={() => handleHotkeyEdit(action)}
+          >
             Изменить
           </button>
-        </div>
+        </>
       )}
-    </div>
+    </SettingsRow>
   );
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'account':
         return (
-          <div className="setting-section">
-            <h3>Аккаунт</h3>
-            <div className="setting-item account-info">
-              <span className="setting-text">Текущий email</span>
-              <span className="account-email-value">{user?.email || user?.Email || '—'}</span>
-            </div>
-            <form className="account-form" onSubmit={handleChangeEmail}>
-              <p className="setting-description account-form-title">Смена email</p>
-              <label className="account-field">
-                <span>Новый email</span>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="new@example.com"
-                  autoComplete="email"
-                />
-              </label>
-              <label className="account-field">
-                <span>Текущий пароль</span>
-                <input
-                  type="password"
-                  value={emailPassword}
-                  onChange={(e) => setEmailPassword(e.target.value)}
-                  placeholder="Подтвердите паролем"
-                  autoComplete="current-password"
-                />
-              </label>
-              {emailError && <div className="account-error">{emailError}</div>}
-              {emailMessage && <div className="account-success">{emailMessage}</div>}
-              <button type="submit" className="account-submit-btn" disabled={isChangingEmail}>
-                {isChangingEmail ? 'Отправка...' : 'Сменить email'}
-              </button>
-            </form>
-            <form className="account-form" onSubmit={handleChangePassword}>
-              <p className="setting-description account-form-title">Смена пароля</p>
-              <label className="account-field">
-                <span>Текущий пароль</span>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </label>
-              <label className="account-field">
-                <span>Новый пароль</span>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              <label className="account-field">
-                <span>Повторите новый пароль</span>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              {passwordError && <div className="account-error">{passwordError}</div>}
-              {passwordMessage && <div className="account-success">{passwordMessage}</div>}
-              <button type="submit" className="account-submit-btn" disabled={isChangingPassword}>
-                {isChangingPassword ? 'Отправка...' : 'Сменить пароль'}
-              </button>
-            </form>
-          </div>
+          <>
+            <SettingsPanel title="Email">
+              <SettingsRow title="Текущий email">
+                <span className="settings-row__value">{userEmail || '—'}</span>
+              </SettingsRow>
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Смена email"
+              description="На новый адрес придёт письмо с подтверждением."
+            >
+              <form onSubmit={handleChangeEmail}>
+                {emailError && <div className="settings-alert settings-alert--error">{emailError}</div>}
+                {emailMessage && (
+                  <div className="settings-alert settings-alert--success">{emailMessage}</div>
+                )}
+                <div className="settings-field">
+                  <label htmlFor="settings-new-email">Новый email</label>
+                  <input
+                    id="settings-new-email"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="new@example.com"
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="settings-email-password">Текущий пароль</label>
+                  <input
+                    id="settings-email-password"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    placeholder="Подтвердите паролем"
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="settings-form-actions">
+                  <button type="submit" className="settings-btn settings-btn--primary" disabled={isChangingEmail}>
+                    {isChangingEmail ? 'Отправка…' : 'Сменить email'}
+                  </button>
+                </div>
+              </form>
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Смена пароля"
+              description="После смены пароля потребуется подтверждение по email."
+            >
+              <form onSubmit={handleChangePassword}>
+                {passwordError && (
+                  <div className="settings-alert settings-alert--error">{passwordError}</div>
+                )}
+                {passwordMessage && (
+                  <div className="settings-alert settings-alert--success">{passwordMessage}</div>
+                )}
+                <div className="settings-field">
+                  <label htmlFor="settings-current-password">Текущий пароль</label>
+                  <input
+                    id="settings-current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="settings-new-password">Новый пароль</label>
+                  <input
+                    id="settings-new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="settings-confirm-password">Повторите новый пароль</label>
+                  <input
+                    id="settings-confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="settings-form-actions">
+                  <button
+                    type="submit"
+                    className="settings-btn settings-btn--primary"
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? 'Отправка…' : 'Сменить пароль'}
+                  </button>
+                </div>
+              </form>
+            </SettingsPanel>
+          </>
+        );
+
+      case 'appearance':
+        return (
+          <ProfileCustomizeSection
+            userId={userId}
+            username={username}
+            active={isOpen && activeTab === 'appearance'}
+            onProfileUpdated={onProfileUpdated}
+          />
         );
 
       case 'audio':
         return (
-          <div className="setting-section">
-            <h3>Аудио</h3>
-            <div className="setting-item">
-              <label className="setting-label">
-                <input
-                  type="checkbox"
-                  checked={noiseSuppression}
-                  onChange={handleNoiseSuppressionToggle}
-                />
-                <span className="setting-text">Подавление шума</span>
-              </label>
-              <p className="setting-description">
-                Автоматически удаляет фоновый шум из микрофона. В режиме VB-Cable отключается —
-                используется поток CABLE Output без дополнительной обработки.
-              </p>
-            </div>
-            <div className="setting-item">
-              <h4 className="setting-subheading">Саундпад в звонке</h4>
-              <SoundpadRemotePlaybackSetting
-                checkboxClassName="setting-label"
-                hintClassName="setting-description"
-                labelTextClassName="setting-text"
+          <>
+            <SettingsPanel title="Микрофон">
+              <SettingsToggle
+                id="settings-noise-suppression"
+                checked={noiseSuppression}
+                onChange={() => setNoiseSuppression((prev) => !prev)}
+                label="Подавление шума"
+                description="Убирает фоновый шум с микрофона. В режиме VB-Cable отключается — используется поток CABLE Output без дополнительной обработки."
               />
-            </div>
-            <div className="setting-item">
-              <h4 className="setting-subheading">Громкость участников</h4>
-              <ParticipantVolumeSettings />
-            </div>
-          </div>
+            </SettingsPanel>
+
+            <SettingsPanel title="Звонки">
+              <SoundpadRemotePlaybackSetting variant="settings-row" />
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Громкость участников"
+              description="Сохранённые уровни применяются при следующем звонке с участником."
+            >
+              <div className="settings-embedded-block">
+                <ParticipantVolumeSettings />
+              </div>
+            </SettingsPanel>
+          </>
         );
 
       case 'soundpad':
@@ -384,103 +521,146 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
 
       case 'interface':
         return (
-          <div className="setting-section">
-            <h3>Интерфейс</h3>
-            <div className="setting-item">
-              <label className="setting-label">
-                <span className="setting-text">Тема оформления</span>
-                <select
-                  className="setting-select"
-                  value={themePresetId}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setThemePresetId(nextId);
-                    persistThemePreset(nextId);
-                  }}
-                >
-                  {THEME_PRESET_LIST.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
-                <p className="setting-description">
+          <SettingsPanel
+            title="Тема"
+            description="Внешний вид интерфейса приложения."
+          >
+            <SettingsRow title="Тема оформления">
+              <select
+                className="settings-select"
+                value={themePresetId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setThemePresetId(nextId);
+                  persistThemePreset(nextId);
+                }}
+              >
+                {THEME_PRESET_LIST.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+            {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
+              <div className="settings-row">
+                <p className="settings-row__desc" style={{ margin: 0 }}>
                   {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId).description}
                 </p>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </SettingsPanel>
         );
 
       case 'notifications':
         return (
-          <div className="setting-section">
-            <h3>Уведомления</h3>
-            <div className="setting-item">
-              <label className="setting-label">
-                <input
-                  type="checkbox"
-                  checked={soundNotificationsEnabled}
-                  onChange={handleSoundNotificationsToggle}
-                />
-                <span className="setting-text">Звуковые уведомления</span>
-              </label>
-            </div>
-            <div className="setting-item">
-              <label className="setting-label">
-                <input type="checkbox" defaultChecked />
-                <span className="setting-text">Уведомления в браузере</span>
-              </label>
-            </div>
-          </div>
+          <SettingsPanel title="Уведомления">
+            <SettingsToggle
+              id="settings-in-app-notifications"
+              checked={inAppNotificationsEnabled}
+              onChange={() => setInAppNotificationsEnabledState((prev) => !prev)}
+              label="Уведомления на рабочем столе"
+              description="Отдельные окна поверх рабочего стола, как в Telegram Desktop. Не используются системные уведомления Windows."
+            />
+            <SettingsRow
+              title="Позиция уведомлений"
+              description="Где на экране показывать всплывающие уведомления."
+            >
+              <select
+                className="settings-select"
+                value={notificationPosition}
+                onChange={(e) => setNotificationPositionState(e.target.value)}
+              >
+                {NOTIFICATION_POSITION_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+            {isElectron && (
+              <SettingsRow
+                title="Входящий звонок"
+                description="Когда приложение свёрнуто или в фоне, карточка дозвона всегда показывается по центру экрана."
+              />
+            )}
+            {isElectron && (
+              <SettingsToggle
+                id="settings-active-call-overlay"
+                checked={activeCallOverlayEnabled}
+                onChange={() => setActiveCallOverlayEnabledState((prev) => !prev)}
+                label="Панель участников звонка"
+                description="Компактный оверлей во время звонка, когда приложение свёрнуто или в фоне: аватар, ник, микрофон и наушники."
+              />
+            )}
+            {isElectron && (
+              <div className="settings-row settings-row--stacked">
+                <div className="settings-row__info">
+                  <span className="settings-row__title">Позиция панели участников</span>
+                  <p className="settings-row__desc">
+                    Выберите любое место на экране — нажмите или перетащите маркер по схеме.
+                  </p>
+                </div>
+                <div className="settings-row__control settings-row__control--wide">
+                  <ActiveCallOverlayPositionPicker
+                    coords={activeCallOverlayCoords}
+                    onChange={setActiveCallOverlayCoordsState}
+                    disabled={!activeCallOverlayEnabled}
+                  />
+                </div>
+              </div>
+            )}
+            <SettingsToggle
+              id="settings-sound-notifications"
+              checked={soundNotificationsEnabled}
+              onChange={() => setSoundNotificationsEnabled((prev) => !prev)}
+              label="Звуковые уведомления"
+              description="Воспроизводить звук в приложении при новых сообщениях."
+            />
+          </SettingsPanel>
         );
 
       case 'hotkeys':
         return (
-          <div className="setting-section">
-            <h3>Горячие клавиши</h3>
-            {isElectron && (
-              <p className="setting-description">
-                В десктоп-приложении хоткеи срабатывают глобально, даже когда окно в фоне.
-                Назначенные клавиши (F1 и др.) продолжают работать в играх, браузере и других программах.
-              </p>
-            )}
-            {renderHotkeyRow(
-              'toggleMic',
-              <Mic className="setting-row-icon" fontSize="small" />,
-              'Переключить микрофон',
-              'Включение/выключение микрофона'
-            )}
-            {renderHotkeyRow(
-              'toggleAudio',
-              <Headset className="setting-row-icon" fontSize="small" />,
-              'Переключить наушники',
-              'Включение/выключение звука в наушниках'
-            )}
-            {isElectron &&
-              renderHotkeyRow(
-                'toggleSoundpadPanel',
-                <GraphicEq className="setting-row-icon" fontSize="small" />,
-                'Панель саундпада',
-                'Открыть или закрыть окно с кнопками звуков (глобально в десктоп-приложении)'
+          <SettingsPanel
+            title="Горячие клавиши"
+            description={
+              isElectron
+                ? 'В десктоп-приложении сочетания работают глобально, даже когда окно в фоне. Назначенные клавиши (F1 и др.) продолжают работать в играх и других программах.'
+                : undefined
+            }
+          >
+              {renderHotkeyRow(
+                'toggleMic',
+                <Mic className="settings-row__title-icon" fontSize="small" />,
+                'Переключить микрофон',
+                'Включение и выключение микрофона'
               )}
-            <div className="setting-item">
-              <div className="setting-item-info">
-                <span className="setting-text setting-text-with-icon">
-                  <RestartAlt className="setting-row-icon" fontSize="small" />
-                  Сбросить горячие клавиши
-                </span>
-                <p className="setting-description">
-                  {isElectron ? 'Вернуть F1, F2 и F3 по умолчанию' : 'Вернуть F1 и F2 по умолчанию'}
-                </p>
-              </div>
-              <button className="hotkey-reset-btn" type="button" onClick={handleHotkeyReset}>
-                Сбросить
-              </button>
-            </div>
-          </div>
+              {renderHotkeyRow(
+                'toggleAudio',
+                <Headset className="settings-row__title-icon" fontSize="small" />,
+                'Переключить наушники',
+                'Включение и выключение звука в наушниках'
+              )}
+              {isElectron &&
+                renderHotkeyRow(
+                  'toggleSoundpadPanel',
+                  <GraphicEq className="settings-row__title-icon" fontSize="small" />,
+                  'Панель саундпада',
+                  'Открыть или закрыть окно с кнопками звуков'
+                )}
+              <SettingsRow
+                title="Сбросить горячие клавиши"
+                description={
+                  isElectron ? 'Вернуть F1, F2 и F3 по умолчанию' : 'Вернуть F1 и F2 по умолчанию'
+                }
+                icon={<RestartAlt className="settings-row__title-icon" fontSize="small" />}
+              >
+                <button className="settings-btn settings-btn--danger" type="button" onClick={handleHotkeyReset}>
+                  Сбросить
+                </button>
+              </SettingsRow>
+          </SettingsPanel>
         );
 
       default:
@@ -491,39 +671,53 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="settings-modal settings-modal--tabbed" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Настройки</h2>
-          <button type="button" className="close-button" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
-        <div className="settings-layout">
-          <nav className="settings-tabs" aria-label="Разделы настроек">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`settings-tab${activeTab === tab.id ? ' settings-tab--active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="settings-content settings-content--tabbed">
-            {renderTabContent()}
+    <div className="settings-modal" role="dialog" aria-modal="true" aria-label="Настройки">
+      <button type="button" className="settings-modal__backdrop" onClick={onClose} aria-label="Закрыть" />
+      <div className="settings-modal__shell" onClick={(e) => e.stopPropagation()}>
+        <aside className="settings-modal__sidebar">
+          <div className="settings-modal__sidebar-head">
+            <h2>Настройки</h2>
           </div>
-        </div>
+          <nav className="settings-modal__nav" aria-label="Разделы настроек">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`settings-modal__tab${
+                    activeTab === tab.id ? ' settings-modal__tab--active' : ''
+                  }`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <TabIcon />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="settings-modal__sidebar-foot">
+            <div className="settings-modal__user">
+              <div className="settings-modal__user-avatar">
+                {username.charAt(0).toUpperCase()}
+              </div>
+              <div className="settings-modal__user-meta">
+                <div className="settings-modal__user-name">{username}</div>
+                <div className="settings-modal__user-hint">ESC — закрыть</div>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-        <div className="modal-actions">
-          <button type="button" className="save-button" onClick={onClose}>
-            Закрыть
-          </button>
-        </div>
+        <main className="settings-modal__main">
+          <header className="settings-modal__page-header">
+            <h1>{activeTabMeta?.label || 'Настройки'}</h1>
+            <button type="button" className="settings-modal__close" onClick={onClose} aria-label="Закрыть">
+              <CloseIcon fontSize="small" />
+            </button>
+          </header>
+          <div className="settings-modal__content">{renderTabContent()}</div>
+        </main>
       </div>
     </div>
   );

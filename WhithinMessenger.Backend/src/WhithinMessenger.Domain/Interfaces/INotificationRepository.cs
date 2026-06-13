@@ -28,6 +28,8 @@ public class NotificationDto
     public string? ChatName { get; init; }
     public string? ServerName { get; init; }
     public string? SenderName { get; init; }
+    public string? SenderAvatarUrl { get; init; }
+    public string? SenderAvatarColor { get; init; }
     public string? MessageContent { get; init; }
 }
 

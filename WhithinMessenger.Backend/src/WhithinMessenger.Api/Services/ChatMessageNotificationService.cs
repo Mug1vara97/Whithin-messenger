@@ -10,6 +10,7 @@ public class ChatMessageNotificationService
     private readonly INotificationService _notificationService;
     private readonly IChatRepository _chatRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IHubContext<ChatListHub> _chatListHubContext;
     private readonly ILogger<ChatMessageNotificationService> _logger;
 
@@ -17,12 +18,14 @@ public class ChatMessageNotificationService
         INotificationService notificationService,
         IChatRepository chatRepository,
         IMessageRepository messageRepository,
+        IUserRepository userRepository,
         IHubContext<ChatListHub> chatListHubContext,
         ILogger<ChatMessageNotificationService> logger)
     {
         _notificationService = notificationService;
         _chatRepository = chatRepository;
         _messageRepository = messageRepository;
+        _userRepository = userRepository;
         _chatListHubContext = chatListHubContext;
         _logger = logger;
     }
@@ -149,12 +152,19 @@ public class ChatMessageNotificationService
                 return;
             }
 
-            var notificationType = isGroupChat ? "group_message" : "direct_message";
+            var sender = await _userRepository.GetByIdAsync(senderId, cancellationToken);
+            var senderAvatarUrl = sender?.UserProfile?.Avatar;
+            var senderAvatarColor = sender?.UserProfile?.AvatarColor;
+
+            var isServerChannel = chat.ServerId.HasValue;
+            var notificationType = isServerChannel
+                ? "server_message"
+                : isGroupChat ? "group_message" : "direct_message";
 
             foreach (var memberId in notificationMembers)
             {
                 var pushChatTitle = chatName;
-                if (!isGroupChat && chat.Type?.TypeName == "Private")
+                if (!isGroupChat && !isServerChannel && chat.Type?.TypeName == "Private")
                 {
                     pushChatTitle = senderUsername;
                 }
@@ -169,6 +179,8 @@ public class ChatMessageNotificationService
                     pushChatTitle,
                     serverDisplayName: chat.Server?.Name,
                     senderDisplayName: senderUsername,
+                    senderAvatarUrl: senderAvatarUrl,
+                    senderAvatarColor: senderAvatarColor,
                     pushMessageType: messageType,
                     pushPreviewText: truncatedPreview,
                     pushThumbnailUrl: string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl,

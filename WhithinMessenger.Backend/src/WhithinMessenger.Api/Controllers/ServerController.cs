@@ -21,19 +21,22 @@ public class ServerController : ControllerBase
     private readonly IWebHostEnvironment _environment;
     private readonly IHubContext<ServerHub> _serverHub;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public ServerController(
         IServerRepository serverRepository,
         IMediator mediator,
         IWebHostEnvironment environment,
         IHubContext<ServerHub> serverHub,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverRepository = serverRepository;
         _mediator = mediator;
         _environment = environment;
         _serverHub = serverHub;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     [HttpGet("servers")]
@@ -235,6 +238,14 @@ public class ServerController : ControllerBase
             server.Banner = relativePath;
             await _serverRepository.UpdateAsync(server);
 
+            await _auditLog.LogAsync(
+                serverId,
+                userId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                serverId,
+                new { targetName = server.Name, field = "banner_upload" });
+
             return Ok(new { banner = relativePath });
         }
         catch (Exception ex)
@@ -272,6 +283,18 @@ public class ServerController : ControllerBase
             }
 
             await _serverRepository.UpdateAsync(server);
+
+            await _auditLog.LogAsync(
+                serverId,
+                userId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                serverId,
+                new
+                {
+                    targetName = server.Name,
+                    field = request.ResetBannerColor ? "banner_color_reset" : "banner_color",
+                });
 
             return Ok(new
             {
@@ -318,6 +341,14 @@ public class ServerController : ControllerBase
 
             server.Banner = null;
             await _serverRepository.UpdateAsync(server);
+
+            await _auditLog.LogAsync(
+                serverId,
+                userId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                serverId,
+                new { targetName = server.Name, field = "banner_delete" });
 
             return Ok(new { message = "Баннер удален" });
         }
@@ -389,6 +420,14 @@ public class ServerController : ControllerBase
             server.Avatar = relativePath;
             await _serverRepository.UpdateAsync(server);
 
+            await _auditLog.LogAsync(
+                serverId,
+                userId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                serverId,
+                new { targetName = server.Name, field = "avatar_upload" });
+
             return Ok(new { avatar = relativePath });
         }
         catch (Exception ex)
@@ -426,6 +465,14 @@ public class ServerController : ControllerBase
 
             server.Avatar = null;
             await _serverRepository.UpdateAsync(server);
+
+            await _auditLog.LogAsync(
+                serverId,
+                userId,
+                AuditLogActionTypes.ServerUpdate,
+                AuditLogTargetTypes.Server,
+                serverId,
+                new { targetName = server.Name, field = "avatar_delete" });
 
             return Ok(new { message = "Аватар удален" });
         }

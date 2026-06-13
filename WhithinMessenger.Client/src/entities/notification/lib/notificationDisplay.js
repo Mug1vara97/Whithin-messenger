@@ -13,6 +13,8 @@ export const normalizeNotification = (notification) => ({
   serverName: pick(notification, 'serverName', 'ServerName'),
   chatName: pick(notification, 'chatName', 'ChatName'),
   senderName: pick(notification, 'senderName', 'SenderName'),
+  senderAvatarUrl: pick(notification, 'senderAvatarUrl', 'SenderAvatarUrl', 'senderAvatar', 'SenderAvatar'),
+  senderAvatarColor: pick(notification, 'senderAvatarColor', 'SenderAvatarColor', 'avatarColor', 'AvatarColor'),
   messageId: pick(notification, 'messageId', 'MessageId'),
   type: pick(notification, 'type', 'Type'),
   content: pick(notification, 'content', 'Content', 'messageContent', 'MessageContent') || '',
@@ -22,22 +24,27 @@ export const normalizeNotification = (notification) => ({
 
 export const getNotificationTypeLabel = (type, serverId) => {
   if (type === 'direct_message') return 'Личное сообщение';
-  if (serverId) return 'Сервер';
+  if (serverId || type === 'server_message') return 'Сервер';
   if (type === 'group_message') return 'Группа';
   return 'Уведомление';
 };
 
 export const getNotificationLocation = (notification) => {
-  const serverId = pick(notification, 'serverId', 'ServerId');
-  const serverName = pick(notification, 'serverName', 'ServerName');
-  const chatName = pick(notification, 'chatName', 'ChatName');
+  const item = normalizeNotification(notification);
+  const { serverId, serverName, chatName, type } = item;
 
-  if (serverId) {
-    const parts = [serverName, chatName].filter(Boolean);
+  if (serverId || type === 'server_message') {
+    const channelLabel = chatName
+      ? (chatName.startsWith('#') ? chatName : `#${chatName}`)
+      : null;
+    const parts = [serverName, channelLabel].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : 'Канал сервера';
   }
 
-  if (chatName) return chatName;
+  if (type === 'group_message' && chatName) {
+    return chatName;
+  }
+
   return null;
 };
 
@@ -72,6 +79,14 @@ export const getNotificationSenderLine = (notification) => {
 
   const messageText = getNotificationMessageText(notification);
   return messageText !== item.content ? item.senderName : null;
+};
+
+export const getNotificationToastTitle = (notification) => {
+  const item = normalizeNotification(notification);
+  if (item.senderName) return item.senderName;
+  if (item.serverId && item.chatName) return `# ${item.chatName}`;
+  if (item.chatName) return item.chatName;
+  return 'Новое сообщение';
 };
 
 export const formatNotificationTime = (createdAt) => {

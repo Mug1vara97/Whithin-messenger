@@ -7,6 +7,7 @@ const SoundpadRemotePlaybackSetting = ({
   hintClassName = 'soundpad-hint',
   labelTextClassName = '',
   showHint = true,
+  variant = 'default',
 }) => {
   const [remoteSoundpadEnabled, setRemoteSoundpadEnabled] = useState(
     () => soundpadStorage.getConfig().remoteSoundpadEnabled !== false
@@ -27,15 +28,36 @@ const SoundpadRemotePlaybackSetting = ({
     useCallStore.getState().applyRemoteSoundpadVolumes();
   };
 
+  const hint = showHint ? (
+    <p className={hintClassName}>
+      Отключает только звуки саундпада от других людей в звонке. Голос они по-прежнему слышны.
+      Работает, если у них режим «Физический микрофон». В режиме VB-Cable саундпад смешан с голосом
+      и отключить отдельно нельзя.
+    </p>
+  ) : null;
+
+  if (variant === 'settings-row') {
+    return (
+      <div className="settings-row">
+        <div className="settings-row__info">
+          <span className="settings-row__title">Слышать саундпад других участников</span>
+          {hint}
+        </div>
+        <label className="settings-switch">
+          <input
+            type="checkbox"
+            checked={remoteSoundpadEnabled}
+            onChange={(e) => handleChange(e.target.checked)}
+          />
+          <span className="settings-switch__slider" />
+        </label>
+      </div>
+    );
+  }
+
   return (
     <>
-      {showHint && (
-        <p className={hintClassName}>
-          Отключает только звуки саундпада от других людей в звонке. Голос они по-прежнему слышны.
-          Работает, если у них режим «Физический микрофон». В режиме VB-Cable саундпад смешан с голосом
-          и отключить отдельно нельзя.
-        </p>
-      )}
+      {hint}
       <label className={checkboxClassName}>
         <input
           type="checkbox"

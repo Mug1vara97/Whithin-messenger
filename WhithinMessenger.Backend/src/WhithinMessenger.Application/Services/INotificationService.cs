@@ -12,6 +12,8 @@ public interface INotificationService
         string? chatDisplayName = null,
         string? serverDisplayName = null,
         string? senderDisplayName = null,
+        string? senderAvatarUrl = null,
+        string? senderAvatarColor = null,
         string? pushMessageType = null,
         string? pushPreviewText = null,
         string? pushThumbnailUrl = null,

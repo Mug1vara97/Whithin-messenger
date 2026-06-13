@@ -1,0 +1,189 @@
+:root {
+  --electron-titlebar-bg: var(--server-list-background, #1e1f22);
+  --electron-titlebar-text: var(--text, #dcddde);
+  --electron-titlebar-nav: var(--icon, var(--text-secondary, #9aa1ac));
+  --electron-titlebar-nav-hover: var(--icon-hover, #d2d6de);
+  --electron-titlebar-height: 32px;
+  --electron-titlebar-controls-reserve: 176px;
+}
+
+[data-theme-preset='cyberpunk'] .electron-titlebar-app-name {
+  text-shadow: var(--cp-glow-yellow);
+}
+
+[data-theme-preset='night-city'] .electron-titlebar-app-name {
+  text-shadow: var(--nc-text-glow);
+}
+
+body.electron-titlebar-chrome {
+  margin: 0;
+  height: 100vh;
+  box-sizing: border-box;
+  padding-top: var(--electron-titlebar-height);
+  overflow: hidden;
+}
+
+body.electron-titlebar-chrome #root {
+  height: 100% !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+}
+
+body.electron-titlebar-chrome #root .app,
+body.electron-titlebar-chrome .app {
+  min-height: 100% !important;
+  height: 100% !important;
+}
+
+body.electron-titlebar-chrome .home-page {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+body.electron-titlebar-chrome .loading-container {
+  min-height: 100% !important;
+  height: 100% !important;
+}
+
+body.electron-titlebar-chrome .friends-page,
+body.electron-titlebar-chrome .friends-panel {
+  height: 100% !important;
+}
+
+body.electron-titlebar-chrome .auth-container {
+  min-height: 100% !important;
+}
+
+body.electron-titlebar-chrome .server-discovery {
+  min-height: 100% !important;
+}
+
+body.electron-titlebar-chrome .role-management,
+body.electron-titlebar-chrome .role-management-content {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+body.electron-titlebar-chrome .server-settings-page,
+body.electron-titlebar-chrome .server-settings-loading,
+body.electron-titlebar-chrome .server-settings-error {
+  min-height: 100% !important;
+}
+
+#electron-titlebar-fill {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--electron-titlebar-height);
+  background: var(--electron-titlebar-bg);
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+#electron-titlebar-drag-shim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: var(--electron-titlebar-controls-reserve);
+  height: var(--electron-titlebar-height);
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  box-sizing: border-box;
+  -webkit-app-region: drag;
+  app-region: drag;
+  z-index: 2147483647;
+}
+
+.electron-titlebar-app-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--electron-titlebar-text);
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#electron-window-controls {
+  position: fixed;
+  top: 0;
+  right: 10px;
+  height: var(--electron-titlebar-height);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  z-index: 2147483647;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+
+button.electron-tl {
+  width: 30px;
+  height: 24px;
+  min-width: 30px;
+  border-radius: 4px;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+button.electron-tl svg {
+  display: block;
+  pointer-events: none;
+}
+
+button.electron-nav {
+  color: var(--electron-titlebar-nav);
+}
+
+button.electron-nav:hover {
+  color: var(--electron-titlebar-nav-hover);
+}
+
+button.electron-reload-pill {
+  width: 30px;
+  min-width: 30px;
+  height: 24px;
+  margin-right: 6px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--electron-titlebar-nav);
+}
+
+button.electron-reload-pill:hover {
+  background: color-mix(in srgb, var(--electron-titlebar-nav) 12%, transparent);
+  color: var(--electron-titlebar-nav-hover);
+}
+
+button.electron-reload-pill:active {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.electron-reload-icon {
+  transform: scaleY(-1);
+}
+
+button.electron-tl:hover {
+  background: rgba(255, 255, 255, 0.06);
+  filter: none;
+}
+
+button.electron-tl:active {
+  background: rgba(0, 0, 0, 0.12);
+}

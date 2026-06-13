@@ -126,21 +126,15 @@ const CategoriesList = ({
     console.log('CategoriesList: Connection received:', connection, 'State:', connection?.state);
     if (!connection || connection.state !== 'Connected') return;
 
-    const handleCategoriesReordered = (updatedCategories) => {
-      console.log('CategoriesReordered received:', updatedCategories);
-      setLocalCategories(updatedCategories);
-      
+    const handleCategoriesReordered = () => {
       if (onCategoriesReordered) {
-        onCategoriesReordered(updatedCategories);
+        onCategoriesReordered();
       }
     };
 
-    const handleChatsReordered = (updatedCategories) => {
-      console.log('ChatsReordered received:', updatedCategories);
-      setLocalCategories(updatedCategories);
-      
+    const handleChatsReordered = () => {
       if (onChatsReordered) {
-        onChatsReordered(updatedCategories);
+        onChatsReordered();
       }
     };
 
@@ -198,6 +192,60 @@ const CategoriesList = ({
     connection.on("CategoryCreated", handleCategoryCreated);
     connection.on("CategoryDeleted", handleCategoryDeleted);
 
+    const handleCategoryUpdated = (updatedCategory) => {
+      setLocalCategories((prev) =>
+        prev.map((cat) => {
+          const catId = cat.categoryId ?? cat.CategoryId;
+          const updatedId = updatedCategory.categoryId ?? updatedCategory.CategoryId;
+          if (String(catId) !== String(updatedId)) return cat;
+
+          const isPrivate =
+            updatedCategory.isPrivate !== undefined && updatedCategory.isPrivate !== null
+              ? updatedCategory.isPrivate === true
+              : updatedCategory.IsPrivate === true;
+
+          return {
+            ...cat,
+            categoryName: updatedCategory.categoryName ?? updatedCategory.CategoryName ?? cat.categoryName,
+            CategoryName: updatedCategory.categoryName ?? updatedCategory.CategoryName ?? cat.CategoryName,
+            isPrivate,
+            IsPrivate: isPrivate,
+            allowedRoleIds: updatedCategory.allowedRoleIds ?? updatedCategory.AllowedRoleIds ?? cat.allowedRoleIds,
+            allowedUserIds: updatedCategory.allowedUserIds ?? updatedCategory.AllowedUserIds ?? cat.allowedUserIds,
+          };
+        })
+      );
+    };
+
+    const handleChatUpdated = (updatedChat) => {
+      const chatId = updatedChat.chatId ?? updatedChat.ChatId;
+      const isPrivate =
+        updatedChat.isPrivate !== undefined && updatedChat.isPrivate !== null
+          ? updatedChat.isPrivate === true
+          : updatedChat.IsPrivate !== undefined && updatedChat.IsPrivate !== null
+            ? updatedChat.IsPrivate === true
+            : undefined;
+
+      setLocalCategories((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          chats: (cat.chats || cat.Chats || []).map((chat) => {
+            if (String(chat.chatId ?? chat.ChatId) !== String(chatId)) return chat;
+            return {
+              ...chat,
+              name: updatedChat.name ?? updatedChat.Name ?? chat.name,
+              isPrivate: isPrivate ?? chat.isPrivate ?? chat.IsPrivate ?? false,
+              IsPrivate: isPrivate ?? chat.IsPrivate ?? chat.isPrivate ?? false,
+              members: updatedChat.members ?? updatedChat.Members ?? chat.members ?? chat.Members,
+            };
+          }),
+        }))
+      );
+    };
+
+    connection.on("CategoryUpdated", handleCategoryUpdated);
+    connection.on("ChatUpdated", handleChatUpdated);
+
     return () => {
       connection.off("CategoriesReordered", handleCategoriesReordered);
       connection.off("ChatsReordered", handleChatsReordered);
@@ -205,6 +253,8 @@ const CategoriesList = ({
       connection.off("ChatDeleted", handleChatDeleted);
       connection.off("CategoryCreated", handleCategoryCreated);
       connection.off("CategoryDeleted", handleCategoryDeleted);
+      connection.off("CategoryUpdated", handleCategoryUpdated);
+      connection.off("ChatUpdated", handleChatUpdated);
     };
   }, [connection?.state, onCategoriesReordered, onChatsReordered, userId]);
 
@@ -244,7 +294,11 @@ const CategoriesList = ({
   };
 
   const isChannelActive = (channel) => {
-    return selectedChat?.chat_id === (channel.chatId || channel.ChatId);
+    const channelId = channel.chatId || channel.ChatId || channel.chat_id;
+    const selectedId =
+      selectedChat?.chatId || selectedChat?.ChatId || selectedChat?.chat_id;
+    if (!channelId || !selectedId) return false;
+    return String(selectedId) === String(channelId);
   };
 
   const handleDragEnd = useCallback(async (result) => {

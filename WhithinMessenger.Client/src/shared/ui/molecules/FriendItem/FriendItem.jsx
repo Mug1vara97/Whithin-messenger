@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Person, PersonOff, MoreVert, Check, Close } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
+import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { getUserStatusColor, getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
 import './FriendItem.css';
 
@@ -15,6 +16,15 @@ const FriendItem = ({
   isRequest = false
 }) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const { openProfile } = useProfileModal();
+
+  const profileUserId = friend.userId || friend.requesterUserId;
+  const profileUsername = friend.username || friend.requesterUsername;
+
+  const handleOpenProfile = () => {
+    if (!profileUserId) return;
+    openProfile(profileUserId, profileUsername, friend.status);
+  };
 
   const formatLastSeen = (lastSeen) => {
     if (!lastSeen) return '';
@@ -34,41 +44,53 @@ const FriendItem = ({
 
   return (
     <div className="friend-item">
-      <div className="friend-item__avatar">
-        <UserAvatar
-          username={friend.username || friend.requesterUsername}
-          avatarUrl={friend.avatar || friend.requesterAvatar}
-          avatarColor={friend.avatarColor || friend.requesterAvatarColor}
-          size="medium"
-        />
-        {!isRequest && (
-          <div 
-            className="friend-item__status-indicator"
-            style={{ backgroundColor: getUserStatusColor(friend.status) }}
+      <div
+        className="friend-item__profile-trigger"
+        role="button"
+        tabIndex={0}
+        onClick={handleOpenProfile}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleOpenProfile();
+          }
+        }}
+      >
+        <div className="friend-item__avatar">
+          <UserAvatar
+            username={profileUsername}
+            avatarUrl={friend.avatar || friend.requesterAvatar}
+            avatarColor={friend.avatarColor || friend.requesterAvatarColor}
+            size="medium"
           />
-        )}
-      </div>
-      
-      <div className="friend-item__info">
-        <div className="friend-item__name">
-          {friend.username || friend.requesterUsername}
+          {!isRequest && (
+            <div
+              className="friend-item__status-indicator"
+              style={{ backgroundColor: getUserStatusColor(friend.status) }}
+            />
+          )}
         </div>
-        {!isRequest && (
-          <div className="friend-item__status">
-            {normalizeUserStatus(friend.status) === PRESENCE_STATUS.OFFLINE && friend.lastSeen 
-              ? `Был в сети ${formatLastSeen(friend.lastSeen)}`
-              : getUserStatusLabel(friend.status)
-            }
+
+        <div className="friend-item__info">
+          <div className="friend-item__name">
+            {profileUsername}
           </div>
-        )}
-        {isRequest && (
-          <div className="friend-item__request-info">
-            Запрос в друзья
-          </div>
-        )}
-        {friend.description && (
-          <div className="friend-item__description">{friend.description}</div>
-        )}
+          {!isRequest && (
+            <div className="friend-item__status">
+              {normalizeUserStatus(friend.status) === PRESENCE_STATUS.OFFLINE && friend.lastSeen
+                ? `Был в сети ${formatLastSeen(friend.lastSeen)}`
+                : getUserStatusLabel(friend.status)}
+            </div>
+          )}
+          {isRequest && (
+            <div className="friend-item__request-info">
+              Запрос в друзья
+            </div>
+          )}
+          {friend.description && (
+            <div className="friend-item__description">{friend.description}</div>
+          )}
+        </div>
       </div>
       
       {showActions && (

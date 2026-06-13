@@ -69,7 +69,6 @@ const CategoryItem = ({
                         {...provided.dragHandleProps}
                     >
                         <div className="category-name-container">
-                            {(category.isPrivate || category.IsPrivate) && <FaLock className="private-icon" />}
                             <span 
                                 className="category-name"
                                 onClick={toggleCollapse}
@@ -79,6 +78,11 @@ const CategoryItem = ({
                             </span>
                         </div>
                         <div className="category-actions">
+                            {(category.isPrivate || category.IsPrivate) && (
+                                <span className="category-private-icon" title="Приватная категория">
+                                    <FaLock aria-hidden />
+                                </span>
+                            )}
                             {onAddChannel && (
                             <button
                                 className="add-channel-button"

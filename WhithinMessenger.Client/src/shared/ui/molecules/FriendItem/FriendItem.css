@@ -4,13 +4,12 @@
   padding: 8px 12px;
   position: relative;
   transition: background-color 0.2s ease;
-  cursor: pointer;
   border-radius: 4px;
   margin: 2px 8px;
 }
 
 .friend-item:hover {
-  background-color: #3c3f44;
+  background-color: var(--surface-hover);
 }
 
 .friend-item:hover .friend-item__actions {
@@ -19,7 +18,7 @@
 
 .friend-item__avatar {
   position: relative;
-  margin-right: 12px;
+  margin-right: 0;
   flex-shrink: 0;
   width: 40px;
   height: 40px;
@@ -34,7 +33,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid #2f3136;
+  border: 2px solid var(--surface);
 }
 
 .friend-item__info {
@@ -45,7 +44,7 @@
 .friend-item__name {
   font-weight: 500;
   font-size: 16px;
-  color: #ffffff;
+  color: var(--text);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -53,22 +52,19 @@
   line-height: 1.2;
 }
 
-.friend-item__status {
+.friend-item__status,
+.friend-item__request-info,
+.friend-item__description {
   font-size: 12px;
-  color: #8e9297;
-  margin-bottom: 0;
+  color: var(--text-muted);
   line-height: 1.2;
 }
 
 .friend-item__request-info {
-  font-size: 12px;
-  color: #8e9297;
   margin-bottom: 4px;
 }
 
 .friend-item__description {
-  font-size: 12px;
-  color: #8e9297;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +82,7 @@
 .friend-item__action-button {
   background: none;
   border: none;
-  color: #8e9297;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 6px;
   border-radius: 4px;
@@ -100,26 +96,26 @@
 }
 
 .friend-item__action-button:hover {
-  background-color: #3c3f44;
-  color: #ffffff;
+  background-color: var(--surface-hover);
+  color: var(--text);
 }
 
 .friend-item__action-button--accept:hover {
-  background-color: #43b581;
-  color: #ffffff;
+  background-color: var(--success, #43b581);
+  color: #fff;
 }
 
 .friend-item__action-button--decline:hover {
-  background-color: #f04747;
-  color: #ffffff;
+  background-color: var(--danger, #f04747);
+  color: #fff;
 }
 
 .friend-item__context-menu {
   position: absolute;
   top: 100%;
   right: 8px;
-  background-color: #2f3136;
-  border: 1px solid #202225;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
@@ -130,7 +126,7 @@
   width: 100%;
   background: none;
   border: none;
-  color: #dcddde;
+  color: var(--text);
   padding: 8px 12px;
   text-align: left;
   cursor: pointer;
@@ -142,7 +138,7 @@
 }
 
 .friend-item__context-item:hover {
-  background-color: #3c3f44;
+  background-color: var(--surface-hover);
 }
 
 .friend-item__context-item svg {

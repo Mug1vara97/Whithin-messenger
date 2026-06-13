@@ -27,7 +27,49 @@ import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModeratio
 import { buildCallOnlyChannelEntry } from '../voice/callOnlyVoiceChannels';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
 
+function notifyVoiceCallOverlaySync() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('voiceCallOverlaySync'));
+}
+
 const SOUNDPAD_TRACK_NAME = 'soundpad';
+
+let voiceJoinSoundSuppressDepth = 0;
+let recentlySyncedPeerUserIds = new Set();
+let clearRecentlySyncedPeersTimer = null;
+
+const beginVoiceJoinSoundSuppress = () => {
+  voiceJoinSoundSuppressDepth += 1;
+};
+
+const endVoiceJoinSoundSuppress = () => {
+  voiceJoinSoundSuppressDepth = Math.max(0, voiceJoinSoundSuppressDepth - 1);
+};
+
+const shouldSuppressPeerJoinSound = () => voiceJoinSoundSuppressDepth > 0;
+
+const rememberExistingPeersForJoinSound = (existingPeers = []) => {
+  recentlySyncedPeerUserIds = new Set(
+    existingPeers
+      .map((peer) => peer?.userId ?? peer?.UserId)
+      .filter(Boolean)
+      .map((id) => String(id)),
+  );
+
+  if (clearRecentlySyncedPeersTimer) {
+    clearTimeout(clearRecentlySyncedPeersTimer);
+  }
+
+  clearRecentlySyncedPeersTimer = setTimeout(() => {
+    recentlySyncedPeerUserIds.clear();
+    clearRecentlySyncedPeersTimer = null;
+  }, 3000);
+};
+
+const isRecentlySyncedPeer = (userId) => {
+  if (userId == null) return false;
+  return recentlySyncedPeerUserIds.has(String(userId));
+};
 
 const resolveParticipantName = (state, userId) => {
   const id = String(userId);
@@ -487,6 +529,7 @@ export const useCallStore = create(
         });
 
         get().emitLocalSpeakingToServer(normalizedUserId, isSpeaking);
+        notifyVoiceCallOverlaySync();
       },
       
       // Сброс состояния говорения для пользователя
@@ -527,6 +570,7 @@ export const useCallStore = create(
         });
 
         get().emitLocalSpeakingToServer(normalizedUserId, false);
+        notifyVoiceCallOverlaySync();
       },
       
       // Управление участниками голосовых каналов (для отображения в списке каналов)
@@ -897,6 +941,24 @@ export const useCallStore = create(
 
             const socketId = peerData.peerId || peerData.id;
             const peerUserId = peerData.userId;
+            const participantAlreadyPresent = peerUserId != null
+              && get().participants.some((participant) => String(participant.userId) === String(peerUserId));
+
+            const currentUserId = get().currentUserId;
+            const isSelf = currentUserId != null && String(peerUserId) === String(currentUserId);
+            const shouldPlayJoinSound = !participantAlreadyPresent
+              && !shouldSuppressPeerJoinSound()
+              && !isSelf
+              && peerUserId != null
+              && !isRecentlySyncedPeer(peerUserId);
+
+            if (shouldPlayJoinSound) {
+              audioNotificationManager.playUserJoinedSound({
+                dedupeKey: `peer:${peerUserId}`,
+              }).catch((error) => {
+                console.warn('Failed to play user joined sound:', error);
+              });
+            }
             
             // Обновляем маппинг peerId -> userId
             if (socketId && peerUserId) {
@@ -977,11 +1039,6 @@ export const useCallStore = create(
             }
 
             get().ensureParticipantSpatialPosition(peerUserId);
-
-            // Воспроизводим звук подключения пользователя
-            audioNotificationManager.playUserJoinedSound().catch(error => {
-              console.warn('Failed to play user joined sound:', error);
-            });
           });
 
           voiceCallApi.on('peerLeft', (peerData) => {
@@ -1144,6 +1201,7 @@ export const useCallStore = create(
             if (currentRoomId) {
               get().updateVoiceChannelParticipant(currentRoomId, userId, { isMuted: mutedState });
             }
+            notifyVoiceCallOverlaySync();
           });
 
           voiceCallApi.on('serverVoiceModerationApplied', (data) => {
@@ -1202,6 +1260,8 @@ export const useCallStore = create(
                 isDeafened: isGlobalAudioMuted
               });
             }
+
+            notifyVoiceCallOverlaySync();
           });
 
           // Handle TrackSubscribed events from LiveKit (for callStore)
@@ -1940,6 +2000,7 @@ export const useCallStore = create(
           }
 
           try {
+            beginVoiceJoinSoundSuppress();
             console.log('Joining room:', normalizedRoomId, 'channelName:', channelName);
 
             const finalChannelName = channelName || normalizedRoomId;
@@ -2005,6 +2066,7 @@ export const useCallStore = create(
 
             if (response.existingPeers?.length) {
               get().applyExistingPeers(response.existingPeers);
+              rememberExistingPeersForJoinSound(response.existingPeers);
             }
 
             if (!isVoiceJoinCurrent(joinGen)) {
@@ -2051,7 +2113,9 @@ export const useCallStore = create(
             }
 
             if (!response.alreadyJoined) {
-              audioNotificationManager.playUserJoinedSound().catch((error) => {
+              audioNotificationManager.playUserJoinedSound({
+                dedupeKey: 'self',
+              }).catch((error) => {
                 console.warn('Failed to play user joined sound for self:', error);
               });
             }
@@ -2060,6 +2124,8 @@ export const useCallStore = create(
               console.error('Failed to join room:', error);
               set({ error: error.message });
             }
+          } finally {
+            endVoiceJoinSoundSuppress();
           }
         });
       },
@@ -2658,6 +2724,8 @@ export const useCallStore = create(
         } catch (error) {
           console.warn('Failed to toggle microphone via LiveKit:', error);
         }
+
+        notifyVoiceCallOverlaySync();
       },
       
       applyRemoteSoundpadVolumes: () => {
@@ -3166,6 +3234,8 @@ export const useCallStore = create(
             console.warn('Failed to play global unmuted sound:', error);
           });
         }
+
+        notifyVoiceCallOverlaySync();
       },
       
       // Переключение шумоподавления
@@ -3516,6 +3586,7 @@ export const useCallStore = create(
         });
 
         console.log('leaveRoom: Left room successfully, connection preserved');
+        notifyVoiceCallOverlaySync();
       },
 
       // Быстрый выход из комнаты без закрытия соединения (для переключения между каналами)
@@ -3696,6 +3767,7 @@ export const useCallStore = create(
           });
           
           console.log('Call ended successfully');
+          notifyVoiceCallOverlaySync();
           if (endedChannelId && typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent('voiceCallEnded', { detail: { channelId: endedChannelId } })
@@ -3712,6 +3784,7 @@ export const useCallStore = create(
             callOnlyVoiceChannels: new Map(),
             suppressVoiceAutoJoinForChannel: endedChannelId,
           });
+          notifyVoiceCallOverlaySync();
           if (endedChannelId && typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent('voiceCallEnded', { detail: { channelId: endedChannelId } })

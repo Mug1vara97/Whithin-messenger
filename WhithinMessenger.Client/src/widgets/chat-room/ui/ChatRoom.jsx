@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
@@ -31,7 +32,9 @@ import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPic
 import { stickerApi } from '../../../entities/sticker/api';
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
+import { ForwardMessageModal } from '../../../shared/ui/molecules/ForwardMessageModal';
 import { UserAvatar } from '../../../shared/ui';
+import { VoiceParticipantStatusIcons } from '../../../shared/ui/atoms/VoiceParticipantStatusIcons';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
 import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
 import { useMembers } from '../../../entities/member/hooks';
@@ -45,9 +48,6 @@ import {
 import {
   Call,
   Mic,
-  MicOff,
-  Headset,
-  HeadsetOff,
   Stop,
   AttachFile,
   Image as ImageIcon,
@@ -92,6 +92,16 @@ const ChatRoom = ({
   const navigate = useNavigate();
   const username = user?.username;
   const userId = user?.id || user?.userId;
+  const { openProfile } = useProfileModal();
+
+  const handleOpenAuthorProfile = useCallback(
+    (message) => {
+      const authorId = message?.senderId ?? message?.SenderId;
+      if (!authorId) return;
+      openProfile(authorId, message?.senderUsername);
+    },
+    [openProfile]
+  );
   const {
     messages,
     connection,
@@ -176,16 +186,12 @@ const ChatRoom = ({
   );
 
   const {
-    messageToForward,
     forwardModalVisible,
-    availableChats,
-    forwardMessageText,
-    setForwardMessageText,
-    forwardTextareaRef,
     startForward,
     closeForwardModal,
-    handleForward
-  } = useMessageForward(userId);
+    forwardToSelected,
+    modalProps,
+  } = useMessageForward(chatId);
 
   const [newMessage, setNewMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -754,6 +760,7 @@ const ChatRoom = ({
   };
 
   const handleForwardMessage = (message) => {
+    if (!message) return;
     startForward(message);
     closeContextMenu();
   };
@@ -946,62 +953,6 @@ const ChatRoom = ({
   }, [newMessage, queueMediaSend, handleSendMessage, setNewMessage]);
 
 
-  const ForwardModal = () => {
-    useEffect(() => {
-      if (forwardModalVisible && forwardTextareaRef.current) {
-        forwardTextareaRef.current.focus();
-      }
-    }, []);
-
-    if (!forwardModalVisible) return null;
-
-    return (
-      <div className="modal-overlay">
-        <div className="modal-content forward-modal">
-          <h3>Переслать сообщение</h3>
-          
-          <div className="forwarded-message-preview">
-            <strong>{messageToForward?.senderUsername}</strong>
-            <p>{messageToForward?.content}</p>
-          </div>
-
-          <div className="forward-message-input">
-            <input
-              ref={forwardTextareaRef}
-              type="text"
-              placeholder="Добавьте комментарий к пересылаемому сообщению..."
-              value={forwardMessageText}
-              onChange={(e) => setForwardMessageText(e.target.value)}
-              className="forward-input"
-              autoFocus
-            />
-          </div>
-
-          <div className="chat-list">
-            <h4>Выберите чат для пересылки:</h4>
-            {availableChats.map(chat => (
-              <div
-                key={chat.chatId}
-                className="chat-item"
-                onClick={() => handleForward(chat.chatId, forwardMessage)}
-              >
-                {chat.name || `Чат с ${chat.username}`}
-              </div>
-            ))}
-          </div>
-          <div className="forward-modal-buttons">
-            <button 
-              className="cancel-button" 
-              onClick={closeForwardModal}
-            >
-              Отмена
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   if (!chatId) {
     console.warn('SECURITY WARNING: ChatRoom rendered without chatId');
     return (
@@ -1111,12 +1062,12 @@ const ChatRoom = ({
                     </div>
                     <div className="join-preview-user-name">{participant.userName || 'User'}</div>
                     <div className="join-preview-user-status-row">
-                      <div className={`join-preview-status-pill ${participantMuted ? 'off' : 'on'}`}>
-                        {participantMuted ? <MicOff style={{ fontSize: '14px' }} /> : <Mic style={{ fontSize: '14px' }} />}
-                      </div>
-                      <div className={`join-preview-status-pill ${participantDeafened ? 'off' : 'on'}`}>
-                        {participantDeafened ? <HeadsetOff style={{ fontSize: '14px' }} /> : <Headset style={{ fontSize: '14px' }} />}
-                      </div>
+                      <VoiceParticipantStatusIcons
+                        isMuted={participantMuted}
+                        isDeafened={participantDeafened}
+                        isSpeaking={!!participant?.isSpeaking}
+                        variant="pills"
+                      />
                     </div>
                   </div>
                 );
@@ -1319,10 +1270,23 @@ const ChatRoom = ({
                 username={msg.senderUsername}
                 avatarUrl={msg.avatarUrl}
                 avatarColor={msg.avatarColor}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleOpenAuthorProfile(msg);
+                }}
               />
               <div className="message-content">
                 <div className="message-header">
-                  <strong className="message-username">{msg.senderUsername}</strong>
+                  <button
+                    type="button"
+                    className="message-username profile-open-trigger"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleOpenAuthorProfile(msg);
+                    }}
+                  >
+                    {msg.senderUsername}
+                  </button>
                   {headerTime && (
                     <span className="message-header-time">{headerTime}</span>
                   )}
@@ -1626,7 +1590,10 @@ const ChatRoom = ({
       />
       </div>
 
-      <ForwardModal />
+      <ForwardMessageModal
+        {...modalProps}
+        onSend={() => forwardToSelected(forwardMessage)}
+      />
 
       {pendingMediaSend?.files?.length > 0 && (
         <MediaSendOverlay

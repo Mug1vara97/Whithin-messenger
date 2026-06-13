@@ -13,6 +13,7 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
     private readonly IChatRepository _chatRepository;
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public AddMemberCommandHandler(
         IServerRepository serverRepository,
@@ -20,7 +21,8 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
         IUserRepository userRepository,
         IChatRepository chatRepository,
         IChatMemberRepository chatMemberRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
@@ -28,6 +30,7 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
         _chatRepository = chatRepository;
         _chatMemberRepository = chatMemberRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<AddMemberResult> Handle(AddMemberCommand request, CancellationToken cancellationToken)
@@ -94,6 +97,15 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
             {
                 await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
             }
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.MemberAdd,
+                AuditLogTargetTypes.Member,
+                request.UserId,
+                new { targetName = user.UserName },
+                cancellationToken);
 
             return new AddMemberResult(true, null, serverMember.Id);
         }

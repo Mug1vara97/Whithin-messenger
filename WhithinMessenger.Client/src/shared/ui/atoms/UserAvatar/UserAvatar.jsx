@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import './UserAvatar.css';
 
-const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
+const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40, onClick, className = '' }) => {
   const [imageError, setImageError] = useState(false);
   
   // Обработка размеров
@@ -21,11 +21,28 @@ const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
   
   const avatarSize = getSize(size);
   const displayInitials = !avatarUrl || imageError;
-  
+  const isClickable = Boolean(onClick);
+
+  const content = !displayInitials ? (
+    <img
+      src={avatarUrl.startsWith('http') ? avatarUrl : `${BASE_URL}${avatarUrl}`}
+      alt=""
+      onError={() => setImageError(true)}
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: '50%',
+        objectFit: 'cover',
+      }}
+    />
+  ) : (
+    username?.charAt(0).toUpperCase() || '?'
+  );
+
   return (
-    <div 
-      className="user-avatar"
-      style={{ 
+    <div
+      className={`user-avatar ${isClickable ? 'user-avatar--clickable' : ''} ${className}`.trim()}
+      style={{
         backgroundColor: avatarColor || '#5865F2',
         width: `${avatarSize}px`,
         height: `${avatarSize}px`,
@@ -37,24 +54,23 @@ const UserAvatar = ({ username, avatarUrl, avatarColor, size = 40 }) => {
         fontSize: `${Math.max(12, avatarSize * 0.35)}px`,
         fontWeight: 'bold',
         flexShrink: 0,
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
+      onClick={onClick}
+      onKeyDown={
+        isClickable
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick?.(event);
+              }
+            }
+          : undefined
+      }
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
     >
-      {!displayInitials ? (
-        <img 
-          src={avatarUrl.startsWith('http') ? avatarUrl : `${BASE_URL}${avatarUrl}`} 
-          alt="User avatar" 
-          onError={() => setImageError(true)}
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: '50%',
-            objectFit: 'cover'
-          }}
-        />
-      ) : (
-        username?.charAt(0).toUpperCase() || '?'
-      )}
+      {content}
     </div>
   );
 };

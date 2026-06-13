@@ -240,8 +240,8 @@
   pointer-events: auto;
   width: min(270px, calc(100vw - 24px));
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #1f222b;
+  border: 1px solid var(--border);
+  background: var(--surface);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
   padding: 18px 18px 20px;
   display: flex;
@@ -264,11 +264,26 @@
   border: none;
   border-radius: 0;
   padding: 0;
+  position: relative;
+}
+
+.global-incoming-call-avatar-ring::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #23a559;
+  animation: incomingCallRingPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes incomingCallRingPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.7; }
 }
 
 .global-incoming-call-chat-name {
   margin-top: 6px;
-  color: #aeb6c6;
+  color: var(--text-muted);
   font-size: 12px;
   max-width: 100%;
   text-overflow: ellipsis;
@@ -278,7 +293,7 @@
 
 .global-incoming-call-user {
   margin-top: 12px;
-  color: #ffffff;
+  color: var(--text);
   font-weight: 700;
   font-size: clamp(17px, 4.8vw, 22px);
   line-height: 1.15;
@@ -288,7 +303,7 @@
 
 .global-incoming-call-text {
   margin-top: 10px;
-  color: #d0d4df;
+  color: var(--text-secondary);
   font-size: clamp(13px, 3.6vw, 16px);
   line-height: 1.25;
   text-align: center;
@@ -324,11 +339,11 @@
 }
 
 .global-incoming-call-button.decline {
-  background: #d83b46;
+  background: var(--danger);
 }
 
 .global-incoming-call-button.accept {
-  background: #3fa96b;
+  background: var(--success);
 }
 
 @media (max-width: 768px) {

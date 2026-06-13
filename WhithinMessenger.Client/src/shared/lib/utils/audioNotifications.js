@@ -14,6 +14,8 @@ class AudioNotificationManager {
       globalUnmuted: null
     };
     this.isInitialized = false;
+    this._lastJoinSoundAtByKey = new Map();
+    this._joinSoundPending = new Set();
   }
 
   /**
@@ -94,9 +96,28 @@ class AudioNotificationManager {
 
   /**
    * Воспроизведение звука подключения пользователя
+   * @param {{ dedupeKey?: string }} options
    */
-  async playUserJoinedSound() {
-    await this.playSound('userJoined', 0.5); // Громкость 50%
+  async playUserJoinedSound(options = {}) {
+    const dedupeKey = options.dedupeKey ?? 'default';
+    if (this._joinSoundPending.has(dedupeKey)) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastPlayedAt = this._lastJoinSoundAtByKey.get(dedupeKey) ?? 0;
+    if (now - lastPlayedAt < 5000) {
+      return;
+    }
+
+    this._joinSoundPending.add(dedupeKey);
+    this._lastJoinSoundAtByKey.set(dedupeKey, now);
+
+    try {
+      await this.playSound('userJoined', 0.5);
+    } finally {
+      this._joinSoundPending.delete(dedupeKey);
+    }
   }
 
   /**
@@ -198,6 +219,8 @@ class AudioNotificationManager {
       globalUnmuted: null
     };
     this.isInitialized = false;
+    this._lastJoinSoundAtByKey.clear();
+    this._joinSoundPending.clear();
   }
 }
 

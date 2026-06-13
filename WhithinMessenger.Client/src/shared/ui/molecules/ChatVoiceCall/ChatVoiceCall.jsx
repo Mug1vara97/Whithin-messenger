@@ -413,7 +413,7 @@ const ChatVoiceCall = ({
                       isServerMuted={participantIsServerMuted}
                       isServerDeafened={participantIsServerDeafened}
                       isSpeaking={isSpeakingLive}
-                      variant="inline"
+                      variant="pills"
                     />
                   </div>
                 </div>

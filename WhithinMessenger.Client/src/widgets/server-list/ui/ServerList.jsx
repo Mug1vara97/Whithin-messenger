@@ -4,8 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import compassIcon from '../../../assets/magnifying-glass.png';
-import { Settings, Palette, GraphicEq } from '@mui/icons-material';
+import { Settings, Palette, GraphicEq, Explore } from '@mui/icons-material';
 import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import { openThemeColorsWindow } from '../../../shared/lib/theme/openThemeColorsWindow';
 import styles from './ServerList.module.css';
@@ -301,17 +300,9 @@ const ServerList = ({
               <div
                 className={styles['server-button']}
                 onClick={handleDiscoverClick}
+                title="Обзор серверов"
               >
-                <img
-                  src={compassIcon}
-                  alt="Discover"
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    filter: 'brightness(0) invert(1)',
-                    opacity: 0.8
-                  }}
-                />
+                <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
               </div>
             </li>
             <li className={styles['server-item']}>
@@ -405,77 +396,6 @@ const ServerList = ({
       </DragDropContext>
 
     </div>
-  );
-};
-
-const CreateServerForm = ({ onClose, onCreate }) => {
-  const [serverName, setServerName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (serverName.trim()) {
-      onCreate({
-        serverName: serverName.trim(),
-        description: description.trim(),
-        isPublic
-      });
-    }
-  };
-
-  const resetModalState = () => {
-    setServerName('');
-    setDescription('');
-    setIsPublic(false);
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        value={serverName}
-        onChange={(e) => setServerName(e.target.value)}
-        placeholder="Название сервера"
-        className={styles['modal-input']}
-      />
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Описание сервера"
-        className={styles['modal-input']}
-        rows={3}
-      />
-      <div className={styles['server-type-toggle']}>
-        <label className={styles['toggle-label']}>
-          <input
-            type="checkbox"
-            checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-          />
-          <span className={styles['toggle-text']}>
-            {isPublic ? 'Публичный сервер' : 'Приватный сервер'}
-          </span>
-        </label>
-        <p className={styles['toggle-description']}>
-          {isPublic 
-            ? 'Сервер будет виден в поиске и доступен всем' 
-            : 'Сервер будет доступен только по приглашению'}
-        </p>
-      </div>
-      <div className={styles['modal-actions']}>
-        <button
-          onClick={handleSubmit}
-          disabled={!serverName.trim()}
-        >
-          Создать
-        </button>
-        <button onClick={resetModalState}>
-          Отмена
-        </button>
-      </div>
-    </form>
   );
 };
 

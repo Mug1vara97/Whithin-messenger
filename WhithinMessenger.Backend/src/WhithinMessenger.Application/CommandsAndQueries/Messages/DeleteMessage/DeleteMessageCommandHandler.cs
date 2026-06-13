@@ -9,15 +9,18 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
     private readonly IMessageRepository _messageRepository;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public DeleteMessageCommandHandler(
         IMessageRepository messageRepository,
         IChatRepository chatRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<DeleteMessageResult> Handle(DeleteMessageCommand request, CancellationToken cancellationToken)
@@ -52,6 +55,28 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
             }
 
             await _messageRepository.DeleteAsync(request.MessageId, cancellationToken);
+
+            if (chat?.ServerId != null)
+            {
+                var preview = string.IsNullOrWhiteSpace(message.Content)
+                    ? "Сообщение без текста"
+                    : (message.Content.Length > 80 ? message.Content[..80] + "…" : message.Content);
+
+                await _auditLog.LogAsync(
+                    chat.ServerId.Value,
+                    request.UserId,
+                    AuditLogActionTypes.MessageDelete,
+                    AuditLogTargetTypes.Message,
+                    request.MessageId,
+                    new
+                    {
+                        targetName = chat.Name,
+                        detail = preview,
+                        channelId = chat.Id,
+                        messageAuthorId = message.UserId,
+                    },
+                    cancellationToken);
+            }
 
             return new DeleteMessageResult
             {

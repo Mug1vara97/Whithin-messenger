@@ -10,6 +10,7 @@ import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import StickerMessage from '../StickerMessage/StickerMessage';
 import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
 import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../lib/utils/messageTime';
+import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { ReplyOutlined, ForwardOutlined, EditOutlined, DeleteOutline } from '@mui/icons-material';
 import './MessageItem.css';
 
@@ -24,6 +25,13 @@ const MessageItem = ({
   onContextMenu
 }) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const { openProfile } = useProfileModal();
+
+  const handleOpenAuthorProfile = useCallback(() => {
+    const authorId = message?.senderId ?? message?.SenderId;
+    if (!authorId) return;
+    openProfile(authorId, message?.senderUsername);
+  }, [message, openProfile]);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const messageRef = useRef(null);
   const contextMenuRef = useRef(null);
@@ -223,19 +231,32 @@ const MessageItem = ({
     >
       {showAvatar && (
         <div className="message-avatar">
-          <UserAvatar 
+          <UserAvatar
             username={message.senderUsername}
             avatarUrl={message.avatarUrl}
             avatarColor={message.avatarColor}
             size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleOpenAuthorProfile();
+            }}
           />
         </div>
       )}
-      
+
       <div className="message-content">
         {showAvatar && (
           <div className="message-header">
-            <span className="message-username">{message.senderUsername}</span>
+            <button
+              type="button"
+              className="message-username profile-open-trigger"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleOpenAuthorProfile();
+              }}
+            >
+              {message.senderUsername}
+            </button>
             {formatTime(message.createdAt) && (
               <span className="message-time">{formatTime(message.createdAt)}</span>
             )}

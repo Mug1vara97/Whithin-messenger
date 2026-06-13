@@ -11,17 +11,20 @@ public class MoveCategoryCommandHandler : IRequestHandler<MoveCategoryCommand, M
     private readonly ICategoryRepository _categoryRepository;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
 
     public MoveCategoryCommandHandler(
         IServerRepository serverRepository,
         ICategoryRepository categoryRepository,
         IChatRepository chatRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
     }
 
     public async Task<MoveCategoryResult> Handle(MoveCategoryCommand request, CancellationToken cancellationToken)
@@ -60,6 +63,15 @@ public class MoveCategoryCommandHandler : IRequestHandler<MoveCategoryCommand, M
                 orderedCategories[i].CategoryOrder = i;
                 await _categoryRepository.UpdateAsync(orderedCategories[i], cancellationToken);
             }
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.UserId,
+                AuditLogActionTypes.CategoryMove,
+                AuditLogTargetTypes.Category,
+                categoryToMove.Id,
+                new { targetName = categoryToMove.CategoryName, position = request.NewPosition },
+                cancellationToken);
 
             var updatedCategories = await _categoryRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
             var chats = await _chatRepository.GetByServerIdAsync(request.ServerId, cancellationToken);
