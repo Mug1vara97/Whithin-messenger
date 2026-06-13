@@ -722,18 +722,30 @@ async function shutdownBridge() {
   log('shutdownBridge');
 
   try {
-    await restoreDefaultCableMic();
-    await restoreDefaultCableRender();
+    await Promise.race([
+      Promise.allSettled([restoreDefaultCableMic(), restoreDefaultCableRender()]),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
   } catch (error) {
     warn('restoreDefaultCableMic/render failed during shutdown', error.message);
   }
 
+  forceKillBridge();
+}
+
+function forceKillBridge() {
   if (bridgeProcess && !bridgeProcess.killed) {
-    bridgeProcess.kill();
+    try {
+      bridgeProcess.kill();
+    } catch (error) {
+      warn('forceKillBridge failed', error.message);
+    }
   }
 
   bridgeProcess = null;
   bridgeReady = false;
+  bridgeStartInFlight = null;
+  mixerStartInFlight = null;
 }
 
 
@@ -886,6 +898,7 @@ function registerAudioBridgeIpc(ipcMain) {
 module.exports = {
   registerAudioBridgeIpc,
   shutdownBridge,
+  forceKillBridge,
   activateDefaultCableMic,
   restoreDefaultCableMic,
   activateDefaultCableRender,

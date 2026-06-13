@@ -18,6 +18,20 @@ let overlaySettings = {
 };
 let measuredSize = null;
 let powerSaveBlockerId = null;
+let getMainWindow = null;
+
+function applyMainWindowThrottleForOverlay(overlayActive) {
+  const main = typeof getMainWindow === 'function' ? getMainWindow() : null;
+  if (!main || main.isDestroyed()) {
+    return;
+  }
+  try {
+    // Освобождаем CPU для оверлея и голоса, пока главное окно в фоне.
+    main.webContents.setBackgroundThrottling(Boolean(overlayActive));
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 const VALID_NOTIFICATION_POSITIONS = new Set(['top-right', 'top-left', 'bottom-right', 'bottom-left']);
 
@@ -133,6 +147,9 @@ function closeHostWindow() {
   hostWindow = null;
   measuredSize = null;
   stopPowerSaveBlocker();
+  if (!activePayload) {
+    applyMainWindowThrottleForOverlay(false);
+  }
 }
 
 function applyHostBounds(payload, sizeOverride) {
@@ -173,8 +190,11 @@ function syncHostWindow() {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
+        backgroundThrottling: false,
       },
     });
+
+    hostWindow.webContents.setBackgroundThrottling(false);
 
     hostWindow.setMenuBarVisibility(false);
     hostWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -206,6 +226,7 @@ function showActiveCallOverlay(payload) {
   activePayload = payload;
   measuredSize = null;
   startPowerSaveBlocker();
+  applyMainWindowThrottleForOverlay(true);
   syncHostWindow();
 }
 
@@ -235,6 +256,7 @@ function updateActiveCallOverlay(payload) {
 function dismissActiveCallOverlay() {
   activePayload = null;
   measuredSize = null;
+  applyMainWindowThrottleForOverlay(false);
   syncHostWindow();
 }
 
@@ -267,7 +289,8 @@ function repositionActiveCallOverlayIfActive() {
   applyAlwaysOnTop(hostWindow);
 }
 
-function registerActiveCallOverlayIpc() {
+function registerActiveCallOverlayIpc(mainWindowGetter) {
+  getMainWindow = typeof mainWindowGetter === 'function' ? mainWindowGetter : null;
   ipcMain.removeAllListeners('electron:show-active-call-overlay');
   ipcMain.removeAllListeners('electron:update-active-call-overlay');
   ipcMain.removeAllListeners('electron:dismiss-active-call-overlay');

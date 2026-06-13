@@ -299,6 +299,7 @@ function registerDesktopNotificationIpc(getMainWindow, showMainWindow) {
 
 function shutdownDesktopNotifications() {
   dismissAllDesktopNotifications();
+  closeHostWindow();
 }
 
 function getActiveNotificationBounds() {

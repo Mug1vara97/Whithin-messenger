@@ -15,6 +15,7 @@ const {
 const {
   registerAudioBridgeIpc,
   shutdownBridge,
+  forceKillBridge,
   restoreDefaultCableMic,
   applySoundpadAudioConfig,
 } = require('./audioBridge.cjs');
@@ -188,6 +189,9 @@ const RENDERER_SOUNDPAD_CONFIG_KEY = 'whithinSoundpadConfig';
 const SOUNDPAD_ACTION_PREFIX = 'soundpad:';
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
+let isQuitting = false;
+let audioBridgeShutdownDone = false;
+const APP_SHUTDOWN_TIMEOUT_MS = 2500;
 
 const ELECTRON_KEY_ALIASES = {
   ArrowUp: 'Up',
@@ -981,6 +985,113 @@ function hideMainWindow() {
   mainWindow.hide();
 }
 
+/** Сворачивание в трей вместо minimize — как «Скрыть», меньше нагрузки на оверлей. */
+function minimizeMainWindowToTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (tray) {
+    hideMainWindow();
+    emitMainWindowVisibility();
+    return;
+  }
+  mainWindow.minimize();
+  emitMainWindowVisibility();
+}
+
+function teardownShortcutHooks() {
+  try {
+    globalShortcut.unregisterAll();
+  } catch (_) {
+    /* ignore */
+  }
+  if (globalKeyboardListener) {
+    try {
+      globalKeyboardListener.kill();
+    } catch (_) {}
+    globalKeyboardListener = null;
+  }
+  if (win32GlobalMouseHookInitialized && win32GlobalMouseEvents) {
+    try {
+      win32GlobalMouseEvents.pauseMouseEvents();
+    } catch (_) {}
+  }
+}
+
+function teardownOverlayWindows() {
+  shutdownDesktopNotifications();
+  shutdownCallOverlay();
+  shutdownActiveCallOverlay();
+  setAppBadgeCount(0);
+}
+
+function destroyTrayIcon() {
+  if (tray) {
+    try {
+      tray.destroy();
+    } catch (_) {}
+    tray = null;
+  }
+}
+
+function destroyAllWindows() {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      try {
+        win.destroy();
+      } catch (_) {}
+    }
+  }
+  mainWindow = null;
+  shortcutCallbackWebContents = null;
+}
+
+function quitApplication() {
+  if (isQuitting) {
+    return;
+  }
+  isQuitting = true;
+  allowAppQuit = true;
+
+  teardownShortcutHooks();
+  teardownOverlayWindows();
+  destroyTrayIcon();
+  destroyAllWindows();
+
+  const finishExit = () => {
+    if (audioBridgeShutdownDone) {
+      return;
+    }
+    audioBridgeShutdownDone = true;
+    forceKillBridge();
+    app.exit(0);
+  };
+
+  const forceTimer = setTimeout(() => {
+    console.warn('[app] shutdown timeout — forcing exit');
+    finishExit();
+  }, APP_SHUTDOWN_TIMEOUT_MS);
+
+  const restoreWithTimeout = Promise.race([
+    restoreDefaultCableMic(),
+    new Promise((resolve) => {
+      setTimeout(() => {
+        console.warn('[app] restoreDefaultCableMic timed out');
+        resolve(null);
+      }, 1500);
+    }),
+  ]);
+
+  Promise.allSettled([restoreWithTimeout, shutdownBridge()])
+    .catch((error) => {
+      console.warn('[Soundpad:Electron] shutdown audio cleanup failed:', error.message);
+    })
+    .finally(() => {
+      clearTimeout(forceTimer);
+      finishExit();
+    });
+}
+
 function createTray() {
   if (tray) {
     return;
@@ -1014,8 +1125,7 @@ function createTray() {
         {
           label: 'Выход',
           click: () => {
-            allowAppQuit = true;
-            app.quit();
+            quitApplication();
           }
         }
       ])
@@ -1152,9 +1262,18 @@ function createWindow() {
 
   mainWindow.loadURL(rendererUrl);
 
-  ['minimize', 'restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
+  mainWindow.on('minimize', (event) => {
+    if (!tray || isQuitting) {
+      return;
+    }
+    event.preventDefault();
+    minimizeMainWindowToTray();
+  });
+
+  ['restore', 'hide', 'show', 'focus', 'blur'].forEach((eventName) => {
     mainWindow.on(eventName, emitMainWindowVisibility);
   });
+
   mainWindow.webContents.on('did-finish-load', () => {
     emitMainWindowVisibility();
     syncShortcutsFromRendererStorage(mainWindow.webContents);
@@ -1284,7 +1403,7 @@ registerAudioBridgeIpc(ipcMain);
 
 registerDesktopNotificationIpc(() => mainWindow, showMainWindow);
 registerCallOverlayIpc(() => mainWindow, showMainWindow);
-registerActiveCallOverlayIpc();
+registerActiveCallOverlayIpc(() => mainWindow);
 
 ipcMain.handle('electron:open-external', async (_, url) => {
   await shell.openExternal(url);
@@ -1292,9 +1411,14 @@ ipcMain.handle('electron:open-external', async (_, url) => {
 
 ipcMain.on('electron:window-minimize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed()) {
-    win.minimize();
+  if (!win || win.isDestroyed()) {
+    return;
   }
+  if (tray && mainWindow && win.id === mainWindow.id) {
+    minimizeMainWindowToTray();
+    return;
+  }
+  win.minimize();
 });
 
 ipcMain.on('electron:window-toggle-maximize', (event) => {
@@ -1416,45 +1540,22 @@ ipcMain.on('electron:remove-shortcut-listener', (event) => {
 });
 
 app.on('window-all-closed', () => {
+  if (isQuitting) {
+    return;
+  }
   // Win/Linux: окно скрывается в трей, не выходим из процесса
 });
-
-let audioBridgeShutdownDone = false;
 
 app.on('before-quit', (event) => {
   if (audioBridgeShutdownDone) {
     return;
   }
   event.preventDefault();
-  Promise.allSettled([restoreDefaultCableMic(), shutdownBridge()])
-    .catch((error) => {
-      console.warn('[Soundpad:Electron] shutdown audio cleanup failed:', error.message);
-    })
-    .finally(() => {
-      audioBridgeShutdownDone = true;
-      app.quit();
-    });
+  quitApplication();
 });
 
 app.on('will-quit', () => {
-  shutdownDesktopNotifications();
-  shutdownCallOverlay();
-  shutdownActiveCallOverlay();
-  setAppBadgeCount(0);
-  globalShortcut.unregisterAll();
-  if (globalKeyboardListener) {
-    try {
-      globalKeyboardListener.kill();
-    } catch (_) {}
-    globalKeyboardListener = null;
-  }
-  if (win32GlobalMouseHookInitialized && win32GlobalMouseEvents) {
-    try {
-      win32GlobalMouseEvents.pauseMouseEvents();
-    } catch (_) {}
-  }
-  if (tray) {
-    tray.destroy();
-    tray = null;
-  }
+  teardownShortcutHooks();
+  teardownOverlayWindows();
+  destroyTrayIcon();
 });
