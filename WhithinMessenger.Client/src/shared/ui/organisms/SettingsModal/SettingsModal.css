@@ -278,6 +278,13 @@
   background: rgba(237, 66, 69, 0.1);
 }
 
+@media (max-width: 720px) {
+  .settings-modal__content .app-sound-settings__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .settings-row {
   display: flex;
   align-items: flex-start;

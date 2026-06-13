@@ -42,7 +42,7 @@ const MessageMediaContent = ({
       )}
 
       {hasCaption && (
-        <div className="message-media-block__caption">
+        <div className="message-media-block__caption message-text">
           {renderCaption()}
         </div>
       )}

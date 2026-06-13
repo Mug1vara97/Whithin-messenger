@@ -15,6 +15,11 @@
   user-select: none;
 }
 
+.sticker-message__media--240 {
+  max-width: min(240px, 100%);
+  max-height: 240px;
+}
+
 .sticker-message__media--180 {
   max-width: min(180px, 100%);
   max-height: 180px;

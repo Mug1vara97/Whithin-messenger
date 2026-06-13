@@ -24,6 +24,7 @@ import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSid
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { findChannelInCategories } from '../../../shared/lib/voice/callOnlyVoiceChannels';
+import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
 import {
   canMuteMembers,
   canManageMessages,
@@ -320,7 +321,7 @@ const HomePage = () => {
       return undefined;
     }
 
-    const audio = new Audio('/den-den-mushi.mp3');
+    const audio = new Audio(getAppSoundUrl('incomingCall') || '/den-den-mushi.mp3');
     audio.loop = true;
     audio.volume = 0.45;
     ringtoneAudioRef.current = audio;

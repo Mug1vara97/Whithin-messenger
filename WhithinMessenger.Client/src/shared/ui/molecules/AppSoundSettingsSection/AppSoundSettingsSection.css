@@ -1,0 +1,43 @@
+.app-sound-settings__error {
+  margin: 12px 16px 0;
+}
+
+.app-sound-settings__status {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-muted, #949ba4);
+  background: var(--hover, rgba(79, 84, 92, 0.24));
+}
+
+.app-sound-settings__status.is-custom {
+  color: var(--success, #43b581);
+  background: rgba(67, 181, 129, 0.12);
+}
+
+.app-sound-settings__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.app-sound-settings__file-btn {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.app-sound-settings__file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.app-sound-settings__footer {
+  margin-top: 0;
+}

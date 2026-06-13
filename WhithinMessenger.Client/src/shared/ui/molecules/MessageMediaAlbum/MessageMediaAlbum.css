@@ -102,6 +102,8 @@
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .message--media-only .message-media-block {
@@ -109,5 +111,5 @@
 }
 
 .message-media-block__caption {
-  margin-top: 4px;
+  margin-top: 6px;
 }

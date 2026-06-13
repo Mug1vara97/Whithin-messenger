@@ -112,6 +112,7 @@
   position: relative;
   max-width: 100%;
   min-height: 200px;
+  overflow: hidden;
 }
 
 .media-image {
@@ -120,7 +121,7 @@
   max-height: 300px;
   object-fit: contain;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.3s ease;
+  transition: opacity 0.3s ease;
   display: block;
 }
 
@@ -131,7 +132,7 @@
 }
 
 .media-image:hover {
-  transform: scale(1.02);
+  opacity: 0.92;
 }
 
 /* Skeleton loader */

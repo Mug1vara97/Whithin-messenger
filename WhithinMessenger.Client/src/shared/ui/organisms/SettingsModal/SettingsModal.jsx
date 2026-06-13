@@ -40,6 +40,7 @@ import {
   setActiveCallOverlayCoords,
 } from '../../../lib/utils/activeCallOverlaySettings';
 import { syncDesktopActiveCallOverlaySettings } from '../../../lib/utils/desktopActiveCallOverlayBridge';
+import { AppSoundSettingsSection } from '../../molecules/AppSoundSettingsSection/AppSoundSettingsSection';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
 
@@ -517,6 +518,10 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                 <ParticipantVolumeSettings />
               </div>
             </SettingsPanel>
+
+            <SettingsPanel title="Звуковые эффекты">
+              <AppSoundSettingsSection />
+            </SettingsPanel>
           </>
         );
 
@@ -525,35 +530,67 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
 
       case 'interface':
         return (
-          <SettingsPanel
-            title="Тема"
-            description="Внешний вид интерфейса приложения."
-          >
-            <SettingsRow title="Тема оформления">
-              <select
-                className="settings-select"
-                value={themePresetId}
-                onChange={(e) => {
-                  const nextId = e.target.value;
-                  setThemePresetId(nextId);
-                  persistThemePreset(nextId);
-                }}
+          <>
+            <SettingsPanel
+              title="Тема"
+              description="Внешний вид интерфейса приложения."
+            >
+              <SettingsRow title="Тема оформления">
+                <select
+                  className="settings-select"
+                  value={themePresetId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setThemePresetId(nextId);
+                    persistThemePreset(nextId);
+                  }}
+                >
+                  {THEME_PRESET_LIST.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+              </SettingsRow>
+              {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
+                <div className="settings-row">
+                  <p className="settings-row__desc" style={{ margin: 0 }}>
+                    {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId).description}
+                  </p>
+                </div>
+              )}
+            </SettingsPanel>
+
+            {isElectron && (
+              <SettingsPanel
+                title="Оверлей звонка"
+                description="Компактная панель участников, когда приложение свёрнуто или в фоне."
               >
-                {THEME_PRESET_LIST.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.name}
-                  </option>
-                ))}
-              </select>
-            </SettingsRow>
-            {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
-              <div className="settings-row">
-                <p className="settings-row__desc" style={{ margin: 0 }}>
-                  {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId).description}
-                </p>
-              </div>
+                <SettingsToggle
+                  id="settings-active-call-overlay"
+                  checked={activeCallOverlayEnabled}
+                  onChange={() => setActiveCallOverlayEnabledState((prev) => !prev)}
+                  label="Панель участников звонка"
+                  description="Аватар, ник, индикаторы микрофона и наушников."
+                />
+                <div className="settings-row settings-row--stacked">
+                  <div className="settings-row__info">
+                    <span className="settings-row__title">Позиция на экране</span>
+                    <p className="settings-row__desc">
+                      Выберите место — нажмите или перетащите маркер по схеме.
+                    </p>
+                  </div>
+                  <div className="settings-row__control settings-row__control--wide">
+                    <ActiveCallOverlayPositionPicker
+                      coords={activeCallOverlayCoords}
+                      onChange={setActiveCallOverlayCoordsState}
+                      disabled={!activeCallOverlayEnabled}
+                    />
+                  </div>
+                </div>
+              </SettingsPanel>
             )}
-          </SettingsPanel>
+          </>
         );
 
       case 'notifications':
@@ -583,38 +620,6 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                 ))}
               </select>
             </SettingsRow>
-            {isElectron && (
-              <SettingsRow
-                title="Входящий звонок"
-                description="Когда приложение свёрнуто или в фоне, карточка дозвона всегда показывается по центру экрана."
-              />
-            )}
-            {isElectron && (
-              <SettingsToggle
-                id="settings-active-call-overlay"
-                checked={activeCallOverlayEnabled}
-                onChange={() => setActiveCallOverlayEnabledState((prev) => !prev)}
-                label="Панель участников звонка"
-                description="Компактный оверлей во время звонка, когда приложение свёрнуто или в фоне: аватар, ник, микрофон и наушники."
-              />
-            )}
-            {isElectron && (
-              <div className="settings-row settings-row--stacked">
-                <div className="settings-row__info">
-                  <span className="settings-row__title">Позиция панели участников</span>
-                  <p className="settings-row__desc">
-                    Выберите любое место на экране — нажмите или перетащите маркер по схеме.
-                  </p>
-                </div>
-                <div className="settings-row__control settings-row__control--wide">
-                  <ActiveCallOverlayPositionPicker
-                    coords={activeCallOverlayCoords}
-                    onChange={setActiveCallOverlayCoordsState}
-                    disabled={!activeCallOverlayEnabled}
-                  />
-                </div>
-              </div>
-            )}
             <SettingsToggle
               id="settings-sound-notifications"
               checked={soundNotificationsEnabled}

@@ -2,6 +2,17 @@
  * Утилита для воспроизведения звуков уведомлений в голосовых звонках
  */
 
+import { getAppSoundUrl } from './appSoundSettings';
+
+const VOICE_SOUND_IDS = [
+  'userJoined',
+  'userLeft',
+  'micMuted',
+  'micUnmuted',
+  'globalMuted',
+  'globalUnmuted',
+];
+
 class AudioNotificationManager {
   constructor() {
     this.audioContext = null;
@@ -11,29 +22,24 @@ class AudioNotificationManager {
       micMuted: null,
       micUnmuted: null,
       globalMuted: null,
-      globalUnmuted: null
+      globalUnmuted: null,
     };
     this.isInitialized = false;
     this._lastJoinSoundAtByKey = new Map();
     this._joinSoundPending = new Set();
   }
 
-  /**
-   * Инициализация аудио контекста и загрузка звуков
-   */
   async initialize() {
     if (this.isInitialized) return;
 
     try {
-      // Создаем AudioContext
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: 48000,
-        latencyHint: 'interactive'
+        latencyHint: 'interactive',
       });
 
-      // Загружаем звуки
       await this.loadSounds();
-      
+
       this.isInitialized = true;
       console.log('AudioNotificationManager: Initialized successfully');
     } catch (error) {
@@ -41,63 +47,50 @@ class AudioNotificationManager {
     }
   }
 
-  /**
-   * Загрузка звуковых файлов
-   */
-  async loadSounds() {
+  async decodeSound(soundId) {
+    const url = getAppSoundUrl(soundId);
+    if (!url || !this.audioContext) {
+      return null;
+    }
+
     try {
-      // Загружаем звук подключения пользователя
-      const userJoinedResponse = await fetch('/patriot.mp3');
-      if (userJoinedResponse.ok) {
-        const userJoinedArrayBuffer = await userJoinedResponse.arrayBuffer();
-        this.sounds.userJoined = await this.audioContext.decodeAudioData(userJoinedArrayBuffer);
+      const response = await fetch(url);
+      if (!response.ok) {
+        return null;
       }
-
-      // Загружаем звук отключения пользователя
-      const userLeftResponse = await fetch('/user-left.mp3');
-      if (userLeftResponse.ok) {
-        const userLeftArrayBuffer = await userLeftResponse.arrayBuffer();
-        this.sounds.userLeft = await this.audioContext.decodeAudioData(userLeftArrayBuffer);
-      }
-
-      // Загружаем звук мьюта микрофона
-      const micMutedResponse = await fetch('/mic-muted.mp3');
-      if (micMutedResponse.ok) {
-        const micMutedArrayBuffer = await micMutedResponse.arrayBuffer();
-        this.sounds.micMuted = await this.audioContext.decodeAudioData(micMutedArrayBuffer);
-      }
-
-      // Загружаем звук размьюта микрофона
-      const micUnmutedResponse = await fetch('/mic-unmuted.mp3');
-      if (micUnmutedResponse.ok) {
-        const micUnmutedArrayBuffer = await micUnmutedResponse.arrayBuffer();
-        this.sounds.micUnmuted = await this.audioContext.decodeAudioData(micUnmutedArrayBuffer);
-      }
-
-      // Загружаем звук глобального мьюта
-      const globalMutedResponse = await fetch('/global-muted.mp3');
-      if (globalMutedResponse.ok) {
-        const globalMutedArrayBuffer = await globalMutedResponse.arrayBuffer();
-        this.sounds.globalMuted = await this.audioContext.decodeAudioData(globalMutedArrayBuffer);
-      }
-
-      // Загружаем звук глобального размьюта
-      const globalUnmutedResponse = await fetch('/global-unmuted.mp3');
-      if (globalUnmutedResponse.ok) {
-        const globalUnmutedArrayBuffer = await globalUnmutedResponse.arrayBuffer();
-        this.sounds.globalUnmuted = await this.audioContext.decodeAudioData(globalUnmutedArrayBuffer);
-      }
-
-      console.log('AudioNotificationManager: Sounds loaded successfully');
+      const arrayBuffer = await response.arrayBuffer();
+      return await this.audioContext.decodeAudioData(arrayBuffer);
     } catch (error) {
-      console.warn('AudioNotificationManager: Failed to load some sounds:', error);
+      console.warn(`AudioNotificationManager: Failed to load ${soundId}:`, error);
+      return null;
     }
   }
 
-  /**
-   * Воспроизведение звука подключения пользователя
-   * @param {{ dedupeKey?: string }} options
-   */
+  async loadSounds() {
+    if (!this.audioContext) {
+      return;
+    }
+
+    await Promise.all(
+      VOICE_SOUND_IDS.map(async (soundId) => {
+        this.sounds[soundId] = await this.decodeSound(soundId);
+      }),
+    );
+  }
+
+  async reloadSounds() {
+    if (!this.audioContext || this.audioContext.state === 'closed') {
+      this.isInitialized = false;
+      await this.initialize();
+      return;
+    }
+
+    VOICE_SOUND_IDS.forEach((soundId) => {
+      this.sounds[soundId] = null;
+    });
+    await this.loadSounds();
+  }
+
   async playUserJoinedSound(options = {}) {
     const dedupeKey = options.dedupeKey ?? 'default';
     if (this._joinSoundPending.has(dedupeKey)) {
@@ -120,46 +113,26 @@ class AudioNotificationManager {
     }
   }
 
-  /**
-   * Воспроизведение звука отключения пользователя
-   */
   async playUserLeftSound() {
-    await this.playSound('userLeft', 0.5); // Громкость 50%
+    await this.playSound('userLeft', 0.5);
   }
 
-  /**
-   * Воспроизведение звука мьюта микрофона (только локально)
-   */
   async playMicMutedSound() {
-    await this.playSound('micMuted', 0.5); // Громкость 50%
+    await this.playSound('micMuted', 0.5);
   }
 
-  /**
-   * Воспроизведение звука размьюта микрофона (только локально)
-   */
   async playMicUnmutedSound() {
-    await this.playSound('micUnmuted', 0.5); // Громкость 50%
+    await this.playSound('micUnmuted', 0.5);
   }
 
-  /**
-   * Воспроизведение звука глобального мьюта (только локально)
-   */
   async playGlobalMutedSound() {
-    await this.playSound('globalMuted', 0.6); // Громкость 60%
+    await this.playSound('globalMuted', 0.6);
   }
 
-  /**
-   * Воспроизведение звука глобального размьюта (только локально)
-   */
   async playGlobalUnmutedSound() {
-    await this.playSound('globalUnmuted', 0.6); // Громкость 60%
+    await this.playSound('globalUnmuted', 0.6);
   }
 
-  /**
-   * Воспроизведение звука
-   * @param {string} soundName - Название звука
-   * @param {number} volume - Громкость (0-1)
-   */
   async playSound(soundName, volume = 0.5) {
     if (!this.isInitialized) {
       await this.initialize();
@@ -170,41 +143,36 @@ class AudioNotificationManager {
       return;
     }
 
-    // Возобновляем контекст если он приостановлен
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
 
-    const sound = this.sounds[soundName];
+    let sound = this.sounds[soundName];
+    if (!sound) {
+      this.sounds[soundName] = await this.decodeSound(soundName);
+      sound = this.sounds[soundName];
+    }
     if (!sound) {
       console.warn(`AudioNotificationManager: Sound ${soundName} not loaded`);
       return;
     }
 
     try {
-      // Создаем источник звука
       const source = this.audioContext.createBufferSource();
       const gainNode = this.audioContext.createGain();
-      
+
       source.buffer = sound;
       gainNode.gain.value = volume;
-      
-      // Подключаем цепочку: source -> gain -> destination
+
       source.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
-      
-      // Воспроизводим звук
+
       source.start(0);
-      
-      console.log(`AudioNotificationManager: Playing ${soundName} sound`);
     } catch (error) {
       console.error(`AudioNotificationManager: Failed to play ${soundName} sound:`, error);
     }
   }
 
-  /**
-   * Очистка ресурсов
-   */
   cleanup() {
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
@@ -216,7 +184,7 @@ class AudioNotificationManager {
       micMuted: null,
       micUnmuted: null,
       globalMuted: null,
-      globalUnmuted: null
+      globalUnmuted: null,
     };
     this.isInitialized = false;
     this._lastJoinSoundAtByKey.clear();
@@ -224,8 +192,12 @@ class AudioNotificationManager {
   }
 }
 
-// Создаем глобальный экземпляр
 export const audioNotificationManager = new AudioNotificationManager();
 
-// Экспортируем также класс для создания отдельных экземпляров
 export { AudioNotificationManager };
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('appSoundSettingsChanged', () => {
+    audioNotificationManager.reloadSounds().catch(() => {});
+  });
+}

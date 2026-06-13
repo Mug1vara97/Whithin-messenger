@@ -90,7 +90,7 @@ const MessageItem = ({
     const messageParts = splitTextWithLinks(message.content);
     const hasTextContent = Boolean(message.content?.trim());
     const renderCaption = () => (
-      <div className="message-text">
+      <>
         {messageParts.length > 0 ? (
           messageParts.map((part, index) => {
             if (part.type === 'link') {
@@ -119,7 +119,7 @@ const MessageItem = ({
         ) : (
           message.content
         )}
-      </div>
+      </>
     );
 
     return (

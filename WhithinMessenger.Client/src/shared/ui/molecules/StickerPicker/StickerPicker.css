@@ -252,6 +252,31 @@ body.is-resizing-sticker-panel {
   cursor: default;
 }
 
+.sticker-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.sticker-preview-overlay__card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(320px, 80vw);
+  max-height: min(320px, 70vh);
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(30, 31, 34, 0.92);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
 @media (max-width: 900px) {
   .sticker-picker {
     flex-basis: 280px;

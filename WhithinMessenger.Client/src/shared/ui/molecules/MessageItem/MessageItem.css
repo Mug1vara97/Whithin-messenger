@@ -12,6 +12,12 @@
   background: var(--hover);
 }
 
+.message-item .message-avatar,
+.message-item .user-avatar {
+  flex-shrink: 0;
+  position: relative;
+}
+
 .message-item.own {
   flex-direction: row-reverse;
 }
@@ -126,6 +132,17 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-media .media-image-container {
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.message-media .media-image:hover {
+  transform: none;
 }
 
 .message-image {
@@ -138,11 +155,10 @@
   border-radius: 8px;
   object-fit: cover;
   cursor: pointer;
-  transition: transform 0.2s ease;
 }
 
 .message-image-content:hover {
-  transform: scale(1.02);
+  opacity: 0.92;
 }
 
 .message-voice {

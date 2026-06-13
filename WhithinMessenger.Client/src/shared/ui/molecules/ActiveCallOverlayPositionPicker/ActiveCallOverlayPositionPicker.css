@@ -19,23 +19,22 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
     var(--surface, #2b2d31);
-  cursor: crosshair;
   overflow: hidden;
   touch-action: none;
 }
 
-.active-call-overlay-position-picker__screen::before {
-  content: '';
+.active-call-overlay-position-picker__inner {
   position: absolute;
   inset: 10%;
   border: 1px dashed rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  pointer-events: none;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .active-call-overlay-position-picker__marker {
   position: absolute;
-  transform: translate(-50%, -50%);
+  width: 56px;
   pointer-events: none;
 }
 

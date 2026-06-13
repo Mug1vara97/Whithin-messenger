@@ -2,22 +2,34 @@ import React, { useCallback, useRef } from 'react';
 import { ACTIVE_CALL_OVERLAY_CORNER_PRESETS } from '../../../lib/utils/activeCallOverlaySettings';
 import './ActiveCallOverlayPositionPicker.css';
 
+const MARKER_WIDTH_PX = 56;
+const MARKER_HEIGHT_PX = 18;
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
 export function ActiveCallOverlayPositionPicker({ coords, onChange, disabled = false }) {
-  const previewRef = useRef(null);
+  const innerRef = useRef(null);
+  const markerRef = useRef(null);
 
   const updateFromClientPoint = useCallback(
     (clientX, clientY) => {
-      if (disabled || !previewRef.current) return;
+      if (disabled || !innerRef.current) return;
 
-      const rect = previewRef.current.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
+      const innerRect = innerRef.current.getBoundingClientRect();
+      if (innerRect.width <= 0 || innerRect.height <= 0) return;
 
-      const xPercent = clamp(((clientX - rect.left) / rect.width) * 100, 0, 100);
-      const yPercent = clamp(((clientY - rect.top) / rect.height) * 100, 0, 100);
+      const markerWidth = markerRef.current?.offsetWidth ?? MARKER_WIDTH_PX;
+      const markerHeight = markerRef.current?.offsetHeight ?? MARKER_HEIGHT_PX;
+      const maxX = Math.max(0, innerRect.width - markerWidth);
+      const maxY = Math.max(0, innerRect.height - markerHeight);
+
+      const localX = clamp(clientX - innerRect.left, 0, maxX);
+      const localY = clamp(clientY - innerRect.top, 0, maxY);
+
+      const xPercent = maxX > 0 ? (localX / maxX) * 100 : 0;
+      const yPercent = maxY > 0 ? (localY / maxY) * 100 : 0;
 
       onChange({
         xPercent: Math.round(xPercent),
@@ -45,21 +57,30 @@ export function ActiveCallOverlayPositionPicker({ coords, onChange, disabled = f
     window.addEventListener('pointerup', handleUp, { once: true });
   };
 
+  const xPercent = coords?.xPercent ?? 100;
+  const yPercent = coords?.yPercent ?? 100;
+
   const markerStyle = {
-    left: `${coords?.xPercent ?? 100}%`,
-    top: `${coords?.yPercent ?? 100}%`,
+    left: `calc((100% - ${MARKER_WIDTH_PX}px) * ${xPercent / 100})`,
+    top: `calc((100% - ${MARKER_HEIGHT_PX}px) * ${yPercent / 100})`,
   };
 
   return (
     <div className={`active-call-overlay-position-picker${disabled ? ' is-disabled' : ''}`}>
-      <div
-        ref={previewRef}
-        className="active-call-overlay-position-picker__screen"
-        onPointerDown={handlePointerDown}
-        role="presentation"
-      >
-        <div className="active-call-overlay-position-picker__marker" style={markerStyle} aria-hidden="true">
-          <span className="active-call-overlay-position-picker__marker-chip" />
+      <div className="active-call-overlay-position-picker__screen" role="presentation">
+        <div
+          ref={innerRef}
+          className="active-call-overlay-position-picker__inner"
+          onPointerDown={handlePointerDown}
+        >
+          <div
+            ref={markerRef}
+            className="active-call-overlay-position-picker__marker"
+            style={markerStyle}
+            aria-hidden="true"
+          >
+            <span className="active-call-overlay-position-picker__marker-chip" />
+          </div>
         </div>
       </div>
       <p className="active-call-overlay-position-picker__hint">

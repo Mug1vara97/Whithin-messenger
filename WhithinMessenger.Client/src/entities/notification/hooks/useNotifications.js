@@ -13,6 +13,7 @@ import {
   getNotificationSoundVolumeFactor,
   getSoundNotificationsEnabled,
 } from '../../../shared/lib/utils/inAppNotificationSettings';
+import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
 
 export const useNotifications = () => {
   const { user } = useAuth();
@@ -153,8 +154,15 @@ export const useNotifications = () => {
     if (typeof window === 'undefined') return;
     if (notificationSoundRef.current) return;
 
-    notificationSoundRef.current = new Audio('/notification-sound.mp3');
+    notificationSoundRef.current = new Audio(getAppSoundUrl('messageNotification') || '/notification-sound.mp3');
     notificationSoundRef.current.preload = 'auto';
+  }, []);
+
+  const applyNotificationSoundSource = useCallback(() => {
+    const audio = notificationSoundRef.current;
+    if (!audio) return;
+    audio.src = getAppSoundUrl('messageNotification') || '/notification-sound.mp3';
+    audio.load();
   }, []);
 
   useEffect(() => {
@@ -172,6 +180,7 @@ export const useNotifications = () => {
       soundNotificationsEnabledRef.current = getSoundNotificationsEnabled();
       notificationSoundVolumeRef.current = getNotificationSoundVolumeFactor();
       setSoundNotificationsEnabled(soundNotificationsEnabledRef.current);
+      applyNotificationSoundSource();
     };
 
     const onStorage = (event) => {
@@ -179,6 +188,7 @@ export const useNotifications = () => {
         event.key === 'soundNotificationsEnabled'
         || event.key === 'notificationSoundVolume'
         || event.key === 'inAppNotificationsEnabled'
+        || event.key === 'appCustomSounds'
       ) {
         syncSetting();
       }
@@ -186,12 +196,14 @@ export const useNotifications = () => {
 
     window.addEventListener('storage', onStorage);
     window.addEventListener('notificationSettingsChanged', syncSetting);
+    window.addEventListener('appSoundSettingsChanged', syncSetting);
 
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('notificationSettingsChanged', syncSetting);
+      window.removeEventListener('appSoundSettingsChanged', syncSetting);
     };
-  }, []);
+  }, [applyNotificationSoundSource]);
 
   useEffect(() => {
     if (!user?.id || !connectionContext?.getConnection) return undefined;

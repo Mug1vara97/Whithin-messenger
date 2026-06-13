@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stickerApi } from '../../../../entities/sticker/api';
 import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 import StickerMessage from '../StickerMessage/StickerMessage';
 import { Add, Close, History } from '@mui/icons-material';
 import './StickerPicker.css';
+
+const LONG_PRESS_MS = 450;
 
 const normalizePack = (pack) => ({
   id: pack.id ?? pack.Id,
@@ -33,6 +35,63 @@ const StickerPicker = ({
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [error, setError] = useState(null);
+  const [previewSticker, setPreviewSticker] = useState(null);
+  const longPressTimerRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewSticker(null);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      closePreview();
+      clearLongPressTimer();
+    }
+  }, [clearLongPressTimer, closePreview, open]);
+
+  useEffect(() => {
+    if (!previewSticker) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closePreview();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [closePreview, previewSticker]);
+
+  const handleStickerPointerDown = useCallback((sticker) => (event) => {
+    if (event.button !== 0) return;
+    longPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setPreviewSticker(sticker);
+    }, LONG_PRESS_MS);
+  }, [clearLongPressTimer]);
+
+  const handleStickerPointerEnd = useCallback(() => {
+    clearLongPressTimer();
+  }, [clearLongPressTimer]);
+
+  const handleStickerClick = useCallback((sticker) => (event) => {
+    if (longPressTriggeredRef.current) {
+      event.preventDefault();
+      longPressTriggeredRef.current = false;
+      return;
+    }
+    onStickerSelect?.(sticker);
+  }, [onStickerSelect]);
 
   const loadPacks = useCallback(async () => {
     setIsLoading(true);
@@ -143,8 +202,12 @@ const StickerPicker = ({
                   key={sticker.id}
                   type="button"
                   className="sticker-picker__cell"
-                  onClick={() => onStickerSelect?.(sticker)}
-                  title="Отправить стикер"
+                  onPointerDown={handleStickerPointerDown(sticker)}
+                  onPointerUp={handleStickerPointerEnd}
+                  onPointerCancel={handleStickerPointerEnd}
+                  onPointerLeave={handleStickerPointerEnd}
+                  onClick={handleStickerClick(sticker)}
+                  title="Отправить стикер. Удерживайте для предпросмотра."
                 >
                   <StickerMessage sticker={sticker} size={64} />
                 </button>
@@ -183,6 +246,20 @@ const StickerPicker = ({
           })}
         </div>
       </aside>
+
+      {previewSticker && (
+        <div
+          className="sticker-preview-overlay"
+          onClick={closePreview}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Предпросмотр стикера"
+        >
+          <div className="sticker-preview-overlay__card" onClick={(event) => event.stopPropagation()}>
+            <StickerMessage sticker={previewSticker} size={240} />
+          </div>
+        </div>
+      )}
 
       {isCatalogOpen && (
         <div className="sticker-catalog-overlay" onClick={() => setIsCatalogOpen(false)}>
