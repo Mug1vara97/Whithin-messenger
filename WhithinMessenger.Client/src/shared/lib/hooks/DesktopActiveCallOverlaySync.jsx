@@ -92,6 +92,9 @@ export function DesktopActiveCallOverlaySync() {
         ...visibilityRef.current,
         ...(state || {}),
       };
+      if (!state?.visible || state?.minimized) {
+        void useCallStore.getState().resumeCallAudioIfSuspended?.();
+      }
       syncOverlay();
     });
 

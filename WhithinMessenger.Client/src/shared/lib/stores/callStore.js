@@ -777,12 +777,40 @@ export const useCallStore = create(
         console.log('[VAD] Initialized local voice activity detector for user:', userId);
       },
       
-      // Удаляем сетевой индикатор говорения (используем только локальный VAD на приёме)
-      initializeSpeakingStateListener: () => {
-        if (voiceCallApi.socket) {
-          voiceCallApi.socket.off('speakingStateChanged');
+      resumeCallAudioIfSuspended: async () => {
+        const ctx = get().audioContext;
+        if (!ctx || ctx.state === 'closed') return;
+        if (ctx.state === 'suspended') {
+          try {
+            await ctx.resume();
+          } catch (_) {
+            /* ignore */
+          }
         }
-        console.log('[VAD] Remote speaking: local analyser per track (no server speaking state)');
+      },
+
+      // Сетевой индикатор для удалённых участников (не зависит от rAF при сворачивании).
+      initializeSpeakingStateListener: () => {
+        if (!voiceCallApi.socket) return;
+
+        voiceCallApi.socket.off('speakingStateChanged');
+        voiceCallApi.socket.on('speakingStateChanged', (payload) => {
+          const rawUserId = payload?.userId ?? payload?.peerId;
+          if (rawUserId == null || rawUserId === '') return;
+
+          const normalizedUserId = String(rawUserId);
+          const state = get();
+          const currentUserId = String(state.currentUserId || '');
+
+          if (normalizedUserId === currentUserId) return;
+
+          const isMuted = state.participantMuteStates?.get(normalizedUserId) === true;
+          if (isMuted && payload?.speaking) return;
+
+          get().updateSpeakingState(normalizedUserId, Boolean(payload?.speaking));
+        });
+
+        console.log('[VAD] Remote speaking: local VAD + speakingStateChanged');
       },
       
       // Локальный VAD по входящему MediaStream для каждого удалённого участника
