@@ -426,6 +426,23 @@ function isKeyboardShortcutMatch(binding, event, isDown) {
   );
 }
 
+/** Совпадение клавиатурного шортката в focused-окне (before-input-event). */
+function isBeforeInputKeyboardMatch(binding, input) {
+  if (!binding || !input || input.type !== 'keyDown') {
+    return false;
+  }
+  const listenerKey = webKeyToListenerKeyName(input.key);
+  if (!listenerKey || listenerKey !== binding.listenerKey) {
+    return false;
+  }
+  return (
+    Boolean(input.control) === Boolean(binding.modifiers.ctrl) &&
+    Boolean(input.alt) === Boolean(binding.modifiers.alt) &&
+    Boolean(input.shift) === Boolean(binding.modifiers.shift) &&
+    Boolean(input.meta) === Boolean(binding.modifiers.meta)
+  );
+}
+
 function ensureGlobalKeyboardListener() {
   if (globalKeyboardListener) {
     return globalKeyboardListener;
@@ -897,6 +914,16 @@ function createWindow() {
       return;
     }
 
+    if (input.type === 'keyDown' && keyboardShortcutBindings.length > 0) {
+      const matched = keyboardShortcutBindings.find((binding) =>
+        isBeforeInputKeyboardMatch(binding, input)
+      );
+      if (matched && dispatchShortcutAction(matched.action, { dedupeMs: 120 })) {
+        _event.preventDefault();
+        return;
+      }
+    }
+
     const isMouseLikePointer =
       input.type === 'mouseDown' ||
       input.type === 'mouseUp' ||
@@ -1114,9 +1141,11 @@ ipcMain.on('electron:window-toggle-maximize', (event) => {
 
 ipcMain.on('electron:window-close', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed()) {
-    win.close();
+  if (!win || win.isDestroyed()) {
+    return;
   }
+  allowAppQuit = true;
+  win.close();
 });
 
 ipcMain.on('electron:sync-window-background', (event, color) => {

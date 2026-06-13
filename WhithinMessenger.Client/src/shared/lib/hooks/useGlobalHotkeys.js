@@ -120,12 +120,8 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     return map;
   }, [currentHotkeys, soundpadSlots]);
 
-  // Browser: keyboard in-window. Electron: passive global hook in main process.
+  // Keyboard in-window (fallback when global hook unavailable; dedupe avoids double-fire).
   useEffect(() => {
-    if (isElectronEnv()) {
-      return undefined;
-    }
-
     const handleKeyboardHotkey = (event) => {
       if (event.repeat || isEditableTarget(event.target)) {
         return;
