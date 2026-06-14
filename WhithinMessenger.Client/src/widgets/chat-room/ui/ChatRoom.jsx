@@ -56,6 +56,7 @@ import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverr
 import { useServerHubConnection } from '../../../shared/lib/hooks/useServerHubConnection';
 import {
   mapChatParticipantToListItem,
+  mapServerMemberToChatParticipant,
   mapServerMemberToListItem,
 } from '../../../shared/lib/utils/memberListUtils';
 import {
@@ -363,6 +364,21 @@ const ChatRoom = ({
     serverRoles,
   ]);
 
+  const chatInfoParticipants = useMemo(() => {
+    if (isPrivateChat) return [];
+
+    if (isServerChat) {
+      if (chatParticipants?.length > 0) {
+        return chatParticipants;
+      }
+      return (serverMembers || []).map((member) =>
+        mapServerMemberToChatParticipant(member, { resolveStatus })
+      );
+    }
+
+    return chatParticipants || [];
+  }, [isPrivateChat, isServerChat, chatParticipants, serverMembers, resolveStatus]);
+
   useEffect(() => {
     exitSelectionMode();
   }, [chatId, exitSelectionMode]);
@@ -616,15 +632,18 @@ const ChatRoom = ({
   }, [connection, showChatInfo, showMemberList, chatId]);
 
   useEffect(() => {
-    if (!isGroupChat || isPrivateChat || !connection || !chatId) return;
+    const shouldLoadParticipants = isGroupChat || isServerChat;
+    if (!shouldLoadParticipants || isPrivateChat || !connection || !chatId) return;
     if (!showMemberList && !showChatInfo) return;
 
-    console.log('ChatRoom - Loading participants for member sidebar, chatId:', chatId);
+    console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
     connection.invoke('GetChatParticipants', chatId).catch((error) => {
       console.error('ChatRoom - Error loading participants via SignalR:', error);
-      setChatParticipants([]);
+      if (!isServerChat) {
+        setChatParticipants([]);
+      }
     });
-  }, [isGroupChat, isPrivateChat, chatId, connection, showMemberList, showChatInfo]);
+  }, [isGroupChat, isServerChat, isPrivateChat, chatId, connection, showMemberList, showChatInfo]);
 
   useEffect(() => {
     if (showChatInfo && connection && chatId) {
@@ -632,8 +651,14 @@ const ChatRoom = ({
       connection.invoke("GetChatInfo", chatId).catch(error => {
         console.error('Error invoking GetChatInfo:', error);
       });
+
+      if (!isPrivateChat && (isGroupChat || isServerChat)) {
+        connection.invoke('GetChatParticipants', chatId).catch((error) => {
+          console.error('ChatRoom - Error loading participants for chat info:', error);
+        });
+      }
     }
-  }, [showChatInfo, chatId, connection]);
+  }, [showChatInfo, chatId, connection, isPrivateChat, isGroupChat, isServerChat]);
 
   useEffect(() => {
     if (!showChatInfo || !chatId) {
@@ -2047,7 +2072,9 @@ const ChatRoom = ({
         }}
         mediaFiles={chatInfoMediaFiles}
         mediaFilesLoading={chatInfoMediaLoading}
-        participants={chatParticipants}
+        participants={chatInfoParticipants}
+        participantsLoading={isServerChat ? serverMembersLoading : false}
+        canAddParticipants={isGroupChat && !isServerChat}
         onParticipantsUpdated={loadChatParticipants}
         connection={connection}
       />

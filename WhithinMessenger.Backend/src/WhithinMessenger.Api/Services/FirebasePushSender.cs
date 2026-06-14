@@ -43,6 +43,11 @@ public class FirebasePushSender : IFirebasePushSender
         string? messageType = null,
         string? previewText = null,
         string? thumbnailUrl = null,
+        string? senderUsername = null,
+        string? senderAvatarUrl = null,
+        string? senderAvatarColor = null,
+        string? serverName = null,
+        string? notificationType = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -52,7 +57,7 @@ public class FirebasePushSender : IFirebasePushSender
             ["chat_title"] = TruncateDataValue(title),
             ["title"] = TruncateDataValue(title),
             ["message"] = TruncateDataValue(message),
-            ["type"] = "chat_message"
+            ["type"] = string.IsNullOrWhiteSpace(notificationType) ? "chat_message" : notificationType.Trim(),
         };
 
         if (!string.IsNullOrWhiteSpace(messageType))
@@ -71,19 +76,27 @@ public class FirebasePushSender : IFirebasePushSender
             data["thumbnail_url"] = TruncateDataValue(thumbnailUrl.Trim());
         }
 
-        var displayBody = !string.IsNullOrWhiteSpace(previewText)
-            ? previewText.Trim()
-            : message;
-        displayBody = TruncateDataValue(displayBody);
+        if (!string.IsNullOrWhiteSpace(senderUsername))
+        {
+            data["sender_username"] = TruncateDataValue(senderUsername.Trim());
+        }
 
-        await SendPushAsync(
-            deviceToken,
-            data,
-            notificationTitle: title,
-            notificationBody: displayBody,
-            androidNotificationChannelId: ChatNotificationChannelId,
-            cancellationToken
-        );
+        if (!string.IsNullOrWhiteSpace(senderAvatarUrl))
+        {
+            data["sender_avatar"] = TruncateDataValue(senderAvatarUrl.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(senderAvatarColor))
+        {
+            data["sender_avatar_color"] = TruncateDataValue(senderAvatarColor.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(serverName))
+        {
+            data["server_name"] = TruncateDataValue(serverName.Trim());
+        }
+
+        await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
     }
 
     public async Task SendIncomingCallNotificationAsync(

@@ -83,6 +83,10 @@ public class NotificationService : INotificationService
                 type: type,
                 content: content,
                 chatDisplayName: chatDisplayName,
+                senderDisplayName: senderDisplayName,
+                senderAvatarUrl: senderAvatarUrl,
+                senderAvatarColor: senderAvatarColor,
+                serverDisplayName: serverDisplayName,
                 pushMessageType: pushMessageType,
                 pushPreviewText: pushPreviewText,
                 pushThumbnailUrl: pushThumbnailUrl,
@@ -176,6 +180,10 @@ public class NotificationService : INotificationService
         string type,
         string content,
         string? chatDisplayName,
+        string? senderDisplayName,
+        string? senderAvatarUrl,
+        string? senderAvatarColor,
+        string? serverDisplayName,
         string? pushMessageType,
         string? pushPreviewText,
         string? pushThumbnailUrl,
@@ -209,6 +217,11 @@ public class NotificationService : INotificationService
                     messageType: pushMessageType,
                     previewText: pushPreviewText,
                     thumbnailUrl: pushThumbnailUrl,
+                    senderUsername: senderDisplayName,
+                    senderAvatarUrl: senderAvatarUrl,
+                    senderAvatarColor: senderAvatarColor,
+                    serverName: serverDisplayName,
+                    notificationType: type,
                     cancellationToken: cancellationToken
                 );
             }

@@ -10,6 +10,11 @@ public interface IFirebasePushSender
         string? messageType = null,
         string? previewText = null,
         string? thumbnailUrl = null,
+        string? senderUsername = null,
+        string? senderAvatarUrl = null,
+        string? senderAvatarColor = null,
+        string? serverName = null,
+        string? notificationType = null,
         CancellationToken cancellationToken = default
     );
 

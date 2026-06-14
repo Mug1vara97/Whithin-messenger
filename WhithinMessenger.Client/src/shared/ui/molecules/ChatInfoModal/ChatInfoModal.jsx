@@ -75,7 +75,18 @@ const getBannerStyle = (banner, fallbackColor = '#5865F2') => {
   };
 };
 
-const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoading = false, participants = [], onParticipantsUpdated, connection }) => {
+const ChatInfoModal = ({
+  open,
+  onClose,
+  chatInfo,
+  mediaFiles = [],
+  mediaFilesLoading = false,
+  participants = [],
+  participantsLoading = false,
+  canAddParticipants = true,
+  onParticipantsUpdated,
+  connection,
+}) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [chatAvatar, setChatAvatar] = useState(chatInfo?.chatAvatar);
@@ -312,16 +323,22 @@ const ChatInfoModal = ({ open, onClose, chatInfo, mediaFiles = [], mediaFilesLoa
                   <div className="chat-info-participants-panel">
                     <div className="chat-info-participants-header">
                       <h5 className="chat-info-participants-title">Участники</h5>
-                      <button 
-                        className="chat-info-add-participant-btn"
-                        title="Добавить участника"
-                        onClick={handleAddParticipant}
-                      >
-                        <GroupAdd />
-                      </button>
+                      {canAddParticipants && (
+                        <button 
+                          className="chat-info-add-participant-btn"
+                          title="Добавить участника"
+                          onClick={handleAddParticipant}
+                        >
+                          <GroupAdd />
+                        </button>
+                      )}
                     </div>
                     <div className="chat-info-participants-list">
-                      {participants && participants.length > 0 ? (
+                      {participantsLoading ? (
+                        <div className="chat-info-no-participants">
+                          <p>Загрузка участников…</p>
+                        </div>
+                      ) : participants && participants.length > 0 ? (
                         participants.map((participant) => {
                           console.log('ChatInfoModal - Rendering participant:', participant);
                           console.log('ChatInfoModal - Avatar URL:', participant.avatarUrl);

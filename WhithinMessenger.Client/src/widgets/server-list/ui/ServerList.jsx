@@ -297,15 +297,6 @@ const ServerList = ({
 
           <ul className={`${styles['server-list-ul']} ${styles['server-list-bottom']}`}>
             <li className={styles['server-item']}>
-              <div
-                className={styles['server-button']}
-                onClick={handleDiscoverClick}
-                title="Обзор серверов"
-              >
-                <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
-              </div>
-            </li>
-            <li className={styles['server-item']}>
               <button
                 type="button"
                 className={`${styles['server-button']} ${styles['create-button']}`}
@@ -313,6 +304,15 @@ const ServerList = ({
               >
                 +
               </button>
+            </li>
+            <li className={styles['server-item']}>
+              <div
+                className={styles['server-button']}
+                onClick={handleDiscoverClick}
+                title="Обзор серверов"
+              >
+                <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
+              </div>
             </li>
             <li className={styles['server-item']}>
               <button

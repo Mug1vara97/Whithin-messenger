@@ -400,6 +400,20 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     return null;
                 }
 
+                if (chat.Type.TypeName == ChatTypeNames.Saved)
+                {
+                    return new ChatInfoDto
+                    {
+                        ChatId = chat.Id,
+                        Name = "Избранное",
+                        Type = "saved",
+                        Avatar = null,
+                        AvatarColor = "#5865F2",
+                        Banner = null,
+                        OtherUserId = userId
+                    };
+                }
+
                 if (chat.Type.TypeName == "Private")
                 {
                     var otherMember = chat.Members.FirstOrDefault(m => m.UserId != userId);

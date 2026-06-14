@@ -242,6 +242,24 @@ export const mapChatParticipantToListItem = (participant, { resolveStatus } = {}
 
 
 
+/** Format for ChatInfoModal participant list (SignalR GetChatParticipants shape). */
+export const mapServerMemberToChatParticipant = (member, { resolveStatus } = {}) => {
+  const userId = resolveMemberId(member);
+  const status = resolveStatus
+    ? resolveStatus(userId, resolveMemberStatus(member))
+    : resolveMemberStatus(member);
+
+  return {
+    userId,
+    username: resolveMemberName(member),
+    avatarUrl: resolveMemberAvatar(member),
+    avatarColor: resolveMemberAvatarColor(member),
+    userStatus: status,
+  };
+};
+
+
+
 export const groupMembersByPresence = (members) => {
 
   const online = [];
