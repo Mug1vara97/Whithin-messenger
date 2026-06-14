@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChatList } from '../../../widgets/chat-list';
 import { ServerList } from '../../../widgets/server-list';
@@ -68,6 +68,10 @@ const HomePage = () => {
   }, [navigate]);
 
   const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers } = useChatList(user?.id || null, handleChatCreatedNavigate);
+  const savedMessagesChatId = useMemo(
+    () => chats.find((chat) => chat.isSavedMessages)?.chatId ?? null,
+    [chats],
+  );
   const { createServer, fetchServers, servers, createConnection } = useServerContext();
   const {
     notifications,
@@ -1015,6 +1019,8 @@ const HomePage = () => {
                       chatId={selectedChat.chatId || selectedChat.chat_id}
                       groupName={selectedChat.groupName || selectedChat.username}
                       isGroupChat={selectedChat.isGroupChat}
+                      isSavedMessages={Boolean(selectedChat.isSavedMessages ?? selectedChat.IsSavedMessages)}
+                      savedMessagesChatId={savedMessagesChatId}
                       isServerChat={selectedServer ? true : false}
                       chatTypeId={selectedChat.chatTypeId}
                       userId={user?.id}

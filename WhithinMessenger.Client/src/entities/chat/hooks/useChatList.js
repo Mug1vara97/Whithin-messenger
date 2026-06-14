@@ -5,6 +5,11 @@ import tokenManager from '../../../shared/lib/services/tokenManager';
 import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
 
 const sortChats = (items) => [...items].sort((a, b) => {
+  const aSaved = Boolean(a.isSavedMessages ?? a.IsSavedMessages);
+  const bSaved = Boolean(b.isSavedMessages ?? b.IsSavedMessages);
+  if (aSaved && !bSaved) return -1;
+  if (!aSaved && bSaved) return 1;
+
   const timeA = new Date(a.lastMessageTime || 0).getTime();
   const timeB = new Date(b.lastMessageTime || 0).getTime();
   return timeB - timeA;
@@ -24,6 +29,7 @@ const normalizeChatListItem = (chat) => {
     avatarColor: chat.avatarColor ?? chat.AvatarColor ?? null,
     userStatus: chat.userStatus ?? chat.UserStatus ?? null,
     isGroupChat: Boolean(chat.isGroupChat ?? chat.IsGroupChat),
+    isSavedMessages: Boolean(chat.isSavedMessages ?? chat.IsSavedMessages),
     lastMessage: chat.lastMessage ?? chat.LastMessage ?? '',
     lastMessageTime: chat.lastMessageTime ?? chat.LastMessageTime ?? null,
     unreadCount: chat.unreadCount ?? chat.UnreadCount ?? 0,

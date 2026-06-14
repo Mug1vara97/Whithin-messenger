@@ -14,9 +14,15 @@ const canForwardMessage = (message) => {
   return !String(messageId).startsWith('temp_');
 };
 
+const normalizeForwardInput = (input) => {
+  if (!input) return [];
+  const list = Array.isArray(input) ? input : [input];
+  return list.filter(canForwardMessage);
+};
+
 export const useMessageForward = (currentChatId) => {
   const { servers } = useServerContext();
-  const [messageToForward, setMessageToForward] = useState(null);
+  const [messagesToForward, setMessagesToForward] = useState([]);
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
   const [forwardMessageText, setForwardMessageText] = useState('');
   const [targets, setTargets] = useState([]);
@@ -27,7 +33,7 @@ export const useMessageForward = (currentChatId) => {
   const [toastMessage, setToastMessage] = useState('');
 
   const resetState = useCallback(() => {
-    setMessageToForward(null);
+    setMessagesToForward([]);
     setForwardMessageText('');
     setTargets([]);
     setSelectedIds(new Set());
@@ -73,13 +79,14 @@ export const useMessageForward = (currentChatId) => {
     }
   }, [currentChatId, servers]);
 
-  const startForward = useCallback((message) => {
-    if (!canForwardMessage(message)) {
-      setError('Нельзя переслать это сообщение');
+  const startForward = useCallback((input) => {
+    const validMessages = normalizeForwardInput(input);
+    if (!validMessages.length) {
+      setError('Нельзя переслать выбранные сообщения');
       return false;
     }
 
-    setMessageToForward(message);
+    setMessagesToForward(validMessages);
     setForwardModalVisible(true);
     setSelectedIds(new Set());
     setForwardMessageText('');
@@ -114,19 +121,20 @@ export const useMessageForward = (currentChatId) => {
   }, []);
 
   const copyMessageLink = useCallback(async () => {
-    if (!messageToForward) return;
+    const firstMessage = messagesToForward[0];
+    if (!firstMessage) return;
     try {
-      await navigator.clipboard.writeText(buildMessageLinkText(messageToForward));
+      await navigator.clipboard.writeText(buildMessageLinkText(firstMessage));
       setToastMessage('Ссылка скопирована');
       window.setTimeout(() => setToastMessage(''), 2000);
     } catch (err) {
       console.error('copyMessageLink failed', err);
       setError('Не удалось скопировать ссылку');
     }
-  }, [messageToForward]);
+  }, [messagesToForward]);
 
   const forwardToSelected = useCallback(async (onForward) => {
-    if (!messageToForward || !onForward || selectedIds.size === 0 || isSending) {
+    if (!messagesToForward.length || !onForward || selectedIds.size === 0 || isSending) {
       return 0;
     }
 
@@ -134,41 +142,52 @@ export const useMessageForward = (currentChatId) => {
     setError('');
 
     let successCount = 0;
+    const trimmedComment = (forwardMessageText ?? '').trim();
+
     try {
       for (const targetChatId of selectedIds) {
-        const ok = await onForward(
-          messageToForward.messageId,
-          targetChatId,
-          forwardMessageText,
-        );
-        if (ok) successCount += 1;
+        for (let index = 0; index < messagesToForward.length; index += 1) {
+          const message = messagesToForward[index];
+          const comment = index === 0 ? trimmedComment : '';
+          const ok = await onForward(message.messageId, targetChatId, comment);
+          if (ok) successCount += 1;
+        }
       }
 
       if (successCount === 0) {
-        setError('Не удалось переслать сообщение');
+        setError('Не удалось переслать сообщения');
         return 0;
       }
 
-      const toast = successCount === 1
-        ? 'Сообщение переслано'
-        : `Переслано в ${successCount} чатов`;
+      const messageCount = messagesToForward.length;
+      const targetCount = selectedIds.size;
+      let toast = 'Сообщение переслано';
+      if (messageCount > 1 && targetCount > 1) {
+        toast = `Переслано ${messageCount} сообщений в ${targetCount} чатов`;
+      } else if (messageCount > 1) {
+        toast = `Переслано ${messageCount} сообщений`;
+      } else if (targetCount > 1) {
+        toast = `Переслано в ${targetCount} чатов`;
+      }
+
       setToastMessage(toast);
       window.setTimeout(() => {
         closeForwardModal();
       }, 450);
       return successCount;
     } catch (err) {
-      console.error('Error forwarding message:', err);
-      setError('Не удалось переслать сообщение');
+      console.error('Error forwarding messages:', err);
+      setError('Не удалось переслать сообщения');
       return successCount;
     } finally {
       setIsSending(false);
     }
-  }, [messageToForward, selectedIds, forwardMessageText, isSending, closeForwardModal]);
+  }, [messagesToForward, selectedIds, forwardMessageText, isSending, closeForwardModal]);
 
   const modalProps = useMemo(() => ({
     isOpen: forwardModalVisible,
-    message: messageToForward,
+    messages: messagesToForward,
+    message: messagesToForward.length === 1 ? messagesToForward[0] : null,
     targets,
     loading: loadingTargets,
     error,
@@ -182,7 +201,7 @@ export const useMessageForward = (currentChatId) => {
     onClose: closeForwardModal,
   }), [
     forwardModalVisible,
-    messageToForward,
+    messagesToForward,
     targets,
     loadingTargets,
     error,

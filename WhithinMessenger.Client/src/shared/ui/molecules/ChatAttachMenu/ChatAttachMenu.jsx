@@ -1,13 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AttachFile,
   Image as ImageIcon,
   InsertDriveFile,
   PollOutlined,
 } from '@mui/icons-material';
+import { clampMenuPosition } from '../../../lib/utils/clampMenuPosition';
 import './ChatAttachMenu.css';
 
 const MENU_HIDE_DELAY_MS = 160;
+const MENU_GAP_PX = 8;
+const VIEWPORT_PADDING = 8;
 
 export function ChatAttachMenu({
   disabled = false,
@@ -17,8 +21,11 @@ export function ChatAttachMenu({
   onDefaultClick,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const hideTimerRef = useRef(null);
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const mediaInputRef = useRef(null);
   const documentInputRef = useRef(null);
   const defaultInputRef = useRef(null);
@@ -43,6 +50,49 @@ export function ChatAttachMenu({
       setMenuOpen(false);
     }, MENU_HIDE_DELAY_MS);
   }, [clearHideTimer]);
+
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = dropdown.getBoundingClientRect();
+    const menuWidth = menuRect.width || dropdown.offsetWidth || 210;
+    const menuHeight = menuRect.height || dropdown.offsetHeight || 160;
+
+    let x = triggerRect.left;
+    let y = triggerRect.top - menuHeight - MENU_GAP_PX;
+
+    if (x + menuWidth > window.innerWidth - VIEWPORT_PADDING) {
+      x = triggerRect.right - menuWidth;
+    }
+
+    const clamped = clampMenuPosition(x, y, menuWidth, menuHeight, VIEWPORT_PADDING);
+
+    setDropdownStyle({
+      top: clamped.y,
+      left: clamped.x,
+      visibility: 'visible',
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setDropdownStyle(null);
+      return undefined;
+    }
+
+    updateDropdownPosition();
+
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [menuOpen, updateDropdownPosition]);
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
@@ -94,54 +144,15 @@ export function ChatAttachMenu({
     onPollClick?.();
   };
 
-  return (
-    <div
-      ref={rootRef}
-      className={`chat-attach-menu${menuOpen ? ' is-open' : ''}${disabled ? ' is-disabled' : ''}`}
-      onMouseEnter={openMenu}
-      onMouseLeave={handleRootMouseLeave}
-    >
-      <input
-        ref={defaultInputRef}
-        type="file"
-        multiple
-        className="chat-attach-menu__input"
-        onChange={handleDefaultPick}
-      />
-      <input
-        ref={mediaInputRef}
-        type="file"
-        multiple
-        accept="image/*,video/*"
-        className="chat-attach-menu__input"
-        onChange={handleMediaPick}
-      />
-      <input
-        ref={documentInputRef}
-        type="file"
-        multiple
-        accept=".pdf,.doc,.docx,.txt,.zip,.rar,.7z,.xls,.xlsx,.ppt,.pptx,application/*"
-        className="chat-attach-menu__input"
-        onChange={handleDocumentPick}
-      />
-
-      <button
-        type="button"
-        className="media-button chat-attach-menu__trigger"
-        disabled={disabled}
-        onClick={handleButtonClick}
-        title="Прикрепить файл"
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-      >
-        <AttachFile />
-      </button>
-
-      {menuOpen && (
+  const dropdown = menuOpen
+    ? createPortal(
         <div
+          ref={dropdownRef}
           className="chat-attach-menu__dropdown"
+          style={dropdownStyle ?? { visibility: 'hidden' }}
           role="menu"
           onMouseEnter={handleMenuMouseEnter}
+          onMouseLeave={scheduleHideMenu}
         >
           <button
             type="button"
@@ -170,9 +181,58 @@ export function ChatAttachMenu({
             <PollOutlined fontSize="small" />
             <span>Опрос</span>
           </button>
-        </div>
-      )}
-    </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <div
+        ref={rootRef}
+        className={`chat-attach-menu${menuOpen ? ' is-open' : ''}${disabled ? ' is-disabled' : ''}`}
+        onMouseEnter={openMenu}
+        onMouseLeave={handleRootMouseLeave}
+      >
+        <input
+          ref={defaultInputRef}
+          type="file"
+          multiple
+          className="chat-attach-menu__input"
+          onChange={handleDefaultPick}
+        />
+        <input
+          ref={mediaInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          className="chat-attach-menu__input"
+          onChange={handleMediaPick}
+        />
+        <input
+          ref={documentInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.doc,.docx,.txt,.zip,.rar,.7z,.xls,.xlsx,.ppt,.pptx,application/*"
+          className="chat-attach-menu__input"
+          onChange={handleDocumentPick}
+        />
+
+        <button
+          ref={triggerRef}
+          type="button"
+          className="media-button chat-attach-menu__trigger"
+          disabled={disabled}
+          onClick={handleButtonClick}
+          title="Прикрепить файл"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+        >
+          <AttachFile />
+        </button>
+      </div>
+      {dropdown}
+    </>
   );
 }
 

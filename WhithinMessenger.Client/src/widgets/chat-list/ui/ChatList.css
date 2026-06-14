@@ -173,6 +173,11 @@
   flex-shrink: 0;
 }
 
+.chat-avatar--saved {
+  background: var(--background-secondary, #36393f);
+  color: var(--text-secondary, #b5bac1);
+}
+
 .status-indicator {
   position: absolute;
   right: -1px;

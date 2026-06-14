@@ -7,6 +7,7 @@ export * from './useMediaHandlers';
 export * from './useContextMenu';
 export * from './useClampedMenuPosition';
 export * from './useMessageForward';
+export * from './useMessageSelection';
 export * from './useAppBadge';
 export * from './useGlobalCall';
 export * from './useGlobalHotkeys';

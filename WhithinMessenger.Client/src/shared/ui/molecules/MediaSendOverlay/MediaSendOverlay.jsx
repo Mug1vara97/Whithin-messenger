@@ -1,8 +1,37 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import './MediaSendOverlay.css';
 
 const MAX_BATCH_MEDIA_COUNT = 10;
+
+const getFilePreviewKey = (file) =>
+  `${file.name}-${file.size}-${file.lastModified}-${file.type}`;
+
+const buildPreviewItems = (files) =>
+  files.slice(0, MAX_BATCH_MEDIA_COUNT).map((file) => {
+    const isImage =
+      (file.type || '').startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(file.name || '');
+    const isVideo =
+      (file.type || '').startsWith('video/') ||
+      /\.(mp4|webm|mov|mkv|m4v)$/i.test(file.name || '');
+
+    return {
+      key: getFilePreviewKey(file),
+      file,
+      url: URL.createObjectURL(file),
+      isImage,
+      isVideo,
+    };
+  });
+
+const revokePreviewItems = (items) => {
+  items.forEach((item) => {
+    if (item.url) {
+      URL.revokeObjectURL(item.url);
+    }
+  });
+};
 
 const pluralize = (count, one, few, many) => {
   const mod10 = count % 10;
@@ -41,23 +70,23 @@ const MediaSendOverlay = ({
   onSend,
 }) => {
   const [caption, setCaption] = useState('');
+  const [previewItems, setPreviewItems] = useState([]);
+  const previewItemsRef = useRef([]);
 
-  const previewItems = useMemo(
-    () =>
-      files.slice(0, MAX_BATCH_MEDIA_COUNT).map((file) => ({
-        file,
-        url: URL.createObjectURL(file),
-        isImage: file.type.startsWith('image/'),
-        isVideo: file.type.startsWith('video/'),
-      })),
-    [files]
-  );
+  useLayoutEffect(() => {
+    const nextItems = files.length ? buildPreviewItems(files) : [];
+
+    revokePreviewItems(previewItemsRef.current);
+    previewItemsRef.current = nextItems;
+    setPreviewItems(nextItems);
+  }, [files]);
 
   useEffect(
     () => () => {
-      previewItems.forEach((item) => URL.revokeObjectURL(item.url));
+      revokePreviewItems(previewItemsRef.current);
+      previewItemsRef.current = [];
     },
-    [previewItems]
+    []
   );
 
   useEffect(() => {
@@ -139,15 +168,15 @@ const MediaSendOverlay = ({
         >
           {single ? (
             renderPreviewItem(single)
-          ) : (
+          ) : previewItems.length > 1 ? (
             <div className="media-send-modal__stack">
               {previewItems.map((item) => (
-                <div key={item.url} className="media-send-modal__stack-item">
+                <div key={item.key} className="media-send-modal__stack-item">
                   {renderPreviewItem(item, true)}
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
 
         {isUploading && (

@@ -15,7 +15,9 @@ import {
   useMediaHandlers, 
   useContextMenu,
   useClampedMenuPosition,
-  useMessageForward 
+  useMessageForward,
+  useMessageSelection,
+  filterDeletableMessages,
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
 import { MessageInput, MessageStatusIndicator } from '../../../shared/ui';
@@ -26,6 +28,12 @@ import MessageMediaContent from '../../../shared/ui/molecules/MessageMediaConten
 import MessageMediaAlbum from '../../../shared/ui/molecules/MessageMediaAlbum/MessageMediaAlbum';
 import MediaSendOverlay from '../../../shared/ui/molecules/MediaSendOverlay/MediaSendOverlay';
 import { categorizeMessageMedia } from '../../../shared/lib/utils/messageMediaHelpers';
+import {
+  getMessageContextMenuActions,
+  copyMessageText,
+  copyMediaFileToClipboard,
+  saveMessageMediaFiles,
+} from '../../../shared/lib/utils/messageClipboardUtils';
 import RepliedMedia from '../../../shared/ui/molecules/RepliedMedia/RepliedMedia';
 import StickerMessage from '../../../shared/ui/molecules/StickerMessage/StickerMessage';
 import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPicker';
@@ -36,6 +44,7 @@ import { stickerApi } from '../../../entities/sticker/api';
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
 import { ForwardMessageModal } from '../../../shared/ui/molecules/ForwardMessageModal';
+import { MessageSelectionBar } from '../../../shared/ui/molecules/MessageSelectionBar';
 import { getPinnedMessagePreview } from '../../../shared/lib/utils/pinnedMessageHelpers';
 import { UserAvatar } from '../../../shared/ui';
 import { VoiceParticipantStatusIcons } from '../../../shared/ui/atoms/VoiceParticipantStatusIcons';
@@ -59,10 +68,16 @@ import {
   FolderZip,
   InsertDriveFile,
   EmojiEmotions,
+  BookmarkBorder,
   ReplyOutlined,
   ForwardOutlined,
   EditOutlined,
   DeleteOutline,
+  ContentCopy,
+  SaveAlt,
+  CheckBoxOutlineBlank,
+  CheckBox,
+  CheckCircleOutlineTwoTone,
   People,
 } from '@mui/icons-material';
 import {
@@ -87,6 +102,8 @@ const ChatRoom = ({
   isServerOwner = false,
   serverId = null,
   serverOwnerId = null,
+  isSavedMessages = false,
+  savedMessagesChatId = null,
   /** When messages load/update; parent debounces the server «mark chat read» call */
   onMessagesActivity
 }) => {
@@ -240,7 +257,6 @@ const ChatRoom = ({
 
   const {
     contextMenu,
-    highlightedMessageId,
     handleContextMenu,
     closeContextMenu
   } = useContextMenu();
@@ -259,6 +275,16 @@ const ChatRoom = ({
     forwardToSelected,
     modalProps,
   } = useMessageForward(chatId);
+
+  const {
+    isSelectionMode,
+    selectedCount,
+    enterSelectionMode,
+    exitSelectionMode,
+    toggleMessage: toggleSelectedMessage,
+    isMessageSelected,
+    getSelectedMessages,
+  } = useMessageSelection();
 
   const [newMessage, setNewMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -337,6 +363,10 @@ const ChatRoom = ({
     serverRoles,
   ]);
 
+  useEffect(() => {
+    exitSelectionMode();
+  }, [chatId, exitSelectionMode]);
+
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -345,6 +375,11 @@ const ChatRoom = ({
 
       if (contextMenu.visible) {
         closeContextMenu();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (isSelectionMode) {
+        exitSelectionMode();
         e.stopImmediatePropagation();
         return;
       }
@@ -403,6 +438,8 @@ const ChatRoom = ({
     stickerPickerOpen,
     editingMessageId,
     replyingToMessage,
+    isSelectionMode,
+    exitSelectionMode,
   ]);
 
   const renderTextWithLinks = useCallback((text, keyPrefix) => {
@@ -832,6 +869,117 @@ const ChatRoom = ({
     closeContextMenu();
   };
 
+  const handleStartMessageSelection = useCallback((message) => {
+    enterSelectionMode(message?.messageId);
+    closeContextMenu();
+  }, [enterSelectionMode, closeContextMenu]);
+
+  const selectedMessages = useMemo(
+    () => getSelectedMessages(messages),
+    [getSelectedMessages, messages],
+  );
+
+  const deletableSelectedMessages = useMemo(
+    () => filterDeletableMessages(selectedMessages, username, canModerateMessages),
+    [selectedMessages, username, canModerateMessages],
+  );
+
+  const handleBatchForward = useCallback(() => {
+    if (!selectedMessages.length) return;
+    startForward(selectedMessages);
+    exitSelectionMode();
+  }, [selectedMessages, startForward, exitSelectionMode]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (!deletableSelectedMessages.length) return;
+
+    const count = deletableSelectedMessages.length;
+    const confirmed = window.confirm(
+      count === 1 ? 'Удалить выбранное сообщение?' : `Удалить ${count} сообщений?`,
+    );
+    if (!confirmed) return;
+
+    for (const message of deletableSelectedMessages) {
+      await deleteMessage(message.messageId);
+      if (editingMessageId === message.messageId) {
+        setEditingMessageId(null);
+        setNewMessage('');
+      }
+    }
+
+    exitSelectionMode();
+  }, [
+    deletableSelectedMessages,
+    deleteMessage,
+    editingMessageId,
+    exitSelectionMode,
+  ]);
+
+  const handleMessageSelectToggle = useCallback((event, messageId) => {
+    if (!isSelectionMode) return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSelectedMessage(messageId);
+  }, [isSelectionMode, toggleSelectedMessage]);
+
+  const handleSaveToSaved = useCallback(async (message) => {
+    if (!message?.messageId || !savedMessagesChatId) return;
+    if (String(savedMessagesChatId) === String(chatId)) return;
+
+    await forwardMessage(message.messageId, savedMessagesChatId);
+    closeContextMenu();
+  }, [savedMessagesChatId, chatId, forwardMessage, closeContextMenu]);
+
+  const handleCopyMessageText = useCallback(async (message) => {
+    try {
+      await copyMessageText(message);
+      closeContextMenu();
+    } catch (error) {
+      console.error('Failed to copy message text:', error);
+      alert('Не удалось скопировать сообщение');
+    }
+  }, [closeContextMenu]);
+
+  const handleCopyMessageImage = useCallback(async (message) => {
+    const { images } = getMessageContextMenuActions(message);
+    if (!images.length) return;
+
+    try {
+      await copyMediaFileToClipboard(images[0]);
+      closeContextMenu();
+    } catch (error) {
+      console.error('Failed to copy image:', error);
+      alert('Не удалось скопировать изображение');
+    }
+  }, [closeContextMenu]);
+
+  const handleCopyMessageVideo = useCallback(async (message) => {
+    const { videos } = getMessageContextMenuActions(message);
+    if (!videos.length) return;
+
+    try {
+      await copyMediaFileToClipboard(videos[0]);
+      closeContextMenu();
+    } catch (error) {
+      console.error('Failed to copy video:', error);
+      alert('Не удалось скопировать видео');
+    }
+  }, [closeContextMenu]);
+
+  const handleSaveMessageMedia = useCallback(async (message) => {
+    const { savableMedia } = getMessageContextMenuActions(message);
+    if (!savableMedia.length) return;
+
+    closeContextMenu();
+
+    try {
+      await saveMessageMediaFiles(savableMedia);
+    } catch (error) {
+      console.error('Failed to save media:', error);
+      alert('Не удалось сохранить файл');
+    }
+  }, [closeContextMenu]);
+
   const handleCreatePoll = async ({ question, options, allowMultiple, isAnonymous }) => {
     setIsCreatingPoll(true);
     try {
@@ -842,6 +990,11 @@ const ChatRoom = ({
   };
 
   const handleContextMenuClick = (e, messageId) => {
+    if (isSelectionMode) {
+      e.preventDefault();
+      return;
+    }
+
     const message = messages.find(m => m.messageId === messageId);
     const isOwnMessage = message?.senderUsername === username;
     const canDelete = isOwnMessage || canModerateMessages;
@@ -1052,7 +1205,7 @@ const ChatRoom = ({
           </div>
         </div>
         <div className="header-actions">
-          {!isServerChat && (isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
+          {!isServerChat && !isSavedMessages && (isPrivateChat || isGroupChat) && !isCallActiveInThisChat && !hasJoinableCallInThisChat && (
             <button
               onClick={handleStartCall}
               className="voice-call-button"
@@ -1210,7 +1363,7 @@ const ChatRoom = ({
       )}
 
       <div
-        className="messages"
+        className={`messages${isSelectionMode ? ' messages--selection-mode' : ''}`}
         ref={messagesContainerRef}
         onScroll={handleMessagesScroll}
       >
@@ -1379,6 +1532,8 @@ const ChatRoom = ({
             </>
           );
 
+          const isSelected = isMessageSelected(msg.messageId);
+
           return (
             <div
               key={msg.messageId}
@@ -1387,10 +1542,11 @@ const ChatRoom = ({
                 isStickerMessage ? 'message--sticker' : ''
               } ${isPollMessage ? 'message--poll' : ''} ${isMediaOnly ? 'message--media-only' : ''} ${
                 msg.isPinned ? 'message--pinned' : ''
-              } ${
-                highlightedMessageId === msg.messageId ? 'highlighted' : ''
+              } ${isSelectionMode ? 'message--selectable' : ''} ${
+                isSelected ? 'message--selected' : ''
               }`}
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
+              onClick={(e) => handleMessageSelectToggle(e, msg.messageId)}
             >
               <UserAvatar
                 username={msg.senderUsername}
@@ -1398,6 +1554,10 @@ const ChatRoom = ({
                 avatarColor={msg.avatarColor}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (isSelectionMode) {
+                    handleMessageSelectToggle(event, msg.messageId);
+                    return;
+                  }
                   handleOpenAuthorProfile(msg);
                 }}
               />
@@ -1428,6 +1588,15 @@ const ChatRoom = ({
                 </div>
                 {messageBody}
               </div>
+              {isSelectionMode && (
+                <span className="message-select-toggle" aria-hidden="true">
+                  {isSelected ? (
+                    <CheckBox fontSize="small" />
+                  ) : (
+                    <CheckBoxOutlineBlank fontSize="small" />
+                  )}
+                </span>
+              )}
             </div>
           );
         })}
@@ -1451,6 +1620,17 @@ const ChatRoom = ({
               </span>
               Ответить
             </button>
+            <button
+              onClick={() => handleStartMessageSelection(
+                messages.find((m) => m.messageId === contextMenu.messageId),
+              )}
+              className="context-menu-button"
+            >
+              <span className="context-menu-button-icon" aria-hidden="true">
+                <CheckCircleOutlineTwoTone fontSize="inherit" />
+              </span>
+              Выбрать
+            </button>
             <button 
               onClick={() => handleForwardMessage(messages.find(m => m.messageId === contextMenu.messageId))}
               className="context-menu-button"
@@ -1460,6 +1640,77 @@ const ChatRoom = ({
               </span>
               Переслать
             </button>
+            {(() => {
+              const message = messages.find((m) => m.messageId === contextMenu.messageId);
+              const {
+                canCopyText,
+                canCopyImage,
+                canCopyVideo,
+                canSaveAs,
+              } = getMessageContextMenuActions(message);
+
+              return (
+                <>
+                  {canCopyText && (
+                    <button
+                      onClick={() => void handleCopyMessageText(message)}
+                      className="context-menu-button"
+                    >
+                      <span className="context-menu-button-icon" aria-hidden="true">
+                        <ContentCopy fontSize="inherit" />
+                      </span>
+                      Скопировать
+                    </button>
+                  )}
+                  {canCopyImage && (
+                    <button
+                      onClick={() => void handleCopyMessageImage(message)}
+                      className="context-menu-button"
+                    >
+                      <span className="context-menu-button-icon" aria-hidden="true">
+                        <ContentCopy fontSize="inherit" />
+                      </span>
+                      Скопировать изображение
+                    </button>
+                  )}
+                  {canCopyVideo && (
+                    <button
+                      onClick={() => void handleCopyMessageVideo(message)}
+                      className="context-menu-button"
+                    >
+                      <span className="context-menu-button-icon" aria-hidden="true">
+                        <ContentCopy fontSize="inherit" />
+                      </span>
+                      Скопировать видео
+                    </button>
+                  )}
+                  {canSaveAs && (
+                    <button
+                      onClick={() => void handleSaveMessageMedia(message)}
+                      className="context-menu-button"
+                    >
+                      <span className="context-menu-button-icon" aria-hidden="true">
+                        <SaveAlt fontSize="inherit" />
+                      </span>
+                      Сохранить как
+                    </button>
+                  )}
+                </>
+              );
+            })()}
+            {savedMessagesChatId && String(savedMessagesChatId) !== String(chatId) && (
+              <button
+                onClick={() => {
+                  void handleSaveToSaved(messages.find((m) => m.messageId === contextMenu.messageId));
+                }}
+                className="context-menu-button"
+              >
+                <span className="context-menu-button-icon" aria-hidden="true">
+                  <BookmarkBorder fontSize="inherit" />
+                </span>
+                Сохранить в избранное
+              </button>
+            )}
             {canPinMessages && (() => {
               const message = messages.find((m) => m.messageId === contextMenu.messageId);
               const isPinned = Boolean(message?.isPinned);
@@ -1564,7 +1815,16 @@ const ChatRoom = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {(canSend || editingMessageId || !isServerChat) && (
+      {isSelectionMode ? (
+        <MessageSelectionBar
+          selectedCount={selectedCount}
+          canForward={selectedMessages.length > 0}
+          canDelete={deletableSelectedMessages.length > 0}
+          onCancel={exitSelectionMode}
+          onForward={handleBatchForward}
+          onDelete={() => void handleBatchDelete()}
+        />
+      ) : (canSend || editingMessageId || !isServerChat) && (
       <form
         className={`input-container ${replyingToMessage ? 'replying' : ''}`}
         onSubmit={handleSendMessage}

@@ -118,25 +118,34 @@ export function buildForwardListItems({ chats = [], channelTargets = [], current
       if (!chatId || chatId.toLowerCase() === currentId) return null;
       if (serverChannelIds.has(chatId.toLowerCase())) return null;
 
-      const title = chat?.username
-        ?? chat?.groupName
-        ?? chat?.GroupName
-        ?? (chat?.isGroupChat || chat?.IsGroupChat ? 'Группа' : 'Чат');
+      const isSavedMessages = Boolean(chat?.isSavedMessages ?? chat?.IsSavedMessages);
+      const title = isSavedMessages
+        ? 'Избранное'
+        : (chat?.username
+          ?? chat?.groupName
+          ?? chat?.GroupName
+          ?? (chat?.isGroupChat || chat?.IsGroupChat ? 'Группа' : 'Чат'));
 
       const lastMessage = chat?.lastMessage ?? chat?.LastMessage ?? '';
 
       return {
-        type: 'dm',
+        type: isSavedMessages ? 'saved' : 'dm',
         chatId,
         title,
         subtitle: lastMessage,
         avatarUrl: chat?.avatarUrl ?? chat?.AvatarUrl ?? null,
         avatarColor: chat?.avatarColor ?? chat?.AvatarColor ?? null,
         isGroup: Boolean(chat?.isGroupChat ?? chat?.IsGroupChat),
+        isSavedMessages,
         searchText: `${title} ${lastMessage}`.toLowerCase(),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.isSavedMessages && !b.isSavedMessages) return -1;
+      if (!a.isSavedMessages && b.isSavedMessages) return 1;
+      return 0;
+    });
 
   return [...channels, ...directMessages];
 }

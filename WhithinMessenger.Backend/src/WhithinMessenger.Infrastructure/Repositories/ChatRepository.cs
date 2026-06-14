@@ -19,6 +19,8 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         public async Task<List<ChatInfo>> GetUserChatsAsync(Guid userId, CancellationToken cancellationToken = default)
         {
+            var savedChat = await EnsureSavedMessagesChatAsync(userId, cancellationToken);
+
             var oneOnOneChats = await _context.Members
                 .Where(m => m.UserId == userId)
                 .Select(m => m.Chat)
@@ -100,8 +102,83 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .OrderByDescending(c => c.LastMessageTime)
                 .ToList();
 
+            chats.Insert(0, savedChat);
+
             await ApplyLastMessagePreviewsAsync(chats, cancellationToken);
             return chats;
+        }
+
+        public async Task<ChatInfo> EnsureSavedMessagesChatAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            var savedChatType = await _context.ChatTypes
+                .FirstOrDefaultAsync(ct => ct.TypeName == ChatTypeNames.Saved, cancellationToken)
+                ?? await _context.ChatTypes
+                    .FirstOrDefaultAsync(ct => ct.Id == ChatTypeIds.Saved, cancellationToken);
+
+            if (savedChatType == null)
+            {
+                throw new InvalidOperationException("Saved chat type not found");
+            }
+
+            var savedChat = await _context.Members
+                .Where(m => m.UserId == userId)
+                .Select(m => m.Chat)
+                .FirstOrDefaultAsync(c => c.TypeId == savedChatType.Id, cancellationToken);
+
+            if (savedChat == null)
+            {
+                savedChat = new Chat
+                {
+                    TypeId = savedChatType.Id,
+                    IsPrivate = true,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedByUserId = userId,
+                };
+
+                _context.Chats.Add(savedChat);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                var user = await _context.Users.FindAsync([userId], cancellationToken)
+                    ?? throw new InvalidOperationException("User not found");
+
+                _context.Members.Add(new Member
+                {
+                    UserId = userId,
+                    ChatId = savedChat.Id,
+                    Chat = savedChat,
+                    User = user,
+                });
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            var profile = await _context.UserProfiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+            var lastMessageTime = await _context.Messages
+                .Where(m => m.ChatId == savedChat.Id)
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => (DateTimeOffset?)m.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken) ?? savedChat.CreatedAt;
+
+            return new ChatInfo
+            {
+                ChatId = savedChat.Id,
+                Username = "Избранное",
+                UserId = userId,
+                AvatarUrl = profile?.Avatar,
+                AvatarColor = profile?.AvatarColor,
+                UserStatus = "online",
+                IsGroupChat = false,
+                IsSavedMessages = true,
+                LastMessage = await _context.Messages
+                    .Where(m => m.ChatId == savedChat.Id)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .Select(m => m.Content)
+                    .FirstOrDefaultAsync(cancellationToken),
+                LastMessageTime = lastMessageTime,
+                UnreadCount = 0,
+            };
         }
 
         private async Task ApplyLastMessagePreviewsAsync(List<ChatInfo> chats, CancellationToken cancellationToken)
@@ -159,6 +236,15 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
+                if (userId == targetUserId)
+                {
+                    return new CreatePrivateChatResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Используйте «Избранное» для сохранения сообщений себе"
+                    };
+                }
+
                 var user1Exists = await _context.Users.AnyAsync(u => u.Id == userId, cancellationToken);
                 var user2Exists = await _context.Users.AnyAsync(u => u.Id == targetUserId, cancellationToken);
 

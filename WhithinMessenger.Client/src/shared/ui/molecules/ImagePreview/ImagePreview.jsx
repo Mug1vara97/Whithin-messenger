@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   MdClose, 
   MdDownload, 
@@ -25,9 +26,29 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
       setZoom(1);
       setRotation(0);
       setError(null);
+      setIsLoading(true);
       setImagePosition({ x: 0, y: 0 });
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose?.();
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   const handleDownload = () => {
     if (mediaFile) {
@@ -121,9 +142,9 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
 
   const imageUrl = `${MEDIA_BASE_URL}/${mediaFile.filePath}`;
 
-  return (
-    <div className="image-preview-overlay">
-      <div className="image-preview-backdrop" onClick={onClose} />
+  return createPortal(
+    <div className="image-preview-overlay" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
+      <div className="image-preview-backdrop" onClick={onClose} aria-hidden="true" />
       
       <div className="image-preview-container">
         <div className="image-preview-header">
@@ -242,7 +263,8 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

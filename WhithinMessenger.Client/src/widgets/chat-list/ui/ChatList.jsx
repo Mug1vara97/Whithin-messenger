@@ -1,6 +1,6 @@
 import React, { useState, useCallback, memo, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { People } from '@mui/icons-material';
+import { People, BookmarkBorder } from '@mui/icons-material';
 import { SearchBar, UserAvatar, CreateGroupChatModal, UserPanel } from '../../../shared/ui';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
@@ -180,16 +180,22 @@ const ChatList = ({
               const lastMessageTimeLabel = formatChatListMessageTime(
                 chat.lastMessageTime ?? chat.LastMessageTime
               );
+              const isSavedMessages = Boolean(chat.isSavedMessages ?? chat.IsSavedMessages);
               const subtitle = lastMessagePreview
-                ?? (chat.isGroupChat ? 'Групповой чат' : null);
+                ?? (isSavedMessages ? 'Сохранённые сообщения' : (chat.isGroupChat ? 'Групповой чат' : null));
 
               return (
               <li
                 key={`${chat.chatId}-${chat.lastMessageTime}-${index}`}
-                className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}`}
+                className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''} ${isSavedMessages ? 'chat-item--saved' : ''}`}
                 onClick={() => handleChatSelection(chat)}
               >
                 <div className="chat-avatar-container">
+                  {isSavedMessages ? (
+                    <div className="chat-avatar chat-avatar--saved">
+                      <BookmarkBorder fontSize="small" />
+                    </div>
+                  ) : (
                   <div 
                     className="chat-avatar" 
                     style={{
@@ -207,7 +213,8 @@ const ChatList = ({
                       </span>
                     )}
                   </div>
-                  {!chat.isGroupChat && (
+                  )}
+                  {!chat.isGroupChat && !isSavedMessages && (
                     <div
                       className="status-indicator"
                       style={{ backgroundColor: getUserStatusColor(chatPresenceStatus) }}

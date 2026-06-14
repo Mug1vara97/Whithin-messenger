@@ -1,0 +1,79 @@
+.message-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 63px;
+  min-height: 63px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border-top: 1px solid var(--border, #3f4147);
+  background: var(--background-secondary, #2b2d31);
+  background-image: none;
+  flex-shrink: 0;
+}
+
+.message-selection-bar__count {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #dbdee1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.message-selection-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.message-selection-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--background-modifier-hover, #35373c);
+  color: var(--text, #dbdee1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.message-selection-bar__btn:hover:not(:disabled) {
+  background: var(--background-modifier-active, #404249);
+}
+
+.message-selection-bar__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.message-selection-bar__btn--cancel {
+  flex-shrink: 0;
+  margin-left: auto;
+  background: transparent;
+  color: var(--primary, #5865f2);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 4px;
+}
+
+.message-selection-bar__btn--cancel:hover:not(:disabled) {
+  background: transparent;
+  color: var(--primary-hover, #4752c4);
+}
+
+.message-selection-bar__btn--danger {
+  color: #ed4245;
+}
+
+.message-selection-bar__btn--danger:hover:not(:disabled) {
+  background: rgba(237, 66, 69, 0.12);
+}

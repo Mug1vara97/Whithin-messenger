@@ -3,6 +3,7 @@ import Close from '@mui/icons-material/Close';
 import Search from '@mui/icons-material/Search';
 import Forward from '@mui/icons-material/Forward';
 import Link from '@mui/icons-material/Link';
+import BookmarkBorder from '@mui/icons-material/BookmarkBorder';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import UserAvatar from '../../atoms/UserAvatar';
 import {
@@ -15,6 +16,7 @@ import './ForwardMessageModal.css';
 const ForwardMessageModal = ({
   isOpen,
   message,
+  messages = [],
   targets,
   loading,
   error,
@@ -30,6 +32,11 @@ const ForwardMessageModal = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
+  const forwardMessages = useMemo(() => {
+    if (Array.isArray(messages) && messages.length > 0) return messages;
+    return message ? [message] : [];
+  }, [message, messages]);
+
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
@@ -42,10 +49,11 @@ const ForwardMessageModal = ({
     return targets.filter((item) => item.searchText?.includes(query));
   }, [targets, searchQuery]);
 
-  if (!isOpen || !message) return null;
+  if (!isOpen || forwardMessages.length === 0) return null;
 
   const selectedCount = selectedIds.size;
   const sendLabel = selectedCount > 0 ? `Отправить (${selectedCount})` : 'Отправить';
+  const isBatch = forwardMessages.length > 1;
 
   return (
     <div
@@ -91,13 +99,37 @@ const ForwardMessageModal = ({
         </header>
 
         <div className="forward-message-modal__preview">
-          <span className="forward-message-modal__preview-label">Сообщение</span>
-          <span className="forward-message-modal__preview-author">
-            {message.senderUsername || 'Пользователь'}
+          <span className="forward-message-modal__preview-label">
+            {isBatch ? `Сообщения (${forwardMessages.length})` : 'Сообщение'}
           </span>
-          <p className="forward-message-modal__preview-text">
-            {getMessageForwardPreview(message)}
-          </p>
+          {isBatch ? (
+            <ul className="forward-message-modal__preview-list">
+              {forwardMessages.slice(0, 5).map((item) => (
+                <li key={item.messageId} className="forward-message-modal__preview-list-item">
+                  <span className="forward-message-modal__preview-author">
+                    {item.senderUsername || 'Пользователь'}
+                  </span>
+                  <span className="forward-message-modal__preview-text">
+                    {getMessageForwardPreview(item)}
+                  </span>
+                </li>
+              ))}
+              {forwardMessages.length > 5 && (
+                <li className="forward-message-modal__preview-more">
+                  и ещё {forwardMessages.length - 5}
+                </li>
+              )}
+            </ul>
+          ) : (
+            <>
+              <span className="forward-message-modal__preview-author">
+                {forwardMessages[0].senderUsername || 'Пользователь'}
+              </span>
+              <p className="forward-message-modal__preview-text">
+                {getMessageForwardPreview(forwardMessages[0])}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="forward-message-modal__search">
@@ -159,6 +191,10 @@ const ForwardMessageModal = ({
                             )}
                             <span className="forward-message-modal__channel-badge">#</span>
                           </>
+                        ) : item.isSavedMessages ? (
+                          <div className="forward-message-modal__saved-icon" aria-hidden="true">
+                            <BookmarkBorder fontSize="small" />
+                          </div>
                         ) : (
                           <UserAvatar
                             username={item.title}

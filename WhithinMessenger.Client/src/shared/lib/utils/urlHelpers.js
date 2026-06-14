@@ -102,7 +102,7 @@ export const splitTextWithLinks = (text) => {
   return parts;
 };
 
-export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
+export const fetchMediaBlob = async (rawUrl) => {
   const directUrl = buildMediaUrl(rawUrl);
   if (!directUrl) {
     throw new Error('Invalid file URL');
@@ -137,19 +137,21 @@ export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
     return response.blob();
   };
 
-  let blob;
   try {
     if (fallbackApiUrl) {
-      blob = await tryDownload(fallbackApiUrl);
-    } else {
-      blob = await tryDownload(directUrl);
+      return await tryDownload(fallbackApiUrl);
     }
+    return await tryDownload(directUrl);
   } catch (primaryError) {
     if (!fallbackApiUrl) {
       throw primaryError;
     }
-    blob = await tryDownload(directUrl);
+    return await tryDownload(directUrl);
   }
+};
+
+export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
+  const blob = await fetchMediaBlob(rawUrl);
 
   const objectUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');

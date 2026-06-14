@@ -20,6 +20,7 @@ namespace WhithinMessenger.Domain.Interfaces
         Task DeleteAllByServerIdAsync(Guid serverId, CancellationToken cancellationToken = default);
         Task<bool> IsUserParticipantAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default);
         Task<ChatType?> GetChatTypeByNameAsync(string typeName, CancellationToken cancellationToken = default);
+        Task<ChatInfo> EnsureSavedMessagesChatAsync(Guid userId, CancellationToken cancellationToken = default);
     }
 
     public class ChatInfo
@@ -32,6 +33,7 @@ namespace WhithinMessenger.Domain.Interfaces
         public string UserStatus { get; init; } = "offline";
         public DateTimeOffset? LastSeen { get; init; }
         public bool IsGroupChat { get; init; }
+        public bool IsSavedMessages { get; init; }
         public string? LastMessage { get; set; }
         public DateTimeOffset LastMessageTime { get; init; }
         public int UnreadCount { get; init; }

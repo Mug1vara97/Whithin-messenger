@@ -706,8 +706,51 @@
   word-break: break-word;
   margin-bottom: 8px;
   display: flex;
-  gap: 12px;
+  gap: 0px;
   align-items: flex-start;
+}
+
+.messages--selection-mode {
+  user-select: none;
+}
+
+.messages--selection-mode .message-link {
+  pointer-events: none;
+}
+
+.message--selectable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 36px 4px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  transition: background-color 0.15s ease;
+}
+
+.message--selectable:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.message--selected {
+  background: rgba(88, 101, 242, 0.12);
+}
+
+.message--selected:hover {
+  background: rgba(88, 101, 242, 0.16);
+}
+
+.message-select-toggle {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--primary, #5865f2);
+  pointer-events: none;
 }
 
 .message > .user-avatar {
@@ -727,7 +770,7 @@
 .message-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -737,9 +780,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
-  line-height: 1.375rem;
+  gap: 6px;
+  margin-bottom: 2px;
+  line-height: 1.25rem;
 }
 
 .message-header-time {
@@ -876,7 +919,7 @@
   margin-bottom: 0;
   font-size: 16px;
   font-weight: 600;
-  line-height: 1.375rem;
+  line-height: 1.25rem;
 }
 
 .bot-message {

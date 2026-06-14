@@ -12,8 +12,6 @@ export const useContextMenu = () => {
     type: null
   });
 
-  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
-
   const handleContextMenu = useCallback((
     e,
     messageId,
@@ -33,7 +31,6 @@ export const useContextMenu = () => {
       canEdit: canEdit,
       type: type
     });
-    setHighlightedMessageId(messageId);
   }, []);
 
   const closeContextMenu = useCallback(() => {
@@ -47,7 +44,6 @@ export const useContextMenu = () => {
       canEdit: false,
       type: null
     });
-    setHighlightedMessageId(null);
   }, []);
 
   useEffect(() => {
@@ -85,7 +81,6 @@ export const useContextMenu = () => {
 
   return {
     contextMenu,
-    highlightedMessageId,
     handleContextMenu,
     closeContextMenu
   };
