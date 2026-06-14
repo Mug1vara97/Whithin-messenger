@@ -96,7 +96,23 @@ public class FirebasePushSender : IFirebasePushSender
             data["server_name"] = TruncateDataValue(serverName.Trim());
         }
 
-        await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
+        var displayBody = !string.IsNullOrWhiteSpace(previewText)
+            ? previewText.Trim()
+            : message;
+        displayBody = TruncateDataValue(displayBody);
+        var displayTitle = !string.IsNullOrWhiteSpace(senderUsername)
+            ? TruncateDataValue(senderUsername.Trim())
+            : TruncateDataValue(title);
+
+        // notification + data: tray fallback in background; data for Discord-style UI in foreground.
+        await SendPushAsync(
+            deviceToken,
+            data,
+            notificationTitle: displayTitle,
+            notificationBody: displayBody,
+            androidNotificationChannelId: ChatNotificationChannelId,
+            cancellationToken
+        );
     }
 
     public async Task SendIncomingCallNotificationAsync(
