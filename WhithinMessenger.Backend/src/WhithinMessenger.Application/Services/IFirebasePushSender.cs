@@ -14,6 +14,7 @@ public interface IFirebasePushSender
         string? senderAvatarUrl = null,
         string? senderAvatarColor = null,
         string? serverName = null,
+        Guid? serverId = null,
         string? notificationType = null,
         CancellationToken cancellationToken = default
     );

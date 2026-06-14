@@ -47,6 +47,7 @@ public class FirebasePushSender : IFirebasePushSender
         string? senderAvatarUrl = null,
         string? senderAvatarColor = null,
         string? serverName = null,
+        Guid? serverId = null,
         string? notificationType = null,
         CancellationToken cancellationToken = default
     )
@@ -94,6 +95,11 @@ public class FirebasePushSender : IFirebasePushSender
         if (!string.IsNullOrWhiteSpace(serverName))
         {
             data["server_name"] = TruncateDataValue(serverName.Trim());
+        }
+
+        if (serverId.HasValue && serverId.Value != Guid.Empty)
+        {
+            data["server_id"] = serverId.Value.ToString();
         }
 
         // Data-only: Android always calls onMessageReceived → our MessagingStyle (Discord-like).

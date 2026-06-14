@@ -82,6 +82,7 @@ public class NotificationService : INotificationService
                 chatId: chatId,
                 type: type,
                 content: content,
+                serverId: serverId,
                 chatDisplayName: chatDisplayName,
                 senderDisplayName: senderDisplayName,
                 senderAvatarUrl: senderAvatarUrl,
@@ -179,6 +180,7 @@ public class NotificationService : INotificationService
         Guid chatId,
         string type,
         string content,
+        Guid? serverId,
         string? chatDisplayName,
         string? senderDisplayName,
         string? senderAvatarUrl,
@@ -222,6 +224,7 @@ public class NotificationService : INotificationService
                     senderAvatarUrl: senderAvatarUrl,
                     senderAvatarColor: senderAvatarColor,
                     serverName: serverDisplayName,
+                    serverId: serverId,
                     notificationType: type,
                     cancellationToken: cancellationToken
                 );
