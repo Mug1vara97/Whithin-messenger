@@ -96,23 +96,9 @@ public class FirebasePushSender : IFirebasePushSender
             data["server_name"] = TruncateDataValue(serverName.Trim());
         }
 
-        var displayBody = !string.IsNullOrWhiteSpace(previewText)
-            ? previewText.Trim()
-            : message;
-        displayBody = TruncateDataValue(displayBody);
-        var displayTitle = !string.IsNullOrWhiteSpace(senderUsername)
-            ? TruncateDataValue(senderUsername.Trim())
-            : TruncateDataValue(title);
-
-        // notification + data: tray fallback in background; data for Discord-style UI in foreground.
-        await SendPushAsync(
-            deviceToken,
-            data,
-            notificationTitle: displayTitle,
-            notificationBody: displayBody,
-            androidNotificationChannelId: ChatNotificationChannelId,
-            cancellationToken
-        );
+        // Data-only: Android always calls onMessageReceived → our MessagingStyle (Discord-like).
+        // System plain notification is NOT used.
+        await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
     }
 
     public async Task SendIncomingCallNotificationAsync(
@@ -183,7 +169,7 @@ public class FirebasePushSender : IFirebasePushSender
         );
     }
 
-    private const string ChatNotificationChannelId = "chat_messages_v3";
+    private const string ChatNotificationChannelId = "chat_messages_v4";
     private const string FriendRequestNotificationChannelId = "friend_requests_v1";
 
     private async Task SendDataOnlyPushAsync(
