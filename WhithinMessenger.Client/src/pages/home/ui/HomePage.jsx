@@ -32,6 +32,7 @@ import {
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
 } from '../../../entities/role/lib/serverPermissions';
+import { useCallStore } from '../../../shared/lib/stores/callStore';
 // import { VoiceChannelSelector } from '../../../shared/ui/molecules';
 import './HomePage.css';
 
@@ -104,7 +105,10 @@ const HomePage = () => {
   // Функция для обработки звонков в чатах
   const handleJoinVoiceChannel = useCallback((callData) => {
     console.log('HomePage: handleJoinVoiceChannel called with:', callData);
-    
+
+    // Явный старт звонка — снимаем блокировку автоподключения после предыдущего endCall()
+    useCallStore.getState().clearVoiceAutoJoinSuppress();
+
     // Устанавливаем активный звонок в чате
     setActiveChatCall({
       chatId: callData.chatId,

@@ -144,10 +144,6 @@ const ChatVoiceCall = ({
   const activeVoiceChannelParticipants = useActiveVoiceChannelParticipantList();
   const isServerMuted = useCallStore(selectActiveServerMuted);
   const isServerDeafened = useCallStore(selectActiveServerDeafened);
-  const suppressVoiceAutoJoinForChannel = useCallStore(
-    (state) => state.suppressVoiceAutoJoinForChannel
-  );
-
   const {
     showErrorBanner,
     showAudioBlockedBanner,
@@ -199,11 +195,7 @@ const ChatVoiceCall = ({
       return;
     }
 
-    const autoJoinSuppressed =
-      suppressVoiceAutoJoinForChannel != null &&
-      isSameVoiceChannel(suppressVoiceAutoJoinForChannel, chatId);
-
-    if (!isInCall && !autoJoinSuppressed) {
+    if (!isInCall) {
       startCall(chatId, chatName).catch((err) => {
         console.error('Call start error:', err);
       });
