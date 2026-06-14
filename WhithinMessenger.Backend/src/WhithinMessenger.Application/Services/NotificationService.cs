@@ -202,6 +202,7 @@ public class NotificationService : INotificationService
             {
                 "direct_message" => "New message",
                 "group_message" => "New message in group",
+                "server_message" => "New message in channel",
                 _ => "Whithin"
             };
 

@@ -131,10 +131,11 @@ public class ChatMessageNotificationService
             var notificationMembers = chatMembers.Where(m => m != senderId).ToList();
 
             var isGroupChat = chat.Type?.TypeName == "Group";
+            var isServerChannel = chat.ServerId.HasValue;
             var chatName = string.IsNullOrWhiteSpace(chat.Name) ? senderUsername : chat.Name;
             var cleanPreview = string.IsNullOrWhiteSpace(previewText) ? "Новое сообщение" : previewText;
             var truncatedPreview = cleanPreview.Length > 140 ? cleanPreview[..140] : cleanPreview;
-            var notificationContent = isGroupChat
+            var notificationContent = isGroupChat || isServerChannel
                 ? $"{senderUsername} в {chatName}: {truncatedPreview}"
                 : $"{senderUsername}: {truncatedPreview}";
 
@@ -156,7 +157,6 @@ public class ChatMessageNotificationService
             var senderAvatarUrl = sender?.UserProfile?.Avatar;
             var senderAvatarColor = sender?.UserProfile?.AvatarColor;
 
-            var isServerChannel = chat.ServerId.HasValue;
             var notificationType = isServerChannel
                 ? "server_message"
                 : isGroupChat ? "group_message" : "direct_message";
