@@ -10,17 +10,20 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IServerAuditLogService _auditLog;
+    private readonly IUserListCacheService _userListCache;
 
     public DeleteMessageCommandHandler(
         IMessageRepository messageRepository,
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
-        IServerAuditLogService auditLog)
+        IServerAuditLogService auditLog,
+        IUserListCacheService userListCache)
     {
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
         _auditLog = auditLog;
+        _userListCache = userListCache;
     }
 
     public async Task<DeleteMessageResult> Handle(DeleteMessageCommand request, CancellationToken cancellationToken)
@@ -76,6 +79,11 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
                         messageAuthorId = message.UserId,
                     },
                     cancellationToken);
+            }
+
+            if (chat != null && !chat.ServerId.HasValue)
+            {
+                await _userListCache.InvalidateChatListForChatAsync(message.ChatId, cancellationToken);
             }
 
             return new DeleteMessageResult

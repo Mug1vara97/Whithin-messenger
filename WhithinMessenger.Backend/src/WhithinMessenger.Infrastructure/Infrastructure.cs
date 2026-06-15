@@ -61,6 +61,22 @@ public static class Infrastructure
         // JWT Services
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.AddScoped<ITokenGenerator, TokenGenerator>();
+
+        services.Configure<RedisCacheSettings>(configuration.GetSection(RedisCacheSettings.SectionName));
+        var redisConnection = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnection))
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnection;
+                options.InstanceName = "whithin:";
+            });
+            services.AddScoped<IUserListCacheService, UserListCacheService>();
+        }
+        else
+        {
+            services.AddSingleton<IUserListCacheService, NullUserListCacheService>();
+        }
         
         return services;
     }

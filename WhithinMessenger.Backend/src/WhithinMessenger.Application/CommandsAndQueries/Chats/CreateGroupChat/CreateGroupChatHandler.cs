@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using Microsoft.EntityFrameworkCore;
@@ -10,15 +11,18 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
     private readonly IChatRepository _chatRepository;
     private readonly IUserRepository _userRepository;
     private readonly IChatMemberRepository _memberRepository;
+    private readonly IUserListCacheService _userListCache;
 
     public CreateGroupChatHandler(
         IChatRepository chatRepository,
         IUserRepository userRepository,
-        IChatMemberRepository memberRepository)
+        IChatMemberRepository memberRepository,
+        IUserListCacheService userListCache)
     {
         _chatRepository = chatRepository;
         _userRepository = userRepository;
         _memberRepository = memberRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<CreateGroupChatResult> Handle(CreateGroupChatCommand request, CancellationToken cancellationToken)
@@ -79,6 +83,8 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
             }
             
             await _memberRepository.AddRangeAsync(members, cancellationToken);
+
+            await _userListCache.InvalidateUserChatsAsync(request.MemberIds, cancellationToken);
 
             return CreateGroupChatResult.SuccessResult(groupChat.Id);
         }

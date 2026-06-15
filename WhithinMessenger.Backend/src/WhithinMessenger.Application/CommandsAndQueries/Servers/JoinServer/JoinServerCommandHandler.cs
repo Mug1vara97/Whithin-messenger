@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -11,19 +12,22 @@ public class JoinServerCommandHandler : IRequestHandler<JoinServerCommand, JoinS
     private readonly IChatRepository _chatRepository;
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IUserListCacheService _userListCache;
 
     public JoinServerCommandHandler(
         IServerRepository serverRepository,
         IServerMemberRepository serverMemberRepository,
         IChatRepository chatRepository,
         IChatMemberRepository chatMemberRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IUserListCacheService userListCache)
     {
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
         _chatRepository = chatRepository;
         _chatMemberRepository = chatMemberRepository;
         _userRepository = userRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<JoinServerResult> Handle(JoinServerCommand request, CancellationToken cancellationToken)
@@ -97,6 +101,8 @@ public class JoinServerCommandHandler : IRequestHandler<JoinServerCommand, JoinS
                     await _chatMemberRepository.AddRangeAsync(membersToAdd, cancellationToken);
                 }
             }
+
+            await _userListCache.InvalidateUserServersAsync(request.UserId, cancellationToken);
 
             return new JoinServerResult
             {

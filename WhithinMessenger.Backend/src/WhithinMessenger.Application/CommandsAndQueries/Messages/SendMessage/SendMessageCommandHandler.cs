@@ -11,17 +11,20 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
     private readonly IUserRepository _userRepository;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IUserListCacheService _userListCache;
 
     public SendMessageCommandHandler(
         IMessageRepository messageRepository,
         IUserRepository userRepository,
         IChatRepository chatRepository,
-        ServerPermissionChecker permissionChecker)
+        ServerPermissionChecker permissionChecker,
+        IUserListCacheService userListCache)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _userListCache = userListCache;
     }
 
     public async Task<SendMessageResult> Handle(SendMessageCommand request, CancellationToken cancellationToken)
@@ -82,6 +85,11 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
             }
 
             await _messageRepository.AddAsync(newMessage, cancellationToken);
+
+            if (!chat.ServerId.HasValue)
+            {
+                await _userListCache.InvalidateChatListForChatAsync(request.ChatId, cancellationToken);
+            }
 
             return new SendMessageResult
             {

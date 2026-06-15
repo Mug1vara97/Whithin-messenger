@@ -14,6 +14,7 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IServerAuditLogService _auditLog;
+    private readonly IUserListCacheService _userListCache;
 
     public AddMemberCommandHandler(
         IServerRepository serverRepository,
@@ -22,7 +23,8 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
         IChatRepository chatRepository,
         IChatMemberRepository chatMemberRepository,
         ServerPermissionChecker permissionChecker,
-        IServerAuditLogService auditLog)
+        IServerAuditLogService auditLog,
+        IUserListCacheService userListCache)
     {
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
@@ -31,6 +33,7 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
         _chatMemberRepository = chatMemberRepository;
         _permissionChecker = permissionChecker;
         _auditLog = auditLog;
+        _userListCache = userListCache;
     }
 
     public async Task<AddMemberResult> Handle(AddMemberCommand request, CancellationToken cancellationToken)
@@ -106,6 +109,8 @@ public class AddMemberCommandHandler : IRequestHandler<AddMemberCommand, AddMemb
                 request.UserId,
                 new { targetName = user.UserName },
                 cancellationToken);
+
+            await _userListCache.InvalidateUserServersAsync(request.UserId, cancellationToken);
 
             return new AddMemberResult(true, null, serverMember.Id);
         }

@@ -1,20 +1,19 @@
 services:
-  # Redis для LiveKit (опционально - нужен только при нескольких серверах)
-  # redis:
-  #   image: redis:7-alpine
-  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 5
-  #   networks:
-  #     - app-network
-  #   restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
 
   db:
     image: postgres:16
@@ -56,6 +55,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=whithin_db;Username=postgres;Password=1000-7
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
       - Email__Enabled=true
       - Email__SmtpHost=smtp-relay.brevo.com
       - Email__SmtpPort=587
@@ -67,6 +67,8 @@ services:
       - Email__FrontendBaseUrl=https://whithin.ru
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app-network
@@ -154,7 +156,7 @@ services:
       - DOMAIN=whithin.ru
 
 volumes:
-  # redis_data:  # Раскомментировать если используете Redis
+  redis_data:
   postgres_data:
     driver: local
     driver_opts:

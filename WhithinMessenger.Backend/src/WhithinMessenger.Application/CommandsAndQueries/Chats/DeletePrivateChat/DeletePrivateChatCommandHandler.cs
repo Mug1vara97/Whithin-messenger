@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Chats.DeletePrivateChat;
@@ -6,10 +7,12 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Chats.DeletePrivateCha
 public class DeletePrivateChatCommandHandler : IRequestHandler<DeletePrivateChatCommand, DeletePrivateChatResult>
 {
     private readonly IChatRepository _chatRepository;
+    private readonly IUserListCacheService _userListCache;
 
-    public DeletePrivateChatCommandHandler(IChatRepository chatRepository)
+    public DeletePrivateChatCommandHandler(IChatRepository chatRepository, IUserListCacheService userListCache)
     {
         _chatRepository = chatRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<DeletePrivateChatResult> Handle(DeletePrivateChatCommand request, CancellationToken cancellationToken)
@@ -31,6 +34,8 @@ public class DeletePrivateChatCommandHandler : IRequestHandler<DeletePrivateChat
             var participants = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
 
             await _chatRepository.DeleteAsync(request.ChatId, cancellationToken);
+
+            await _userListCache.InvalidateUserChatsAsync(participants, cancellationToken);
 
             return new DeletePrivateChatResult { Success = true, Participants = participants };
         }

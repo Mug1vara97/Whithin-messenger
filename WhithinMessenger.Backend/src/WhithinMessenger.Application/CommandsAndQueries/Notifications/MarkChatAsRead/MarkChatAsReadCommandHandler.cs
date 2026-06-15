@@ -11,17 +11,20 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
     private readonly IHubContext<Hub> _notificationHub;
     private readonly INotificationService _notificationService;
     private readonly IMessageRepository _messageRepository;
+    private readonly IUserListCacheService _userListCache;
 
     public MarkChatAsReadCommandHandler(
         INotificationRepository notificationRepository,
         IHubContext<Hub> notificationHub,
         INotificationService notificationService,
-        IMessageRepository messageRepository)
+        IMessageRepository messageRepository,
+        IUserListCacheService userListCache)
     {
         _notificationRepository = notificationRepository;
         _notificationHub = notificationHub;
         _notificationService = notificationService;
         _messageRepository = messageRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<MarkChatAsReadResult> Handle(MarkChatAsReadCommand request, CancellationToken cancellationToken)
@@ -35,6 +38,8 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
             var notificationUnreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString())
                 .SendAsync("UnreadCountChanged", notificationUnreadCount, cancellationToken);
+
+            await _userListCache.InvalidateUserChatsAsync(request.UserId, cancellationToken);
 
             return new MarkChatAsReadResult
             {

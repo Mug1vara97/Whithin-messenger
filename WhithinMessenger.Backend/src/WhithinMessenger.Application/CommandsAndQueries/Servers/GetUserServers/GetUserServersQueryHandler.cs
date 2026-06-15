@@ -1,4 +1,6 @@
 using MediatR;
+using WhithinMessenger.Application.Models;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
@@ -6,35 +8,49 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Servers;
 public class GetUserServersQueryHandler : IRequestHandler<GetUserServersQuery, GetUserServersResult>
 {
     private readonly IServerRepository _serverRepository;
+    private readonly IUserListCacheService _userListCache;
 
-    public GetUserServersQueryHandler(IServerRepository serverRepository)
+    public GetUserServersQueryHandler(IServerRepository serverRepository, IUserListCacheService userListCache)
     {
         _serverRepository = serverRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<GetUserServersResult> Handle(GetUserServersQuery request, CancellationToken cancellationToken)
     {
         try
         {
-            var servers = await _serverRepository.GetUserServersAsync(request.UserId, cancellationToken);
-            
-            var serverDtos = servers.Select(s => new
+            var cached = await _userListCache.GetUserServersAsync(request.UserId, cancellationToken);
+            if (cached != null)
             {
-                serverId = s.Id,
-                name = s.Name,
-                ownerId = s.OwnerId,
-                createdAt = s.CreatedAt,
-                isPublic = s.IsPublic,
-                description = s.Description,
-                avatar = s.Avatar,
-                banner = s.Banner,
-                bannerColor = s.BannerColor
+                return new GetUserServersResult
+                {
+                    Success = true,
+                    Servers = cached.Select(s => s.ToApiObject()).Cast<object>().ToList(),
+                };
+            }
+
+            var servers = await _serverRepository.GetUserServersAsync(request.UserId, cancellationToken);
+
+            var items = servers.Select(s => new CachedUserServerItem
+            {
+                ServerId = s.Id,
+                Name = s.Name,
+                OwnerId = s.OwnerId,
+                CreatedAt = s.CreatedAt,
+                IsPublic = s.IsPublic,
+                Description = s.Description,
+                Avatar = s.Avatar,
+                Banner = s.Banner,
+                BannerColor = s.BannerColor,
             }).ToList();
+
+            await _userListCache.SetUserServersAsync(request.UserId, items, cancellationToken);
 
             return new GetUserServersResult
             {
                 Success = true,
-                Servers = serverDtos.Cast<object>().ToList()
+                Servers = items.Select(s => s.ToApiObject()).Cast<object>().ToList(),
             };
         }
         catch (Exception ex)

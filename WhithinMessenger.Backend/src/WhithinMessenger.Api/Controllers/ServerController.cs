@@ -45,23 +45,14 @@ public class ServerController : ControllerBase
         try
         {
             var userId = (Guid)HttpContext.Items["UserId"]!;
-            
-            var servers = await _serverRepository.GetUserServersAsync(userId);
-            
-            var serverDtos = servers.Select(s => new
+            var result = await _mediator.Send(new GetUserServersQuery(userId));
+
+            if (!result.Success)
             {
-                serverId = s.Id,
-                name = s.Name,
-                ownerId = s.OwnerId,
-                createdAt = s.CreatedAt,
-                isPublic = s.IsPublic,
-                description = s.Description,
-                avatar = s.Avatar,
-                banner = s.Banner,
-                bannerColor = s.BannerColor
-            }).ToList();
-            
-            return Ok(serverDtos);
+                return StatusCode(500, new { error = "Произошла ошибка при получении списка серверов: " + result.ErrorMessage });
+            }
+
+            return Ok(result.Servers);
         }
         catch (Exception ex)
         {

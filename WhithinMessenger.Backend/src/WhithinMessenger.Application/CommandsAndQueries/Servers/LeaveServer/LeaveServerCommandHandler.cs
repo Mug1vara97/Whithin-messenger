@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Servers.LeaveServer;
@@ -7,13 +8,16 @@ public class LeaveServerCommandHandler : IRequestHandler<LeaveServerCommand, Lea
 {
     private readonly IServerRepository _serverRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly IUserListCacheService _userListCache;
 
     public LeaveServerCommandHandler(
         IServerRepository serverRepository,
-        IServerMemberRepository serverMemberRepository)
+        IServerMemberRepository serverMemberRepository,
+        IUserListCacheService userListCache)
     {
         _serverRepository = serverRepository;
         _serverMemberRepository = serverMemberRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<LeaveServerResult> Handle(LeaveServerCommand request, CancellationToken cancellationToken)
@@ -38,6 +42,8 @@ public class LeaveServerCommandHandler : IRequestHandler<LeaveServerCommand, Lea
             }
 
             await _serverMemberRepository.DeleteByServerAndUserAsync(request.ServerId, request.UserId, cancellationToken);
+
+            await _userListCache.InvalidateUserServersAsync(request.UserId, cancellationToken);
 
             return new LeaveServerResult(true, null);
         }

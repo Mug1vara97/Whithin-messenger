@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -12,6 +13,7 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
     private readonly IServerMemberRepository _serverMemberRepository;
     private readonly IChatMemberRepository _chatMemberRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IUserListCacheService _userListCache;
 
     public CreateServerCommandHandler(
         IServerRepository serverRepository,
@@ -19,7 +21,8 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
         IChatRepository chatRepository,
         IServerMemberRepository serverMemberRepository,
         IChatMemberRepository chatMemberRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IUserListCacheService userListCache)
     {
         _serverRepository = serverRepository;
         _categoryRepository = categoryRepository;
@@ -27,6 +30,7 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
         _serverMemberRepository = serverMemberRepository;
         _chatMemberRepository = chatMemberRepository;
         _userRepository = userRepository;
+        _userListCache = userListCache;
     }
 
     public async Task<CreateServerResult> Handle(CreateServerCommand request, CancellationToken cancellationToken)
@@ -147,6 +151,8 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
             };
 
             await _chatMemberRepository.CreateAsync(voiceChatMember, cancellationToken);
+
+            await _userListCache.InvalidateUserServersAsync(request.OwnerId, cancellationToken);
 
             return new CreateServerResult
             {
