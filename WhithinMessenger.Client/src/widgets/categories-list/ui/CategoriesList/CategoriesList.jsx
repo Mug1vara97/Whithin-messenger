@@ -50,6 +50,7 @@ const CategoriesList = ({
   const [localCategories, setLocalCategories] = useState(categories);
   const isInCall = useCallStore((state) => state.isInCall);
   const currentRoomId = useCallStore((state) => state.currentRoomId);
+  const currentCallServerId = useCallStore((state) => state.currentCallServerId);
   const callOnlyVoiceChannels = useCallStore((state) => state.callOnlyVoiceChannels);
 
   useEffect(() => {
@@ -62,9 +63,10 @@ const CategoriesList = ({
         localCategories,
         callOnlyVoiceChannels,
         currentRoomId,
-        isInCall
+        isInCall,
+        currentCallServerId
       ),
-    [localCategories, callOnlyVoiceChannels, isInCall, currentRoomId]
+    [localCategories, callOnlyVoiceChannels, isInCall, currentRoomId, currentCallServerId]
   );
 
   // Подключаемся к voice-server для получения участников голосовых каналов

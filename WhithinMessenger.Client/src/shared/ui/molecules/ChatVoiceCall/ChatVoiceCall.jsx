@@ -209,15 +209,11 @@ const ChatVoiceCall = ({
     };
   }, []);
 
-  const handleClose = () => {
+  const handleDisconnect = async () => {
+    await endCall();
     if (onClose) {
       onClose();
     }
-  };
-
-  const handleDisconnect = async () => {
-    await endCall();
-    handleClose();
   };
 
   const currentUser = createParticipant(userId, userName || 'You', null, 'online', 'host');

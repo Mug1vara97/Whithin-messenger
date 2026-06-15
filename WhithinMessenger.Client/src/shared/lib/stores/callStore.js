@@ -716,6 +716,17 @@ export const useCallStore = create(
       registerCallOnlyVoiceChannel: (channelId, channelName, placement = {}) => {
         const key = normalizeChannelId(channelId);
         if (!key) return;
+
+        if (!get().currentCallServerId) {
+          set((state) => {
+            if (!state.callOnlyVoiceChannels.has(key)) return state;
+            const map = new Map(state.callOnlyVoiceChannels);
+            map.delete(key);
+            return { callOnlyVoiceChannels: map };
+          });
+          return;
+        }
+
         const existing = get().callOnlyVoiceChannels.get(key);
         const resolvedName =
           channelName && channelName !== key

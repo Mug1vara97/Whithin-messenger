@@ -223,8 +223,12 @@ Whithin-android/
 ВКР/
 **/ВКР*/
 **/*ВКР*
-generate_vkr_docx.py
+**/vkr*/
+**/*vkr*
+docs/vkr*
+generate_vkr*.py
 Скриншоты/
+**/речь_защиты_ВКР*
 
 ## Local tools
 

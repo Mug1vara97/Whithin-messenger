@@ -75,9 +75,16 @@ export const mergeCallOnlyIntoCategories = (
   categories,
   callOnlyMap,
   currentRoomId,
-  isInCall = false
+  isInCall = false,
+  currentCallServerId = null
 ) => {
-  if (!isInCall || !currentRoomId || !callOnlyMap?.size || !categories?.length) {
+  if (
+    !isInCall ||
+    !currentRoomId ||
+    !currentCallServerId ||
+    !callOnlyMap?.size ||
+    !categories?.length
+  ) {
     return categories;
   }
 

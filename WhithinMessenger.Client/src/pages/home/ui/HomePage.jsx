@@ -712,6 +712,12 @@ const HomePage = () => {
       const activeChatId = selectedChat.chatId || selectedChat.chat_id;
       if (!activeChatId || String(activeChatId) !== String(endedChannelId)) return;
 
+      // Обычный текстовый/DM-чат со встроенным звонком — остаёмся в чате, только скрываем панель звонка.
+      if (!isVoiceChannel(selectedChat)) {
+        handleEndChatCall();
+        return;
+      }
+
       const currentServerData = serverDataFromPanel || serverData;
       const channelInServer = findChannelInCategories(
         currentServerData?.categories,
@@ -724,7 +730,7 @@ const HomePage = () => {
 
     window.addEventListener('voiceCallEnded', handleVoiceCallEnded);
     return () => window.removeEventListener('voiceCallEnded', handleVoiceCallEnded);
-  }, [selectedChat, serverData, serverDataFromPanel, handleCloseSelectedChat]);
+  }, [selectedChat, serverData, serverDataFromPanel, handleCloseSelectedChat, handleEndChatCall]);
 
   const handleServerDataUpdated = useCallback((updatedServerData) => {
     console.log('HomePage: Server data updated from ServerPanel:', updatedServerData);
