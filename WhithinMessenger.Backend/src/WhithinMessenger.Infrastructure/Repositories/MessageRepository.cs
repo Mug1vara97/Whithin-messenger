@@ -41,7 +41,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         public async Task<List<Message>> GetByChatIdAsync(Guid chatId, CancellationToken cancellationToken = default)
         {
-            return await ApplyMessageIncludes(_context.Messages.Where(m => m.ChatId == chatId))
+            return await ApplyMessageIncludes(_context.Messages.AsNoTracking().Where(m => m.ChatId == chatId))
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync(cancellationToken);
         }
@@ -52,11 +52,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
             Guid? beforeMessageId = null,
             CancellationToken cancellationToken = default)
         {
-            var query = _context.Messages.Where(m => m.ChatId == chatId);
+            var query = _context.Messages.AsNoTracking().Where(m => m.ChatId == chatId);
 
             if (beforeMessageId.HasValue)
             {
                 var cursor = await _context.Messages
+                    .AsNoTracking()
                     .Where(m => m.Id == beforeMessageId.Value && m.ChatId == chatId)
                     .Select(m => new { m.CreatedAt, m.Id })
                     .FirstOrDefaultAsync(cancellationToken);
@@ -77,6 +78,52 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             page.Reverse();
             return page;
+        }
+
+        public async Task<(List<Message> Messages, bool HasMoreOlder)> GetByChatIdPageWithHasMoreAsync(
+            Guid chatId,
+            int limit,
+            Guid? beforeMessageId = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (limit <= 0)
+            {
+                var all = await GetByChatIdAsync(chatId, cancellationToken);
+                return (all, false);
+            }
+
+            var query = _context.Messages.AsNoTracking().Where(m => m.ChatId == chatId);
+
+            if (beforeMessageId.HasValue)
+            {
+                var cursor = await _context.Messages
+                    .AsNoTracking()
+                    .Where(m => m.Id == beforeMessageId.Value && m.ChatId == chatId)
+                    .Select(m => new { m.CreatedAt, m.Id })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (cursor != null)
+                {
+                    query = query.Where(m =>
+                        m.CreatedAt < cursor.CreatedAt ||
+                        (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
+                }
+            }
+
+            var page = await ApplyMessageIncludes(query)
+                .OrderByDescending(m => m.CreatedAt)
+                .ThenByDescending(m => m.Id)
+                .Take(limit + 1)
+                .ToListAsync(cancellationToken);
+
+            var hasMoreOlder = page.Count > limit;
+            if (hasMoreOlder)
+            {
+                page.RemoveAt(page.Count - 1);
+            }
+
+            page.Reverse();
+            return (page, hasMoreOlder);
         }
 
         public async Task<bool> HasOlderMessagesAsync(
@@ -103,6 +150,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         private static IQueryable<Message> ApplyMessageIncludes(IQueryable<Message> query) =>
             query
+                .AsSplitQuery()
                 .Include(m => m.User)
                     .ThenInclude(u => u.UserProfile)
                 .Include(m => m.ForwardedFromMessage)

@@ -67,5 +67,6 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(e => new { e.ChatId, e.IsPinned });
+        builder.HasIndex(e => new { e.ChatId, e.CreatedAt, e.Id });
     }
 }

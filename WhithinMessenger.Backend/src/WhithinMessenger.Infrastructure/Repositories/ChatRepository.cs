@@ -343,9 +343,17 @@ namespace WhithinMessenger.Infrastructure.Repositories
         public async Task<List<Guid>> GetChatMembersAsync(Guid chatId, CancellationToken cancellationToken = default)
         {
             return await _context.Members
+                .AsNoTracking()
                 .Where(m => m.ChatId == chatId)
                 .Select(m => m.UserId)
                 .ToListAsync(cancellationToken);
+        }
+
+        public async Task<int> GetChatMemberCountAsync(Guid chatId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Members
+                .AsNoTracking()
+                .CountAsync(m => m.ChatId == chatId, cancellationToken);
         }
 
         public async Task<List<ChatParticipantInfo>> GetChatParticipantsAsync(Guid chatId, CancellationToken cancellationToken = default)

@@ -15,6 +15,11 @@ namespace WhithinMessenger.Domain.Interfaces
             int limit,
             Guid? beforeMessageId = null,
             CancellationToken cancellationToken = default);
+        Task<(List<Message> Messages, bool HasMoreOlder)> GetByChatIdPageWithHasMoreAsync(
+            Guid chatId,
+            int limit,
+            Guid? beforeMessageId = null,
+            CancellationToken cancellationToken = default);
         Task<bool> HasOlderMessagesAsync(
             Guid chatId,
             Guid messageId,

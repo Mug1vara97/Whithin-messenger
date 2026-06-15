@@ -1,5 +1,6 @@
 using MediatR;
 using WhithinMessenger.Domain.Interfaces;
+using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 
@@ -19,34 +20,40 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
         try
         {
             var limit = request.Limit > 0 ? request.Limit : 0;
-            var messages = limit > 0
-                ? await _messageRepository.GetByChatIdPageAsync(
+            Task<int> memberCountTask =
+                _chatRepository.GetChatMemberCountAsync(request.ChatId, cancellationToken);
+
+            List<Message> messages;
+            var hasMoreOlder = false;
+
+            if (limit > 0)
+            {
+                var pageTask = _messageRepository.GetByChatIdPageWithHasMoreAsync(
                     request.ChatId,
                     limit,
                     request.BeforeMessageId,
-                    cancellationToken)
-                : await _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
-
-            var hasMoreOlder = false;
-            if (limit > 0 && messages.Count == limit)
-            {
-                hasMoreOlder = await _messageRepository.HasOlderMessagesAsync(
-                    request.ChatId,
-                    messages[0].Id,
                     cancellationToken);
+                await Task.WhenAll(pageTask, memberCountTask);
+                (messages, hasMoreOlder) = await pageTask;
+            }
+            else
+            {
+                var allMessagesTask = _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
+                await Task.WhenAll(allMessagesTask, memberCountTask);
+                messages = await allMessagesTask;
             }
 
-            var chatMembers = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
-            var recipientCount = Math.Max(0, chatMembers.Count - 1);
-
-            Dictionary<Guid, string> statuses = new();
-            if (request.UserId.HasValue && recipientCount > 0)
-            {
-                var ownMessageIds = messages
+            var recipientCount = Math.Max(0, await memberCountTask - 1);
+            var ownMessageIds = request.UserId.HasValue
+                ? messages
                     .Where(m => m.UserId == request.UserId.Value)
                     .Select(m => m.Id)
-                    .ToList();
+                    .ToList()
+                : [];
 
+            Dictionary<Guid, string> statuses = new();
+            if (request.UserId.HasValue && ownMessageIds.Count > 0 && recipientCount > 0)
+            {
                 statuses = await _messageRepository.GetMessageStatusesAsync(
                     request.UserId.Value,
                     ownMessageIds,
