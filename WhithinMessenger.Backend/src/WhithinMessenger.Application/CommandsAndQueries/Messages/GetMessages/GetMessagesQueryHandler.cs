@@ -20,30 +20,25 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
         try
         {
             var limit = request.Limit > 0 ? request.Limit : 0;
-            Task<int> memberCountTask =
-                _chatRepository.GetChatMemberCountAsync(request.ChatId, cancellationToken);
 
             List<Message> messages;
             var hasMoreOlder = false;
 
             if (limit > 0)
             {
-                var pageTask = _messageRepository.GetByChatIdPageWithHasMoreAsync(
+                (messages, hasMoreOlder) = await _messageRepository.GetByChatIdPageWithHasMoreAsync(
                     request.ChatId,
                     limit,
                     request.BeforeMessageId,
                     cancellationToken);
-                await Task.WhenAll(pageTask, memberCountTask);
-                (messages, hasMoreOlder) = await pageTask;
             }
             else
             {
-                var allMessagesTask = _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
-                await Task.WhenAll(allMessagesTask, memberCountTask);
-                messages = await allMessagesTask;
+                messages = await _messageRepository.GetByChatIdAsync(request.ChatId, cancellationToken);
             }
 
-            var recipientCount = Math.Max(0, await memberCountTask - 1);
+            var memberCount = await _chatRepository.GetChatMemberCountAsync(request.ChatId, cancellationToken);
+            var recipientCount = Math.Max(0, memberCount - 1);
             var ownMessageIds = request.UserId.HasValue
                 ? messages
                     .Where(m => m.UserId == request.UserId.Value)
