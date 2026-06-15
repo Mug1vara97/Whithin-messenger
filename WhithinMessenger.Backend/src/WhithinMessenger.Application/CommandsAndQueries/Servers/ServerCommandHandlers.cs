@@ -1594,8 +1594,7 @@ public class GetServerInfoQueryHandler : IRequestHandler<GetServerInfoQuery, Get
                 return new GetServerInfoResult { Success = false, ErrorMessage = "Сервер не найден" };
             }
 
-            var userServers = await _serverRepository.GetUserServersAsync(request.UserId);
-            if (!userServers.Any(s => s.Id == request.ServerId))
+            if (!await _serverRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken))
             {
                 return new GetServerInfoResult { Success = false, ErrorMessage = "У вас нет доступа к этому серверу" };
             }

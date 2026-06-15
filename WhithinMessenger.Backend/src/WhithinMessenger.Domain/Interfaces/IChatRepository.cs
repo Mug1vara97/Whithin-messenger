@@ -37,7 +37,7 @@ namespace WhithinMessenger.Domain.Interfaces
         public bool IsSavedMessages { get; init; }
         public string? LastMessage { get; set; }
         public DateTimeOffset LastMessageTime { get; init; }
-        public int UnreadCount { get; init; }
+        public int UnreadCount { get; set; }
     }
 
     public interface ICreatePrivateChatResult

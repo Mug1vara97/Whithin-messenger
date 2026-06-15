@@ -32,13 +32,12 @@ public class ServerRepository : IServerRepository
     public async Task<List<Server>> GetUserServersAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var servers = await _context.Servers
+            .AsNoTracking()
             .Where(s => s.ServerMembers.Any(sm => sm.UserId == userId))
-            .Include(s => s.ChatCategories)
-                .ThenInclude(c => c.Chats)
-            .Include(s => s.Chats.Where(c => c.CategoryId == null))
             .ToListAsync(cancellationToken);
 
         var orderMap = await _context.UserServerOrders
+            .AsNoTracking()
             .Where(o => o.UserId == userId)
             .ToDictionaryAsync(o => o.ServerId, o => o.Position, cancellationToken);
 

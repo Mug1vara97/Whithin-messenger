@@ -22,6 +22,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
             var savedChat = await EnsureSavedMessagesChatAsync(userId, cancellationToken);
 
             var oneOnOneChats = await _context.Members
+                .AsNoTracking()
                 .Where(m => m.UserId == userId)
                 .Select(m => m.Chat)
                 .Where(c => c.Type.TypeName == "Private")
@@ -53,23 +54,14 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         .Select(m => m.User.LastSeen)
                         .FirstOrDefault(),
                     IsGroupChat = false,
-                    LastMessage = _context.Messages
-                        .Where(m => m.ChatId == c.Id)
-                        .OrderByDescending(m => m.CreatedAt)
-                        .Select(m => m.Content)
-                        .FirstOrDefault(),
                     LastMessageTime = _context.Messages
                         .Where(m => m.ChatId == c.Id)
-                        .OrderByDescending(m => m.CreatedAt)
-                        .Select(m => m.CreatedAt)
-                        .FirstOrDefault(),
-                    UnreadCount = _context.Messages
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Count(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
+                        .Max(m => (DateTimeOffset?)m.CreatedAt) ?? DateTimeOffset.MinValue,
                 })
                 .ToListAsync(cancellationToken);
 
             var groupChats = await _context.Members
+                .AsNoTracking()
                 .Where(m => m.UserId == userId)
                 .Select(m => m.Chat)
                 .Where(c => c.Type.TypeName == "Group")
@@ -81,19 +73,9 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     AvatarUrl = c.Avatar,
                     AvatarColor = c.AvatarColor,
                     IsGroupChat = true,
-                    LastMessage = _context.Messages
-                        .Where(m => m.ChatId == c.Id)
-                        .OrderByDescending(m => m.CreatedAt)
-                        .Select(m => m.Content)
-                        .FirstOrDefault(),
                     LastMessageTime = _context.Messages
                         .Where(m => m.ChatId == c.Id)
-                        .OrderByDescending(m => m.CreatedAt)
-                        .Select(m => m.CreatedAt)
-                        .FirstOrDefault(),
-                    UnreadCount = _context.Messages
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Count(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
+                        .Max(m => (DateTimeOffset?)m.CreatedAt) ?? DateTimeOffset.MinValue,
                 })
                 .ToListAsync(cancellationToken);
 
@@ -104,6 +86,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             chats.Insert(0, savedChat);
 
+            await ApplyUnreadCountsAsync(chats, userId, cancellationToken);
             await ApplyLastMessagePreviewsAsync(chats, cancellationToken);
             return chats;
         }
@@ -156,10 +139,9 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
             var lastMessageTime = await _context.Messages
+                .AsNoTracking()
                 .Where(m => m.ChatId == savedChat.Id)
-                .OrderByDescending(m => m.CreatedAt)
-                .Select(m => (DateTimeOffset?)m.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken) ?? savedChat.CreatedAt;
+                .MaxAsync(m => (DateTimeOffset?)m.CreatedAt, cancellationToken) ?? savedChat.CreatedAt;
 
             return new ChatInfo
             {
@@ -171,14 +153,46 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 UserStatus = "online",
                 IsGroupChat = false,
                 IsSavedMessages = true,
-                LastMessage = await _context.Messages
-                    .Where(m => m.ChatId == savedChat.Id)
-                    .OrderByDescending(m => m.CreatedAt)
-                    .Select(m => m.Content)
-                    .FirstOrDefaultAsync(cancellationToken),
                 LastMessageTime = lastMessageTime,
                 UnreadCount = 0,
             };
+        }
+
+        private async Task ApplyUnreadCountsAsync(
+            List<ChatInfo> chats,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            if (chats.Count == 0)
+            {
+                return;
+            }
+
+            var chatIds = chats
+                .Where(c => !c.IsSavedMessages)
+                .Select(c => c.ChatId)
+                .ToList();
+
+            if (chatIds.Count == 0)
+            {
+                return;
+            }
+
+            var unreadByChatId = await _context.Messages
+                .AsNoTracking()
+                .Where(m => chatIds.Contains(m.ChatId) && m.UserId != userId)
+                .Where(m => !_context.MessageReads.Any(mr => mr.MessageId == m.Id && mr.UserId == userId))
+                .GroupBy(m => m.ChatId)
+                .Select(g => new { ChatId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ChatId, x => x.Count, cancellationToken);
+
+            foreach (var chat in chats)
+            {
+                if (unreadByChatId.TryGetValue(chat.ChatId, out var count))
+                {
+                    chat.UnreadCount = count;
+                }
+            }
         }
 
         private async Task ApplyLastMessagePreviewsAsync(List<ChatInfo> chats, CancellationToken cancellationToken)
@@ -190,14 +204,24 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var chatIds = chats.Select(c => c.ChatId).ToList();
 
+            var lastMessageIds = await _context.Messages
+                .AsNoTracking()
+                .Where(m => chatIds.Contains(m.ChatId))
+                .GroupBy(m => m.ChatId)
+                .Select(g => g.OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Select(m => m.Id).First())
+                .ToListAsync(cancellationToken);
+
+            if (lastMessageIds.Count == 0)
+            {
+                return;
+            }
+
             var lastMessages = await _context.Messages
                 .AsNoTracking()
+                .AsSplitQuery()
                 .Include(m => m.MediaFiles)
                 .Include(m => m.Poll)
-                .Where(m => chatIds.Contains(m.ChatId))
-                .Where(m => m.CreatedAt == _context.Messages
-                    .Where(m2 => m2.ChatId == m.ChatId)
-                    .Max(m2 => m2.CreatedAt))
+                .Where(m => lastMessageIds.Contains(m.Id))
                 .ToListAsync(cancellationToken);
 
             if (lastMessages.Count == 0)

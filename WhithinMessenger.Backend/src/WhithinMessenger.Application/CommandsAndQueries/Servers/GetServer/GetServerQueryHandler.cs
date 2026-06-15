@@ -42,8 +42,7 @@ public class GetServerQueryHandler : IRequestHandler<GetServerQuery, GetServerRe
                 };
             }
 
-            var userServers = await _serverRepository.GetUserServersAsync(request.UserId, cancellationToken);
-            if (!userServers.Any(s => s.Id == request.ServerId))
+            if (!await _serverRepository.IsUserMemberAsync(request.ServerId, request.UserId, cancellationToken))
             {
                 return new GetServerResult
                 {

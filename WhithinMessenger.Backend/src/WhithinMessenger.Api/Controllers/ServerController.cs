@@ -113,8 +113,7 @@ public class ServerController : ControllerBase
                 return NotFound(new { error = "Сервер не найден" });
             }
 
-            var userServers = await _serverRepository.GetUserServersAsync(userId);
-            if (!userServers.Any(s => s.Id == serverId))
+            if (!await _serverRepository.IsUserMemberAsync(serverId, userId))
             {
                 return Forbid("У вас нет доступа к этому серверу");
             }
