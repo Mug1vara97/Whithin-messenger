@@ -110,6 +110,10 @@ export const useNotifications = () => {
         setNotifications((prev) =>
           prev.filter((item) => (item.id || item.Id) !== notificationId)
         );
+        dismissDesktopNotificationById(notificationId);
+        window.dispatchEvent(
+          new CustomEvent('notificationRead', { detail: { notificationId } }),
+        );
         await refreshUnreadCount();
       } catch (err) {
         setError(err?.message || 'Не удалось удалить уведомление');
@@ -245,13 +249,23 @@ export const useNotifications = () => {
 
     const onNotificationDismissed = (payload) => {
       const notificationId = payload?.notificationId ?? payload?.NotificationId;
-      if (!notificationId) return;
-      setNotifications((prev) =>
-        prev.filter((item) => (item.id || item.Id) !== notificationId),
-      );
-      dismissDesktopNotificationById(notificationId);
+      const chatId = payload?.chatId ?? payload?.ChatId;
+      if (notificationId) {
+        setNotifications((prev) =>
+          prev.filter((item) => (item.id || item.Id) !== notificationId),
+        );
+        dismissDesktopNotificationById(notificationId);
+      }
+      if (chatId) {
+        setNotifications((prev) =>
+          prev.filter((item) => (item.chatId || item.ChatId) !== chatId),
+        );
+        dismissDesktopNotificationsByChatId(chatId);
+      }
       window.dispatchEvent(
-        new CustomEvent('notificationRead', { detail: { notificationId } }),
+        new CustomEvent('notificationRead', {
+          detail: { notificationId, chatId },
+        }),
       );
     };
 

@@ -393,50 +393,18 @@ const HomePage = () => {
           }
 
           if (!alreadyInCall && !isLocalAccept && pendingIncoming) {
-            handleJoinVoiceChannel({
-              roomId: pendingIncoming.chatId,
-              roomName: `Звонок с ${pendingIncoming.chatName || pendingIncoming.callerName}`,
-              userName: user.username,
-              userId: user.id,
-              isPrivateCall: true,
-              chatId: pendingIncoming.chatId,
-            });
-            navigate(`/channels/@me/${pendingIncoming.chatId}`);
+            // Answered on another device — only stop ringing here, do not auto-join.
+            return;
           }
         };
 
         incomingCallDismissedHandler = (payload) => {
           const chatIdValue = payload?.chatId ?? payload?.ChatId;
-          const reason = payload?.reason ?? payload?.Reason;
-          const actorUserId = payload?.actorUserId ?? payload?.ActorUserId;
           if (!chatIdValue) return;
 
           const chatIdStr = String(chatIdValue);
-          const pendingIncoming =
-            incomingCallRef.current?.chatId === chatIdStr ? incomingCallRef.current : null;
-
-          if (pendingIncoming) {
+          if (incomingCallRef.current?.chatId === chatIdStr) {
             setIncomingCall(null);
-          }
-
-          if (
-            reason === 'accepted'
-            && actorUserId
-            && String(actorUserId) === String(user.id)
-            && pendingIncoming
-            && activeChatCallRef.current?.chatId !== chatIdStr
-            && localCallAcceptChatIdRef.current !== chatIdStr
-          ) {
-            localCallAcceptChatIdRef.current = null;
-            handleJoinVoiceChannel({
-              roomId: pendingIncoming.chatId,
-              roomName: `Звонок с ${pendingIncoming.chatName || pendingIncoming.callerName}`,
-              userName: user.username,
-              userId: user.id,
-              isPrivateCall: true,
-              chatId: pendingIncoming.chatId,
-            });
-            navigate(`/channels/@me/${pendingIncoming.chatId}`);
           }
         };
 

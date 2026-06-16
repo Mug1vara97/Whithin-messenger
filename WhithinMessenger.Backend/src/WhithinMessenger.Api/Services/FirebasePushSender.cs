@@ -145,6 +145,24 @@ public class FirebasePushSender : IFirebasePushSender
         await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
     }
 
+    public async Task SendIncomingCallDismissedAsync(
+        string deviceToken,
+        Guid chatId,
+        string reason,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "call_dismissed",
+            ["chat_id"] = chatId.ToString(),
+            ["room_id"] = chatId.ToString(),
+            ["reason"] = string.IsNullOrWhiteSpace(reason) ? "dismissed" : reason.Trim(),
+        };
+
+        await SendDataOnlyPushAsync(deviceToken, data, cancellationToken);
+    }
+
     public async Task SendFriendRequestNotificationAsync(
         string deviceToken,
         Guid requestId,

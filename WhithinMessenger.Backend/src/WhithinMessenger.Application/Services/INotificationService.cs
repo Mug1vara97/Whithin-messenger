@@ -34,6 +34,12 @@ public interface INotificationService
         Guid senderId,
         string senderUsername,
         CancellationToken cancellationToken = default);
+
+    Task SendIncomingCallDismissedPushAsync(
+        Guid userId,
+        Guid chatId,
+        string reason,
+        CancellationToken cancellationToken = default);
 }
 
 

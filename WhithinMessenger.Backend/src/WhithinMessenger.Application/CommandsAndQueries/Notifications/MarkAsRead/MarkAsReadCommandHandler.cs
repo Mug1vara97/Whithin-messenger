@@ -25,13 +25,19 @@ public class MarkAsReadCommandHandler : IRequestHandler<MarkAsReadCommand, MarkA
     {
         try
         {
+            var notification = await _notificationRepository.GetByIdAsync(request.NotificationId, cancellationToken);
+
             await _notificationRepository.MarkAsReadAsync(request.NotificationId, request.UserId, cancellationToken);
 
             var unreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync("UnreadCountChanged", unreadCount, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync(
                 "NotificationDismissed",
-                new { notificationId = request.NotificationId },
+                new
+                {
+                    notificationId = request.NotificationId,
+                    chatId = notification?.ChatId,
+                },
                 cancellationToken);
 
             return new MarkAsReadResult { Success = true };

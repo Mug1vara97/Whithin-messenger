@@ -36,4 +36,11 @@ public interface IFirebasePushSender
         string senderUsername,
         CancellationToken cancellationToken = default
     );
+
+    Task SendIncomingCallDismissedAsync(
+        string deviceToken,
+        Guid chatId,
+        string reason,
+        CancellationToken cancellationToken = default
+    );
 }

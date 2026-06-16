@@ -39,6 +39,14 @@ public class DeleteNotificationCommandHandler : IRequestHandler<DeleteNotificati
 
             var unreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync("UnreadCountChanged", unreadCount, cancellationToken);
+            await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync(
+                "NotificationDismissed",
+                new
+                {
+                    notificationId = request.NotificationId,
+                    chatId = notification.ChatId,
+                },
+                cancellationToken);
 
             return new DeleteNotificationResult { Success = true };
         }

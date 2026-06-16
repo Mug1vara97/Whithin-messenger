@@ -143,6 +143,35 @@ public class NotificationService : INotificationService
         }
     }
 
+    public async Task SendIncomingCallDismissedPushAsync(
+        Guid userId,
+        Guid chatId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await _userPushTokenStore.GetTokensAsync(userId, cancellationToken);
+        if (tokens.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var token in tokens)
+        {
+            try
+            {
+                await _firebasePushSender.SendIncomingCallDismissedAsync(
+                    deviceToken: token,
+                    chatId: chatId,
+                    reason: reason,
+                    cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Incoming-call dismiss push failed for user {userId}: {ex.Message}");
+            }
+        }
+    }
+
     public async Task SendFriendRequestPushAsync(
         Guid addresseeId,
         Guid requestId,

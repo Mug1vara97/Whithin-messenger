@@ -63,6 +63,7 @@ public class GroupChatHub : Hub
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly IUserRepository _userRepository;
+    private readonly IHubContext<NotificationHub> _notificationHubContext;
 
     public GroupChatHub(
         IMediator mediator,
@@ -74,7 +75,8 @@ public class GroupChatHub : Hub
         IMessageRepository messageRepository,
         ChatMessageNotificationService chatMessageNotificationService,
         IMessageReceiptService messageReceiptService,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IHubContext<NotificationHub> notificationHubContext)
     {
         _mediator = mediator;
         _chatListHubContext = chatListHubContext;
@@ -86,6 +88,7 @@ public class GroupChatHub : Hub
         _chatMessageNotificationService = chatMessageNotificationService;
         _messageReceiptService = messageReceiptService;
         _userRepository = userRepository;
+        _notificationHubContext = notificationHubContext;
     }
 
         public async Task JoinGroup(string chatId)
@@ -1311,12 +1314,25 @@ public class GroupChatHub : Hub
         string reason,
         Guid? actorUserId = null)
     {
-        await Clients.User(userId.ToString()).SendAsync("IncomingCallDismissed", new
+        var payload = new
         {
             chatId,
             reason,
             actorUserId,
-        });
+        };
+
+        var userKey = userId.ToString();
+        await Clients.User(userKey).SendAsync("IncomingCallDismissed", payload);
+        await _notificationHubContext.Clients.User(userKey).SendAsync("IncomingCallDismissed", payload);
+
+        try
+        {
+            await _notificationService.SendIncomingCallDismissedPushAsync(userId, chatId, reason);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Incoming-call dismiss push failed for user {UserId}", userId);
+        }
     }
 
     private async Task BroadcastCallLogMessageAsync(CallSession session, string callEvent, int durationSeconds)
