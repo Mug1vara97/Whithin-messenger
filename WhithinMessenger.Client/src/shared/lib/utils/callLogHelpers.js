@@ -19,7 +19,7 @@ export function parseCallLogPayload(content) {
 export function formatCallDuration(seconds) {
   const total = Math.max(0, Number(seconds) || 0);
   if (total < 60) {
-    return total <= 5 ? 'несколько секунд' : `${total} сек.`;
+    return total <= 5 ? 'несколько секунд' : `${total} сек`;
   }
 
   const minutes = Math.floor(total / 60);
@@ -27,7 +27,7 @@ export function formatCallDuration(seconds) {
   if (remainder === 0) {
     return `${minutes} ${pluralizeMinutes(minutes)}`;
   }
-  return `${minutes} ${pluralizeMinutes(minutes)} ${remainder} сек.`;
+  return `${minutes} ${pluralizeMinutes(minutes)} ${remainder} сек`;
 }
 
 function pluralizeMinutes(count) {

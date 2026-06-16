@@ -10,7 +10,7 @@ import './CallLogMessage.css';
 
 const GhostIcon = () => (
   <svg
-    viewBox="0 0 512 512"
+    viewBox="0 0 640 640"
     className="call-log-message__ghost"
     aria-hidden="true"
     focusable="false"

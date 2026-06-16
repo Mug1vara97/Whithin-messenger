@@ -43,10 +43,12 @@ public class GroupChatHub : Hub
     {
         public Guid ChatId { get; init; }
         public Guid CallerId { get; init; }
+        public Guid? CalleeId { get; set; }
         public string CallerName { get; set; } = string.Empty;
         public DateTimeOffset RingStartedAt { get; init; }
         public DateTimeOffset? AnsweredAt { get; set; }
         public bool IsAnswered => AnsweredAt.HasValue;
+        public ConcurrentDictionary<Guid, byte> EndedParticipantIds { get; } = new();
     }
 
     private static readonly ConcurrentDictionary<Guid, CallSession> CallSessions = new();
@@ -1125,6 +1127,7 @@ public class GroupChatHub : Hub
                 return;
             }
 
+            session.CalleeId = userId.Value;
             session.AnsweredAt = DateTimeOffset.UtcNow;
             CancelCallRingTimeout(chatId);
 
@@ -1223,17 +1226,58 @@ public class GroupChatHub : Hub
                 return;
             }
 
-            if (!CallSessions.TryRemove(chatId, out var session))
+            if (!CallSessions.TryGetValue(chatId, out var session))
             {
                 return;
             }
-
-            CancelCallRingTimeout(chatId);
 
             if (!session.IsAnswered)
             {
                 return;
             }
+
+            var expectedParticipantIds =
+                new[] { session.CallerId, session.CalleeId }
+                    .Where(id => id.HasValue)
+                    .Select(id => id!.Value)
+                    .Distinct()
+                    .ToArray();
+
+            if (expectedParticipantIds.Length < 2)
+            {
+                _logger.LogWarning(
+                    "EndCall waiting for callee before finalizing chat {ChatId}; user {UserId}",
+                    chatId,
+                    userId.Value);
+                return;
+            }
+
+            if (!expectedParticipantIds.Contains(userId.Value))
+            {
+                _logger.LogWarning(
+                    "EndCall ignored for non-call participant {UserId} in chat {ChatId}",
+                    userId.Value,
+                    chatId);
+                return;
+            }
+
+            session.EndedParticipantIds.TryAdd(userId.Value, 0);
+            var hasEveryoneLeft = expectedParticipantIds.All(id => session.EndedParticipantIds.ContainsKey(id));
+            if (!hasEveryoneLeft)
+            {
+                _logger.LogInformation(
+                    "EndCall recorded user {UserId} for chat {ChatId}; waiting for other participant",
+                    userId.Value,
+                    chatId);
+                return;
+            }
+
+            if (!CallSessions.TryRemove(chatId, out session))
+            {
+                return;
+            }
+
+            CancelCallRingTimeout(chatId);
 
             var serverDurationSeconds = session.AnsweredAt.HasValue
                 ? (int)Math.Round((DateTimeOffset.UtcNow - session.AnsweredAt.Value).TotalSeconds)

@@ -1,8 +1,8 @@
 .call-log-message {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 2px 0;
+  gap: 8px;
+  padding: 6px 0;
   color: var(--text-muted, #949ba4);
   font-size: 13px;
   line-height: 1.45;
@@ -61,7 +61,7 @@
 .message--call-log {
   display: flex;
   justify-content: flex-start;
-  padding: 2px 0 8px;
+  padding: 0 0 8px;
   background: transparent !important;
 }
 
