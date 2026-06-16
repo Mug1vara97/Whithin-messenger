@@ -19,6 +19,7 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { NotificationsModal, SoundpadSoundsModal, CreateServerModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
+import { SOUNDPAD_OPEN_MANAGER_EVENT } from '../../../shared/lib/soundpad/soundpadPanelEvents';
 import { UserAvatar } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
@@ -185,6 +186,12 @@ const HomePage = () => {
 
   useEffect(() => {
     soundpadBridge.warmUpInAppMixer().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const onOpenSoundpadManager = () => setShowSoundpadModal(true);
+    window.addEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadManager);
+    return () => window.removeEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadManager);
   }, []);
 
   useEffect(() => {

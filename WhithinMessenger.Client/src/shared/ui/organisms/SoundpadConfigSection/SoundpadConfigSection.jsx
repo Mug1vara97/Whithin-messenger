@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
+import { SOUNDPAD_OPEN_MANAGER_EVENT } from '../../../lib/soundpad/soundpadPanelEvents';
 import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 
 const SoundpadConfigSection = ({ active }) => {
@@ -37,6 +38,20 @@ const SoundpadConfigSection = ({ active }) => {
         <p className="soundpad-hint">
           Звук подмешивается в микрофон внутри Whithin. Саундпад слышен в звонке даже при выключенном микрофоне.
         </p>
+      </section>
+
+      <section className="soundpad-section">
+        <h3>Звуки и горячие клавиши</h3>
+        <p className="soundpad-hint">
+          Загрузка звуков, громкость слотов и привязка клавиш — в отдельном окне саундпада (F3).
+        </p>
+        <button
+          type="button"
+          className="soundpad-btn soundpad-btn--primary"
+          onClick={() => window.dispatchEvent(new CustomEvent(SOUNDPAD_OPEN_MANAGER_EVENT))}
+        >
+          Открыть управление звуками
+        </button>
       </section>
 
       <section className="soundpad-section">

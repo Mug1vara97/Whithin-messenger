@@ -10,7 +10,8 @@ const {
   globalShortcut,
   Tray,
   Menu,
-  nativeImage
+  nativeImage,
+  screen,
 } = require('electron');
 const {
   registerDesktopNotificationIpc,
@@ -715,6 +716,14 @@ async function readRendererTheme() {
   }
 }
 
+function getScreenPickerThumbnailSize() {
+  const scaleFactor = Math.min(Math.max(screen.getPrimaryDisplay().scaleFactor || 1, 1), 2);
+  return {
+    width: Math.round(960 * scaleFactor),
+    height: Math.round(540 * scaleFactor),
+  };
+}
+
 function mapScreenPickerSources(sources) {
   return sources.map((source) => {
     const sourceNameLower = (source.name || '').toLowerCase();
@@ -725,6 +734,7 @@ function mapScreenPickerSources(sources) {
       name: source.name,
       type: sourceType,
       thumbnail: source.thumbnail?.toDataURL?.() || null,
+      appIcon: source.appIcon?.toDataURL?.() || null,
       canShareAudio: sourceType === 'screen' || (sourceType === 'window' && !isWhithinWindow),
     };
   });
@@ -739,8 +749,8 @@ async function openScreenPickerWindow(sources) {
   const titlebarBg = theme?.vars?.titlebarBg || theme?.vars?.bg || '#1e1f22';
 
   const pickerWindow = new BrowserWindow({
-    width: 920,
-    height: 708,
+    width: 960,
+    height: 720,
     parent: mainWindow,
     modal: true,
     frame: false,
@@ -826,7 +836,7 @@ async function openScreenPickerWindow(sources) {
     }
     latestSources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
-      thumbnailSize: { width: 320, height: 180 },
+      thumbnailSize: getScreenPickerThumbnailSize(),
     });
     await sendInit();
     return { ok: true };
@@ -1384,7 +1394,7 @@ if (!gotSingleInstanceLock) {
       try {
         const sources = await desktopCapturer.getSources({
           types: ['screen', 'window'],
-          thumbnailSize: { width: 320, height: 180 }
+          thumbnailSize: getScreenPickerThumbnailSize(),
         });
 
         const now = Date.now();
@@ -1544,7 +1554,7 @@ ipcMain.handle('electron:update-global-shortcuts', (_, shortcuts) => {
 ipcMain.handle('electron:choose-screen-source', async () => {
   const sources = await desktopCapturer.getSources({
     types: ['screen', 'window'],
-    thumbnailSize: { width: 320, height: 180 }
+    thumbnailSize: getScreenPickerThumbnailSize(),
   });
 
   if (!sources.length || !mainWindow) {
