@@ -41,7 +41,7 @@ rtc:
 # Настройки комнат
 room:
   # Пустые комнаты удаляются через 5 минут
-  empty_timeout: 3000
+  empty_timeout: 300
   # Максимальное количество участников
   # Автоматическое создание комнат
   auto_create: true
@@ -52,7 +52,7 @@ room:
   playout_delay:
     enabled: true
     min: 100
-    max: 2000
+    max: 500
 
 # Ограничения видео (максимальные битрейты)
 limit:
@@ -60,20 +60,20 @@ limit:
   max_video_bitrate: 5000000
   # Максимальный битрейт для демонстрации экрана (8 Mbps для высокого качества)
   max_screen_share_bitrate: 8000000
-  # Максимальный битрейт для аудио (выше для стабильного качества screen-share audio)
-  max_audio_bitrate: 256000
+  # Максимальный битрейт для аудио (balanced speech profile, screen-share audio still has headroom)
+  max_audio_bitrate: 64000
   # Максимальное количество треков на участника
   num_tracks: 10
 
 # Настройки кодеков
 video:
-  # Поддерживаемые кодеки (VP9 для лучшего качества/сжатия)
+  # Поддерживаемые кодеки (VP8/H264 первыми для меньшей CPU-нагрузки screen-share)
   codecs:
-    - mime: video/VP9
-      fmtp_line: "profile-id=0"
     - mime: video/VP8
     - mime: video/H264
       fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+    - mime: video/VP9
+      fmtp_line: "profile-id=0"
   
   # Настройки Dynacast (адаптивная передача)
   dynacast_pause_delay: 4s
@@ -92,12 +92,10 @@ development: true
 
 log_level: info
 
-# Redis для масштабирования (опционально, нужен только при нескольких серверах)
-# redis:
-#   address: "127.0.0.1:6379"
-#   db: 0
+redis:
+  address: "127.0.0.1:6379"
+  db: 0
 
-# Webhook (опционально)
-# webhook:
-#   urls:
-#     - http://voice-server:3000/webhook
+webhook:
+  urls:
+    - https://whithin.ru/webhook/livekit

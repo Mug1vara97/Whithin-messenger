@@ -2081,17 +2081,16 @@ export const useCallStore = create(
               participantSpeakingStates: new Map(),
             });
 
-            let userAvatar = null;
-            let userAvatarColor = '#5865f2';
-            try {
-              const profile = await userApi.getProfile(state.currentUserId);
-              if (profile) {
-                userAvatar = profile.avatar || null;
-                userAvatarColor = profile.avatarColor || '#5865f2';
-              }
-            } catch (err) {
+            const profilePromise = userApi.getProfile(state.currentUserId).catch((err) => {
               console.warn('Failed to load profile for joinRoom:', err);
-            }
+              return null;
+            });
+            const profile = await Promise.race([
+              profilePromise,
+              new Promise((resolve) => setTimeout(() => resolve(null), 100)),
+            ]);
+            const userAvatar = profile?.avatar || null;
+            const userAvatarColor = profile?.avatarColor || '#5865f2';
 
             if (!isVoiceJoinCurrent(joinGen)) {
               console.log('joinRoom: superseded after profile load');
@@ -2108,6 +2107,14 @@ export const useCallStore = create(
               userAvatarColor,
               serverId
             );
+
+            profilePromise.then((loadedProfile) => {
+              if (!loadedProfile) return;
+              if (normalizeChannelId(get().currentRoomId) !== normalizedRoomId) return;
+              get().refreshVoiceChannelParticipantsList(normalizedRoomId).catch((err) => {
+                console.warn('Failed to refresh participants after profile load:', err);
+              });
+            });
 
             if (!isVoiceJoinCurrent(joinGen)) {
               console.log('joinRoom: superseded after LiveKit join');
@@ -2425,13 +2432,6 @@ export const useCallStore = create(
             return null;
           };
 
-          let stream = getLiveKitMicStream();
-          if (!stream) {
-            await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            stream = getLiveKitMicStream();
-          }
-
           const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
           const wantsNoiseSuppression = savedNoiseSuppression
             ? JSON.parse(savedNoiseSuppression)
@@ -2447,11 +2447,23 @@ export const useCallStore = create(
             suppressLocalAudioPlayback: true,
           });
 
-          if (!stream || wantsNoiseSuppression || usesInAppSoundpad()) {
+          let stream = getLiveKitMicStream();
+          if (!stream) {
+            await room.localParticipant.setMicrophoneEnabled(!state.isMuted);
+            stream = getLiveKitMicStream();
+          }
+
+          const needsCustomCapture = wantsNoiseSuppression || usesInAppSoundpad();
+          if ((!stream && needsCustomCapture) || needsCustomCapture) {
             const capturedStream = await navigator.mediaDevices.getUserMedia({
               audio: buildMicConstraints(),
             });
             stream = capturedStream;
+          }
+
+          if (!stream) {
+            console.warn('LiveKit microphone track is not ready yet; skipping local audio helpers');
+            return;
           }
 
           set({ localStream: stream, audioStream: stream });

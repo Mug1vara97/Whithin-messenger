@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import { useCallStore } from '../stores/callStore';
 import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
+import tokenManager from './tokenManager';
 
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
 
@@ -56,6 +57,9 @@ class VoiceChannelService {
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      auth: {
+        token: tokenManager.getToken(),
+      },
     });
 
     this.socket.on('connect', () => {
@@ -64,8 +68,13 @@ class VoiceChannelService {
       this.reconnectAttempts = 0;
       this.requestedChannels.clear();
       this.subscribedChannels.forEach((channelId) => {
+        this.socket.emit('subscribeChannel', { channelId });
         this.requestChannelParticipants(channelId, true);
       });
+    });
+
+    this.socket.io.on('reconnect_attempt', () => {
+      this.socket.auth = { token: tokenManager.getToken() };
     });
 
     this.socket.on('disconnect', () => {
@@ -276,12 +285,17 @@ class VoiceChannelService {
     this.subscribedChannels.add(key);
 
     if (this.isConnected) {
+      this.socket.emit('subscribeChannel', { channelId: key });
       this.requestChannelParticipants(key);
     }
   }
 
   unsubscribeFromChannel(channelId) {
-    this.subscribedChannels.delete(normalizeChannelId(channelId));
+    const key = normalizeChannelId(channelId);
+    this.subscribedChannels.delete(key);
+    if (this.isConnected && key) {
+      this.socket.emit('unsubscribeChannel', { channelId: key });
+    }
   }
 
   requestChannelParticipants(channelId, force = false) {

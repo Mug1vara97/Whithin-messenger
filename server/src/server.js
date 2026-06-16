@@ -6,6 +6,9 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
+const Redis = require('ioredis');
+const { createAdapter } = require('@socket.io/redis-adapter');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -35,6 +38,7 @@ app.use(cors({
     origin: ["https://whithin.ru"],
     credentials: true
 }));
+app.post('/webhook/livekit', express.raw({ type: '*/*' }), handleLiveKitWebhook);
 app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../public')));
@@ -44,6 +48,35 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'ws://host.docker.internal:7880';
 const LIVEKIT_EXTERNAL_URL = process.env.LIVEKIT_EXTERNAL_URL || 'wss://whithin.ru';
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'this_is_a_very_long_secret_key_for_livekit_server_at_least_32_chars';
+const REDIS_URL = process.env.REDIS_URL || null;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'https://whithin.ru';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'https://whithin.ru';
+const JWT_KEY = process.env.JWT_KEY || 'WhithinMessenger2024!SuperSecretJWTKeyForTesting123456789';
+const VOICE_ALLOW_ANON = process.env.VOICE_ALLOW_ANON === 'true' || process.env.NODE_ENV !== 'production';
+const VOICE_RECONNECT_GRACE_MS = Number(process.env.VOICE_RECONNECT_GRACE_MS || 20000);
+
+let redis = null;
+let redisPub = null;
+let redisSub = null;
+
+if (REDIS_URL) {
+    redis = new Redis(REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 2 });
+    redisPub = new Redis(REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 2 });
+    redisSub = redisPub.duplicate();
+
+    redis.on('error', (error) => console.warn('[redis] voice state error:', error.message));
+    redisPub.on('error', (error) => console.warn('[redis] adapter pub error:', error.message));
+    redisSub.on('error', (error) => console.warn('[redis] adapter sub error:', error.message));
+
+    Promise.all([redis.connect(), redisPub.connect(), redisSub.connect()])
+        .then(() => {
+            io.adapter(createAdapter(redisPub, redisSub));
+            console.log('[redis] Voice server Redis adapter connected');
+        })
+        .catch((error) => {
+            console.warn('[redis] Voice server running without Redis adapter:', error.message);
+        });
+}
 
 // Store active rooms and peers (simplified - no mediasoup)
 const rooms = new Map(); // roomId -> { id, peers: Map<socketId, peer> }
@@ -54,6 +87,142 @@ const userVoiceStates = new Map(); // userId -> { isMuted, isAudioDisabled, chan
 
 // Дебаунс для обновлений участников канала
 const channelUpdateTimeouts = new Map();
+const peerSpeakingUpdateAt = new Map();
+const disconnectGraceTimers = new Map();
+const SPEAKING_UPDATE_MIN_INTERVAL_MS = 250;
+const channelRoomName = (channelId) => `channel:${normalizeChannelId(channelId)}`;
+const serverRoomName = (serverId) => `server:${String(serverId)}`;
+const userRoomName = (userId) => `user:${String(userId)}`;
+
+function parseAuthToken(token) {
+    if (!token) return null;
+    return jwt.verify(token, JWT_KEY, {
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
+        clockTolerance: 0,
+    });
+}
+
+function getClaim(payload, ...names) {
+    for (const name of names) {
+        if (payload?.[name] != null && payload[name] !== '') return payload[name];
+    }
+    return null;
+}
+
+function normalizeAuthUser(payload) {
+    if (!payload) return null;
+    const userId = getClaim(payload, 'UserId', 'userId', 'sub', 'nameid');
+    const username = getClaim(payload, 'Username', 'username', 'unique_name', 'preferred_username', 'name') || 'User';
+    if (!userId) return null;
+    return { userId: String(userId), username: String(username) };
+}
+
+io.use((socket, next) => {
+    try {
+        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+        const authUser = normalizeAuthUser(parseAuthToken(token));
+        if (authUser) {
+            socket.data.userId = authUser.userId;
+            socket.data.username = authUser.username;
+            socket.data.authenticated = true;
+            return next();
+        }
+
+        if (VOICE_ALLOW_ANON) {
+            socket.data.authenticated = false;
+            return next();
+        }
+
+        return next(new Error('Unauthorized voice socket'));
+    } catch (error) {
+        if (VOICE_ALLOW_ANON) {
+            socket.data.authenticated = false;
+            return next();
+        }
+        return next(new Error('Unauthorized voice socket'));
+    }
+});
+
+function emitChannel(channelId, eventName, payload) {
+    const normalizedChannelId = normalizeChannelId(channelId);
+    if (!normalizedChannelId) return;
+    io.to(channelRoomName(normalizedChannelId)).emit(eventName, payload);
+}
+
+function emitServer(serverId, eventName, payload) {
+    if (!serverId) return;
+    io.to(serverRoomName(serverId)).emit(eventName, payload);
+}
+
+function emitVoiceState(peer, eventName, payload) {
+    if (peer?.roomId) emitChannel(peer.roomId, eventName, payload);
+    if (peer?.serverId) emitServer(peer.serverId, eventName, payload);
+}
+
+function redisKeyUser(userId) {
+    return `voice:user:${String(userId)}`;
+}
+
+function redisKeyChannelParticipants(channelId) {
+    return `voice:channel:${normalizeChannelId(channelId)}:participants`;
+}
+
+function serializeParticipantFromPeer(peer, userState = {}) {
+    const realUserId = peer.userId || peer.id;
+    return {
+        userId: realUserId,
+        name: peer.name,
+        isMuted: userState.isMuted !== undefined ? Boolean(userState.isMuted) : Boolean(peer.muted),
+        isSpeaking: Boolean(peer.speaking),
+        isAudioDisabled: userState.isAudioDisabled !== undefined ? Boolean(userState.isAudioDisabled) : !peer.audioEnabled,
+        isServerMuted: Boolean(
+            peer.serverMuted ||
+            getServerModerationState(userState, peer.serverId).serverMuted
+        ),
+        isServerDeafened: Boolean(
+            peer.serverDeafened ||
+            getServerModerationState(userState, peer.serverId).serverDeafened
+        ),
+        isActive: peer.liveKitConnected !== false,
+        avatar: peer.avatar || userState.avatar || null,
+        avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
+    };
+}
+
+function persistUserVoiceState(userId, state) {
+    if (!redis || !userId) return;
+    redis.hset(redisKeyUser(userId), {
+        data: JSON.stringify(state),
+        updatedAt: String(Date.now()),
+    }).catch((error) => console.warn('[redis] persist user voice state failed:', error.message));
+}
+
+function persistChannelParticipant(channelId, participant) {
+    if (!redis || !channelId || !participant?.userId) return;
+    redis.hset(
+        redisKeyChannelParticipants(channelId),
+        String(participant.userId),
+        JSON.stringify({ ...participant, updatedAt: Date.now() })
+    ).catch((error) => console.warn('[redis] persist channel participant failed:', error.message));
+}
+
+function removeChannelParticipant(channelId, userId) {
+    if (!redis || !channelId || !userId) return;
+    redis.hdel(redisKeyChannelParticipants(channelId), String(userId))
+        .catch((error) => console.warn('[redis] remove channel participant failed:', error.message));
+}
+
+async function getRedisChannelParticipants(channelId) {
+    if (!redis || !channelId) return [];
+    try {
+        const values = await redis.hvals(redisKeyChannelParticipants(channelId));
+        return values.map((value) => JSON.parse(value));
+    } catch (error) {
+        console.warn('[redis] get channel participants failed:', error.message);
+        return [];
+    }
+}
 
 // Функция для дебаунса обновлений канала
 function scheduleChannelUpdate(channelId, delay = 100) {
@@ -63,9 +232,9 @@ function scheduleChannelUpdate(channelId, delay = 100) {
     }
     
     // Планируем новое обновление
-    const timeout = setTimeout(() => {
-        const participants = getChannelParticipants(channelId);
-        io.emit('voiceChannelParticipantsUpdate', {
+    const timeout = setTimeout(async () => {
+        const participants = await getChannelParticipantsAsync(channelId);
+        emitChannel(channelId, 'voiceChannelParticipantsUpdate', {
             channelId: channelId,
             participants: participants
         });
@@ -86,6 +255,7 @@ function updateUserVoiceState(userId, updates) {
     
     const newState = { ...currentState, ...updates };
     userVoiceStates.set(userId, newState);
+    persistUserVoiceState(userId, newState);
     console.log(`[USER_VOICE_STATE] Updated user ${userId}:`, newState);
     return newState;
 }
@@ -152,7 +322,8 @@ function reconcileUserVoiceStates() {
         if (!hasActivePeer) {
             const channelId = state.channelId;
             updateUserVoiceState(userId, { channelId: null });
-            io.emit('userLeftVoiceChannel', { channelId, userId });
+            emitChannel(channelId, 'userLeftVoiceChannel', { channelId, userId });
+            removeChannelParticipant(channelId, userId);
             scheduleChannelUpdate(channelId, 100);
         }
     }
@@ -175,7 +346,7 @@ function evictUserPeersFromRoom(room, userId, exceptSocketId, options = {}) {
         peers.delete(staleSocketId);
 
         if (emitLeftEvent && stalePeer?.userId) {
-            io.emit('userLeftVoiceChannel', {
+            emitChannel(room.id, 'userLeftVoiceChannel', {
                 channelId: room.id,
                 userId: stalePeer.userId
             });
@@ -197,8 +368,6 @@ function evictUserPeersFromRoom(room, userId, exceptSocketId, options = {}) {
 }
 
 function getChannelParticipants(channelId) {
-    reconcileUserVoiceStates();
-
     const participants = [];
     const normalizedChannelId = normalizeChannelId(channelId);
     const room = rooms.get(channelId) || rooms.get(normalizedChannelId);
@@ -208,28 +377,222 @@ function getChannelParticipants(channelId) {
             const realUserId = peer.userId || peer.id;
             const userState = userVoiceStates.get(realUserId) || {};
 
-            participants.push({
-                userId: realUserId,
-                name: peer.name,
-                isMuted: userState.isMuted !== undefined ? userState.isMuted : peer.muted,
-                isSpeaking: peer.speaking || false,
-                isAudioDisabled: userState.isAudioDisabled !== undefined ? userState.isAudioDisabled : !peer.audioEnabled,
-                isServerMuted: Boolean(
-                    peer.serverMuted ||
-                    getServerModerationState(userState, peer.serverId).serverMuted
-                ),
-                isServerDeafened: Boolean(
-                    peer.serverDeafened ||
-                    getServerModerationState(userState, peer.serverId).serverDeafened
-                ),
-                isActive: true,
-                avatar: peer.avatar || userState.avatar || null,
-                avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
-            });
+            participants.push(serializeParticipantFromPeer(peer, userState));
         });
     }
 
     return participants;
+}
+
+async function getChannelParticipantsAsync(channelId) {
+    const redisParticipants = await getRedisChannelParticipants(channelId);
+    const localParticipants = getChannelParticipants(channelId);
+    const byUserId = new Map();
+    redisParticipants.forEach((participant) => {
+        if (participant?.userId) byUserId.set(String(participant.userId), participant);
+    });
+    localParticipants.forEach((participant) => {
+        if (participant?.userId) byUserId.set(String(participant.userId), participant);
+    });
+    return Array.from(byUserId.values());
+}
+
+function getLiveKitWebhookToken(req) {
+    const header = req.headers.authorization || req.headers.Authorization;
+    if (!header || typeof header !== 'string') return null;
+    const [scheme, token] = header.split(' ');
+    if (!token || scheme.toLowerCase() !== 'bearer') return null;
+    return token;
+}
+
+function verifyLiveKitWebhook(req) {
+    const token = getLiveKitWebhookToken(req);
+    if (!token) {
+        throw new Error('Missing LiveKit webhook authorization');
+    }
+
+    try {
+        jwt.verify(token, LIVEKIT_API_SECRET, {
+            issuer: LIVEKIT_API_KEY,
+            clockTolerance: 60,
+        });
+    } catch (error) {
+        jwt.verify(token, LIVEKIT_API_SECRET, {
+            clockTolerance: 60,
+        });
+    }
+}
+
+function findPeerByUserAndRoom(userId, roomId) {
+    const normalizedRoomId = normalizeChannelId(roomId);
+    const room = rooms.get(normalizedRoomId);
+    if (!room || !userId) return null;
+    for (const peer of room.peers.values()) {
+        if (String(peer.userId) === String(userId)) {
+            return peer;
+        }
+    }
+    return null;
+}
+
+async function clearVoiceChannelFromLiveKit(roomId) {
+    const normalizedRoomId = normalizeChannelId(roomId);
+    if (!normalizedRoomId) return;
+
+    const room = rooms.get(normalizedRoomId);
+    if (room) {
+        room.peers.forEach((peer) => {
+            if (peer.userId) {
+                peer.liveKitConnected = false;
+                updateUserVoiceState(peer.userId, {
+                    channelId: null,
+                    liveKitConnected: false,
+                    liveKitLeftAt: Date.now(),
+                });
+                removeChannelParticipant(normalizedRoomId, peer.userId);
+            }
+        });
+        rooms.delete(normalizedRoomId);
+    } else if (redis) {
+        try {
+            const participants = await getRedisChannelParticipants(normalizedRoomId);
+            participants.forEach((participant) => {
+                if (participant.userId) {
+                    updateUserVoiceState(participant.userId, {
+                        channelId: null,
+                        liveKitConnected: false,
+                        liveKitLeftAt: Date.now(),
+                    });
+                    removeChannelParticipant(normalizedRoomId, participant.userId);
+                }
+            });
+        } catch (error) {
+            console.warn('[livekit-webhook] Failed to clear Redis channel participants:', error.message);
+        }
+    }
+
+    emitChannel(normalizedRoomId, 'voiceChannelParticipantsUpdate', {
+        channelId: normalizedRoomId,
+        participants: [],
+    });
+}
+
+async function applyLiveKitParticipantJoined(roomId, participant) {
+    const normalizedRoomId = normalizeChannelId(roomId);
+    const userId = participant?.identity ? String(participant.identity) : null;
+    if (!normalizedRoomId || !userId) return;
+
+    const peer = findPeerByUserAndRoom(userId, normalizedRoomId);
+    if (peer) {
+        peer.liveKitConnected = true;
+    }
+    const state = updateUserVoiceState(userId, {
+        channelId: normalizedRoomId,
+        userName: participant?.name || peer?.name || userId,
+        liveKitConnected: true,
+        liveKitJoinedAt: Date.now(),
+        liveKitLeftAt: null,
+    });
+
+    if (peer) {
+        persistChannelParticipant(normalizedRoomId, serializeParticipantFromPeer(peer, state));
+    } else {
+        persistChannelParticipant(normalizedRoomId, {
+            userId,
+            name: participant?.name || userId,
+            isMuted: Boolean(state.isMuted),
+            isSpeaking: false,
+            isAudioDisabled: Boolean(state.isAudioDisabled),
+            isServerMuted: false,
+            isServerDeafened: false,
+            isActive: true,
+            avatar: state.avatar || null,
+            avatarColor: state.avatarColor || '#5865f2',
+        });
+    }
+
+    emitChannel(normalizedRoomId, 'voiceChannelParticipantsUpdate', {
+        channelId: normalizedRoomId,
+        participants: await getChannelParticipantsAsync(normalizedRoomId),
+    });
+}
+
+async function applyLiveKitParticipantLeft(roomId, participant) {
+    const normalizedRoomId = normalizeChannelId(roomId);
+    const userId = participant?.identity ? String(participant.identity) : null;
+    if (!normalizedRoomId || !userId) return;
+
+    const peer = findPeerByUserAndRoom(userId, normalizedRoomId);
+    if (peer) {
+        peer.liveKitConnected = false;
+        const state = updateUserVoiceState(userId, {
+            liveKitConnected: false,
+            liveKitLeftAt: Date.now(),
+        });
+        persistChannelParticipant(normalizedRoomId, {
+            ...serializeParticipantFromPeer(peer, state),
+            isActive: false,
+        });
+    } else {
+        updateUserVoiceState(userId, {
+            channelId: null,
+            liveKitConnected: false,
+            liveKitLeftAt: Date.now(),
+        });
+        removeChannelParticipant(normalizedRoomId, userId);
+        emitChannel(normalizedRoomId, 'userLeftVoiceChannel', {
+            channelId: normalizedRoomId,
+            userId,
+        });
+    }
+
+    emitChannel(normalizedRoomId, 'voiceChannelParticipantsUpdate', {
+        channelId: normalizedRoomId,
+        participants: await getChannelParticipantsAsync(normalizedRoomId),
+    });
+}
+
+async function processLiveKitWebhookEvent(event) {
+    const eventName = event?.event;
+    const roomId = event?.room?.name;
+
+    if (!eventName || !roomId) {
+        console.warn('[livekit-webhook] Ignoring event without event or room:', event);
+        return;
+    }
+
+    console.log('[livekit-webhook] Event received:', {
+        event: eventName,
+        room: roomId,
+        participant: event?.participant?.identity || null,
+    });
+
+    if (eventName === 'room_finished') {
+        await clearVoiceChannelFromLiveKit(roomId);
+        return;
+    }
+
+    if (eventName === 'participant_joined') {
+        await applyLiveKitParticipantJoined(roomId, event.participant);
+        return;
+    }
+
+    if (eventName === 'participant_left') {
+        await applyLiveKitParticipantLeft(roomId, event.participant);
+    }
+}
+
+async function handleLiveKitWebhook(req, res) {
+    try {
+        verifyLiveKitWebhook(req);
+        const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
+        const event = JSON.parse(rawBody);
+        await processLiveKitWebhookEvent(event);
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        console.warn('[livekit-webhook] Rejected webhook:', error.message);
+        res.status(401).json({ error: 'invalid livekit webhook' });
+    }
 }
 
 // Generate LiveKit access token
@@ -268,7 +631,35 @@ async function generateToken(roomName, participantName, identity) {
 }
 
 io.on('connection', async (socket) => {
-    console.log('Client connected:', socket.id);
+    console.log('Client connected:', socket.id, {
+        authenticated: Boolean(socket.data.authenticated),
+        userId: socket.data.userId || null,
+    });
+
+    if (socket.data.userId) {
+        socket.join(userRoomName(socket.data.userId));
+    }
+
+    socket.on('subscribeChannel', async ({ channelId }) => {
+        const normalizedChannelId = normalizeChannelId(channelId);
+        if (!normalizedChannelId) return;
+        socket.join(channelRoomName(normalizedChannelId));
+        socket.emit('voiceChannelParticipantsUpdate', {
+            channelId: normalizedChannelId,
+            participants: await getChannelParticipantsAsync(normalizedChannelId),
+        });
+    });
+
+    socket.on('unsubscribeChannel', ({ channelId }) => {
+        const normalizedChannelId = normalizeChannelId(channelId);
+        if (!normalizedChannelId) return;
+        socket.leave(channelRoomName(normalizedChannelId));
+    });
+
+    socket.on('subscribeServer', ({ serverId }) => {
+        if (!serverId) return;
+        socket.join(serverRoomName(serverId));
+    });
 
     // Handle voice activity
     socket.on('speaking', ({ speaking }) => {
@@ -280,17 +671,26 @@ io.on('connection', async (socket) => {
 
         // Only update speaking state if the peer is not muted
         if (!peer.muted) {
-            peer.speaking = speaking;
-            scheduleChannelUpdate(room.id, 100);
+            const nextSpeaking = Boolean(speaking);
+            const now = Date.now();
+            const lastUpdateAt = peerSpeakingUpdateAt.get(socket.id) || 0;
+            if (peer.speaking === nextSpeaking && now - lastUpdateAt < SPEAKING_UPDATE_MIN_INTERVAL_MS) {
+                return;
+            }
+
+            peer.speaking = nextSpeaking;
+            peerSpeakingUpdateAt.set(socket.id, now);
+            scheduleChannelUpdate(room.id, 250);
             // Broadcast speaking state to all peers in the room
             socket.to(room.id).emit('speakingStateChanged', {
                 peerId: socket.id,
                 userId: peer.userId, // Добавляем userId для правильного сопоставления
-                speaking: speaking && !peer.muted
+                speaking: nextSpeaking
             });
         } else if (!speaking) {
             peer.speaking = false;
-            scheduleChannelUpdate(room.id, 100);
+            peerSpeakingUpdateAt.set(socket.id, Date.now());
+            scheduleChannelUpdate(room.id, 250);
         }
     });
 
@@ -315,7 +715,8 @@ io.on('connection', async (socket) => {
         
         // Update global user voice state
         if (peer.userId) {
-            updateUserVoiceState(peer.userId, { isMuted });
+            const userState = updateUserVoiceState(peer.userId, { isMuted });
+            persistChannelParticipant(room.id, serializeParticipantFromPeer(peer, userState));
         }
         
         // If muted, ensure speaking state is false
@@ -331,7 +732,7 @@ io.on('connection', async (socket) => {
         });
 
         if (peer.userId) {
-            io.emit('globalMuteState', {
+            emitVoiceState(peer, 'globalMuteState', {
                 userId: peer.userId,
                 isMuted,
             });
@@ -394,6 +795,13 @@ io.on('connection', async (socket) => {
 
     socket.on('join', async ({ roomId, name, userId, serverId = null, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2' }, callback) => {
         try {
+            const effectiveUserId = socket.data.userId || (VOICE_ALLOW_ANON ? userId : null);
+            const effectiveName = socket.data.username || name || 'User';
+            if (!effectiveUserId) {
+                callback({ error: 'Unauthorized voice join' });
+                return;
+            }
+
             // Create room if it doesn't exist
             let room = rooms.get(roomId);
             if (!room) {
@@ -405,11 +813,16 @@ io.on('connection', async (socket) => {
                 rooms.set(roomId, room);
             }
 
-            if (userId) {
-                evictUserPeersFromRoom(room, userId, socket.id);
+            if (disconnectGraceTimers.has(effectiveUserId)) {
+                clearTimeout(disconnectGraceTimers.get(effectiveUserId));
+                disconnectGraceTimers.delete(effectiveUserId);
             }
 
-            const existingUserState = userId ? getUserVoiceState(userId) : {};
+            if (effectiveUserId) {
+                evictUserPeersFromRoom(room, effectiveUserId, socket.id);
+            }
+
+            const existingUserState = effectiveUserId ? getUserVoiceState(effectiveUserId) : {};
             const normalizedServerId = serverId ? String(serverId) : null;
             const { serverMuted, serverDeafened } = getServerModerationState(
                 existingUserState,
@@ -424,8 +837,8 @@ io.on('connection', async (socket) => {
                 socket: socket,
                 roomId: roomId,
                 serverId: normalizedServerId,
-                name: name,
-                userId: userId,
+                name: effectiveName,
+                userId: effectiveUserId,
                 muted: effectiveMuted,
                 audioEnabled: effectiveAudioEnabled,
                 serverMuted,
@@ -436,9 +849,9 @@ io.on('connection', async (socket) => {
             };
             
             // Обновляем глобальное состояние пользователя при подключении к комнате
-            updateUserVoiceState(userId, { 
+            updateUserVoiceState(effectiveUserId, { 
                 channelId: roomId, 
-                userName: name, 
+                userName: effectiveName, 
                 isMuted: effectiveMuted, 
                 isAudioDisabled: !effectiveAudioEnabled,
                 avatar: avatar,
@@ -467,6 +880,10 @@ io.on('connection', async (socket) => {
             // Store room ID in socket data
             socket.data.roomId = roomId;
             socket.join(roomId);
+            socket.join(channelRoomName(roomId));
+            if (normalizedServerId) {
+                socket.join(serverRoomName(normalizedServerId));
+            }
 
             // Get existing peers
             const existingPeers = [];
@@ -488,10 +905,26 @@ io.on('connection', async (socket) => {
                 }
             });
 
+            // Generate and return the LiveKit token before fan-out presence updates.
+            const token = await generateToken(roomId, effectiveName, effectiveUserId || socket.id);
+
+            console.log(`Generated token for ${effectiveName} in room ${roomId}:`, {
+                tokenType: typeof token,
+                tokenLength: token?.length,
+                tokenPreview: token ? token.substring(0, 20) + '...' : 'null'
+            });
+
+            callback({
+                token: token,
+                url: LIVEKIT_EXTERNAL_URL,
+                existingPeers: existingPeers
+            });
+
             // Получаем реальное состояние пользователя из глобального хранилища
             const userState = getUserVoiceState(peer.userId);
-            
-            // Notify other peers about the new peer BEFORE sending callback
+            persistChannelParticipant(roomId, serializeParticipantFromPeer(peer, userState));
+
+            // Notify other peers after the joining client can start LiveKit connect.
             socket.to(roomId).emit('peerJoined', {
                 peerId: peer.id,
                 name: peer.name,
@@ -505,7 +938,7 @@ io.on('connection', async (socket) => {
 
             // Отправляем глобальное событие о присоединении к голосовому каналу
             // (для всех клиентов, даже тех кто не в звонке)
-            io.emit('userJoinedVoiceChannel', {
+            emitChannel(roomId, 'userJoinedVoiceChannel', {
                 channelId: roomId,
                 userId: peer.userId,
                 userName: peer.name,
@@ -518,25 +951,8 @@ io.on('connection', async (socket) => {
             // Также отправляем обновленный список участников канала
             scheduleChannelUpdate(roomId, 100);
 
-            console.log(`Peer ${name} (${socket.id}) joined room ${roomId}`);
+            console.log(`Peer ${effectiveName} (${socket.id}) joined room ${roomId}`);
             console.log('Existing peers:', existingPeers);
-
-            // Generate LiveKit token
-            const token = await generateToken(roomId, name, userId || socket.id);
-            
-            // Debug: log token info
-            console.log(`Generated token for ${name} in room ${roomId}:`, {
-                tokenType: typeof token,
-                tokenLength: token?.length,
-                tokenPreview: token ? token.substring(0, 20) + '...' : 'null'
-            });
-
-            // Send LiveKit token and existing peers
-            callback({
-                token: token,
-                url: LIVEKIT_EXTERNAL_URL,
-                existingPeers: existingPeers
-            });
 
         } catch (error) {
             console.error('Error in join:', error);
@@ -602,7 +1018,8 @@ io.on('connection', async (socket) => {
             if (muteMic) {
                 targetPeer.serverMuted = true;
                 targetPeer.muted = true;
-                updateUserVoiceState(targetUserId, { isMuted: true });
+                const updatedState = updateUserVoiceState(targetUserId, { isMuted: true });
+                persistChannelParticipant(room.id, serializeParticipantFromPeer(targetPeer, updatedState));
                 if (moderationServerId) {
                     updateServerModeration(targetUserId, moderationServerId, { serverMuted: true });
                 }
@@ -618,7 +1035,8 @@ io.on('connection', async (socket) => {
             if (deafen) {
                 targetPeer.serverDeafened = true;
                 targetPeer.audioEnabled = false;
-                updateUserVoiceState(targetUserId, { isAudioDisabled: true });
+                const updatedState = updateUserVoiceState(targetUserId, { isAudioDisabled: true });
+                persistChannelParticipant(room.id, serializeParticipantFromPeer(targetPeer, updatedState));
                 if (moderationServerId) {
                     updateServerModeration(targetUserId, moderationServerId, { serverDeafened: true });
                 }
@@ -665,7 +1083,7 @@ io.on('connection', async (socket) => {
             isMuted: targetPeer.muted,
         });
 
-        io.emit('globalMuteState', {
+        emitVoiceState(targetPeer, 'globalMuteState', {
             userId: targetUserId,
             isMuted: Boolean(targetPeer.muted),
         });
@@ -677,7 +1095,7 @@ io.on('connection', async (socket) => {
             isGlobalAudioMuted: !targetPeer.audioEnabled,
         });
 
-        io.emit('globalAudioState', {
+        emitVoiceState(targetPeer, 'globalAudioState', {
             userId: targetUserId,
             isGlobalAudioMuted: !targetPeer.audioEnabled,
         });
@@ -710,7 +1128,8 @@ io.on('connection', async (socket) => {
         // Update global user voice state if provided
         const realUserId = userId || peer.userId;
         if (realUserId && isGlobalAudioMuted !== undefined) {
-            updateUserVoiceState(realUserId, { isAudioDisabled: isGlobalAudioMuted });
+            const userState = updateUserVoiceState(realUserId, { isAudioDisabled: isGlobalAudioMuted });
+            persistChannelParticipant(room.id, serializeParticipantFromPeer(peer, userState));
         }
         
         // Broadcast to all peers in the room (including sender for consistency)
@@ -722,7 +1141,7 @@ io.on('connection', async (socket) => {
         });
         
         // Also emit global event for all clients (even those not in the call)
-        io.emit('globalAudioState', {
+        emitVoiceState(peer, 'globalAudioState', {
             userId: realUserId,
             isGlobalAudioMuted: isGlobalAudioMuted || false
         });
@@ -755,16 +1174,23 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик для получения информации о участниках голосовых каналов
-    socket.on('getVoiceChannelParticipants', (data) => {
+    socket.on('getVoiceChannelParticipants', async (data) => {
         try {
             const requestedChannelId = data?.channelId;
             
             // Если запрошен конкретный канал - отправляем только его
             if (requestedChannelId) {
-                const participants = getChannelParticipants(requestedChannelId);
+                const participants = await getChannelParticipantsAsync(requestedChannelId);
                 socket.emit('voiceChannelParticipantsUpdate', {
                     channelId: requestedChannelId,
                     participants: participants
+                });
+                return;
+            }
+
+            if (!VOICE_ALLOW_ANON) {
+                socket.emit('voiceChannelParticipantsError', {
+                    error: 'channelId is required',
                 });
                 return;
             }
@@ -781,9 +1207,9 @@ io.on('connection', async (socket) => {
                 }
             }
 
-            // Уведомляем всех клиентов о пустых комнатах
+            // Уведомляем подписчиков о пустых комнатах
             emptyRooms.forEach(roomId => {
-                io.emit('voiceChannelParticipantsUpdate', {
+                emitChannel(roomId, 'voiceChannelParticipantsUpdate', {
                     channelId: roomId,
                     participants: []
                 });
@@ -805,15 +1231,14 @@ io.on('connection', async (socket) => {
             }
             
             // Отправляем информацию о каждом канале
-            allChannelIds.forEach(channelId => {
-                const participants = getChannelParticipants(channelId);
+            for (const channelId of allChannelIds) {
+                const participants = await getChannelParticipantsAsync(channelId);
                 
-                // Отправляем информацию всем подключенным клиентам
-                io.emit('voiceChannelParticipantsUpdate', {
+                socket.emit('voiceChannelParticipantsUpdate', {
                     channelId: channelId,
                     participants: participants
                 });
-            });
+            }
         } catch (error) {
             console.error('Error in getVoiceChannelParticipants:', error);
         }
@@ -822,8 +1247,8 @@ io.on('connection', async (socket) => {
     // Обработчик для уведомления о присоединении пользователя к голосовому каналу
     socket.on('userJoinedVoiceChannel', ({ channelId, userId, userName, isMuted }) => {
         try {
-            // Отправляем уведомление всем клиентам
-            io.emit('userJoinedVoiceChannel', {
+            if (!VOICE_ALLOW_ANON) return;
+            emitChannel(channelId, 'userJoinedVoiceChannel', {
                 channelId,
                 userId,
                 userName,
@@ -837,6 +1262,7 @@ io.on('connection', async (socket) => {
     // Обработчик для уведомления о выходе пользователя из голосового канала
     socket.on('userLeftVoiceChannel', ({ channelId, userId }) => {
         try {
+            if (!VOICE_ALLOW_ANON) return;
             // Проверяем, есть ли еще участники в комнате
             const room = rooms.get(channelId);
             if (room) {
@@ -856,13 +1282,13 @@ io.on('connection', async (socket) => {
                     console.log(`Empty room ${channelId} removed via userLeftVoiceChannel`);
                     
                     // Уведомляем всех клиентов о том, что комната стала пустой
-                    io.emit('voiceChannelParticipantsUpdate', {
+                    emitChannel(channelId, 'voiceChannelParticipantsUpdate', {
                         channelId: channelId,
                         participants: []
                     });
                 } else {
                     // Отправляем уведомление всем клиентам о выходе конкретного пользователя
-                    io.emit('userLeftVoiceChannel', {
+                    emitChannel(channelId, 'userLeftVoiceChannel', {
                         channelId,
                         userId
                     });
@@ -870,7 +1296,7 @@ io.on('connection', async (socket) => {
             } else {
                 console.log(`Room ${channelId} not found for user ${userId}`);
                 // Даже если комната не найдена, отправляем обновление с пустым списком участников
-                io.emit('voiceChannelParticipantsUpdate', {
+                emitChannel(channelId, 'voiceChannelParticipantsUpdate', {
                     channelId: channelId,
                     participants: []
                 });
@@ -883,8 +1309,8 @@ io.on('connection', async (socket) => {
     // Обработчик для уведомления об изменении состояния участника
     socket.on('voiceChannelParticipantStateChanged', ({ channelId, userId, isMuted, isSpeaking }) => {
         try {
-            // Отправляем уведомление всем клиентам
-            io.emit('voiceChannelParticipantStateChanged', {
+            if (!VOICE_ALLOW_ANON) return;
+            emitChannel(channelId, 'voiceChannelParticipantStateChanged', {
                 channelId,
                 userId,
                 isMuted,
@@ -896,42 +1322,45 @@ io.on('connection', async (socket) => {
     });
 
     // Новые обработчики для управления глобальным состоянием пользователей
-    socket.on('updateUserVoiceState', ({ userId, userName, channelId, isMuted, isAudioDisabled }) => {
+    socket.on('updateUserVoiceState', async ({ userId, userName, channelId, isMuted, isAudioDisabled }) => {
         try {
+            const effectiveUserId = socket.data.userId || (VOICE_ALLOW_ANON ? userId : null);
+            if (!effectiveUserId || String(effectiveUserId) !== String(userId)) return;
+
             const updates = {};
             if (userName !== undefined) updates.userName = userName;
             if (channelId !== undefined) updates.channelId = channelId;
             if (isMuted !== undefined) updates.isMuted = isMuted;
             if (isAudioDisabled !== undefined) updates.isAudioDisabled = isAudioDisabled;
             
-            updateUserVoiceState(userId, updates);
+            updateUserVoiceState(effectiveUserId, updates);
             
             // Если пользователь присоединился/покинул канал, обновляем информацию о канале
             if (channelId !== undefined) {
                 // Мгновенное обновление для смены канала
-                const participants = getChannelParticipants(channelId);
+                const participants = await getChannelParticipantsAsync(channelId);
                 console.log(`[INSTANT_UPDATE] Channel ${channelId}: ${participants.length} participants`);
-                io.emit('voiceChannelParticipantsUpdate', {
+                emitChannel(channelId, 'voiceChannelParticipantsUpdate', {
                     channelId: channelId,
                     participants: participants
                 });
                 
                 // Если пользователь покинул канал, также обновляем предыдущий канал
-                const currentState = getUserVoiceState(userId);
+                const currentState = getUserVoiceState(effectiveUserId);
                 if (currentState.channelId && currentState.channelId !== channelId) {
-                    const oldParticipants = getChannelParticipants(currentState.channelId);
-                    io.emit('voiceChannelParticipantsUpdate', {
+                    const oldParticipants = await getChannelParticipantsAsync(currentState.channelId);
+                    emitChannel(currentState.channelId, 'voiceChannelParticipantsUpdate', {
                         channelId: currentState.channelId,
                         participants: oldParticipants
                     });
                 }
             } else {
                 // Для изменений состояния (микрофон/наушники) - тоже мгновенно
-                const userState = getUserVoiceState(userId);
+                const userState = getUserVoiceState(effectiveUserId);
                 if (userState.channelId) {
-                    const participants = getChannelParticipants(userState.channelId);
+                    const participants = await getChannelParticipantsAsync(userState.channelId);
                     console.log(`[INSTANT_UPDATE] State change for channel ${userState.channelId}: ${participants.length} participants`);
-                    io.emit('voiceChannelParticipantsUpdate', {
+                    emitChannel(userState.channelId, 'voiceChannelParticipantsUpdate', {
                         channelId: userState.channelId,
                         participants: participants
                     });
@@ -1027,7 +1456,7 @@ io.on('connection', async (socket) => {
         updateUserVoiceState(userId, { channelId: null });
         
         // Уведомляем о выходе из исходного канала
-        io.emit('userLeftVoiceChannel', {
+        emitChannel(sourceChannelId, 'userLeftVoiceChannel', {
             channelId: sourceChannelId,
             userId: userId
         });
@@ -1035,7 +1464,7 @@ io.on('connection', async (socket) => {
         // Если исходная комната стала пустой, удаляем её
         if (sourceRoom.peers.size === 0) {
             rooms.delete(sourceChannelId);
-            io.emit('voiceChannelParticipantsUpdate', {
+            emitChannel(sourceChannelId, 'voiceChannelParticipantsUpdate', {
                 channelId: sourceChannelId,
                 participants: []
             });
@@ -1087,9 +1516,11 @@ io.on('connection', async (socket) => {
             channelId: targetChannelId,
             userName: peerToMove.name
         });
+        persistChannelParticipant(targetChannelId, serializeParticipantFromPeer(peerData, getUserVoiceState(userId)));
+        removeChannelParticipant(sourceChannelId, userId);
         
         // Уведомляем о присоединении к новому каналу
-        io.emit('userJoinedVoiceChannel', {
+        emitChannel(targetChannelId, 'userJoinedVoiceChannel', {
             channelId: targetChannelId,
             userId: userId,
             userName: peerToMove.name,
@@ -1133,9 +1564,10 @@ io.on('connection', async (socket) => {
                 
                 // Обновляем состояние - пользователь покинул канал
                 updateUserVoiceState(peer.userId, { channelId: null });
+                removeChannelParticipant(actualRoomId, peer.userId);
                 
                 // Уведомляем всех клиентов о выходе пользователя
-                io.emit('userLeftVoiceChannel', {
+                emitChannel(actualRoomId, 'userLeftVoiceChannel', {
                     channelId: actualRoomId,
                     userId: peer.userId
                 });
@@ -1157,7 +1589,7 @@ io.on('connection', async (socket) => {
             console.log(`Empty room ${actualRoomId} removed`);
             
             // Уведомляем всех клиентов о том, что комната стала пустой
-            io.emit('voiceChannelParticipantsUpdate', {
+            emitChannel(actualRoomId, 'voiceChannelParticipantsUpdate', {
                 channelId: actualRoomId,
                 participants: []
             });
@@ -1173,67 +1605,66 @@ io.on('connection', async (socket) => {
     // Обработчик отключения сокета
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
-        
+
         const peer = peers.get(socket.id);
-        if (peer) {
-            const roomId = peer.roomId;
+        if (!peer) return;
+
+        const graceKey = peer.userId || socket.id;
+        const roomId = peer.roomId;
+        const graceUntil = Date.now() + VOICE_RECONNECT_GRACE_MS;
+        if (peer.userId) {
+            updateUserVoiceState(peer.userId, { lastSeen: Date.now(), graceUntil });
+        }
+
+        if (disconnectGraceTimers.has(graceKey)) {
+            clearTimeout(disconnectGraceTimers.get(graceKey));
+        }
+
+        disconnectGraceTimers.set(graceKey, setTimeout(() => {
+            disconnectGraceTimers.delete(graceKey);
+
+            const currentPeer = peers.get(socket.id);
+            if (!currentPeer || currentPeer.id !== peer.id) return;
+
             const room = rooms.get(roomId);
-            
-            // Важно: Удаляем информацию о пользователе из глобального состояния
             if (peer.userId) {
-                // Получаем текущее состояние пользователя
                 const userState = getUserVoiceState(peer.userId);
                 if (userState.channelId) {
-                    console.log(`Removing user ${peer.userId} from voice channel ${userState.channelId} due to disconnect`);
-                    
-                    // Обновляем состояние - пользователь покинул канал
-                    updateUserVoiceState(peer.userId, { channelId: null });
-                    
-                    // Уведомляем всех клиентов о выходе пользователя
-                    io.emit('userLeftVoiceChannel', {
+                    console.log(`Removing user ${peer.userId} from voice channel ${userState.channelId} after reconnect grace`);
+                    updateUserVoiceState(peer.userId, { channelId: null, graceUntil: null });
+                    removeChannelParticipant(userState.channelId, peer.userId);
+                    emitChannel(userState.channelId, 'userLeftVoiceChannel', {
                         channelId: userState.channelId,
                         userId: peer.userId
                     });
-                    
-                    // Также отправляем обновленный список участников
                     scheduleChannelUpdate(userState.channelId, 100);
                 }
             }
-            
+
             if (room) {
-                // Удаляем peer из комнаты
                 room.peers.delete(socket.id);
-                console.log(`Peer ${socket.id} removed from room ${roomId}`);
-                
-                // Если комната пустая, удаляем её и уведомляем всех клиентов
+                console.log(`Peer ${socket.id} removed from room ${roomId} after reconnect grace`);
                 if (room.peers.size === 0) {
                     rooms.delete(roomId);
                     console.log(`Empty room ${roomId} removed`);
-                    
-                    // Уведомляем всех клиентов о том, что комната стала пустой
-                    io.emit('voiceChannelParticipantsUpdate', {
+                    emitChannel(roomId, 'voiceChannelParticipantsUpdate', {
                         channelId: roomId,
                         participants: []
                     });
                 } else {
-                    // Уведомляем остальных участников о выходе
                     socket.to(room.id).emit('peerLeft', { peerId: socket.id, userId: peer.userId });
                     scheduleChannelUpdate(roomId, 100);
                 }
-            } else {
-                console.log(`Room ${roomId} not found for peer ${socket.id}`);
-                // Даже если комната не найдена, отправляем обновление с пустым списком участников
-                if (roomId) {
-                    io.emit('voiceChannelParticipantsUpdate', {
-                        channelId: roomId,
-                        participants: []
-                    });
-                }
+            } else if (roomId) {
+                emitChannel(roomId, 'voiceChannelParticipantsUpdate', {
+                    channelId: roomId,
+                    participants: []
+                });
             }
-            
-            // Удаляем peer из глобального списка
+
             peers.delete(socket.id);
-        }
+            peerSpeakingUpdateAt.delete(socket.id);
+        }, VOICE_RECONNECT_GRACE_MS));
     });
 
 });
