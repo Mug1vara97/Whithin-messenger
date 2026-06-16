@@ -26,6 +26,7 @@ import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { findChannelInCategories } from '../../../shared/lib/voice/callOnlyVoiceChannels';
 import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
+import { CALL_RING_TIMEOUT_MS } from '../../../shared/lib/utils/callLogHelpers';
 import { isElectronDesktop } from '../../../shared/lib/utils/desktopCallOverlayBridge';
 import {
   canMuteMembers,
@@ -93,9 +94,13 @@ const HomePage = () => {
   const [activeChatCall, setActiveChatCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const [groupChatConnection, setGroupChatConnection] = useState(null);
-  const ringtoneAudioRef = useRef(null);
-  const joinedChatGroupsRef = useRef(new Set());
+  const activeChatCallRef = useRef(null);
+  const incomingCallRef = useRef(null);
   const groupChatConnectionRef = useRef(null);
+  const localCallAcceptChatIdRef = useRef(null);
+  const ringtoneAudioRef = useRef(null);
+  const outgoingRingtoneAudioRef = useRef(null);
+  const joinedChatGroupsRef = useRef(new Set());
   const chatsRef = useRef([]);
   const callerProfilesRef = useRef(new Map());
   const waitingForRingtoneGestureRef = useRef(false);
@@ -107,25 +112,67 @@ const HomePage = () => {
   const handleJoinVoiceChannel = useCallback((callData) => {
     console.log('HomePage: handleJoinVoiceChannel called with:', callData);
 
-    // Явный старт звонка — снимаем блокировку автоподключения после предыдущего endCall()
     useCallStore.getState().clearVoiceAutoJoinSuppress();
 
-    // Устанавливаем активный звонок в чате
+    const withRinging = Boolean(callData.withRinging);
     setActiveChatCall({
       chatId: callData.chatId,
       chatName: callData.roomName,
       userId: callData.userId,
-      userName: callData.userName
+      userName: callData.userName,
+      withRinging,
+      isAnswered: !withRinging,
+      callAnsweredAt: withRinging ? null : Date.now(),
     });
     
     console.log('HomePage: Voice call started in chat:', callData.roomName);
   }, []);
 
-  // Функция для завершения звонка в чате
-  const handleEndChatCall = useCallback(() => {
-    console.log('HomePage: Ending chat call');
-    setActiveChatCall(null);
+  const stopOutgoingCallRingtone = useCallback(() => {
+    if (!outgoingRingtoneAudioRef.current) return;
+    outgoingRingtoneAudioRef.current.pause();
+    outgoingRingtoneAudioRef.current.currentTime = 0;
+    outgoingRingtoneAudioRef.current = null;
   }, []);
+
+  const forceEndOutgoingRingingCall = useCallback(async () => {
+    stopOutgoingCallRingtone();
+    try {
+      await useCallStore.getState().endCall();
+    } catch (error) {
+      console.warn('HomePage: forceEndOutgoingRingingCall failed:', error);
+    }
+    setActiveChatCall(null);
+  }, [stopOutgoingCallRingtone]);
+
+  const handleEndChatCall = useCallback(async () => {
+    console.log('HomePage: Ending chat call');
+    const call = activeChatCallRef.current;
+    const connection = groupChatConnectionRef.current;
+
+    stopOutgoingCallRingtone();
+
+    if (call && connection?.state === 'Connected') {
+      try {
+        if (call.isAnswered && call.callAnsweredAt) {
+          const duration = Math.max(1, Math.floor((Date.now() - call.callAnsweredAt) / 1000));
+          await connection.invoke('EndCall', call.chatId, duration);
+        } else if (call.withRinging) {
+          await connection.invoke('CancelOutgoingCall', call.chatId);
+        }
+      } catch (error) {
+        console.warn('HomePage: call hangup signaling failed:', error);
+      }
+    }
+
+    try {
+      await useCallStore.getState().endCall();
+    } catch (error) {
+      console.warn('HomePage: endCall failed:', error);
+    }
+
+    setActiveChatCall(null);
+  }, [stopOutgoingCallRingtone]);
 
   const stopIncomingCallRingtone = useCallback(() => {
     if (gestureRetryHandlerRef.current) {
@@ -185,6 +232,18 @@ const HomePage = () => {
   }, [chats]);
 
   useEffect(() => {
+    activeChatCallRef.current = activeChatCall;
+  }, [activeChatCall]);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => {
+    groupChatConnectionRef.current = groupChatConnection;
+  }, [groupChatConnection]);
+
+  useEffect(() => {
     soundpadBridge.warmUpInAppMixer().catch(() => {});
   }, []);
 
@@ -200,6 +259,10 @@ const HomePage = () => {
     let mounted = true;
     let incomingCallHandler = null;
     let messageSentHandler = null;
+    let callMissedHandler = null;
+    let callAcceptedHandler = null;
+    let callCancelledHandler = null;
+    let incomingCallDismissedHandler = null;
 
     const setupIncomingCallListener = async () => {
       try {
@@ -279,8 +342,110 @@ const HomePage = () => {
             });
         };
 
+        callMissedHandler = (payload) => {
+          const callerId = payload?.callerId ?? payload?.CallerId;
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          if (String(callerId) === String(user.id)) {
+            forceEndOutgoingRingingCall();
+          }
+          if (chatIdValue && incomingCallRef.current?.chatId === String(chatIdValue)) {
+            setIncomingCall(null);
+          }
+        };
+
+        callCancelledHandler = (payload) => {
+          const callerId = payload?.callerId ?? payload?.CallerId;
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          if (String(callerId) === String(user.id)) {
+            forceEndOutgoingRingingCall();
+          }
+          if (chatIdValue && incomingCallRef.current?.chatId === String(chatIdValue)) {
+            setIncomingCall(null);
+          }
+        };
+
+        callAcceptedHandler = (payload) => {
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          const calleeId = payload?.calleeId ?? payload?.CalleeId;
+          if (!chatIdValue) return;
+
+          const chatIdStr = String(chatIdValue);
+          stopOutgoingCallRingtone();
+          setActiveChatCall((prev) => {
+            if (!prev || String(prev.chatId) !== chatIdStr) return prev;
+            return {
+              ...prev,
+              isAnswered: true,
+              callAnsweredAt: Date.now(),
+            };
+          });
+
+          if (!calleeId || String(calleeId) !== String(user.id)) return;
+
+          const isLocalAccept = localCallAcceptChatIdRef.current === chatIdStr;
+          localCallAcceptChatIdRef.current = null;
+          const pendingIncoming =
+            incomingCallRef.current?.chatId === chatIdStr ? incomingCallRef.current : null;
+          const alreadyInCall = activeChatCallRef.current?.chatId === chatIdStr;
+
+          if (pendingIncoming) {
+            setIncomingCall(null);
+          }
+
+          if (!alreadyInCall && !isLocalAccept && pendingIncoming) {
+            handleJoinVoiceChannel({
+              roomId: pendingIncoming.chatId,
+              roomName: `Звонок с ${pendingIncoming.chatName || pendingIncoming.callerName}`,
+              userName: user.username,
+              userId: user.id,
+              isPrivateCall: true,
+              chatId: pendingIncoming.chatId,
+            });
+            navigate(`/channels/@me/${pendingIncoming.chatId}`);
+          }
+        };
+
+        incomingCallDismissedHandler = (payload) => {
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          const reason = payload?.reason ?? payload?.Reason;
+          const actorUserId = payload?.actorUserId ?? payload?.ActorUserId;
+          if (!chatIdValue) return;
+
+          const chatIdStr = String(chatIdValue);
+          const pendingIncoming =
+            incomingCallRef.current?.chatId === chatIdStr ? incomingCallRef.current : null;
+
+          if (pendingIncoming) {
+            setIncomingCall(null);
+          }
+
+          if (
+            reason === 'accepted'
+            && actorUserId
+            && String(actorUserId) === String(user.id)
+            && pendingIncoming
+            && activeChatCallRef.current?.chatId !== chatIdStr
+            && localCallAcceptChatIdRef.current !== chatIdStr
+          ) {
+            localCallAcceptChatIdRef.current = null;
+            handleJoinVoiceChannel({
+              roomId: pendingIncoming.chatId,
+              roomName: `Звонок с ${pendingIncoming.chatName || pendingIncoming.callerName}`,
+              userName: user.username,
+              userId: user.id,
+              isPrivateCall: true,
+              chatId: pendingIncoming.chatId,
+            });
+            navigate(`/channels/@me/${pendingIncoming.chatId}`);
+          }
+        };
+
         connection.on('IncomingCall', incomingCallHandler);
         connection.on('MessageSent', messageSentHandler);
+        connection.on('CallMissed', callMissedHandler);
+        connection.on('CallCancelled', callCancelledHandler);
+        connection.on('CallAccepted', callAcceptedHandler);
+        connection.on('IncomingCallDismissed', incomingCallDismissedHandler);
         groupChatConnectionRef.current = connection;
       } catch (error) {
         console.error('HomePage: failed to setup IncomingCall listener', error);
@@ -298,9 +463,21 @@ const HomePage = () => {
         if (messageSentHandler) {
           groupChatConnectionRef.current.off('MessageSent', messageSentHandler);
         }
+        if (callMissedHandler) {
+          groupChatConnectionRef.current.off('CallMissed', callMissedHandler);
+        }
+        if (callCancelledHandler) {
+          groupChatConnectionRef.current.off('CallCancelled', callCancelledHandler);
+        }
+        if (callAcceptedHandler) {
+          groupChatConnectionRef.current.off('CallAccepted', callAcceptedHandler);
+        }
+        if (incomingCallDismissedHandler) {
+          groupChatConnectionRef.current.off('IncomingCallDismissed', incomingCallDismissedHandler);
+        }
       }
     };
-  }, [getConnection, user?.id]);
+  }, [getConnection, user?.id, user?.username, navigate, handleJoinVoiceChannel, forceEndOutgoingRingingCall, stopOutgoingCallRingtone]);
 
   useEffect(() => {
     if (!groupChatConnection || groupChatConnection.state !== 'Connected' || !Array.isArray(chats)) return;
@@ -352,11 +529,59 @@ const HomePage = () => {
     if (!incomingCall) return undefined;
 
     const timeoutId = setTimeout(() => {
+      const current = incomingCallRef.current;
+      if (!current?.chatId) return;
+      groupChatConnectionRef.current
+        ?.invoke('ReportMissedCall', current.chatId)
+        .catch((error) => {
+          console.warn('HomePage: ReportMissedCall failed:', error);
+        });
       setIncomingCall(null);
-    }, 180000);
+    }, CALL_RING_TIMEOUT_MS);
 
     return () => clearTimeout(timeoutId);
   }, [incomingCall]);
+
+  useEffect(() => {
+    const shouldPlayOutgoingRing =
+      Boolean(activeChatCall?.withRinging) && !activeChatCall?.isAnswered;
+
+    if (!shouldPlayOutgoingRing) {
+      stopOutgoingCallRingtone();
+      return undefined;
+    }
+
+    const audio = new Audio(getAppSoundUrl('incomingCall') || '/den-den-mushi.mp3');
+    audio.loop = true;
+    audio.volume = 0.4;
+    outgoingRingtoneAudioRef.current = audio;
+    audio.play().catch((error) => {
+      console.warn('HomePage: failed to play outgoing call ringtone:', error);
+    });
+
+    const outgoingTimeoutId = setTimeout(() => {
+      const call = activeChatCallRef.current;
+      if (call?.chatId) {
+        groupChatConnectionRef.current
+          ?.invoke('ReportMissedCall', call.chatId)
+          .catch((error) => {
+            console.warn('HomePage: outgoing ReportMissedCall failed:', error);
+          });
+      }
+      forceEndOutgoingRingingCall();
+    }, CALL_RING_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(outgoingTimeoutId);
+      stopOutgoingCallRingtone();
+    };
+  }, [
+    activeChatCall?.withRinging,
+    activeChatCall?.isAnswered,
+    activeChatCall?.chatId,
+    forceEndOutgoingRingingCall,
+    stopOutgoingCallRingtone,
+  ]);
 
   useEffect(() => {
     if (activeChatCall) {
@@ -371,13 +596,21 @@ const HomePage = () => {
   const handleAcceptIncomingCall = useCallback(() => {
     if (!incomingCall || !user?.id) return;
 
+    localCallAcceptChatIdRef.current = incomingCall.chatId;
+
+    groupChatConnectionRef.current
+      ?.invoke('AcceptCall', incomingCall.chatId)
+      .catch((error) => {
+        console.warn('HomePage: AcceptCall failed:', error);
+      });
+
     const callData = {
       roomId: incomingCall.chatId,
       roomName: `Звонок с ${incomingCall.chatName}`,
       userName: user.username,
       userId: user.id,
       isPrivateCall: true,
-      chatId: incomingCall.chatId
+      chatId: incomingCall.chatId,
     };
 
     handleJoinVoiceChannel(callData);
@@ -386,6 +619,14 @@ const HomePage = () => {
   }, [handleJoinVoiceChannel, incomingCall, navigate, user?.id, user?.username]);
 
   const handleDeclineIncomingCall = useCallback(() => {
+    const current = incomingCallRef.current;
+    if (current?.chatId) {
+      groupChatConnectionRef.current
+        ?.invoke('DeclineCall', current.chatId)
+        .catch((error) => {
+          console.warn('HomePage: DeclineCall failed:', error);
+        });
+    }
     setIncomingCall(null);
   }, []);
 

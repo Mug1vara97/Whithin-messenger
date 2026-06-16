@@ -9,6 +9,7 @@ import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { openExternalUrl, splitTextWithLinks, buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
 import { fetchAllChatMediaFiles, collectMediaFromMessages } from '../../../shared/lib/utils/fetchChatMedia';
 import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../shared/lib/utils/messageTime';
+import { isCallLogMessage } from '../../../shared/lib/utils/callLogHelpers';
 import { 
   useChat, 
   useMessageSearch, 
@@ -40,6 +41,7 @@ import StickerPicker from '../../../shared/ui/molecules/StickerPicker/StickerPic
 import ChatAttachMenu from '../../../shared/ui/molecules/ChatAttachMenu/ChatAttachMenu';
 import CreatePollModal from '../../../shared/ui/molecules/CreatePollModal/CreatePollModal';
 import PollMessage from '../../../shared/ui/molecules/PollMessage/PollMessage';
+import { CallLogMessage } from '../../../shared/ui/molecules/CallLogMessage';
 import { stickerApi } from '../../../entities/sticker/api';
 import ChatInfoModal from '../../../shared/ui/molecules/ChatInfoModal/ChatInfoModal';
 import AddUserModal from '../../../shared/ui/molecules/AddUserModal/AddUserModal';
@@ -1028,14 +1030,15 @@ const ChatRoom = ({
     handleContextMenu(e, messageId, isOwnMessage, canDelete, 'message', canEdit);
   };
 
-  const startChatCall = useCallback(() => {
+  const startChatCall = useCallback((options = {}) => {
     const callData = {
       roomId: chatId.toString(),
       roomName: `Звонок с ${groupName}`,
       userName: username,
       userId: userId,
       isPrivateCall: true,
-      chatId: chatId
+      chatId: chatId,
+      withRinging: Boolean(options.withRinging),
     };
 
     if (onJoinVoiceChannel) {
@@ -1063,7 +1066,7 @@ const ChatRoom = ({
       }
     }
 
-    startChatCall();
+    startChatCall({ withRinging: true });
     setShowCallTypeSelector(false);
     closeContextMenu();
   };
@@ -1432,6 +1435,22 @@ const ChatRoom = ({
 
         {!isLoading && messages.map((msg, messageIndex) => {
           const isOwn = msg.senderUsername === username;
+          const isCallLog = isCallLogMessage(msg);
+
+          if (isCallLog) {
+            return (
+              <div
+                key={msg.messageId}
+                id={`message-${msg.messageId}`}
+                className="message message--call-log"
+              >
+                <div className="message-body">
+                  <CallLogMessage message={msg} currentUserId={userId} />
+                </div>
+              </div>
+            );
+          }
+
           const headerTime = formatDiscordMessageTimestamp(msg.createdAt);
           const isStickerMessage = !msg.forwardedMessage && msg.contentType === 'sticker' && msg.sticker;
           const isPollMessage = !msg.forwardedMessage && msg.contentType === 'poll' && msg.poll;

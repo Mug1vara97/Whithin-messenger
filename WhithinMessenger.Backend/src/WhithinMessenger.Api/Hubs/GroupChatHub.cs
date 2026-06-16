@@ -27,11 +27,28 @@ using WhithinMessenger.Api.Services;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Linq;
+using System.Text.Json;
+using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Api.Hubs
 {
 public class GroupChatHub : Hub
 {
+    private const int CallRingTimeoutSeconds = 180;
+
+    private sealed class CallSession
+    {
+        public Guid ChatId { get; init; }
+        public Guid CallerId { get; init; }
+        public string CallerName { get; set; } = string.Empty;
+        public DateTimeOffset RingStartedAt { get; init; }
+        public DateTimeOffset? AnsweredAt { get; set; }
+        public bool IsAnswered => AnsweredAt.HasValue;
+    }
+
+    private static readonly ConcurrentDictionary<Guid, CallSession> CallSessions = new();
+    private static readonly ConcurrentDictionary<Guid, CancellationTokenSource> CallRingTimeouts = new();
+
     private static readonly ConcurrentDictionary<Guid, int> ActiveConnections = new();
 
     public static bool HasActiveConnection(Guid userId) =>
@@ -1033,6 +1050,15 @@ public class GroupChatHub : Hub
                 resolvedCallerName = "Пользователь";
             }
 
+            CallSessions[chatId] = new CallSession
+            {
+                ChatId = chatId,
+                CallerId = callerId,
+                CallerName = resolvedCallerName,
+                RingStartedAt = DateTimeOffset.UtcNow,
+            };
+            ScheduleCallRingTimeout(chatId);
+
             await Clients.Group(chatId.ToString()).SendAsync("IncomingCall",
                 new { chatId, caller = resolvedCallerName, callerId, roomId = chatId.ToString() });
 
@@ -1066,6 +1092,275 @@ public class GroupChatHub : Hub
         {
             Console.Error.WriteLine($"Error sending call notification: {ex.Message}");
         }
+    }
+
+    public async Task AcceptCall(Guid chatId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                return;
+            }
+
+            if (!CallSessions.TryGetValue(chatId, out var session))
+            {
+                return;
+            }
+
+            if (session.CallerId == userId.Value)
+            {
+                return;
+            }
+
+            session.AnsweredAt = DateTimeOffset.UtcNow;
+            CancelCallRingTimeout(chatId);
+
+            await Clients.Group(chatId.ToString()).SendAsync("CallAccepted", new
+            {
+                chatId,
+                callerId = session.CallerId,
+                calleeId = userId.Value,
+            });
+
+            await NotifyIncomingCallDismissedAsync(userId.Value, chatId, "accepted", userId.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AcceptCall failed for chat {ChatId}", chatId);
+        }
+    }
+
+    public async Task DeclineCall(Guid chatId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                return;
+            }
+
+            await FinalizeMissedCallAsync(chatId, userId.Value, "declined");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "DeclineCall failed for chat {ChatId}", chatId);
+        }
+    }
+
+    public async Task CancelOutgoingCall(Guid chatId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                return;
+            }
+
+            if (!CallSessions.TryGetValue(chatId, out var session) || session.CallerId != userId.Value || session.IsAnswered)
+            {
+                return;
+            }
+
+            var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
+            ClearCallSession(chatId);
+            await Clients.Group(chatId.ToString()).SendAsync("CallCancelled", new { chatId, callerId = session.CallerId });
+
+            foreach (var participantId in participantIds.Where(id => id != session.CallerId))
+            {
+                await NotifyIncomingCallDismissedAsync(participantId, chatId, "cancelled", userId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "CancelOutgoingCall failed for chat {ChatId}", chatId);
+        }
+    }
+
+    public async Task ReportMissedCall(Guid chatId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                return;
+            }
+
+            await FinalizeMissedCallAsync(chatId, userId.Value, "timeout");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ReportMissedCall failed for chat {ChatId}", chatId);
+        }
+    }
+
+    public async Task EndCall(Guid chatId, int durationSeconds)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                return;
+            }
+
+            if (!CallSessions.TryRemove(chatId, out var session))
+            {
+                return;
+            }
+
+            CancelCallRingTimeout(chatId);
+
+            if (!session.IsAnswered)
+            {
+                return;
+            }
+
+            var safeDuration = Math.Max(0, durationSeconds);
+            await BroadcastCallLogMessageAsync(session, "completed", safeDuration);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "EndCall failed for chat {ChatId}", chatId);
+        }
+    }
+
+    private void ScheduleCallRingTimeout(Guid chatId)
+    {
+        CancelCallRingTimeout(chatId);
+        var cts = new CancellationTokenSource();
+        CallRingTimeouts[chatId] = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(CallRingTimeoutSeconds), cts.Token);
+                if (!CallSessions.TryGetValue(chatId, out var session) || session.IsAnswered)
+                {
+                    return;
+                }
+
+                await FinalizeMissedCallAsync(chatId, session.CallerId, "timeout");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Call ring timeout failed for chat {ChatId}", chatId);
+            }
+        });
+    }
+
+    private static void CancelCallRingTimeout(Guid chatId)
+    {
+        if (CallRingTimeouts.TryRemove(chatId, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+    }
+
+    private static void ClearCallSession(Guid chatId)
+    {
+        CallSessions.TryRemove(chatId, out _);
+        CancelCallRingTimeout(chatId);
+    }
+
+    private async Task FinalizeMissedCallAsync(Guid chatId, Guid actorUserId, string reason)
+    {
+        if (!CallSessions.TryRemove(chatId, out var session) || session.IsAnswered)
+        {
+            return;
+        }
+
+        CancelCallRingTimeout(chatId);
+
+        var ringDuration = Math.Max(1, (int)Math.Round((DateTimeOffset.UtcNow - session.RingStartedAt).TotalSeconds));
+        await BroadcastCallLogMessageAsync(session, "missed", ringDuration);
+
+        await Clients.Group(chatId.ToString()).SendAsync("CallMissed", new
+        {
+            chatId,
+            callerId = session.CallerId,
+            reason,
+            actorUserId,
+        });
+
+        var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
+        var dismissReason = reason switch
+        {
+            "declined" => "declined",
+            "timeout" => "missed",
+            _ => "missed",
+        };
+        foreach (var participantId in participantIds.Where(id => id != session.CallerId))
+        {
+            await NotifyIncomingCallDismissedAsync(participantId, chatId, dismissReason, actorUserId);
+        }
+    }
+
+    private async Task NotifyIncomingCallDismissedAsync(
+        Guid userId,
+        Guid chatId,
+        string reason,
+        Guid? actorUserId = null)
+    {
+        await Clients.User(userId.ToString()).SendAsync("IncomingCallDismissed", new
+        {
+            chatId,
+            reason,
+            actorUserId,
+        });
+    }
+
+    private async Task BroadcastCallLogMessageAsync(CallSession session, string callEvent, int durationSeconds)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            callEvent,
+            callerId = session.CallerId,
+            callerName = session.CallerName,
+            durationSeconds,
+        });
+
+        var message = new Message
+        {
+            Id = Guid.NewGuid(),
+            ChatId = session.ChatId,
+            UserId = session.CallerId,
+            Content = payload,
+            ContentType = "call_log",
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await _messageRepository.AddAsync(message);
+
+        var userProfile = await _mediator.Send(new GetUserProfileQuery(session.CallerId));
+
+        await Clients.Group(session.ChatId.ToString()).SendAsync("MessageSent", new
+        {
+            messageId = message.Id,
+            senderId = session.CallerId,
+            content = payload,
+            username = session.CallerName,
+            chatId = session.ChatId,
+            contentType = "call_log",
+            createdAt = message.CreatedAt,
+            avatarUrl = userProfile?.Avatar,
+            avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(session.CallerId),
+            status = MessageStatusHelper.Sent,
+        });
+
+        await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
+            session.ChatId,
+            message.Id,
+            session.CallerId);
     }
 
         // Вспомогательный метод для получения текущего пользователя

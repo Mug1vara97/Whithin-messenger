@@ -38,6 +38,8 @@ public class MarkChatAsReadCommandHandler : IRequestHandler<MarkChatAsReadComman
             var notificationUnreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString())
                 .SendAsync("UnreadCountChanged", notificationUnreadCount, cancellationToken);
+            await _notificationHub.Clients.User(request.UserId.ToString())
+                .SendAsync("ChatNotificationsDismissed", new { chatId = request.ChatId }, cancellationToken);
 
             await _userListCache.InvalidateUserChatsAsync(request.UserId, cancellationToken);
 

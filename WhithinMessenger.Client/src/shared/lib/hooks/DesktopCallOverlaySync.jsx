@@ -111,6 +111,7 @@ export function DesktopCallOverlaySync() {
     let mounted = true;
     let connection = null;
     let incomingCallHandler = null;
+    let callDismissedHandler = null;
 
     const setupIncomingCallListener = async () => {
       try {
@@ -165,6 +166,20 @@ export function DesktopCallOverlaySync() {
 
         connection.off('IncomingCall', incomingCallHandler);
         connection.on('IncomingCall', incomingCallHandler);
+
+        callDismissedHandler = (payload) => {
+          const chatIdValue = payload?.chatId ?? payload?.ChatId;
+          if (!chatIdValue) return;
+          if (incomingCallRef.current?.chatId !== String(chatIdValue)) return;
+          applyIncomingCall(null);
+        };
+
+        connection.off('IncomingCallDismissed', callDismissedHandler);
+        connection.on('IncomingCallDismissed', callDismissedHandler);
+        connection.off('CallMissed', callDismissedHandler);
+        connection.on('CallMissed', callDismissedHandler);
+        connection.off('CallCancelled', callDismissedHandler);
+        connection.on('CallCancelled', callDismissedHandler);
       } catch (error) {
         console.warn('DesktopCallOverlaySync: failed to setup IncomingCall listener', error);
       }
@@ -176,6 +191,11 @@ export function DesktopCallOverlaySync() {
       mounted = false;
       if (connection && incomingCallHandler) {
         connection.off('IncomingCall', incomingCallHandler);
+      }
+      if (connection && callDismissedHandler) {
+        connection.off('IncomingCallDismissed', callDismissedHandler);
+        connection.off('CallMissed', callDismissedHandler);
+        connection.off('CallCancelled', callDismissedHandler);
       }
     };
   }, [applyIncomingCall, getConnection, isAuthenticated, user?.id]);

@@ -1,0 +1,61 @@
+.call-log-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px;
+  color: var(--text-muted, #949ba4);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.call-log-message__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: #23a559;
+  font-size: 16px;
+}
+
+.call-log-message__icon--missed {
+  color: var(--text-muted, #949ba4);
+}
+
+.call-log-message__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.call-log-message__text strong {
+  color: var(--text, #dbdee1);
+  font-weight: 600;
+}
+
+.call-log-message__time {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--text-muted, #949ba4);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.message--call-log {
+  display: flex;
+  justify-content: center;
+  padding: 2px 16px 8px;
+  background: transparent !important;
+}
+
+.message--call-log .user-avatar,
+.message--call-log .message-header,
+.message--call-log .message-actions {
+  display: none !important;
+}
+
+.message--call-log .message-body {
+  width: 100%;
+  max-width: 100%;
+}

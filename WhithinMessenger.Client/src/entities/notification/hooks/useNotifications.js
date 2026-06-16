@@ -243,6 +243,30 @@ export const useNotifications = () => {
       setUnreadCount(typeof count === 'number' ? count : 0);
     };
 
+    const onNotificationDismissed = (payload) => {
+      const notificationId = payload?.notificationId ?? payload?.NotificationId;
+      if (!notificationId) return;
+      setNotifications((prev) =>
+        prev.filter((item) => (item.id || item.Id) !== notificationId),
+      );
+      dismissDesktopNotificationById(notificationId);
+      window.dispatchEvent(
+        new CustomEvent('notificationRead', { detail: { notificationId } }),
+      );
+    };
+
+    const onChatNotificationsDismissed = (payload) => {
+      const chatId = payload?.chatId ?? payload?.ChatId;
+      if (!chatId) return;
+      setNotifications((prev) =>
+        prev.filter((item) => (item.chatId || item.ChatId) !== chatId),
+      );
+      dismissDesktopNotificationsByChatId(chatId);
+      window.dispatchEvent(
+        new CustomEvent('notificationRead', { detail: { chatId } }),
+      );
+    };
+
     const setupRealtime = async () => {
       try {
         connection = await connectionContext.getConnection('notificationhub', user.id);
@@ -252,6 +276,10 @@ export const useNotifications = () => {
         connection.on('ReceiveNotification', onReceiveNotification);
         connection.off('UnreadCountChanged', onUnreadCountChanged);
         connection.on('UnreadCountChanged', onUnreadCountChanged);
+        connection.off('NotificationDismissed', onNotificationDismissed);
+        connection.on('NotificationDismissed', onNotificationDismissed);
+        connection.off('ChatNotificationsDismissed', onChatNotificationsDismissed);
+        connection.on('ChatNotificationsDismissed', onChatNotificationsDismissed);
       } catch (err) {
         console.error('Failed to setup notification realtime', err);
       }
@@ -264,6 +292,8 @@ export const useNotifications = () => {
       if (connection) {
         connection.off('ReceiveNotification', onReceiveNotification);
         connection.off('UnreadCountChanged', onUnreadCountChanged);
+        connection.off('NotificationDismissed', onNotificationDismissed);
+        connection.off('ChatNotificationsDismissed', onChatNotificationsDismissed);
       }
     };
   }, [user?.id, connectionContext, sortByDate, playNotificationSound]);

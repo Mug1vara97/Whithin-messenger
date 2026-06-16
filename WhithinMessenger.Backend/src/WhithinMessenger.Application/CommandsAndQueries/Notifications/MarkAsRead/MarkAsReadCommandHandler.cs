@@ -29,6 +29,10 @@ public class MarkAsReadCommandHandler : IRequestHandler<MarkAsReadCommand, MarkA
 
             var unreadCount = await _notificationService.GetUnreadCountForUserAsync(request.UserId, cancellationToken);
             await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync("UnreadCountChanged", unreadCount, cancellationToken);
+            await _notificationHub.Clients.User(request.UserId.ToString()).SendAsync(
+                "NotificationDismissed",
+                new { notificationId = request.NotificationId },
+                cancellationToken);
 
             return new MarkAsReadResult { Success = true };
         }
