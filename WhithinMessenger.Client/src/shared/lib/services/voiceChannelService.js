@@ -281,8 +281,7 @@ class VoiceChannelService {
   }
 
   unsubscribeFromChannel(channelId) {
-    const key = normalizeChannelId(channelId);
-    this.subscribedChannels.delete(key);
+    this.subscribedChannels.delete(normalizeChannelId(channelId));
   }
 
   requestChannelParticipants(channelId, force = false) {

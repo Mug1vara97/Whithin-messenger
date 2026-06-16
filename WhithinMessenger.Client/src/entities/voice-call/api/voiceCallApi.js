@@ -1,8 +1,7 @@
 import { io } from 'socket.io-client';
-import { AudioPresets, Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
+import { Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { serverApi } from '../../server/api/serverApi';
-import tokenManager from '../../../shared/lib/services/tokenManager';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -15,13 +14,6 @@ const VOICE_SERVER_CONFIG = {
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
 };
-
-const getVoiceServerConfig = () => ({
-  ...VOICE_SERVER_CONFIG,
-  auth: {
-    token: tokenManager.getToken(),
-  },
-});
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
@@ -60,9 +52,15 @@ const getRoomOptions = () => {
       noiseSuppression: true,
       autoGainControl: true
     },
+    videoCaptureDefaults: {
+      resolution: VideoPresets.h1080.resolution,
+      frameRate: 30
+    },
     publishDefaults: {
-      audioPreset: AudioPresets.speech,
-      stopMicTrackOnMute: false,
+      videoCodec: 'vp8',
+      videoEncoding: VideoPresets.h1080.encoding,
+      simulcast: true,
+      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
     }
   };
 };
@@ -207,23 +205,6 @@ class VoiceCallApi {
     }
   }
 
-  tuneLocalScreenShareVideoTrack() {
-    if (!this.room) return;
-    try {
-      for (const publication of this.room.localParticipant.videoTrackPublications.values()) {
-        if (publication.source !== Track.Source.ScreenShare) continue;
-        const mediaTrack = publication.track?.mediaStreamTrack;
-        if (!mediaTrack) continue;
-
-        if ('contentHint' in mediaTrack) {
-          mediaTrack.contentHint = 'detail';
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to tune screen-share video track:', error);
-    }
-  }
-
   async connect(userId, userName, serverUrl = VOICE_SERVER_URL) {
     if (this.socket && this.isConnected) {
       return this.socket;
@@ -232,7 +213,7 @@ class VoiceCallApi {
     this.userId = userId;
     this.userName = userName;
 
-    this.socket = io(serverUrl, getVoiceServerConfig());
+    this.socket = io(serverUrl, VOICE_SERVER_CONFIG);
 
     // Регистрируем базовые обработчики сразу
     this.socket.on('disconnect', (reason) => {
@@ -252,10 +233,6 @@ class VoiceCallApi {
         this.emit('voiceServerReconnected');
       }
       this.hadSocketSession = true;
-    });
-
-    this.socket.io.on('reconnect_attempt', () => {
-      this.socket.auth = { token: tokenManager.getToken() };
     });
 
     this.socket.on('peerJoined', (data) => {
@@ -580,12 +557,15 @@ class VoiceCallApi {
           // Note: LiveKit doesn't have a direct "audio output enabled" concept
           // This is handled at the application level
 
-          // Setup event listeners before syncing existing tracks so already-published
-          // remote audio is visible without an artificial join delay.
+          // Setup event listeners
           this.setupRoomEventListeners();
-          console.log('🔍 Checking for existing remote participants...');
-          console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
-          this.syncExistingRemoteTracks();
+          
+          // Handlers may register after connect; delay once so trackSubscribed listeners exist.
+          setTimeout(() => {
+            console.log('🔍 Checking for existing remote participants...');
+            console.log('🔍 Remote participants count:', this.room.remoteParticipants.size);
+            this.syncExistingRemoteTracks();
+          }, 500);
 
           resolve({
             token: response.token,
@@ -602,31 +582,6 @@ class VoiceCallApi {
 
   setupRoomEventListeners() {
     if (!this.room) return;
-
-    if (RoomEvent.Reconnecting) {
-      this.room.on(RoomEvent.Reconnecting, () => {
-        console.warn('LiveKit room reconnecting:', this.roomId);
-        this.emit('roomReconnecting', { roomId: this.roomId });
-      });
-    }
-
-    if (RoomEvent.Reconnected) {
-      this.room.on(RoomEvent.Reconnected, () => {
-        console.log('LiveKit room reconnected:', this.roomId);
-        this.emit('roomReconnected', { roomId: this.roomId });
-        this.syncExistingRemoteTracks();
-      });
-    }
-
-    if (RoomEvent.ConnectionQualityChanged) {
-      this.room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
-        this.emit('connectionQualityChanged', {
-          quality,
-          participantIdentity: participant?.identity,
-          roomId: this.roomId,
-        });
-      });
-    }
 
     this.room.on(RoomEvent.Disconnected, (reason) => {
       console.warn('LiveKit room disconnected:', reason);
@@ -910,14 +865,14 @@ class VoiceCallApi {
                   channelCount: 2
                 },
                 resolution: VideoPresets.h720.resolution,
-                frameRate: 30
+                frameRate: 60
               },
               publish: {
                 videoCodec: 'vp8',
                 videoEncoding: {
                   ...VideoPresets.h720.encoding,
-                  maxBitrate: 3_000_000,
-                  maxFramerate: 30
+                  maxBitrate: 2_500_000,
+                  maxFramerate: 60
                 },
                 simulcast: false
               }
@@ -956,14 +911,14 @@ class VoiceCallApi {
               capture: {
                 audio: false,
                 resolution: VideoPresets.h720.resolution,
-                frameRate: 30
+                frameRate: 60
               },
               publish: {
                 videoCodec: 'vp8',
                 videoEncoding: {
                   ...VideoPresets.h720.encoding,
-                  maxBitrate: 3_000_000,
-                  maxFramerate: 30
+                  maxBitrate: 2_500_000,
+                  maxFramerate: 60
                 },
                 simulcast: false
               }
@@ -980,8 +935,6 @@ class VoiceCallApi {
             await this.room.localParticipant.setScreenShareEnabled(true, profile.capture);
           }
 
-          this.tuneLocalScreenShareVideoTrack();
-
           if (!includeAudio) {
             return;
           }
@@ -989,7 +942,6 @@ class VoiceCallApi {
           const audioPublished = await this.waitForScreenShareAudioPublished();
           if (audioPublished) {
             this.tuneLocalScreenShareAudioTrack();
-            this.tuneLocalScreenShareVideoTrack();
             return;
           }
 
