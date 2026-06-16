@@ -54,6 +54,8 @@ const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'https://whithin.ru';
 const JWT_KEY = process.env.JWT_KEY || 'WhithinMessenger2024!SuperSecretJWTKeyForTesting123456789';
 const VOICE_ALLOW_ANON = process.env.VOICE_ALLOW_ANON === 'true' || process.env.NODE_ENV !== 'production';
 const VOICE_RECONNECT_GRACE_MS = Number(process.env.VOICE_RECONNECT_GRACE_MS || 20000);
+const VOICE_PRESENCE_TTL_MS = Number(process.env.VOICE_PRESENCE_TTL_MS || 90000);
+const VOICE_CLEAR_STALE_ON_START = process.env.VOICE_CLEAR_STALE_ON_START !== 'false';
 
 let redis = null;
 let redisPub = null;
@@ -69,7 +71,10 @@ if (REDIS_URL) {
     redisSub.on('error', (error) => console.warn('[redis] adapter sub error:', error.message));
 
     Promise.all([redis.connect(), redisPub.connect(), redisSub.connect()])
-        .then(() => {
+        .then(async () => {
+            if (VOICE_CLEAR_STALE_ON_START) {
+                await clearStaleRedisVoicePresence();
+            }
             io.adapter(createAdapter(redisPub, redisSub));
             console.log('[redis] Voice server Redis adapter connected');
         })
@@ -168,6 +173,51 @@ function redisKeyChannelParticipants(channelId) {
     return `voice:channel:${normalizeChannelId(channelId)}:participants`;
 }
 
+async function scanRedisKeys(pattern) {
+    if (!redis) return [];
+    const keys = [];
+    let cursor = '0';
+    do {
+        const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        keys.push(...batch);
+    } while (cursor !== '0');
+    return keys;
+}
+
+async function clearStaleRedisVoicePresence() {
+    if (!redis) return;
+    try {
+        const channelKeys = await scanRedisKeys('voice:channel:*:participants');
+        if (channelKeys.length > 0) {
+            await redis.del(...channelKeys);
+        }
+
+        const userKeys = await scanRedisKeys('voice:user:*');
+        for (const key of userKeys) {
+            const raw = await redis.hget(key, 'data');
+            if (!raw) continue;
+            const state = JSON.parse(raw);
+            if (!state?.channelId) continue;
+            state.channelId = null;
+            state.liveKitConnected = false;
+            state.graceUntil = null;
+            state.clearedOnVoiceServerStart = Date.now();
+            await redis.hset(key, {
+                data: JSON.stringify(state),
+                updatedAt: String(Date.now()),
+            });
+        }
+
+        console.log('[redis] Cleared stale voice presence on startup:', {
+            channelKeys: channelKeys.length,
+            userKeys: userKeys.length,
+        });
+    } catch (error) {
+        console.warn('[redis] Failed to clear stale voice presence on startup:', error.message);
+    }
+}
+
 function serializeParticipantFromPeer(peer, userState = {}) {
     const realUserId = peer.userId || peer.id;
     return {
@@ -200,11 +250,14 @@ function persistUserVoiceState(userId, state) {
 
 function persistChannelParticipant(channelId, participant) {
     if (!redis || !channelId || !participant?.userId) return;
+    const key = redisKeyChannelParticipants(channelId);
     redis.hset(
-        redisKeyChannelParticipants(channelId),
+        key,
         String(participant.userId),
         JSON.stringify({ ...participant, updatedAt: Date.now() })
-    ).catch((error) => console.warn('[redis] persist channel participant failed:', error.message));
+    )
+        .then(() => redis.pexpire(key, VOICE_PRESENCE_TTL_MS))
+        .catch((error) => console.warn('[redis] persist channel participant failed:', error.message));
 }
 
 function removeChannelParticipant(channelId, userId) {
