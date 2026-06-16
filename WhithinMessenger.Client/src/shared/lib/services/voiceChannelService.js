@@ -21,6 +21,8 @@ const participantsListChanged = (next = [], prev = []) => {
     if (!current) return true;
     return (
       (participant.userName || participant.name) !== (current.userName || current.name) ||
+      (participant.avatar || null) !== (current.avatar || null) ||
+      (participant.avatarColor || null) !== (current.avatarColor || null) ||
       Boolean(participant.isMuted) !== Boolean(current.isMuted) ||
       Boolean(participant.isSpeaking) !== Boolean(current.isSpeaking) ||
       Boolean(participant.isAudioDisabled) !== Boolean(current.isAudioDisabled) ||
@@ -126,20 +128,22 @@ class VoiceChannelService {
     this.socket.on('voiceChannelParticipantsUpdate', (data) => {
       console.log('[VoiceChannelService] Voice channel participants update:', data);
       const channelId = normalizeChannelId(data.channelId);
-      const formattedParticipants = (data.participants || []).map((p) => ({
-        odUserId: p.userId,
-        userId: p.userId,
-        userName: p.name || p.userName,
-        isMuted: p.isMuted || false,
-        isSpeaking: p.isSpeaking || false,
-        isAudioDisabled: p.isAudioDisabled || false,
-        isDeafened: p.isAudioDisabled || false,
-        isGlobalAudioMuted: p.isAudioDisabled || false,
-        isServerMuted: p.isServerMuted || false,
-        isServerDeafened: p.isServerDeafened || false,
-        avatar: p.avatar || null,
-        avatarColor: p.avatarColor || '#5865f2',
-      }));
+      const formattedParticipants = (data.participants || [])
+        .filter((p) => p?.isActive !== false)
+        .map((p) => ({
+          odUserId: p.userId,
+          userId: p.userId,
+          userName: p.name || p.userName,
+          isMuted: p.isMuted || false,
+          isSpeaking: p.isSpeaking || false,
+          isAudioDisabled: p.isAudioDisabled || false,
+          isDeafened: p.isAudioDisabled || false,
+          isGlobalAudioMuted: p.isAudioDisabled || false,
+          isServerMuted: p.isServerMuted || false,
+          isServerDeafened: p.isServerDeafened || false,
+          avatar: p.avatar || null,
+          avatarColor: p.avatarColor || '#5865f2',
+        }));
 
       const state = useCallStore.getState();
       formattedParticipants.forEach((participant) => {

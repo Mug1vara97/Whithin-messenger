@@ -209,7 +209,7 @@ function persistChannelParticipant(channelId, participant) {
 
 function removeChannelParticipant(channelId, userId) {
     if (!redis || !channelId || !userId) return;
-    redis.hdel(redisKeyChannelParticipants(channelId), String(userId))
+    return redis.hdel(redisKeyChannelParticipants(channelId), String(userId))
         .catch((error) => console.warn('[redis] remove channel participant failed:', error.message));
 }
 
@@ -217,7 +217,9 @@ async function getRedisChannelParticipants(channelId) {
     if (!redis || !channelId) return [];
     try {
         const values = await redis.hvals(redisKeyChannelParticipants(channelId));
-        return values.map((value) => JSON.parse(value));
+        return values
+            .map((value) => JSON.parse(value))
+            .filter((participant) => participant?.isActive !== false);
     } catch (error) {
         console.warn('[redis] get channel participants failed:', error.message);
         return [];
@@ -394,7 +396,7 @@ async function getChannelParticipantsAsync(channelId) {
     localParticipants.forEach((participant) => {
         if (participant?.userId) byUserId.set(String(participant.userId), participant);
     });
-    return Array.from(byUserId.values());
+    return Array.from(byUserId.values()).filter((participant) => participant?.isActive !== false);
 }
 
 function getLiveKitWebhookToken(req) {
@@ -441,7 +443,7 @@ async function clearVoiceChannelFromLiveKit(roomId) {
 
     const room = rooms.get(normalizedRoomId);
     if (room) {
-        room.peers.forEach((peer) => {
+        for (const peer of room.peers.values()) {
             if (peer.userId) {
                 peer.liveKitConnected = false;
                 updateUserVoiceState(peer.userId, {
@@ -449,23 +451,23 @@ async function clearVoiceChannelFromLiveKit(roomId) {
                     liveKitConnected: false,
                     liveKitLeftAt: Date.now(),
                 });
-                removeChannelParticipant(normalizedRoomId, peer.userId);
+                await removeChannelParticipant(normalizedRoomId, peer.userId);
             }
-        });
+        }
         rooms.delete(normalizedRoomId);
     } else if (redis) {
         try {
             const participants = await getRedisChannelParticipants(normalizedRoomId);
-            participants.forEach((participant) => {
+            for (const participant of participants) {
                 if (participant.userId) {
                     updateUserVoiceState(participant.userId, {
                         channelId: null,
                         liveKitConnected: false,
                         liveKitLeftAt: Date.now(),
                     });
-                    removeChannelParticipant(normalizedRoomId, participant.userId);
+                    await removeChannelParticipant(normalizedRoomId, participant.userId);
                 }
-            });
+            }
         } catch (error) {
             console.warn('[livekit-webhook] Failed to clear Redis channel participants:', error.message);
         }
@@ -539,7 +541,7 @@ async function applyLiveKitParticipantLeft(roomId, participant) {
             liveKitConnected: false,
             liveKitLeftAt: Date.now(),
         });
-        removeChannelParticipant(normalizedRoomId, userId);
+        await removeChannelParticipant(normalizedRoomId, userId);
         emitChannel(normalizedRoomId, 'userLeftVoiceChannel', {
             channelId: normalizedRoomId,
             userId,
@@ -1382,7 +1384,7 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик переключения пользователя в другой канал
-    socket.on('switchUserToChannel', ({
+    socket.on('switchUserToChannel', async ({
         userId,
         targetChannelId,
         channelName,
@@ -1517,7 +1519,7 @@ io.on('connection', async (socket) => {
             userName: peerToMove.name
         });
         persistChannelParticipant(targetChannelId, serializeParticipantFromPeer(peerData, getUserVoiceState(userId)));
-        removeChannelParticipant(sourceChannelId, userId);
+        await removeChannelParticipant(sourceChannelId, userId);
         
         // Уведомляем о присоединении к новому каналу
         emitChannel(targetChannelId, 'userJoinedVoiceChannel', {
@@ -1538,7 +1540,7 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик выхода из комнаты (без отключения сокета)
-    socket.on('leave', ({ roomId }) => {
+    socket.on('leave', async ({ roomId }) => {
         console.log('Client leaving room:', socket.id, roomId);
         
         const peer = peers.get(socket.id);
@@ -1564,7 +1566,7 @@ io.on('connection', async (socket) => {
                 
                 // Обновляем состояние - пользователь покинул канал
                 updateUserVoiceState(peer.userId, { channelId: null });
-                removeChannelParticipant(actualRoomId, peer.userId);
+                await removeChannelParticipant(actualRoomId, peer.userId);
                 
                 // Уведомляем всех клиентов о выходе пользователя
                 emitChannel(actualRoomId, 'userLeftVoiceChannel', {
@@ -1620,7 +1622,7 @@ io.on('connection', async (socket) => {
             clearTimeout(disconnectGraceTimers.get(graceKey));
         }
 
-        disconnectGraceTimers.set(graceKey, setTimeout(() => {
+        disconnectGraceTimers.set(graceKey, setTimeout(async () => {
             disconnectGraceTimers.delete(graceKey);
 
             const currentPeer = peers.get(socket.id);
@@ -1632,7 +1634,7 @@ io.on('connection', async (socket) => {
                 if (userState.channelId) {
                     console.log(`Removing user ${peer.userId} from voice channel ${userState.channelId} after reconnect grace`);
                     updateUserVoiceState(peer.userId, { channelId: null, graceUntil: null });
-                    removeChannelParticipant(userState.channelId, peer.userId);
+                    await removeChannelParticipant(userState.channelId, peer.userId);
                     emitChannel(userState.channelId, 'userLeftVoiceChannel', {
                         channelId: userState.channelId,
                         userId: peer.userId
