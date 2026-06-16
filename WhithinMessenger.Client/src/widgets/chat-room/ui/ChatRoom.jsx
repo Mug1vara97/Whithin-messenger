@@ -1449,9 +1449,7 @@ const ChatRoom = ({
                 id={`message-${msg.messageId}`}
                 className="message message--call-log"
               >
-                <div className="message-body">
-                  <CallLogMessage message={msg} currentUserId={userId} />
-                </div>
+                <CallLogMessage message={msg} currentUserId={userId} />
               </div>
             );
           }

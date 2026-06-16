@@ -1,8 +1,18 @@
+import {
+  buildCallLogText,
+  parseCallLogPayload,
+} from './callLogHelpers';
+
 const ATTACHMENT_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf)$/i;
 
 export function formatChatListLastMessage(raw) {
   const text = (raw ?? '').trim();
   if (!text) return null;
+
+  const callLogPayload = parseCallLogPayload(text);
+  if (callLogPayload) {
+    return buildCallLogText(callLogPayload, '') || null;
+  }
 
   const lower = text.toLowerCase();
 
