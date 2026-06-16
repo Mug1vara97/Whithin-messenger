@@ -562,29 +562,30 @@ const HomePage = () => {
   }, [incomingCall]);
 
   const handleAcceptIncomingCall = useCallback(() => {
-    if (!incomingCall || !user?.id) return;
+    const current = incomingCallRef.current;
+    if (!current || !user?.id) return;
 
-    localCallAcceptChatIdRef.current = incomingCall.chatId;
+    localCallAcceptChatIdRef.current = current.chatId;
 
     groupChatConnectionRef.current
-      ?.invoke('AcceptCall', incomingCall.chatId)
+      ?.invoke('AcceptCall', current.chatId)
       .catch((error) => {
         console.warn('HomePage: AcceptCall failed:', error);
       });
 
     const callData = {
-      roomId: incomingCall.chatId,
-      roomName: `Звонок с ${incomingCall.chatName}`,
+      roomId: current.chatId,
+      roomName: `Звонок с ${current.chatName}`,
       userName: user.username,
       userId: user.id,
       isPrivateCall: true,
-      chatId: incomingCall.chatId,
+      chatId: current.chatId,
     };
 
     handleJoinVoiceChannel(callData);
-    navigate(`/channels/@me/${incomingCall.chatId}`);
+    navigate(`/channels/@me/${current.chatId}`);
     setIncomingCall(null);
-  }, [handleJoinVoiceChannel, incomingCall, navigate, user?.id, user?.username]);
+  }, [handleJoinVoiceChannel, navigate, user?.id, user?.username]);
 
   const handleDeclineIncomingCall = useCallback(() => {
     const current = incomingCallRef.current;

@@ -224,16 +224,16 @@ export function DesktopCallOverlaySync() {
     if (!isAuthenticated || !isElectronDesktop()) return undefined;
 
     const onCallOverlayAction = (event) => {
-      if (event.detail?.action === 'decline' || event.detail?.action === 'accept') {
-        incomingCallRef.current = null;
-        dispatchIncomingCallChanged(null);
-      }
-
       window.dispatchEvent(
         new CustomEvent('incomingCallOverlayAction', {
           detail: { action: event.detail?.action },
         }),
       );
+
+      if (event.detail?.action === 'decline' || event.detail?.action === 'accept') {
+        incomingCallRef.current = null;
+        dispatchIncomingCallChanged(null);
+      }
     };
 
     const unsubscribe = window.electronAPI.onCallOverlayAction?.(onCallOverlayAction);
