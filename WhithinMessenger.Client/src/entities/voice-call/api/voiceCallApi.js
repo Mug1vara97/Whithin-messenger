@@ -403,8 +403,9 @@ class VoiceCallApi {
     }
     
     // Отправляем событие на сервер о выходе из канала
-    if (this.socket && this.socket.connected && previousRoomId) {
-      this.socket.emit('leave', { roomId: previousRoomId });
+    const socket = this.socket;
+    if (socket?.connected && previousRoomId) {
+      socket.emit('leave', { roomId: previousRoomId });
       console.log('leaveRoom: Sent leave event for room:', previousRoomId);
     }
     
@@ -414,14 +415,15 @@ class VoiceCallApi {
   // Переключение пользователя в другой голосовой канал
   async switchUserToChannel(userId, targetChannelId) {
     return new Promise((resolve, reject) => {
-      if (!this.socket || !this.socket.connected) {
+      const socket = this.socket;
+      if (!socket?.connected) {
         reject(new Error('Not connected to voice server'));
         return;
       }
 
       console.log('switchUserToChannel: Switching user', userId, 'to channel', targetChannelId);
       
-      this.socket.emit('switchUserToChannel', { userId, targetChannelId }, (response) => {
+      socket.emit('switchUserToChannel', { userId, targetChannelId }, (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
           return;
@@ -504,7 +506,13 @@ class VoiceCallApi {
     }
 
     return new Promise((resolve, reject) => {
-      this.socket.emit('join', {
+      const socket = this.socket;
+      if (!socket?.connected) {
+        reject(new Error('Not connected to voice server'));
+        return;
+      }
+
+      socket.emit('join', {
         roomId,
         name,
         userId,

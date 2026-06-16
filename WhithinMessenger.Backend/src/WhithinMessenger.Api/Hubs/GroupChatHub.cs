@@ -1120,6 +1120,11 @@ public class GroupChatHub : Hub
                 return;
             }
 
+            if (session.IsAnswered)
+            {
+                return;
+            }
+
             session.AnsweredAt = DateTimeOffset.UtcNow;
             CancelCallRingTimeout(chatId);
 
@@ -1230,7 +1235,10 @@ public class GroupChatHub : Hub
                 return;
             }
 
-            var safeDuration = Math.Max(0, durationSeconds);
+            var serverDurationSeconds = session.AnsweredAt.HasValue
+                ? (int)Math.Round((DateTimeOffset.UtcNow - session.AnsweredAt.Value).TotalSeconds)
+                : durationSeconds;
+            var safeDuration = Math.Max(1, serverDurationSeconds);
             await BroadcastCallLogMessageAsync(session, "completed", safeDuration);
         }
         catch (Exception ex)

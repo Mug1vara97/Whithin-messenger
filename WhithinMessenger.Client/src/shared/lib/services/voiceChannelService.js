@@ -286,7 +286,8 @@ class VoiceChannelService {
 
   requestChannelParticipants(channelId, force = false) {
     const key = normalizeChannelId(channelId);
-    if (!this.socket || !this.isConnected || !key) {
+    const socket = this.socket;
+    if (!socket?.connected || !this.isConnected || !key) {
       console.warn('[VoiceChannelService] Cannot request participants - not connected');
       return;
     }
@@ -299,7 +300,7 @@ class VoiceChannelService {
 
     console.log('[VoiceChannelService] Requesting participants for channel:', key);
     this.requestedChannels.set(key, now);
-    this.socket.emit('getVoiceChannelParticipants', { channelId: key });
+    socket.emit('getVoiceChannelParticipants', { channelId: key });
   }
 
   requestMultipleChannelParticipants(channelIds) {
@@ -311,7 +312,8 @@ class VoiceChannelService {
 
   switchUserToChannel(userId, targetChannelId, channelMeta = null) {
     return new Promise((resolve, reject) => {
-      if (!this.socket || !this.isConnected) {
+      const socket = this.socket;
+      if (!socket?.connected || !this.isConnected) {
         reject(new Error('Not connected to voice server'));
         return;
       }
@@ -329,7 +331,7 @@ class VoiceChannelService {
         if (channelMeta.chatOrder !== undefined) payload.chatOrder = channelMeta.chatOrder;
       }
 
-      this.socket.emit('switchUserToChannel', payload, (response) => {
+      socket.emit('switchUserToChannel', payload, (response) => {
         if (response && response.error) {
           reject(new Error(response.error));
           return;
