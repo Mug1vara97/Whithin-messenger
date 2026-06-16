@@ -1127,7 +1127,11 @@ public class GroupChatHub : Hub
                 calleeId = userId.Value,
             });
 
-            await NotifyIncomingCallDismissedAsync(userId.Value, chatId, "accepted", userId.Value);
+            var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
+            foreach (var participantId in participantIds.Where(id => id != session.CallerId))
+            {
+                await NotifyIncomingCallDismissedAsync(participantId, chatId, "accepted", userId.Value);
+            }
         }
         catch (Exception ex)
         {

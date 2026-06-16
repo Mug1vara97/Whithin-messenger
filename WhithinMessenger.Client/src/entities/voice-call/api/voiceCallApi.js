@@ -583,6 +583,13 @@ class VoiceCallApi {
   setupRoomEventListeners() {
     if (!this.room) return;
 
+    this.room.on(RoomEvent.Disconnected, (reason) => {
+      console.warn('LiveKit room disconnected:', reason);
+      this.emit('roomDisconnected', { reason, roomId: this.roomId });
+      this.room = null;
+      this.roomId = null;
+    });
+
     // Track published (remote participant published a track)
     this.room.on(RoomEvent.TrackPublished, (publication, participant) => {
       console.log('Track published:', {

@@ -701,6 +701,34 @@ export const useCallStore = create(
             : []
         );
       },
+
+      handleRoomDisconnected: async (details = {}) => {
+        const state = get();
+        const endedChannelId = normalizeChannelId(state.currentRoomId || details.roomId);
+        if (!endedChannelId || !state.isInCall) return;
+
+        console.warn('[callStore] Room disconnected, cleaning local call state:', details);
+        try {
+          await get()._leaveRoomCore();
+          set({ suppressVoiceAutoJoinForChannel: endedChannelId });
+        } catch (error) {
+          console.error('[callStore] Failed to cleanup after room disconnect:', error);
+          set({
+            isInCall: false,
+            currentRoomId: null,
+            currentCall: null,
+            currentCallServerId: null,
+            suppressVoiceAutoJoinForChannel: endedChannelId,
+          });
+        } finally {
+          notifyVoiceCallOverlaySync();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('voiceCallEnded', { detail: { channelId: endedChannelId } })
+            );
+          }
+        }
+      },
       
       clearVoiceChannelParticipants: (channelId) => {
         const key = normalizeChannelId(channelId);
@@ -932,6 +960,7 @@ export const useCallStore = create(
           voiceCallApi.off('globalAudioStateChanged');
           voiceCallApi.off('voiceServerDisconnected');
           voiceCallApi.off('voiceServerReconnected');
+          voiceCallApi.off('roomDisconnected');
           
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
@@ -961,6 +990,10 @@ export const useCallStore = create(
             } catch (error) {
               console.error('Failed to rejoin voice room after reconnect:', error);
             }
+          });
+
+          voiceCallApi.on('roomDisconnected', async (details) => {
+            await get().handleRoomDisconnected(details);
           });
           
           // Устанавливаем isConnected сразу после успешного подключения
@@ -3646,6 +3679,7 @@ export const useCallStore = create(
           voiceCallApi.off('globalAudioStateChanged');
           voiceCallApi.off('voiceServerDisconnected');
           voiceCallApi.off('voiceServerReconnected');
+          voiceCallApi.off('roomDisconnected');
           
           // Очищаем socket обработчики
           if (voiceCallApi.socket) {
