@@ -45,6 +45,7 @@ public class GroupChatHub : Hub
     private readonly IMessageRepository _messageRepository;
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly IMessageReceiptService _messageReceiptService;
+    private readonly IUserRepository _userRepository;
 
     public GroupChatHub(
         IMediator mediator,
@@ -55,7 +56,8 @@ public class GroupChatHub : Hub
         IChatRepository chatRepository,
         IMessageRepository messageRepository,
         ChatMessageNotificationService chatMessageNotificationService,
-        IMessageReceiptService messageReceiptService)
+        IMessageReceiptService messageReceiptService,
+        IUserRepository userRepository)
     {
         _mediator = mediator;
         _chatListHubContext = chatListHubContext;
@@ -66,6 +68,7 @@ public class GroupChatHub : Hub
         _messageRepository = messageRepository;
         _chatMessageNotificationService = chatMessageNotificationService;
         _messageReceiptService = messageReceiptService;
+        _userRepository = userRepository;
     }
 
         public async Task JoinGroup(string chatId)
@@ -1019,8 +1022,19 @@ public class GroupChatHub : Hub
     {
         try
         {
+            var callerUser = await _userRepository.GetByIdAsync(callerId);
+            var resolvedCallerName = callerUser?.UserName?.Trim();
+            if (string.IsNullOrWhiteSpace(resolvedCallerName))
+            {
+                resolvedCallerName = caller?.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(resolvedCallerName))
+            {
+                resolvedCallerName = "Пользователь";
+            }
+
             await Clients.Group(chatId.ToString()).SendAsync("IncomingCall",
-                new { chatId, caller, callerId, roomId = chatId.ToString() });
+                new { chatId, caller = resolvedCallerName, callerId, roomId = chatId.ToString() });
 
             var callerProfile = await _mediator.Send(new GetUserProfileQuery(callerId));
             var callerAvatar = callerProfile?.Avatar;
@@ -1037,7 +1051,7 @@ public class GroupChatHub : Hub
                         userId: participantId,
                         chatId: chatId,
                         callerId: callerId,
-                        callerName: caller,
+                        callerName: resolvedCallerName,
                         callerAvatar: callerAvatar,
                         callerAvatarColor: callerAvatarColor
                     );

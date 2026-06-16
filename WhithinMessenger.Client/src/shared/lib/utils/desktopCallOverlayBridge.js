@@ -43,6 +43,7 @@ export function shouldShowDesktopOverlayWhenInBackground(visibility) {
 
 export function shouldShowDesktopCallOverlay(call, visibility) {
   if (!call) return false;
+  if (isElectronDesktop()) return true;
   return shouldShowDesktopOverlayWhenInBackground(visibility);
 }
 

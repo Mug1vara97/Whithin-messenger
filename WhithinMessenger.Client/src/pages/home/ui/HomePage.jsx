@@ -25,6 +25,7 @@ import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { findChannelInCategories } from '../../../shared/lib/voice/callOnlyVoiceChannels';
 import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
+import { isElectronDesktop } from '../../../shared/lib/utils/desktopCallOverlayBridge';
 import {
   canMuteMembers,
   canManageMessages,
@@ -90,7 +91,6 @@ const HomePage = () => {
   // Состояние для активного звонка в чате
   const [activeChatCall, setActiveChatCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [desktopCallOverlayActive, setDesktopCallOverlayActive] = useState(false);
   const [groupChatConnection, setGroupChatConnection] = useState(null);
   const ringtoneAudioRef = useRef(null);
   const joinedChatGroupsRef = useRef(new Set());
@@ -362,15 +362,6 @@ const HomePage = () => {
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('incomingCallChanged', { detail: incomingCall }));
   }, [incomingCall]);
-
-  useEffect(() => {
-    const onDesktopCallOverlayActive = (event) => {
-      setDesktopCallOverlayActive(Boolean(event.detail?.active));
-    };
-
-    window.addEventListener('desktopCallOverlayActive', onDesktopCallOverlayActive);
-    return () => window.removeEventListener('desktopCallOverlayActive', onDesktopCallOverlayActive);
-  }, []);
 
   const handleAcceptIncomingCall = useCallback(() => {
     if (!incomingCall || !user?.id) return;
@@ -1085,15 +1076,17 @@ const HomePage = () => {
         onDeleteNotification={handleDeleteNotification}
       />
 
-      {incomingCall && !desktopCallOverlayActive && (
+      {incomingCall && !isElectronDesktop() && (
         <div className="global-incoming-call-overlay">
           <div className="global-incoming-call-card">
-            <div className="global-incoming-call-avatar-ring">
+            <div className="global-incoming-call-avatar-wrap">
+              <span className="global-incoming-call-avatar-ring" aria-hidden="true" />
               <UserAvatar
                 username={incomingCall.callerName}
                 avatarUrl={incomingCall.avatarUrl}
                 avatarColor={incomingCall.avatarColor}
                 size={88}
+                className="global-incoming-call-avatar"
               />
             </div>
             <div className="global-incoming-call-user">{incomingCall.callerName}</div>

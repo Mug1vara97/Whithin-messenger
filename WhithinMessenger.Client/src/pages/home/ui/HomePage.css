@@ -257,28 +257,40 @@
   display: none;
 }
 
-.global-incoming-call-avatar-ring {
+.global-incoming-call-avatar-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  position: relative;
+  flex-shrink: 0;
 }
 
-.global-incoming-call-avatar-ring::before {
-  content: '';
+.global-incoming-call-avatar-ring {
   position: absolute;
-  inset: -6px;
+  inset: 0;
   border-radius: 50%;
   border: 2px solid #23a559;
+  pointer-events: none;
+  box-sizing: border-box;
   animation: incomingCallRingPulse 1.6s ease-in-out infinite;
 }
 
+.global-incoming-call-avatar-wrap .global-incoming-call-avatar {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes incomingCallRingPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.06); opacity: 0.7; }
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.45);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 6px rgba(35, 165, 89, 0);
+  }
 }
 
 .global-incoming-call-chat-name {
