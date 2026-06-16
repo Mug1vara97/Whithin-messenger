@@ -189,12 +189,5 @@ class SoundpadInAppMixer {
 export const soundpadInAppMixer = new SoundpadInAppMixer();
 
 export function usesInAppSoundpad() {
-  try {
-    const raw = localStorage.getItem('whithinAudioDevices');
-    if (!raw) return true;
-    const config = JSON.parse(raw);
-    return config.soundpadMode !== 'system';
-  } catch {
-    return true;
-  }
+  return true;
 }

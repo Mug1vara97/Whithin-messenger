@@ -2,7 +2,7 @@ const path = require('node:path');
 const { BrowserWindow, screen, ipcMain, powerSaveBlocker } = require('electron');
 const { getActiveNotificationBounds } = require('./desktopNotifications.cjs');
 
-const PANEL_WIDTH = 260;
+const PANEL_WIDTH = 220;
 const ROW_HEIGHT = 42;
 const ROW_GAP = 12;
 const HOST_PADDING = 16;
@@ -400,7 +400,7 @@ function registerActiveCallOverlayIpc(mainWindowGetter) {
     if (!size || !Number.isFinite(size.width) || !Number.isFinite(size.height)) return;
 
     measuredSize = {
-      width: Math.max(180, Math.min(360, Math.round(size.width))),
+      width: Math.max(80, Math.min(360, Math.round(size.width))),
       height: Math.max(ROW_HEIGHT, Math.round(size.height)),
     };
 

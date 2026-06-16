@@ -6,7 +6,7 @@ const CONFIG_KEY = 'whithinSoundpadConfig';
 const defaultConfig = () => ({
   slots: [],
   globalVolume: 1,
-  /** Hear soundpad in your headphones/speakers (separate from mic/CABLE level). */
+  /** Hear soundpad in your headphones/speakers (separate from call mix level). */
   monitorEnabled: true,
   monitorVolume: 1,
   /** Hear soundpad tracks from other call participants (in-app mode, separate track). */

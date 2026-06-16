@@ -7,9 +7,7 @@ import { VoiceActivityDetector } from '../utils/voiceActivityDetector';
 import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
-import { audioDeviceStorage } from '../soundpad/audioDeviceStorage';
 import { soundpadInAppMixer, usesInAppSoundpad } from '../soundpad/soundpadInAppMixer';
-import { soundpadBridge } from '../soundpad/soundpadBridge';
 import { soundpadStorage } from '../soundpad/soundpadStorage';
 import {
   applyPannerWorldPosition,
@@ -2099,10 +2097,6 @@ export const useCallStore = create(
             });
             get().registerCallOnlyVoiceChannel(normalizedRoomId, finalChannelName);
 
-            if (!usesInAppSoundpad()) {
-              get().routeCallAudioAwayFromCable().catch(() => {});
-            }
-
             if (response.existingPeers?.length) {
               get().applyExistingPeers(response.existingPeers);
               rememberExistingPeersForJoinSound(response.existingPeers);
@@ -2415,31 +2409,21 @@ export const useCallStore = create(
           }
 
           const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
-          const systemSoundpadMode = audioDeviceStorage.getConfig().soundpadMode === 'system';
-          const wantsNoiseSuppression = !systemSoundpadMode && savedNoiseSuppression
+          const wantsNoiseSuppression = savedNoiseSuppression
             ? JSON.parse(savedNoiseSuppression)
             : false;
-          const inAppSoundpad = usesInAppSoundpad();
-          const virtualMicDeviceId = inAppSoundpad ? '' : audioDeviceStorage.getVirtualMicDeviceId();
-          const useVirtualMic = Boolean(virtualMicDeviceId);
 
-          const buildMicConstraints = () => {
-            const audio = {
-              echoCancellation: !useVirtualMic,
-              noiseSuppression: !useVirtualMic,
-              autoGainControl: !useVirtualMic,
-              sampleRate: 48000,
-              channelCount: 1,
-              latency: 0,
-              suppressLocalAudioPlayback: true,
-            };
-            if (virtualMicDeviceId) {
-              audio.deviceId = { exact: virtualMicDeviceId };
-            }
-            return audio;
-          };
+          const buildMicConstraints = () => ({
+            echoCancellation: true,
+            noiseSuppression: wantsNoiseSuppression,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+            latency: 0,
+            suppressLocalAudioPlayback: true,
+          });
 
-          if (useVirtualMic || !stream || wantsNoiseSuppression || inAppSoundpad) {
+          if (!stream || wantsNoiseSuppression || usesInAppSoundpad()) {
             const capturedStream = await navigator.mediaDevices.getUserMedia({
               audio: buildMicConstraints(),
             });
@@ -2475,7 +2459,7 @@ export const useCallStore = create(
             streamForPublish = noiseSuppressionManager.getProcessedStream() || stream;
           }
 
-          if (inAppSoundpad) {
+          if (usesInAppSoundpad()) {
             await soundpadInAppMixer.attachMicStream(streamForPublish);
             soundpadInAppMixer.setMicMuted(state.isMuted);
             streamForPublish = soundpadInAppMixer.getMixedStream();
@@ -2500,11 +2484,11 @@ export const useCallStore = create(
             throw new Error('No audio track in stream');
           }
 
-          const publishMicEnabled = inAppSoundpad ? true : !state.isMuted;
+          const publishMicEnabled = usesInAppSoundpad() ? true : !state.isMuted;
           audioTrack.enabled = publishMicEnabled;
           
           const publishTrack = streamForPublish.getAudioTracks()[0];
-          const needsCustomPublish = wantsNoiseSuppression || inAppSoundpad;
+          const needsCustomPublish = wantsNoiseSuppression || usesInAppSoundpad();
 
           if (needsCustomPublish && publishTrack) {
             try {
@@ -3050,9 +3034,6 @@ export const useCallStore = create(
         try {
           await audioElement.play();
           set({ audioBlocked: false });
-          if (!usesInAppSoundpad()) {
-            get().routeCallAudioAwayFromCable();
-          }
         } catch (error) {
           console.warn('🔊 callStore: Voice playback blocked:', error);
           set({ audioBlocked: true });
@@ -3832,14 +3813,6 @@ export const useCallStore = create(
         }
       },
       
-      routeCallAudioAwayFromCable: async () => {
-        try {
-          await soundpadBridge.routeCallAudioElements(get().audioElements);
-        } catch (error) {
-          console.warn('routeCallAudioAwayFromCable failed:', error);
-        }
-      },
-
       restoreCallAudioSink: () => {
         if (typeof HTMLMediaElement.prototype.setSinkId !== 'function') {
           return;
@@ -4335,19 +4308,3 @@ export const useCallStore = create(
     }
   )
 );
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('audioDeviceConfigChanged', (event) => {
-    const config = event.detail;
-    if (config?.soundpadMode !== 'system') {
-      return;
-    }
-
-    const state = useCallStore.getState();
-    if (!state.isInCall) {
-      return;
-    }
-
-    state.routeCallAudioAwayFromCable().catch(() => {});
-  });
-}

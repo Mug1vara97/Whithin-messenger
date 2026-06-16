@@ -502,7 +502,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                 checked={noiseSuppression}
                 onChange={() => setNoiseSuppression((prev) => !prev)}
                 label="Подавление шума"
-                description="Убирает фоновый шум с микрофона. В режиме VB-Cable отключается — используется поток CABLE Output без дополнительной обработки."
+                description="Убирает фоновый шум с микрофона во время звонков."
               />
             </SettingsPanel>
 

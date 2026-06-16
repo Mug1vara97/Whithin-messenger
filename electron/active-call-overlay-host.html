@@ -24,7 +24,8 @@
     .host {
       display: flex;
       flex-direction: column;
-      width: 100%;
+      width: max-content;
+      max-width: 360px;
       flex: 0 0 auto;
       padding: 8px;
       background: transparent;
@@ -35,7 +36,8 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      width: 100%;
+      width: max-content;
+      max-width: 344px;
       overflow: visible;
     }
 
@@ -335,9 +337,12 @@
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (hostEl.hidden) return;
-          const rect = hostEl.getBoundingClientRect();
-          const width = Math.ceil(rect.width);
-          const height = Math.ceil(rect.height);
+
+          const listWidth = Math.ceil(listEl.scrollWidth || listEl.offsetWidth || 0);
+          const listHeight = Math.ceil(listEl.scrollHeight || listEl.offsetHeight || 0);
+          const width = Math.ceil(hostEl.scrollWidth || hostEl.offsetWidth || listWidth + 16);
+          const height = Math.ceil(hostEl.scrollHeight || hostEl.offsetHeight || listHeight + 16);
+
           if (width > 0 && height > 0) {
             window.activeCallOverlayHostAPI.reportSize({ width, height });
           }

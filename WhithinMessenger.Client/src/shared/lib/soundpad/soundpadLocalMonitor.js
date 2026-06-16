@@ -4,7 +4,7 @@ import { soundpadLog, soundpadWarn } from './soundpadLogger';
 const clampVolume = (value) => Math.max(0, Math.min(2, Number(value) || 0));
 
 /**
- * Plays soundpad clips to local speakers/headphones (monitor), separate from mic/CABLE mix.
+ * Plays soundpad clips to local speakers/headphones (monitor), separate from the call mix.
  */
 class SoundpadLocalMonitor {
   constructor() {

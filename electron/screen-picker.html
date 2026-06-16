@@ -1,117 +1,475 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Screen Picker</title>
+    <title>Демонстрация экрана — Whithin</title>
     <style>
       :root {
-        --bg: #111214;
-        --surface: #1a1b1e;
-        --surface-hover: #22242a;
-        --border: #2b2d31;
+        --titlebar-height: 32px;
+        --titlebar-bg: #1e1f22;
+        --titlebar-text: #dcddde;
+        --titlebar-nav: #9aa1ac;
+        --titlebar-nav-hover: #d2d6de;
+        --titlebar-controls-reserve: 176px;
+        --bg: #1e1f22;
+        --surface: #2b2d31;
+        --surface-hover: #35373c;
+        --border: #3f4147;
         --primary: #5865f2;
-        --text: #f2f3f5;
-        --muted: #b5bac1;
+        --text: #dbdee1;
+        --muted: #949ba4;
+        --danger: #ed4245;
       }
+
       * { box-sizing: border-box; }
-      body {
+
+      html, body {
         margin: 0;
-        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
         color: var(--text);
-        background: linear-gradient(180deg, #0f1014 0%, var(--bg) 100%);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
       }
-      .container { padding: 20px 24px 16px; }
-      .title { font-size: 20px; font-weight: 700; margin: 0; }
-      .subtitle { margin: 6px 0 16px; color: var(--muted); font-size: 13px; }
+
+      .app-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .titlebar {
+        position: relative;
+        height: var(--titlebar-height);
+        flex-shrink: 0;
+        background: var(--titlebar-bg);
+        border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+        user-select: none;
+      }
+
+      .titlebar__drag {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: var(--titlebar-controls-reserve);
+        height: var(--titlebar-height);
+        display: flex;
+        align-items: center;
+        padding-left: 12px;
+        box-sizing: border-box;
+        -webkit-app-region: drag;
+        app-region: drag;
+      }
+
+      .titlebar__brand {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--titlebar-text);
+        font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+        pointer-events: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      [data-theme-preset='cyberpunk'] .titlebar__brand {
+        text-shadow: var(--cp-glow-yellow, none);
+      }
+
+      [data-theme-preset='night-city'] .titlebar__brand {
+        text-shadow: var(--nc-text-glow, none);
+      }
+
+      .titlebar__controls {
+        position: absolute;
+        top: 0;
+        right: 10px;
+        height: var(--titlebar-height);
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+        pointer-events: auto;
+      }
+
+      .titlebar__btn {
+        width: 30px;
+        height: 24px;
+        min-width: 30px;
+        border: none;
+        border-radius: 4px;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
+      }
+
+      .titlebar__btn svg {
+        display: block;
+        pointer-events: none;
+      }
+
+      .titlebar__btn--reload {
+        margin-right: 6px;
+        color: var(--titlebar-nav);
+      }
+
+      .titlebar__btn--reload:hover {
+        background: color-mix(in srgb, var(--titlebar-nav) 12%, transparent);
+        color: var(--titlebar-nav-hover);
+      }
+
+      .titlebar__btn--reload:active {
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      .titlebar__btn--reload .reload-icon {
+        transform: scaleY(-1);
+      }
+
+      .titlebar__btn:hover:not(.titlebar__btn--reload) {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .titlebar__btn:active:not(.titlebar__btn--reload) {
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      .titlebar__btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+        pointer-events: none;
+      }
+
+      .content {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 20px 22px 16px;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 35%, var(--bg)) 0%, var(--bg) 100%);
+      }
+
+      .heading {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin: 6px 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
       .grid {
+        flex: 1;
+        min-height: 0;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 12px;
-        max-height: 470px;
         overflow: auto;
         padding-right: 4px;
       }
+
       .card {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 12px;
         cursor: pointer;
         overflow: hidden;
-        transition: transform .12s ease, border-color .12s ease, background .12s ease;
+        padding: 0;
+        text-align: left;
+        color: inherit;
+        transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
       }
-      .card:hover { background: var(--surface-hover); border-color: #3b3e45; transform: translateY(-1px); }
-      .card.active { border-color: var(--primary); box-shadow: 0 0 0 1px rgba(88,101,242,.45) inset; }
-      .thumb { width: 100%; height: 132px; background: #0b0c0f; object-fit: cover; display: block; }
-      .meta { padding: 10px; }
-      .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .type { margin-top: 5px; font-size: 12px; color: var(--muted); text-transform: capitalize; }
+
+      .card:hover {
+        background: var(--surface-hover);
+        border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+        transform: translateY(-1px);
+      }
+
+      .card.active {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent) inset;
+      }
+
+      .thumb {
+        width: 100%;
+        height: 132px;
+        background: color-mix(in srgb, var(--bg) 80%, #000);
+        object-fit: cover;
+        display: block;
+      }
+
+      .thumb--empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .meta { padding: 10px 10px 12px; }
+
+      .name {
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .type {
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
       .toolbar {
         margin-top: 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 12px;
+        flex-shrink: 0;
       }
-      .checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
-      .checkbox input { accent-color: var(--primary); width: 16px; height: 16px; }
+
+      .checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .checkbox input {
+        accent-color: var(--primary);
+        width: 16px;
+        height: 16px;
+      }
+
       .actions { display: flex; gap: 10px; }
+
       .btn {
         border: 1px solid var(--border);
         border-radius: 8px;
         height: 36px;
-        padding: 0 14px;
-        background: #1f2125;
+        padding: 0 16px;
+        background: var(--surface);
         color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
+        transition: background 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
       }
-      .btn.primary { border-color: transparent; background: var(--primary); }
-      .btn:disabled { opacity: .5; cursor: not-allowed; }
-      .hint { font-size: 12px; color: #ffbf66; }
+
+      .btn:hover:not(:disabled) {
+        background: var(--surface-hover);
+        border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+      }
+
+      .btn.primary {
+        border-color: transparent;
+        background: var(--primary);
+        color: #fff;
+      }
+
+      .btn.primary:hover:not(:disabled) {
+        filter: brightness(1.06);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: #ffbf66;
+        margin-top: 8px;
+      }
+
+      .empty {
+        grid-column: 1 / -1;
+        padding: 32px 16px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1 class="title">Choose what to share</h1>
-      <p class="subtitle">Select a screen or app window for screen sharing</p>
-      <div id="sources" class="grid"></div>
-      <div class="toolbar">
-        <label class="checkbox">
-          <input id="captureAudio" type="checkbox" />
-          Share audio
-        </label>
-        <div class="actions">
-          <button id="cancelBtn" class="btn" type="button">Cancel</button>
-          <button id="shareBtn" class="btn primary" type="button" disabled>Share</button>
+    <div class="app-shell">
+      <header class="titlebar">
+        <div class="titlebar__drag">
+          <span class="titlebar__brand">Whithin</span>
+        </div>
+        <div class="titlebar__controls">
+          <button type="button" class="titlebar__btn titlebar__btn--reload" id="titlebarReloadBtn" title="Обновить список" aria-label="Обновить список">
+            <svg class="reload-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+          </button>
+          <button type="button" class="titlebar__btn" disabled title="Развернуть" aria-label="Развернуть" aria-disabled="true">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1" fill="none" stroke="#28c840" stroke-width="1.35" />
+            </svg>
+          </button>
+          <button type="button" class="titlebar__btn" id="titlebarMinBtn" title="Свернуть" aria-label="Свернуть">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path stroke="#ffbd2e" stroke-width="1.35" stroke-linecap="round" d="M2.25 9h7.5" />
+            </svg>
+          </button>
+          <button type="button" class="titlebar__btn" id="titlebarCloseBtn" title="Закрыть" aria-label="Закрыть">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path stroke="#ff5f57" stroke-width="1.35" stroke-linecap="round" d="M3 3l6 6M9 3L3 9" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="content">
+        <h1 class="heading">Что показать</h1>
+        <p class="subtitle">Выберите экран или окно приложения для демонстрации</p>
+        <div id="sources" class="grid"></div>
+        <div class="toolbar">
+          <label class="checkbox">
+            <input id="captureAudio" type="checkbox" />
+            Передавать звук
+          </label>
+          <div class="actions">
+            <button id="cancelBtn" class="btn" type="button">Отмена</button>
+            <button id="shareBtn" class="btn primary" type="button" disabled>Поделиться</button>
+          </div>
+        </div>
+        <div id="audioHint" class="hint" style="display:none;">
+          Для выбранного источника звук недоступен на этой системе.
         </div>
       </div>
-      <div id="audioHint" class="hint" style="display:none; margin-top:8px;">
-        Audio is not available for the selected source on this system.
-      </div>
     </div>
+
     <script>
       const sourcesNode = document.getElementById('sources');
       const captureAudioNode = document.getElementById('captureAudio');
       const shareBtn = document.getElementById('shareBtn');
       const cancelBtn = document.getElementById('cancelBtn');
+      const titlebarCloseBtn = document.getElementById('titlebarCloseBtn');
+      const titlebarMinBtn = document.getElementById('titlebarMinBtn');
+      const titlebarReloadBtn = document.getElementById('titlebarReloadBtn');
       const audioHint = document.getElementById('audioHint');
 
       let selected = null;
       let allSources = [];
 
+      const TYPE_LABELS = {
+        screen: 'Экран',
+        window: 'Окно',
+      };
+
+      function applyTheme(theme) {
+        if (!theme) return;
+
+        const root = document.documentElement;
+        if (theme.presetId) {
+          root.setAttribute('data-theme-preset', theme.presetId);
+        }
+        if (theme.themeMode) {
+          root.setAttribute('data-theme-mode', theme.themeMode);
+        }
+
+        const vars = theme.vars || {};
+        const map = {
+          bg: '--bg',
+          titlebarBg: '--titlebar-bg',
+          surface: '--surface',
+          surfaceHover: '--surface-hover',
+          border: '--border',
+          primary: '--primary',
+          text: '--text',
+          textMuted: '--muted',
+          titlebarText: '--titlebar-text',
+          titlebarNav: '--titlebar-nav',
+          titlebarNavHover: '--titlebar-nav-hover',
+          danger: '--danger',
+          cpGlowYellow: '--cp-glow-yellow',
+          ncTextGlow: '--nc-text-glow',
+        };
+
+        Object.entries(map).forEach(([key, cssVar]) => {
+          const value = vars[key];
+          if (value) {
+            root.style.setProperty(cssVar, value);
+          }
+        });
+
+        if (vars.titlebarBg) {
+          root.style.setProperty('--titlebar-bg', vars.titlebarBg);
+        }
+        if (vars.text) {
+          root.style.setProperty('--titlebar-text', vars.text);
+        }
+        if (vars.textMuted) {
+          root.style.setProperty('--titlebar-nav', vars.textMuted);
+        }
+        if (vars.bg) {
+          document.body.style.background = vars.bg;
+        }
+      }
+
+      async function refreshSources() {
+        if (!window.screenPickerAPI?.refreshSources) {
+          return;
+        }
+        titlebarReloadBtn.disabled = true;
+        try {
+          await window.screenPickerAPI.refreshSources();
+        } finally {
+          titlebarReloadBtn.disabled = false;
+        }
+      }
+
       function render() {
         sourcesNode.innerHTML = '';
+
+        if (!allSources.length) {
+          sourcesNode.innerHTML = '<div class="empty">Нет доступных источников для демонстрации</div>';
+          return;
+        }
+
         allSources.forEach((source) => {
           const card = document.createElement('button');
           card.type = 'button';
           card.className = `card ${selected?.id === source.id ? 'active' : ''}`;
+
+          const thumb = source.thumbnail
+            ? `<img class="thumb" src="${source.thumbnail}" alt="">`
+            : '<div class="thumb thumb--empty">Нет превью</div>';
+
           card.innerHTML = `
-            <img class="thumb" src="${source.thumbnail || ''}" alt="">
+            ${thumb}
             <div class="meta">
-              <div class="name">${source.name || 'Unknown source'}</div>
-              <div class="type">${source.type}</div>
+              <div class="name">${source.name || 'Неизвестный источник'}</div>
+              <div class="type">${TYPE_LABELS[source.type] || source.type || 'Источник'}</div>
             </div>
           `;
+
           card.addEventListener('click', () => {
             selected = source;
             shareBtn.disabled = false;
@@ -125,12 +483,19 @@
             }
             render();
           });
+
           sourcesNode.appendChild(card);
         });
       }
 
-      window.screenPickerAPI.onSources((sources) => {
-        allSources = sources || [];
+      window.screenPickerAPI.onInit((data) => {
+        applyTheme(data?.theme);
+        allSources = data?.sources || [];
+        selected = null;
+        shareBtn.disabled = true;
+        captureAudioNode.checked = false;
+        captureAudioNode.disabled = true;
+        audioHint.style.display = 'none';
         render();
       });
 
@@ -140,13 +505,18 @@
           id: selected.id,
           name: selected.name,
           type: selected.type,
-          captureAudio: Boolean(captureAudioNode.checked && !captureAudioNode.disabled)
+          captureAudio: Boolean(captureAudioNode.checked && !captureAudioNode.disabled),
         });
       });
 
-      cancelBtn.addEventListener('click', () => window.screenPickerAPI.cancel());
+      const cancel = () => window.screenPickerAPI.cancel();
+      cancelBtn.addEventListener('click', cancel);
+      titlebarCloseBtn.addEventListener('click', cancel);
+      titlebarMinBtn.addEventListener('click', () => window.screenPickerAPI.windowMinimize());
+      titlebarReloadBtn.addEventListener('click', () => refreshSources());
+
       window.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') window.screenPickerAPI.cancel();
+        if (event.key === 'Escape') cancel();
       });
     </script>
   </body>

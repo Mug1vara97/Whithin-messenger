@@ -184,9 +184,7 @@ const HomePage = () => {
   }, [chats]);
 
   useEffect(() => {
-    soundpadBridge.syncAudioConfigToElectron().catch(() => {});
     soundpadBridge.warmUpInAppMixer().catch(() => {});
-    soundpadBridge.warmUpSystemBridge().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1080,12 +1078,11 @@ const HomePage = () => {
         <div className="global-incoming-call-overlay">
           <div className="global-incoming-call-card">
             <div className="global-incoming-call-avatar-wrap">
-              <span className="global-incoming-call-avatar-ring" aria-hidden="true" />
               <UserAvatar
                 username={incomingCall.callerName}
                 avatarUrl={incomingCall.avatarUrl}
                 avatarColor={incomingCall.avatarColor}
-                size={88}
+                size={80}
                 className="global-incoming-call-avatar"
               />
             </div>

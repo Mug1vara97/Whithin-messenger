@@ -259,37 +259,41 @@
 
 .global-incoming-call-avatar-wrap {
   position: relative;
-  width: 88px;
-  height: 88px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 104px;
+  height: 104px;
   flex-shrink: 0;
 }
 
-.global-incoming-call-avatar-ring {
+.global-incoming-call-avatar-wrap::before {
+  content: '';
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: 92px;
+  height: 92px;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 2px solid #23a559;
-  pointer-events: none;
   box-sizing: border-box;
+  pointer-events: none;
+  z-index: 0;
   animation: incomingCallRingPulse 1.6s ease-in-out infinite;
 }
 
 .global-incoming-call-avatar-wrap .global-incoming-call-avatar {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1;
 }
 
 @keyframes incomingCallRingPulse {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.45);
   }
   50% {
-    opacity: 0.65;
-    box-shadow: 0 0 0 6px rgba(35, 165, 89, 0);
+    opacity: 0.45;
   }
 }
 

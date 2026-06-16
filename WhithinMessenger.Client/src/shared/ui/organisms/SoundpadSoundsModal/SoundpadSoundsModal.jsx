@@ -199,7 +199,7 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
 
             <div className="soundpad-range-field">
               <div className="soundpad-range-field__head">
-                <label htmlFor="global-volume">В микрофон / CABLE</label>
+                <label htmlFor="global-volume">В микрофон</label>
                 <span className="soundpad-range-field__value">{formatVolume(globalVolume)}</span>
               </div>
               <input
@@ -271,7 +271,7 @@ const SoundpadSoundsModal = ({ isOpen, onClose }) => {
               </label>
             </div>
             <p className="soundpad-hint soundpad-modal-section__hint">
-              mp3, wav, ogg. Шорткаты — глобально в десктопе. VB-Cable — в Настройках → Саундпад.
+              mp3, wav, ogg. Шорткаты работают глобально в десктоп-приложении.
             </p>
           </section>
 

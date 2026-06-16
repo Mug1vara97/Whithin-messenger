@@ -1,8 +1,8 @@
 const path = require('node:path');
 const { BrowserWindow, screen, ipcMain } = require('electron');
 
-const OVERLAY_WIDTH = 300;
-const OVERLAY_HEIGHT = 248;
+const OVERLAY_WIDTH = 320;
+const OVERLAY_HEIGHT = 304;
 const AUTO_DISMISS_MS = 3 * 60 * 1000;
 
 let hostWindow = null;

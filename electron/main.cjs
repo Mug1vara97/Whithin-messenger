@@ -13,14 +13,6 @@ const {
   nativeImage
 } = require('electron');
 const {
-  registerAudioBridgeIpc,
-  shutdownBridge,
-  forceKillBridge,
-  restoreDefaultCableMic,
-  applySoundpadAudioConfig,
-} = require('./audioBridge.cjs');
-const { readSoundpadAudioConfig } = require('./soundpadElectronConfig.cjs');
-const {
   registerDesktopNotificationIpc,
   shutdownDesktopNotifications,
 } = require('./desktopNotifications.cjs');
@@ -190,8 +182,6 @@ const SOUNDPAD_ACTION_PREFIX = 'soundpad:';
 /** true — настоящий выход (меню трея); false — крестик сворачивает в трей */
 let allowAppQuit = false;
 let isQuitting = false;
-let audioBridgeShutdownDone = false;
-const APP_SHUTDOWN_TIMEOUT_MS = 2500;
 
 const ELECTRON_KEY_ALIASES = {
   ArrowUp: 'Up',
@@ -674,71 +664,188 @@ function syncWin32GlobalMouseHook() {
   }
 }
 
-function openScreenPickerWindow(sources) {
-  return new Promise((resolve) => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      resolve(null);
+async function readRendererTheme() {
+  const fallback = {
+    presetId: 'default',
+    themeMode: 'dark',
+    vars: {
+      bg: '#1e1f22',
+      titlebarBg: '#1e1f22',
+      surface: '#2b2d31',
+      surfaceHover: '#35373c',
+      border: '#3f4147',
+      primary: '#5865f2',
+      text: '#dbdee1',
+      textMuted: '#949ba4',
+      danger: '#ed4245',
+    },
+  };
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return fallback;
+  }
+
+  try {
+    return await mainWindow.webContents.executeJavaScript(`(() => {
+      const root = document.documentElement;
+      const styles = getComputedStyle(root);
+      const pick = (name, fallbackValue) => styles.getPropertyValue(name).trim() || fallbackValue;
+      return {
+        presetId: root.getAttribute('data-theme-preset') || 'default',
+        themeMode: root.getAttribute('data-theme-mode') || 'dark',
+        vars: {
+          bg: pick('--background', '#1e1f22'),
+          titlebarBg: pick('--server-list-background') || pick('--background', '#1e1f22'),
+          surface: pick('--surface', '#2b2d31'),
+          surfaceHover: pick('--surface-highlight', '#35373c'),
+          border: pick('--border', '#3f4147'),
+          primary: pick('--primary', '#5865f2'),
+          text: pick('--text', '#dbdee1'),
+          textMuted: pick('--text-muted') || pick('--text-secondary', '#949ba4'),
+          titlebarNav: pick('--icon') || pick('--text-secondary', '#9aa1ac'),
+          danger: pick('--danger', '#ed4245'),
+          cpGlowYellow: pick('--cp-glow-yellow', ''),
+          ncTextGlow: pick('--nc-text-glow', ''),
+        },
+      };
+    })()`);
+  } catch (error) {
+    console.warn('[screen-picker] failed to read renderer theme:', error.message);
+    return fallback;
+  }
+}
+
+function mapScreenPickerSources(sources) {
+  return sources.map((source) => {
+    const sourceNameLower = (source.name || '').toLowerCase();
+    const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
+    const sourceType = source.id.startsWith('screen:') ? 'screen' : 'window';
+    return {
+      id: source.id,
+      name: source.name,
+      type: sourceType,
+      thumbnail: source.thumbnail?.toDataURL?.() || null,
+      canShareAudio: sourceType === 'screen' || (sourceType === 'window' && !isWhithinWindow),
+    };
+  });
+}
+
+async function openScreenPickerWindow(sources) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return null;
+  }
+
+  const theme = await readRendererTheme();
+  const titlebarBg = theme?.vars?.titlebarBg || theme?.vars?.bg || '#1e1f22';
+
+  const pickerWindow = new BrowserWindow({
+    width: 920,
+    height: 708,
+    parent: mainWindow,
+    modal: true,
+    frame: false,
+    resizable: false,
+    minimizable: true,
+    maximizable: false,
+    autoHideMenuBar: true,
+    title: 'Демонстрация экрана',
+    backgroundColor: titlebarBg,
+    webPreferences: {
+      preload: path.join(__dirname, 'picker-preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+
+  let isResolved = false;
+  let latestSources = sources;
+  let resolvePromise;
+
+  const resultPromise = new Promise((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  const sendInit = async () => {
+    if (pickerWindow.isDestroyed()) {
       return;
     }
-
-    const pickerWindow = new BrowserWindow({
-      width: 960,
-      height: 680,
-      parent: mainWindow,
-      modal: true,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      autoHideMenuBar: true,
-      title: 'Choose source for screen sharing',
-      backgroundColor: '#0f1014',
-      webPreferences: {
-        preload: path.join(__dirname, 'picker-preload.cjs'),
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false
-      }
+    const nextTheme = await readRendererTheme();
+    pickerWindow.webContents.send('electron:screen-picker-init', {
+      sources: mapScreenPickerSources(latestSources),
+      theme: nextTheme,
     });
+  };
 
-    const payload = sources.map((source) => {
-      const sourceNameLower = (source.name || '').toLowerCase();
-      const isWhithinWindow = sourceNameLower.includes('whithin') || sourceNameLower.includes('electron');
-      const sourceType = source.id.startsWith('screen:') ? 'screen' : 'window';
-      return {
-        id: source.id,
-        name: source.name,
-        type: sourceType,
-        thumbnail: source.thumbnail?.toDataURL?.() || null,
-        // Для экрана используем system audio (loopback), для окна — audio конкретного окна.
-        // Окно самого Whithin исключаем, чтобы не ловить эхо звонка.
-        canShareAudio: sourceType === 'screen' || (sourceType === 'window' && !isWhithinWindow)
-      };
+  const cleanup = () => {
+    ipcMain.removeListener('electron:screen-picker-submit', handleSubmit);
+    ipcMain.removeListener('electron:screen-picker-cancel', handleCancel);
+    ipcMain.removeHandler('electron:screen-picker-refresh');
+    ipcMain.removeListener('electron:screen-picker-minimize', handleMinimize);
+  };
+
+  const closePicker = () => {
+    if (!pickerWindow.isDestroyed()) {
+      pickerWindow.close();
+    }
+  };
+
+  const handleSubmit = (_event, data) => {
+    if (isResolved) {
+      return;
+    }
+    isResolved = true;
+    cleanup();
+    closePicker();
+    resolvePromise(data);
+  };
+
+  const handleCancel = () => {
+    if (isResolved) {
+      return;
+    }
+    isResolved = true;
+    cleanup();
+    closePicker();
+    resolvePromise(null);
+  };
+
+  const handleMinimize = (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.minimize();
+    }
+  };
+
+  ipcMain.once('electron:screen-picker-submit', handleSubmit);
+  ipcMain.once('electron:screen-picker-cancel', handleCancel);
+  ipcMain.on('electron:screen-picker-minimize', handleMinimize);
+  ipcMain.handle('electron:screen-picker-refresh', async (event) => {
+    if (event.sender !== pickerWindow.webContents || pickerWindow.isDestroyed()) {
+      return { ok: false };
+    }
+    latestSources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 },
     });
-
-    let isResolved = false;
-    const finalize = (value) => {
-      if (isResolved) return;
-      isResolved = true;
-      ipcMain.removeListener('electron:screen-picker-submit', handleSubmit);
-      ipcMain.removeListener('electron:screen-picker-cancel', handleCancel);
-      if (!pickerWindow.isDestroyed()) {
-        pickerWindow.close();
-      }
-      resolve(value);
-    };
-
-    const handleSubmit = (_event, data) => finalize(data);
-    const handleCancel = () => finalize(null);
-
-    ipcMain.once('electron:screen-picker-submit', handleSubmit);
-    ipcMain.once('electron:screen-picker-cancel', handleCancel);
-
-    pickerWindow.on('closed', () => finalize(null));
-    pickerWindow.webContents.on('did-finish-load', () => {
-      pickerWindow.webContents.send('electron:screen-picker-sources', payload);
-    });
-    pickerWindow.loadFile(path.join(__dirname, 'screen-picker.html'));
+    await sendInit();
+    return { ok: true };
   });
+
+  pickerWindow.on('closed', () => {
+    if (!isResolved) {
+      isResolved = true;
+      cleanup();
+      resolvePromise(null);
+    }
+  });
+
+  pickerWindow.webContents.on('did-finish-load', () => {
+    sendInit();
+  });
+  await pickerWindow.loadFile(path.join(__dirname, 'screen-picker.html'));
+
+  return resultPromise;
 }
 
 /** Шапка окна рендерится в React (ElectronTitlebar); здесь только хук для совместимости. */
@@ -1052,39 +1159,7 @@ function quitApplication() {
   teardownOverlayWindows();
   destroyTrayIcon();
   destroyAllWindows();
-
-  const finishExit = () => {
-    if (audioBridgeShutdownDone) {
-      return;
-    }
-    audioBridgeShutdownDone = true;
-    forceKillBridge();
-    app.exit(0);
-  };
-
-  const forceTimer = setTimeout(() => {
-    console.warn('[app] shutdown timeout — forcing exit');
-    finishExit();
-  }, APP_SHUTDOWN_TIMEOUT_MS);
-
-  const restoreWithTimeout = Promise.race([
-    restoreDefaultCableMic(),
-    new Promise((resolve) => {
-      setTimeout(() => {
-        console.warn('[app] restoreDefaultCableMic timed out');
-        resolve(null);
-      }, 1500);
-    }),
-  ]);
-
-  Promise.allSettled([restoreWithTimeout, shutdownBridge()])
-    .catch((error) => {
-      console.warn('[Soundpad:Electron] shutdown audio cleanup failed:', error.message);
-    })
-    .finally(() => {
-      clearTimeout(forceTimer);
-      finishExit();
-    });
+  app.exit(0);
 }
 
 function createTray() {
@@ -1364,13 +1439,6 @@ if (!gotSingleInstanceLock) {
     { useSystemPicker: true }
   );
 
-  const savedSoundpadAudio = readSoundpadAudioConfig();
-  if (savedSoundpadAudio) {
-    applySoundpadAudioConfig(savedSoundpadAudio).catch((error) => {
-      console.warn('[Soundpad:Electron] applySoundpadAudioConfig on startup failed:', error.message);
-    });
-  }
-
   createWindow();
   createTray();
   registerGlobalShortcuts(DEFAULT_VOICE_SHORTCUTS);
@@ -1385,8 +1453,6 @@ if (!gotSingleInstanceLock) {
   });
   });
 }
-
-registerAudioBridgeIpc(ipcMain);
 
 registerDesktopNotificationIpc(() => mainWindow, showMainWindow);
 registerCallOverlayIpc(() => mainWindow, showMainWindow);
@@ -1530,7 +1596,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  if (audioBridgeShutdownDone) {
+  if (isQuitting) {
     return;
   }
   event.preventDefault();
