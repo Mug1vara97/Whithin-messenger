@@ -124,29 +124,8 @@ function normalizeAuthUser(payload) {
 }
 
 io.use((socket, next) => {
-    try {
-        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-        const authUser = normalizeAuthUser(parseAuthToken(token));
-        if (authUser) {
-            socket.data.userId = authUser.userId;
-            socket.data.username = authUser.username;
-            socket.data.authenticated = true;
-            return next();
-        }
-
-        if (VOICE_ALLOW_ANON) {
-            socket.data.authenticated = false;
-            return next();
-        }
-
-        return next(new Error('Unauthorized voice socket'));
-    } catch (error) {
-        if (VOICE_ALLOW_ANON) {
-            socket.data.authenticated = false;
-            return next();
-        }
-        return next(new Error('Unauthorized voice socket'));
-    }
+    socket.data.authenticated = false;
+    return next();
 });
 
 function emitChannel(channelId, eventName, payload) {
@@ -672,27 +651,6 @@ io.on('connection', async (socket) => {
         socket.join(userRoomName(socket.data.userId));
     }
 
-    socket.on('subscribeChannel', async ({ channelId }) => {
-        const normalizedChannelId = normalizeChannelId(channelId);
-        if (!normalizedChannelId) return;
-        socket.join(channelRoomName(normalizedChannelId));
-        socket.emit('voiceChannelParticipantsUpdate', {
-            channelId: normalizedChannelId,
-            participants: await getChannelParticipantsAsync(normalizedChannelId),
-        });
-    });
-
-    socket.on('unsubscribeChannel', ({ channelId }) => {
-        const normalizedChannelId = normalizeChannelId(channelId);
-        if (!normalizedChannelId) return;
-        socket.leave(channelRoomName(normalizedChannelId));
-    });
-
-    socket.on('subscribeServer', ({ serverId }) => {
-        if (!serverId) return;
-        socket.join(serverRoomName(serverId));
-    });
-
     // Handle voice activity
     socket.on('speaking', ({ speaking }) => {
         const peer = peers.get(socket.id);
@@ -827,10 +785,10 @@ io.on('connection', async (socket) => {
 
     socket.on('join', async ({ roomId, name, userId, serverId = null, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2' }, callback) => {
         try {
-            const effectiveUserId = socket.data.userId || (VOICE_ALLOW_ANON ? userId : null);
-            const effectiveName = socket.data.username || name || 'User';
+            const effectiveUserId = userId;
+            const effectiveName = name || 'User';
             if (!effectiveUserId) {
-                callback({ error: 'Unauthorized voice join' });
+                callback({ error: 'userId is required' });
                 return;
             }
 
@@ -912,10 +870,6 @@ io.on('connection', async (socket) => {
             // Store room ID in socket data
             socket.data.roomId = roomId;
             socket.join(roomId);
-            socket.join(channelRoomName(roomId));
-            if (normalizedServerId) {
-                socket.join(serverRoomName(normalizedServerId));
-            }
 
             // Get existing peers
             const existingPeers = [];
@@ -1220,13 +1174,6 @@ io.on('connection', async (socket) => {
                 return;
             }
 
-            if (!VOICE_ALLOW_ANON) {
-                socket.emit('voiceChannelParticipantsError', {
-                    error: 'channelId is required',
-                });
-                return;
-            }
-            
             // Иначе отправляем информацию о всех каналах
             
             // Очищаем пустые комнаты
@@ -1356,8 +1303,8 @@ io.on('connection', async (socket) => {
     // Новые обработчики для управления глобальным состоянием пользователей
     socket.on('updateUserVoiceState', async ({ userId, userName, channelId, isMuted, isAudioDisabled }) => {
         try {
-            const effectiveUserId = socket.data.userId || (VOICE_ALLOW_ANON ? userId : null);
-            if (!effectiveUserId || String(effectiveUserId) !== String(userId)) return;
+            const effectiveUserId = userId;
+            if (!effectiveUserId) return;
 
             const updates = {};
             if (userName !== undefined) updates.userName = userName;

@@ -122,14 +122,6 @@ services:
       - ./ssl:/app/ssl
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
-      - JWT_ISSUER=https://whithin.ru
-      - JWT_AUDIENCE=https://whithin.ru
-      - JWT_KEY=WhithinMessenger2024!SuperSecretJWTKeyForTesting123456789
-      - VOICE_ALLOW_ANON=false
-      - VOICE_RECONNECT_GRACE_MS=20000
-      - VOICE_PRESENCE_TTL_MS=90000
-      - VOICE_CLEAR_STALE_ON_START=true
       - LIVEKIT_URL=ws://host.docker.internal:7880
       - LIVEKIT_EXTERNAL_URL=wss://whithin.ru
       - LIVEKIT_API_KEY=devkey
@@ -137,10 +129,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      livekit:
-        condition: service_started
-      redis:
-        condition: service_healthy
+      - livekit
     networks:
       - app-network
     restart: unless-stopped
