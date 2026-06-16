@@ -150,19 +150,15 @@ io.use((socket, next) => {
 });
 
 function emitChannel(channelId, eventName, payload) {
-    const normalizedChannelId = normalizeChannelId(channelId);
-    if (!normalizedChannelId) return;
-    io.to(channelRoomName(normalizedChannelId)).emit(eventName, payload);
+    io.emit(eventName, payload);
 }
 
 function emitServer(serverId, eventName, payload) {
-    if (!serverId) return;
-    io.to(serverRoomName(serverId)).emit(eventName, payload);
+    io.emit(eventName, payload);
 }
 
 function emitVoiceState(peer, eventName, payload) {
-    if (peer?.roomId) emitChannel(peer.roomId, eventName, payload);
-    if (peer?.serverId) emitServer(peer.serverId, eventName, payload);
+    io.emit(eventName, payload);
 }
 
 function redisKeyUser(userId) {
@@ -249,34 +245,15 @@ function persistUserVoiceState(userId, state) {
 }
 
 function persistChannelParticipant(channelId, participant) {
-    if (!redis || !channelId || !participant?.userId) return;
-    const key = redisKeyChannelParticipants(channelId);
-    redis.hset(
-        key,
-        String(participant.userId),
-        JSON.stringify({ ...participant, updatedAt: Date.now() })
-    )
-        .then(() => redis.pexpire(key, VOICE_PRESENCE_TTL_MS))
-        .catch((error) => console.warn('[redis] persist channel participant failed:', error.message));
+    return;
 }
 
 function removeChannelParticipant(channelId, userId) {
-    if (!redis || !channelId || !userId) return;
-    return redis.hdel(redisKeyChannelParticipants(channelId), String(userId))
-        .catch((error) => console.warn('[redis] remove channel participant failed:', error.message));
+    return;
 }
 
 async function getRedisChannelParticipants(channelId) {
-    if (!redis || !channelId) return [];
-    try {
-        const values = await redis.hvals(redisKeyChannelParticipants(channelId));
-        return values
-            .map((value) => JSON.parse(value))
-            .filter((participant) => participant?.isActive !== false);
-    } catch (error) {
-        console.warn('[redis] get channel participants failed:', error.message);
-        return [];
-    }
+    return [];
 }
 
 // Функция для дебаунса обновлений канала

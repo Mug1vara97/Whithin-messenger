@@ -96,6 +96,4 @@ redis:
   address: "127.0.0.1:6379"
   db: 0
 
-webhook:
-  urls:
-    - https://whithin.ru/webhook/livekit
+# Webhook disabled: voice participant lists are maintained by voice-server Socket.IO state.
