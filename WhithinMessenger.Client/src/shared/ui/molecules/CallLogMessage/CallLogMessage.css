@@ -1,26 +1,42 @@
 .call-log-message {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
   color: var(--text-muted, #949ba4);
   font-size: 13px;
   line-height: 1.45;
 }
 
-.call-log-message__icon {
+.call-log-message__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--icon, var(--text-secondary, #b9bbbe));
+  background: transparent;
+}
+
+.call-log-message__ghost {
+  width: 40px;
+  height: 40px;
+  fill: currentColor;
+}
+
+.call-log-message__status-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 16px;
   height: 18px;
-  margin-top: 1px;
   flex-shrink: 0;
   color: #23a559;
   font-size: 16px;
 }
 
-.call-log-message__icon--missed {
+.call-log-message__status-icon--missed {
   color: var(--text-muted, #949ba4);
 }
 
@@ -44,8 +60,8 @@
 
 .message--call-log {
   display: flex;
-  justify-content: center;
-  padding: 2px 16px 8px;
+  justify-content: flex-start;
+  padding: 2px 0 8px;
   background: transparent !important;
 }
 
