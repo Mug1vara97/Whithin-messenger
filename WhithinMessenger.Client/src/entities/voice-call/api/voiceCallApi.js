@@ -1,5 +1,7 @@
 import { io } from 'socket.io-client';
 import { Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
+import { useCallStore } from '../../../shared/lib/stores/callStore';
+import { serverApi } from '../../server/api/serverApi';
 
 // Конфигурация для голосового сервера
 const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'https://whithin.ru';
@@ -277,14 +279,12 @@ class VoiceCallApi {
       if (this.roomId === sourceChannelId && this.room) {
         try {
           // Используем callStore для правильного переключения
-          const { useCallStore } = await import('../../../shared/lib/stores/callStore');
           const callStore = useCallStore.getState();
           
           let channelName = eventChannelName || null;
           
           if (!channelName) {
             try {
-              const { serverApi } = await import('../../server/api/serverApi');
               const serverId = window.location.pathname.match(/\/server\/([^/]+)/)?.[1];
               
               if (serverId) {

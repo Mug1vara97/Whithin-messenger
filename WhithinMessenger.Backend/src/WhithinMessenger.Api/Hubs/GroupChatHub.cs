@@ -35,6 +35,9 @@ namespace WhithinMessenger.Api.Hubs
 public class GroupChatHub : Hub
 {
     private const int CallRingTimeoutSeconds = 180;
+    // Если инициатор сам отклонил звонок слишком быстро, то из-за гонок/порядка событий может
+    // появляться случайная запись "missed".
+    private const int MissedCallLogMinSeconds = 3;
 
     private sealed class CallSession
     {
@@ -1288,8 +1291,21 @@ public class GroupChatHub : Hub
 
         CancelCallRingTimeout(chatId);
 
-        var ringDuration = Math.Max(1, (int)Math.Round((DateTimeOffset.UtcNow - session.RingStartedAt).TotalSeconds));
-        await BroadcastCallLogMessageAsync(session, "missed", ringDuration);
+        var ringDurationTotalSeconds = (DateTimeOffset.UtcNow - session.RingStartedAt).TotalSeconds;
+        var ringDuration = Math.Max(1, (int)Math.Round(ringDurationTotalSeconds));
+
+        // Пропускаем создание call-log только в одном кейсе:
+        // инициатор (session.CallerId) сам отклонил вызов слишком быстро
+        // (например, успел открыть/закрыть оверлей и отменить звонок),
+        // чтобы не появлялись случайные "missed" сообщения.
+        var isCallerSelfDecline = reason == "declined" && actorUserId == session.CallerId;
+        var shouldCreateMissedLog =
+            !(isCallerSelfDecline && ringDurationTotalSeconds < MissedCallLogMinSeconds);
+
+        if (shouldCreateMissedLog)
+        {
+            await BroadcastCallLogMessageAsync(session, "missed", ringDuration);
+        }
 
         await Clients.Group(chatId.ToString()).SendAsync("CallMissed", new
         {

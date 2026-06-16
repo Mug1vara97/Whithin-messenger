@@ -776,12 +776,13 @@ const ChatRoom = ({
     isPrivateChat) || (activeChatCall && 
     String(activeChatCall.chatId) === String(chatId));
 
-  const usersAlreadyInCall = existingCallParticipants.filter((participant) => {
+  const callPreviewParticipants = existingCallParticipants;
+  const usersAlreadyInCall = callPreviewParticipants.filter((participant) => {
     const participantId = participant.odUserId || participant.userId;
     return String(participantId) !== String(userId);
   });
-  const hasJoinableCallInThisChat = !isCallActiveInThisChat && usersAlreadyInCall.length > 0;
-  const primaryJoinParticipant = usersAlreadyInCall[0] || null;
+  const hasJoinableCallInThisChat = !isCallActiveInThisChat && callPreviewParticipants.length > 0;
+  const primaryJoinParticipant = usersAlreadyInCall[0] || callPreviewParticipants[0] || null;
 
   const handleAddUserClick = () => {
     console.log('ChatRoom - Add user button clicked');
@@ -1295,14 +1296,16 @@ const ChatRoom = ({
         <div className="chat-voice-call-join-preview">
           <div className="join-preview-center">
             <div className="join-preview-title">Звонок уже идёт</div>
-            <div className={`join-preview-users-grid ${usersAlreadyInCall.length === 1 ? 'single-user' : ''}`}>
-              {usersAlreadyInCall.slice(0, 8).map((participant) => {
+            <div className={`join-preview-users-grid ${callPreviewParticipants.length === 1 ? 'single-user' : ''}`}>
+              {callPreviewParticipants.slice(0, 8).map((participant) => {
                 const participantMuted = !!participant?.isMuted;
                 const participantDeafened = !!(
                   participant?.isGlobalAudioMuted ||
                   participant?.isAudioDisabled ||
                   participant?.isDeafened
                 );
+                const participantId = participant?.odUserId || participant?.userId;
+                const isCurrentUserInPreview = String(participantId) === String(userId);
 
                 return (
                   <div
@@ -1317,7 +1320,9 @@ const ChatRoom = ({
                         size={74}
                       />
                     </div>
-                    <div className="join-preview-user-name">{participant.userName || 'User'}</div>
+                    <div className="join-preview-user-name">
+                      {isCurrentUserInPreview ? 'Вы' : (participant.userName || 'User')}
+                    </div>
                     <div className="join-preview-user-status-row">
                       <VoiceParticipantStatusIcons
                         isMuted={participantMuted}
@@ -1329,8 +1334,8 @@ const ChatRoom = ({
                   </div>
                 );
               })}
-              {usersAlreadyInCall.length > 8 && (
-                <div className="join-preview-user-more">+{usersAlreadyInCall.length - 8}</div>
+              {callPreviewParticipants.length > 8 && (
+                <div className="join-preview-user-more">+{callPreviewParticipants.length - 8}</div>
               )}
             </div>
           </div>

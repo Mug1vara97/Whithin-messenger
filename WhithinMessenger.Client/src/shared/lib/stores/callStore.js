@@ -24,6 +24,7 @@ import {
 import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModerationState';
 import { buildCallOnlyChannelEntry } from '../voice/callOnlyVoiceChannels';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
+import voiceChannelService from '../services/voiceChannelService';
 
 function notifyVoiceCallOverlaySync() {
   if (typeof window === 'undefined') return;
@@ -2004,13 +2005,8 @@ export const useCallStore = create(
           await get().createAudioStream();
         }
 
-        try {
-          const { default: voiceChannelService } = await import('../services/voiceChannelService');
-          voiceChannelService.subscribeToChannel(targetRoomId);
-          voiceChannelService.requestChannelParticipants(targetRoomId, true);
-        } catch (error) {
-          console.warn('[callStore] Failed to refresh voice channel service participants:', error);
-        }
+        voiceChannelService.subscribeToChannel(targetRoomId);
+        voiceChannelService.requestChannelParticipants(targetRoomId, true);
       },
 
       // Присоединение к комнате (очередь + generation — защита от гонок при быстром переключении каналов)
@@ -2170,13 +2166,8 @@ export const useCallStore = create(
 
             await get().refreshVoiceChannelParticipantsList(normalizedRoomId);
 
-            try {
-              const { default: voiceChannelService } = await import('../services/voiceChannelService');
-              voiceChannelService.subscribeToChannel(normalizedRoomId);
-              voiceChannelService.requestChannelParticipants(normalizedRoomId, true);
-            } catch (error) {
-              console.warn('[callStore] Failed to refresh voice channel service on join:', error);
-            }
+            voiceChannelService.subscribeToChannel(normalizedRoomId);
+            voiceChannelService.requestChannelParticipants(normalizedRoomId, true);
 
             if (!response.alreadyJoined) {
               audioNotificationManager.playUserJoinedSound({
