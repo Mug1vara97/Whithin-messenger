@@ -226,7 +226,7 @@ const LoginForm = () => {
   }, [qrOverlayOpen, closeQrOverlay]);
 
   return (
-    <div className="auth-container">
+    <div className="auth-container" data-nosnippet>
       <GhostBackground />
       <div className="auth-box">
         <div className="auth-header">

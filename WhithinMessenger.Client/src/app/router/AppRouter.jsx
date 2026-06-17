@@ -11,6 +11,7 @@ import { ResetPasswordPage } from '../../pages/reset-password/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
+import SeoRouteSync from '../../shared/lib/seo/SeoRouteSync';
 import { DesktopNotificationSync } from '../../shared/lib/hooks/DesktopNotificationSync';
 import { DesktopCallOverlaySync } from '../../shared/lib/hooks/DesktopCallOverlaySync';
 import { DesktopActiveCallOverlaySync } from '../../shared/lib/hooks/DesktopActiveCallOverlaySync';
@@ -55,6 +56,7 @@ const AppRouter = () => {
   return (
     <>
       <Router>
+        <SeoRouteSync />
         <DesktopNotificationSync />
         <DesktopCallOverlaySync />
         <DesktopActiveCallOverlaySync />

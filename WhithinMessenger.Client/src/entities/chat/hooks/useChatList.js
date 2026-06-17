@@ -27,6 +27,7 @@ const normalizeChatListItem = (chat) => {
     userId: chat.userId ?? chat.UserId,
     avatarUrl: chat.avatarUrl ?? chat.AvatarUrl ?? null,
     avatarColor: chat.avatarColor ?? chat.AvatarColor ?? null,
+    nameplate: chat.nameplate ?? chat.Nameplate ?? null,
     userStatus: chat.userStatus ?? chat.UserStatus ?? null,
     isGroupChat: Boolean(chat.isGroupChat ?? chat.IsGroupChat),
     isSavedMessages: Boolean(chat.isSavedMessages ?? chat.IsSavedMessages),

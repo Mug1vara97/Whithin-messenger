@@ -76,12 +76,12 @@
 }
 
 .user-identity {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    height: 40px;
-    display: flex;
-    align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
 }
 
 .user-identity-button {

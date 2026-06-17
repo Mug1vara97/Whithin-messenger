@@ -32,6 +32,12 @@ const resolveMemberAvatarColor = (member) =>
 
 
 
+const resolveMemberNameplate = (member) =>
+
+  member?.nameplate ?? member?.Nameplate ?? null;
+
+
+
 const resolveMemberStatus = (member) =>
 
   member?.userStatus ?? member?.UserStatus ?? member?.status ?? PRESENCE_STATUS.OFFLINE;
@@ -186,6 +192,8 @@ export const mapServerMemberToListItem = (member, { serverOwnerId, resolveStatus
 
     avatarColor: resolveMemberAvatarColor(member),
 
+    nameplate: resolveMemberNameplate(member),
+
     status: resolveStatus ? resolveStatus(userId, resolveMemberStatus(member)) : resolveMemberStatus(member),
 
     roles,
@@ -219,6 +227,8 @@ export const mapChatParticipantToListItem = (participant, { resolveStatus } = {}
     avatar: resolveMemberAvatar(participant),
 
     avatarColor: resolveMemberAvatarColor(participant),
+
+    nameplate: resolveMemberNameplate(participant),
 
     status: resolveStatus
 

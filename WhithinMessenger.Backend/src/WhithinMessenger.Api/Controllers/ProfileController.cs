@@ -45,7 +45,8 @@ public class ProfileController : ControllerBase
                     AvatarColor = AvatarColorGenerator.GenerateColor(userId),
                     Description = null,
                     Avatar = null,
-                    Banner = null
+                    Banner = null,
+                    Nameplate = null
                 };
                 
                 await _userProfileRepository.CreateAsync(userProfile);
@@ -62,6 +63,7 @@ public class ProfileController : ControllerBase
                 avatarColor = userProfile.AvatarColor,
                 description = userProfile.Description,
                 banner = userProfile.Banner,
+                nameplate = userProfile.Nameplate,
                 status = user?.Status.ToString().ToLowerInvariant(),
                 createdAt = user?.CreatedAt ?? DateTimeOffset.UtcNow
             });
@@ -151,6 +153,62 @@ public class ProfileController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = "Ошибка при обновлении описания: " + ex.Message });
+        }
+    }
+
+    [HttpPost("update-nameplate")]
+    [RequireAuth]
+    public async Task<IActionResult> UpdateNameplate([FromBody] UpdateNameplateRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.Nameplate = string.IsNullOrWhiteSpace(request.Nameplate) ? null : request.Nameplate.Trim();
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { nameplate = userProfile.Nameplate });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при обновлении таблички: " + ex.Message });
+        }
+    }
+
+    [HttpPost("remove-nameplate")]
+    [RequireAuth]
+    public async Task<IActionResult> RemoveNameplate([FromBody] ProfileUserRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.Nameplate = null;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { nameplate = userProfile.Nameplate });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при удалении таблички: " + ex.Message });
         }
     }
 
@@ -375,6 +433,12 @@ public class UpdateAvatarColorRequest
 {
     public Guid UserId { get; set; }
     public string AvatarColor { get; set; } = string.Empty;
+}
+
+public class UpdateNameplateRequest
+{
+    public Guid UserId { get; set; }
+    public string? Nameplate { get; set; }
 }
 
 public class ProfileUserRequest

@@ -316,7 +316,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
   }, []);
 
   return (
-    <div className={`startup-preloader ${isExiting ? 'is-exiting' : ''}`}>
+    <div className={`startup-preloader ${isExiting ? 'is-exiting' : ''}`} data-nosnippet>
       <div className="startup-preloader__noise" />
       <div className="startup-preloader__scanlines" />
 

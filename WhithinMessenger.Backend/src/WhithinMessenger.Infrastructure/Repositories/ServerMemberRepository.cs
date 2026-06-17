@@ -53,6 +53,7 @@ public class ServerMemberRepository : IServerMemberRepository
                 Username = sm.User.UserName ?? string.Empty,
                 Avatar = sm.User.UserProfile != null ? sm.User.UserProfile.Avatar : null,
                 AvatarColor = sm.User.UserProfile != null ? sm.User.UserProfile.AvatarColor : null,
+                Nameplate = sm.User.UserProfile != null ? sm.User.UserProfile.Nameplate : null,
                 UserStatus = sm.User.Status.ToString().ToLower(),
                 LastSeen = sm.User.LastSeen.DateTime,
                 JoinedAt = sm.JoinedAt.DateTime,

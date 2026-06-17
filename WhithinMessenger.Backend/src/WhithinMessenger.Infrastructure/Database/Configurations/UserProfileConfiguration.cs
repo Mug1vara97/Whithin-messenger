@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WhithinMessenger.Domain.Models;
 
@@ -25,6 +25,10 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
 
         builder
             .Property(e => e.Banner)
+            .HasMaxLength(255);
+
+        builder
+            .Property(e => e.Nameplate)
             .HasMaxLength(255);
 
         builder

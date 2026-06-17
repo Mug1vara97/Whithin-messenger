@@ -178,12 +178,22 @@
   margin-top: 12px;
 }
 
+.profile-modal__nameplate {
+  min-height: 42px;
+  border-radius: 6px;
+}
+
+.profile-modal__nameplate .user-nameplate__content {
+  padding: 6px 12px;
+}
+
 .profile-modal__name {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
   color: var(--text, #f2f3f5);
   line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .profile-modal__body {

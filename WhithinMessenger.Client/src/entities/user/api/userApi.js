@@ -67,6 +67,27 @@ export const userApi = {
     }
   },
 
+  async updateProfileNameplate(userId, nameplate) {
+    try {
+      const response = await apiClient.post('/profile/update-nameplate', {
+        UserId: userId,
+        Nameplate: nameplate,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось обновить табличку'));
+    }
+  },
+
+  async removeProfileNameplate(userId) {
+    try {
+      const response = await apiClient.post('/profile/remove-nameplate', { UserId: userId });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось удалить табличку'));
+    }
+  },
+
   async uploadProfileAvatar(file) {
     const formData = new FormData();
     formData.append('file', file);

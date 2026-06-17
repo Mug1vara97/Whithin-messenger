@@ -31,6 +31,7 @@ namespace WhithinMessenger.Domain.Interfaces
         public Guid UserId { get; init; }
         public string? AvatarUrl { get; init; }
         public string? AvatarColor { get; init; }
+        public string? Nameplate { get; init; }
         public string UserStatus { get; init; } = "offline";
         public DateTimeOffset? LastSeen { get; init; }
         public bool IsGroupChat { get; init; }

@@ -1,4 +1,4 @@
-﻿namespace WhithinMessenger.Domain.Models;
+namespace WhithinMessenger.Domain.Models;
 
 public class UserProfile
 {
@@ -13,6 +13,8 @@ public class UserProfile
     public string? Description { get; set; }
 
     public string? Banner { get; set; }
+
+    public string? Nameplate { get; set; }
 
     public ApplicationUser User { get; set; } = null!;
 }
