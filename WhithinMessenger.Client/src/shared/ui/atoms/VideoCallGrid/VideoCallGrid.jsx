@@ -27,6 +27,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { Slider } from '@mui/material';
 import { useVoiceParticipantModeration } from '../../molecules/VoiceParticipantModerationMenu';
+import UserAvatar from '../UserAvatar/UserAvatar';
 import './VideoCallGrid.css';
 
 /** Максимум участников на одной странице сетки (есть CSS для 1–9) */
@@ -440,6 +441,27 @@ const VideoCallGrid = ({
     }
   }, [fullscreenScreenShareId]);
 
+  const renderTileAvatar = (participant, isSmall, { overlay = false } = {}) => {
+    const avatarSize = isSmall ? 60 : 100;
+    const avatarNode = (
+      <div className={`tile-avatar-wrap${overlay ? ' tile-avatar-wrap--overlay' : ''}`}>
+        <UserAvatar
+          username={participant.name || 'U'}
+          avatarUrl={participant.avatar}
+          avatarColor={participant.avatarColor || getAvatarColor(participant.name)}
+          avatarDecoration={participant.avatarDecoration}
+          size={avatarSize}
+        />
+      </div>
+    );
+
+    if (overlay) {
+      return avatarNode;
+    }
+
+    return <div className="tile-avatar-stage">{avatarNode}</div>;
+  };
+
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const channelParticipant = findChannelParticipant(activeVoiceChannelParticipants, participant.id);
@@ -545,89 +567,12 @@ const VideoCallGrid = ({
                       backgroundPosition: 'center'
                     } : {})
                   }}>
-                {participant.avatar ? (
-                  <img
-                    src={participant.avatar}
-                    alt={participant.name}
-                    className="tile-avatar-bg"
-                    style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: isSmall ? '60px' : '100px',
-                      height: isSmall ? '60px' : '100px',
-                      borderRadius: '50%',
-                      border: '3px solid white',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="avatar-placeholder"
-                    style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: isSmall ? '60px' : '100px',
-                      height: isSmall ? '60px' : '100px',
-                      borderRadius: '50%',
-                      backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: isSmall ? '24px' : '40px',
-                      fontWeight: '600',
-                      color: 'white',
-                      border: '3px solid white'
-                    }}
-                  >
-                    {getInitials(participant.name)}
-                  </div>
-                )}
+                {renderTileAvatar(participant, isSmall, { overlay: true })}
                   </div>
                 );
               })()
-            ) : participant.avatar ? (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <img
-                  src={participant.avatar}
-                  alt={participant.name}
-                  className="tile-avatar-bg"
-                  style={{
-                    width: isSmall ? '80px' : '120px',
-                    height: isSmall ? '80px' : '120px',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
-                />
-              </div>
             ) : (
-              <div
-                className="avatar-placeholder"
-                style={{
-                  backgroundColor: participant.avatarColor || getAvatarColor(participant.name),
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: isSmall ? '40px' : '80px',
-                  fontWeight: '600',
-                  color: 'white'
-                }}
-              >
-                {getInitials(participant.name)}
-              </div>
+              renderTileAvatar(participant, isSmall)
             )}
           </div>
 

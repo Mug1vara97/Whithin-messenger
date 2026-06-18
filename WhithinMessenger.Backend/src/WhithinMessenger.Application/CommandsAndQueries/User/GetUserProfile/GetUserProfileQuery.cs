@@ -12,6 +12,8 @@ public record UserProfileDto
     public string? AvatarColor { get; init; }
     public string? Description { get; init; }
     public string? Banner { get; init; }
+    public string? Nameplate { get; init; }
+    public string? AvatarDecoration { get; init; }
 }
 
 

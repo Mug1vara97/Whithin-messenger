@@ -41,7 +41,7 @@ const UserNameplate = ({
   }
 
   return (
-    <div className={`user-nameplate ${className}`.trim()}>
+    <div className={`user-nameplate user-nameplate--decorated ${className}`.trim()}>
       {isNameplateVideo(nameplate) ? (
         <video
           ref={videoRef}

@@ -12,8 +12,8 @@
   background: var(--hover);
 }
 
-.message-item .message-avatar,
-.message-item .user-avatar {
+.message-item .message-avatar-wrap,
+.message-item .user-avatar-frame {
   flex-shrink: 0;
   position: relative;
 }
@@ -38,9 +38,20 @@
   border-radius: 18px 18px 18px 4px;
 }
 
-.message-avatar {
+.message-avatar-wrap {
+  --avatar-decoration-scale: 1.22;
+
   flex-shrink: 0;
   margin-top: 4px;
+  width: 48px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.message-item .message-avatar-wrap .user-avatar-frame {
+  overflow: visible;
 }
 
 .message-content {

@@ -61,14 +61,18 @@ const FriendItem = ({
             username={profileUsername}
             avatarUrl={friend.avatar || friend.requesterAvatar}
             avatarColor={friend.avatarColor || friend.requesterAvatarColor}
+            avatarDecoration={friend.avatarDecoration || friend.requesterAvatarDecoration}
             size="medium"
+            statusIndicator={
+              !isRequest ? (
+                <span
+                  className="user-avatar-presence-dot"
+                  style={{ backgroundColor: getUserStatusColor(friend.status) }}
+                  title={getUserStatusLabel(friend.status)}
+                />
+              ) : null
+            }
           />
-          {!isRequest && (
-            <div
-              className="friend-item__status-indicator"
-              style={{ backgroundColor: getUserStatusColor(friend.status) }}
-            />
-          )}
         </div>
 
         <div className="friend-item__info">

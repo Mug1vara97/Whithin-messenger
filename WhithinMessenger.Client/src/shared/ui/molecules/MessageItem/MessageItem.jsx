@@ -230,12 +230,13 @@ const MessageItem = ({
       onContextMenu={handleContextMenu}
     >
       {showAvatar && (
-        <div className="message-avatar">
+        <div className="message-avatar-wrap">
           <UserAvatar
             username={message.senderUsername}
             avatarUrl={message.avatarUrl}
             avatarColor={message.avatarColor}
-            size="small"
+            avatarDecoration={message.avatarDecoration}
+            size={40}
             onClick={(event) => {
               event.stopPropagation();
               handleOpenAuthorProfile();

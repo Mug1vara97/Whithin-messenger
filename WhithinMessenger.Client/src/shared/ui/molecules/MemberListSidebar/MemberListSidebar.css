@@ -52,68 +52,114 @@
 .member-list-section-items {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  overflow: visible;
 }
 
 .member-list-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 6px 8px;
-  border-radius: 4px;
+  align-items: stretch;
+  min-height: 0;
+  padding: 0;
+  border-radius: 8px;
   cursor: default;
   transition: background-color 0.15s ease;
+  overflow: visible;
+}
+
+.member-list-item--clickable {
+  cursor: pointer;
 }
 
 .member-list-item:hover {
   background: var(--surface-hover);
 }
 
-.member-list-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-}
-
-.member-list-status-dot {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-  z-index: 1;
-}
-
-.member-list-item:hover .member-list-status-dot {
-  border-color: var(--surface-hover);
-}
-
-.member-list-name {
-  display: block;
-  min-width: 0;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+.member-list-item:has(.user-nameplate--decorated):hover {
+  background: transparent;
 }
 
 .member-list-nameplate {
-  min-height: 30px;
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
 }
 
-.member-list-nameplate .user-nameplate__content {
-  padding: 4px 10px 4px 8px;
+.member-list-nameplate__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 5px 10px 5px 6px;
+  box-sizing: border-box;
+}
+
+.member-list-nameplate.user-nameplate--empty .member-list-nameplate__row {
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
+.member-list-nameplate.user-nameplate--decorated {
+  overflow: visible;
+  min-height: 0;
+  box-shadow: none;
+}
+
+.member-list-nameplate.user-nameplate--decorated:hover {
+  filter: none;
+  box-shadow: none;
+}
+
+.member-list-nameplate.user-nameplate--decorated .member-list-nameplate__row {
+  min-height: 48px;
+  padding: 6px 10px 6px 4px;
+  gap: 8px;
+}
+
+/* Слот шире аватара — рамка не залезает на ник */
+.member-list-avatar-wrap {
+  --avatar-decoration-scale: 1.22;
+
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  z-index: 2;
+}
+
+.member-list-nameplate.user-nameplate--decorated .member-list-avatar-wrap {
+  --avatar-decoration-scale: 1.2;
+}
+
+.member-list-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e8eef8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.member-list-nameplate.user-nameplate--empty .member-list-name {
+  color: var(--text);
+  font-weight: 500;
+  text-shadow: none;
 }
 
 .member-list-section-items--offline .member-list-name {
   color: var(--text-muted);
+}
+
+.member-list-section-items--offline .member-list-nameplate.user-nameplate--decorated .member-list-name {
+  color: #c5ccd8;
 }
 
 .member-list-owner-icon {
@@ -121,6 +167,7 @@
   width: 16px !important;
   height: 16px !important;
   color: var(--warning, #f0b232);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .member-list-empty {

@@ -114,6 +114,53 @@ export const userApi = {
     }
   },
 
+  async uploadProfileNameplate(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post('/profile/upload/nameplate', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось загрузить табличку'));
+    }
+  },
+
+  async updateProfileAvatarDecoration(userId, avatarDecoration) {
+    try {
+      const response = await apiClient.post('/profile/update-avatar-decoration', {
+        UserId: userId,
+        AvatarDecoration: avatarDecoration,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось обновить рамку аватара'));
+    }
+  },
+
+  async removeProfileAvatarDecoration(userId) {
+    try {
+      const response = await apiClient.post('/profile/remove-avatar-decoration', { UserId: userId });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось удалить рамку аватара'));
+    }
+  },
+
+  async uploadProfileAvatarDecoration(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post('/profile/upload/avatar-decoration', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось загрузить рамку аватара'));
+    }
+  },
+
   async updateStatus(userId, status) {
     const response = await apiClient.put(`/user/status/${userId}`, { status });
     return response.data;

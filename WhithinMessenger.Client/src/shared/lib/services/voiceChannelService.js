@@ -24,7 +24,8 @@ const participantsListChanged = (next = [], prev = []) => {
       Boolean(participant.isSpeaking) !== Boolean(current.isSpeaking) ||
       Boolean(participant.isAudioDisabled) !== Boolean(current.isAudioDisabled) ||
       Boolean(participant.isServerMuted) !== Boolean(current.isServerMuted) ||
-      Boolean(participant.isServerDeafened) !== Boolean(current.isServerDeafened)
+      Boolean(participant.isServerDeafened) !== Boolean(current.isServerDeafened) ||
+      (participant.nameplate || null) !== (current.nameplate || null)
     );
   });
 };
@@ -81,7 +82,7 @@ class VoiceChannelService {
     this.socket.on('userJoinedVoiceChannel', (data) => {
       console.log('[VoiceChannelService] User joined voice channel:', data);
       const channelId = normalizeChannelId(data.channelId);
-      const { userId, userName, isMuted, isAudioDisabled, avatar, avatarColor } = data;
+      const { userId, userName, isMuted, isAudioDisabled, avatar, avatarColor, nameplate } = data;
 
       const state = useCallStore.getState();
       state.voiceChannelParticipants.forEach((participants, existingChannelId) => {
@@ -104,6 +105,7 @@ class VoiceChannelService {
         isDeafened: isAudioDisabled || false,
         avatar: avatar || null,
         avatarColor: avatarColor || '#5865f2',
+        nameplate: nameplate || null,
       });
     });
 
@@ -130,6 +132,7 @@ class VoiceChannelService {
         isServerDeafened: p.isServerDeafened || false,
         avatar: p.avatar || null,
         avatarColor: p.avatarColor || '#5865f2',
+        nameplate: p.nameplate || null,
       }));
 
       const state = useCallStore.getState();

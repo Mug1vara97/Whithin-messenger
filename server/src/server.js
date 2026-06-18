@@ -224,7 +224,8 @@ function getChannelParticipants(channelId) {
                 ),
                 isActive: true,
                 avatar: peer.avatar || userState.avatar || null,
-                avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2'
+                avatarColor: peer.avatarColor || userState.avatarColor || '#5865f2',
+                nameplate: peer.nameplate || userState.nameplate || null
             });
         });
     }
@@ -392,7 +393,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('join', async ({ roomId, name, userId, serverId = null, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2' }, callback) => {
+    socket.on('join', async ({ roomId, name, userId, serverId = null, initialMuted = false, initialAudioEnabled = true, avatar = null, avatarColor = '#5865f2', nameplate = null }, callback) => {
         try {
             // Create room if it doesn't exist
             let room = rooms.get(roomId);
@@ -432,7 +433,8 @@ io.on('connection', async (socket) => {
                 serverDeafened,
                 speaking: false,
                 avatar: avatar,
-                avatarColor: avatarColor
+                avatarColor: avatarColor,
+                nameplate: nameplate
             };
             
             // Обновляем глобальное состояние пользователя при подключении к комнате
@@ -442,7 +444,8 @@ io.on('connection', async (socket) => {
                 isMuted: effectiveMuted, 
                 isAudioDisabled: !effectiveAudioEnabled,
                 avatar: avatar,
-                avatarColor: avatarColor
+                avatarColor: avatarColor,
+                nameplate: nameplate
             });
 
             if (normalizedServerId && (serverMuted || serverDeafened)) {
@@ -512,7 +515,8 @@ io.on('connection', async (socket) => {
                 isMuted: peer.muted,
                 isAudioDisabled: !peer.audioEnabled,
                 avatar: peer.avatar,
-                avatarColor: peer.avatarColor
+                avatarColor: peer.avatarColor,
+                nameplate: peer.nameplate || null
             });
 
             // Также отправляем обновленный список участников канала
@@ -820,14 +824,18 @@ io.on('connection', async (socket) => {
     });
 
     // Обработчик для уведомления о присоединении пользователя к голосовому каналу
-    socket.on('userJoinedVoiceChannel', ({ channelId, userId, userName, isMuted }) => {
+    socket.on('userJoinedVoiceChannel', ({ channelId, userId, userName, isMuted, isAudioDisabled, avatar, avatarColor, nameplate }) => {
         try {
             // Отправляем уведомление всем клиентам
             io.emit('userJoinedVoiceChannel', {
                 channelId,
                 userId,
                 userName,
-                isMuted
+                isMuted,
+                isAudioDisabled,
+                avatar,
+                avatarColor,
+                nameplate: nameplate || null
             });
         } catch (error) {
             console.error('Error in userJoinedVoiceChannel:', error);
@@ -1016,6 +1024,7 @@ io.on('connection', async (socket) => {
             speaking: peerToMove.speaking,
             avatar: peerToMove.avatar,
             avatarColor: peerToMove.avatarColor,
+            nameplate: peerToMove.nameplate || null,
             roomId: targetChannelId
         };
         
@@ -1096,7 +1105,8 @@ io.on('connection', async (socket) => {
             isMuted: peerToMove.muted || false,
             isAudioDisabled: userState.isAudioDisabled || false,
             avatar: peerToMove.avatar || null,
-            avatarColor: peerToMove.avatarColor || '#5865f2'
+            avatarColor: peerToMove.avatarColor || '#5865f2',
+            nameplate: peerToMove.nameplate || null
         });
         
         scheduleChannelUpdate(targetChannelId, 100);

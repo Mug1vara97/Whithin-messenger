@@ -55,6 +55,7 @@
   color: var(--text-secondary) !important;
 }
 
+[data-theme-mode='light'] [class*='user-avatar-presence-dot'],
 [data-theme-mode='light'] [class*='user-avatar-status'] {
   border-color: var(--surface) !important;
 }

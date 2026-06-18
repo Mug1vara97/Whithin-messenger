@@ -19,6 +19,11 @@ public class ProfileController : ControllerBase
     private readonly WithinDbContext _context;
     private readonly IWebHostEnvironment _environment;
 
+    private static readonly HashSet<string> AvatarDecorationAllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".apng", ".gif", ".webp", ".webm", ".mp4", ".mov", ".mkv", ".avi",
+    };
+
     public ProfileController(
         IUserProfileRepository userProfileRepository,
         WithinDbContext context,
@@ -46,7 +51,8 @@ public class ProfileController : ControllerBase
                     Description = null,
                     Avatar = null,
                     Banner = null,
-                    Nameplate = null
+                    Nameplate = null,
+                    AvatarDecoration = null
                 };
                 
                 await _userProfileRepository.CreateAsync(userProfile);
@@ -64,6 +70,7 @@ public class ProfileController : ControllerBase
                 description = userProfile.Description,
                 banner = userProfile.Banner,
                 nameplate = userProfile.Nameplate,
+                avatarDecoration = userProfile.AvatarDecoration,
                 status = user?.Status.ToString().ToLowerInvariant(),
                 createdAt = user?.CreatedAt ?? DateTimeOffset.UtcNow
             });
@@ -181,6 +188,64 @@ public class ProfileController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = "Ошибка при обновлении таблички: " + ex.Message });
+        }
+    }
+
+    [HttpPost("update-avatar-decoration")]
+    [RequireAuth]
+    public async Task<IActionResult> UpdateAvatarDecoration([FromBody] UpdateAvatarDecorationRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.AvatarDecoration = string.IsNullOrWhiteSpace(request.AvatarDecoration)
+                ? null
+                : request.AvatarDecoration.Trim();
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { avatarDecoration = userProfile.AvatarDecoration });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при обновлении рамки аватара: " + ex.Message });
+        }
+    }
+
+    [HttpPost("remove-avatar-decoration")]
+    [RequireAuth]
+    public async Task<IActionResult> RemoveAvatarDecoration([FromBody] ProfileUserRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.AvatarDecoration = null;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            return Ok(new { avatarDecoration = userProfile.AvatarDecoration });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при удалении рамки аватара: " + ex.Message });
         }
     }
 
@@ -391,6 +456,106 @@ public class ProfileController : ControllerBase
         }
     }
 
+    [HttpPost("upload/nameplate")]
+    [RequireAuth]
+    public async Task<IActionResult> UploadNameplate(IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "Файл не выбран" });
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".webm", ".png", ".webp" };
+            if (!allowedExtensions.Contains(extension))
+            {
+                return BadRequest(new { error = "Допустимы файлы WebM, PNG или WebP" });
+            }
+
+            var allowedTypes = new[] { "video/webm", "image/png", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                return BadRequest(new { error = "Неподдерживаемый тип файла" });
+            }
+
+            if (file.Length > 3 * 1024 * 1024)
+            {
+                return BadRequest(new { error = "Файл слишком большой (максимум 3MB)" });
+            }
+
+            var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "nameplates");
+            if (!Directory.Exists(uploadsPath))
+            {
+                Directory.CreateDirectory(uploadsPath);
+            }
+
+            var fileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsPath, fileName);
+            var relativePath = $"/uploads/nameplates/{fileName}";
+
+            await using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            return Ok(new { url = relativePath });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при загрузке таблички: " + ex.Message });
+        }
+    }
+
+    [HttpPost("upload/avatar-decoration")]
+    [RequireAuth]
+    public async Task<IActionResult> UploadAvatarDecoration(IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { error = "Файл не выбран" });
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AvatarDecorationAllowedExtensions.Contains(extension))
+            {
+                return BadRequest(new { error = "Допустимы MP4, WebM, PNG/APNG, GIF или WebP (.mp4, .webm, .png, .apng, .gif, .webp)" });
+            }
+
+            var contentType = (file.ContentType ?? string.Empty).ToLowerInvariant();
+            var allowedTypes = new[]
+            {
+                "image/png", "image/gif", "image/webp", "video/webm", "video/mp4",
+                "video/quicktime", "video/x-matroska", "application/octet-stream",
+            };
+            if (!string.IsNullOrEmpty(contentType) && !allowedTypes.Contains(contentType))
+            {
+                return BadRequest(new { error = "Неподдерживаемый тип файла" });
+            }
+
+            var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "avatar-decorations");
+            Directory.CreateDirectory(uploadsPath);
+
+            var fileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsPath, fileName);
+            var relativePath = $"/uploads/avatar-decorations/{fileName}";
+
+            await using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            return Ok(new { url = relativePath });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при загрузке рамки аватара: " + ex.Message });
+        }
+    }
+
     private bool EnsureOwnProfile(Guid targetUserId, out IActionResult? forbidResult)
     {
         var userId = HttpContext.Items["UserId"] as Guid?;
@@ -439,6 +604,12 @@ public class UpdateNameplateRequest
 {
     public Guid UserId { get; set; }
     public string? Nameplate { get; set; }
+}
+
+public class UpdateAvatarDecorationRequest
+{
+    public Guid UserId { get; set; }
+    public string? AvatarDecoration { get; set; }
 }
 
 public class ProfileUserRequest

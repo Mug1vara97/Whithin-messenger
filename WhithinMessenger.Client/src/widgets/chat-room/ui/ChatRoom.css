@@ -701,8 +701,7 @@
   border-radius: 0;
   position: relative;
   flex: 0 0 auto;
-  overflow: hidden;
-  contain: layout paint;
+  overflow: visible;
   word-break: break-word;
   margin-bottom: 8px;
   display: flex;
@@ -753,9 +752,23 @@
   pointer-events: none;
 }
 
-.message > .user-avatar {
+.message > .message-avatar-wrap {
+  --avatar-decoration-scale: 1.22;
+
   flex-shrink: 0;
   position: relative;
+  width: 48px;
+  height: 44px;
+  margin-right: 8px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.message > .user-avatar-frame {
+  flex-shrink: 0;
+  position: relative;
+  overflow: visible;
 }
 
 .my-message {

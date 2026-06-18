@@ -1065,7 +1065,9 @@ export const useCallStore = create(
                 profileData = {
                   avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
                   avatarColor: profile.avatarColor || '#5865f2',
-                  banner: bannerValue
+                  banner: bannerValue,
+                  nameplate: profile.nameplate || null,
+                  avatarDecoration: profile.avatarDecoration || null,
                 };
                 console.log('📸 Loaded profile for participant:', peerData.userId, profileData);
               }
@@ -1086,7 +1088,9 @@ export const useCallStore = create(
                 isSpeaking: false,
                 avatar: profileData?.avatar || null,
                 avatarColor: profileData?.avatarColor || '#5865f2',
-                banner: profileData?.banner || null
+                banner: profileData?.banner || null,
+                nameplate: profileData?.nameplate || null,
+                avatarDecoration: profileData?.avatarDecoration || null,
               }]
             }));
 
@@ -1104,7 +1108,9 @@ export const useCallStore = create(
                 isAudioDisabled: peerData.isGlobalAudioMuted || false,
                 isDeafened: peerData.isGlobalAudioMuted || false,
                 avatar: profileData?.avatar || null,
-                avatarColor: profileData?.avatarColor || '#5865f2'
+                avatarColor: profileData?.avatarColor || '#5865f2',
+                nameplate: profileData?.nameplate || null,
+                avatarDecoration: profileData?.avatarDecoration || null,
               });
               console.log('📢 Added peer to voice channel participants:', peerData.userId);
             }
@@ -1880,6 +1886,8 @@ export const useCallStore = create(
             avatar: null,
             avatarColor: '#5865f2',
             banner: null,
+            nameplate: null,
+            avatarDecoration: null,
           })),
         });
 
@@ -1907,6 +1915,8 @@ export const useCallStore = create(
                       avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
                       avatarColor: profile.avatarColor || '#5865f2',
                       banner: bannerValue,
+                      nameplate: profile.nameplate || null,
+                      avatarDecoration: profile.avatarDecoration || null,
                     }
                   : participant
               ),
@@ -1933,6 +1943,8 @@ export const useCallStore = create(
           isDeafened: afterJoinState.isGlobalAudioMuted || false,
           avatar: null,
           avatarColor: '#5865f2',
+          nameplate: null,
+          avatarDecoration: null,
         };
 
         try {
@@ -1940,6 +1952,8 @@ export const useCallStore = create(
           if (profile) {
             currentUserData.avatar = profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null;
             currentUserData.avatarColor = profile.avatarColor || '#5865f2';
+            currentUserData.nameplate = profile.nameplate || null;
+            currentUserData.avatarDecoration = profile.avatarDecoration || null;
           }
         } catch (error) {
           console.warn('Failed to load current user profile for voice channel:', error);
@@ -1957,6 +1971,8 @@ export const useCallStore = create(
             isDeafened: participant.isGlobalAudioMuted || false,
             avatar: participant.avatar,
             avatarColor: participant.avatarColor || '#5865f2',
+            nameplate: participant.nameplate || null,
+            avatarDecoration: participant.avatarDecoration || null,
           })),
         ];
 
@@ -1972,11 +1988,13 @@ export const useCallStore = create(
 
         let userAvatar = null;
         let userAvatarColor = '#5865f2';
+        let userNameplate = null;
         try {
           const profile = await userApi.getProfile(state.currentUserId);
           if (profile) {
             userAvatar = profile.avatar || null;
             userAvatarColor = profile.avatarColor || '#5865f2';
+            userNameplate = profile.nameplate || null;
           }
         } catch (error) {
           console.warn('Failed to load profile for resyncActiveCall:', error);
@@ -1990,6 +2008,7 @@ export const useCallStore = create(
           !state.isGlobalAudioMuted,
           userAvatar,
           userAvatarColor,
+          userNameplate,
           state.currentCallServerId
         );
 
@@ -2083,11 +2102,13 @@ export const useCallStore = create(
 
             let userAvatar = null;
             let userAvatarColor = '#5865f2';
+            let userNameplate = null;
             try {
               const profile = await userApi.getProfile(state.currentUserId);
               if (profile) {
                 userAvatar = profile.avatar || null;
                 userAvatarColor = profile.avatarColor || '#5865f2';
+                userNameplate = profile.nameplate || null;
               }
             } catch (err) {
               console.warn('Failed to load profile for joinRoom:', err);
@@ -2106,6 +2127,7 @@ export const useCallStore = create(
               !state.isGlobalAudioMuted,
               userAvatar,
               userAvatarColor,
+              userNameplate,
               serverId
             );
 

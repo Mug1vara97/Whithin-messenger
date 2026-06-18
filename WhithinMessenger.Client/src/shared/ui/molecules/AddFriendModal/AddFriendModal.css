@@ -231,22 +231,7 @@
 }
 
 .add-friend-modal__avatar-wrap {
-  position: relative;
   flex-shrink: 0;
-}
-
-.add-friend-modal__status-dot {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--background, #1e1f22);
-}
-
-.add-friend-modal__row:hover .add-friend-modal__status-dot {
-  border-color: var(--surface-hover, #35373c);
 }
 
 .add-friend-modal__user-info {

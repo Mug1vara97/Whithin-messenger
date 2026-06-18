@@ -439,6 +439,7 @@ public class GroupChatHub : Hub
                     var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
                     string? avatarUrl = userProfile?.Avatar;
+                    string? avatarDecoration = userProfile?.AvatarDecoration;
 
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
                         new { 
@@ -448,6 +449,7 @@ public class GroupChatHub : Hub
                             username = username,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
+                            avatarDecoration = avatarDecoration,
                             avatarColor = avatarColor,
                             repliedMessage = repliedMessage,
                             forwardedMessage = messageResult.Success
@@ -724,6 +726,7 @@ public class GroupChatHub : Hub
                     chatId = parsedChatId,
                     contentType = message.ContentType,
                     avatarUrl = userProfile?.Avatar,
+                    avatarDecoration = userProfile?.AvatarDecoration,
                     avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value),
                     poll = BuildPollPayload(message.Poll, userId.Value),
                     isPinned = false,
@@ -913,6 +916,7 @@ public class GroupChatHub : Hub
                     var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
                     string? avatarUrl = userProfile?.Avatar;
+                    string? avatarDecoration = userProfile?.AvatarDecoration;
 
                     // Уведомляем всех участников чата о новом медиафайле
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
@@ -923,6 +927,7 @@ public class GroupChatHub : Hub
                             username = username,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
+                            avatarDecoration = avatarDecoration,
                             avatarColor = avatarColor,
                             repliedMessage = (object?)null,
                             forwardedMessage = messageResult.Success
@@ -1441,6 +1446,7 @@ public class GroupChatHub : Hub
             contentType = "call_log",
             createdAt = message.CreatedAt,
             avatarUrl = userProfile?.Avatar,
+            avatarDecoration = userProfile?.AvatarDecoration,
             avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(session.CallerId),
             status = MessageStatusHelper.Sent,
         });

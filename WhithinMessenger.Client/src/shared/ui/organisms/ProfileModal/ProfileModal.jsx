@@ -11,6 +11,9 @@ import {
   getUserStatusLabel,
   normalizeUserStatus,
 } from '../../../lib/utils/userStatus';
+import UserNameplate from '../../atoms/UserNameplate';
+import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
+import AvatarDecorationMedia from '../../atoms/UserAvatar/AvatarDecorationMedia';
 import './ProfileModal.css';
 
 const MAX_BIO_LENGTH = 190;
@@ -179,6 +182,8 @@ const ProfileModal = ({
   if (!isOpen) return null;
 
   const avatarUrl = resolveMediaUrl(profile?.avatar);
+  const avatarDecorationUrl = resolveAvatarDecorationUrl(profile?.avatarDecoration);
+  const hasAvatarDecoration = Boolean(avatarDecorationUrl);
 
   return (
     <div className="profile-modal" role="dialog" aria-modal="true" aria-label="Профиль">
@@ -209,8 +214,8 @@ const ProfileModal = ({
         <div className="profile-modal__hero">
           <div className="profile-modal__avatar-wrap">
             <div
-              className="profile-modal__avatar-ring"
-              style={{ '--profile-accent': accentColor }}
+              className={`profile-modal__avatar-ring ${hasAvatarDecoration ? 'profile-modal__avatar-ring--decorated' : ''}`}
+              style={hasAvatarDecoration ? undefined : { '--profile-accent': accentColor }}
             >
               <div className="profile-modal__avatar" style={{ backgroundColor: accentColor }}>
                 {avatarUrl ? (
@@ -219,6 +224,14 @@ const ProfileModal = ({
                   <span>{displayName.charAt(0).toUpperCase()}</span>
                 )}
               </div>
+              {hasAvatarDecoration && (
+                <div className="profile-modal__avatar-decoration-layer" aria-hidden="true">
+                  <AvatarDecorationMedia
+                    src={avatarDecorationUrl}
+                    className="profile-modal__avatar-decoration"
+                  />
+                </div>
+              )}
               <span
                 className="profile-modal__avatar-status"
                 style={{ backgroundColor: presenceColor }}
@@ -229,7 +242,9 @@ const ProfileModal = ({
           </div>
 
           <div className="profile-modal__identity">
-            <h2 className="profile-modal__name">{displayName}</h2>
+            <UserNameplate nameplate={profile?.nameplate} className="profile-modal__nameplate">
+              <h2 className="profile-modal__name">{displayName}</h2>
+            </UserNameplate>
           </div>
         </div>
 

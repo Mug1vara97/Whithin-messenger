@@ -16,5 +16,7 @@ public class UserProfile
 
     public string? Nameplate { get; set; }
 
+    public string? AvatarDecoration { get; set; }
+
     public ApplicationUser User { get; set; } = null!;
 }

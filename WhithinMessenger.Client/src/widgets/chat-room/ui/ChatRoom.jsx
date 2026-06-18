@@ -1317,6 +1317,7 @@ const ChatRoom = ({
                         username={participant.userName || 'U'}
                         avatarUrl={participant.avatar}
                         avatarColor={participant.avatarColor}
+                        avatarDecoration={participant.avatarDecoration}
                         size={74}
                       />
                     </div>
@@ -1595,19 +1596,23 @@ const ChatRoom = ({
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
               onClick={(e) => handleMessageSelectToggle(e, msg.messageId)}
             >
-              <UserAvatar
-                username={msg.senderUsername}
-                avatarUrl={msg.avatarUrl}
-                avatarColor={msg.avatarColor}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (isSelectionMode) {
-                    handleMessageSelectToggle(event, msg.messageId);
-                    return;
-                  }
-                  handleOpenAuthorProfile(msg);
-                }}
-              />
+              <div className="message-avatar-wrap">
+                <UserAvatar
+                  username={msg.senderUsername}
+                  avatarUrl={msg.avatarUrl}
+                  avatarColor={msg.avatarColor}
+                  avatarDecoration={msg.avatarDecoration}
+                  size={40}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (isSelectionMode) {
+                      handleMessageSelectToggle(event, msg.messageId);
+                      return;
+                    }
+                    handleOpenAuthorProfile(msg);
+                  }}
+                />
+              </div>
               <div className="message-content">
                 <div className="message-header">
                   <button

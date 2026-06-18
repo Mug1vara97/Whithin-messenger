@@ -184,15 +184,18 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
                         username={user.username}
                         avatarUrl={user.avatarUrl}
                         avatarColor={user.avatarColor}
+                        avatarDecoration={user.avatarDecoration}
                         size="medium"
+                        statusIndicator={
+                          meta.tone === 'status' ? (
+                            <span
+                              className="user-avatar-presence-dot"
+                              style={{ backgroundColor: getUserStatusColor(user.userStatus) }}
+                              title={meta.label}
+                            />
+                          ) : null
+                        }
                       />
-                      {meta.tone === 'status' && (
-                        <span
-                          className="add-friend-modal__status-dot"
-                          style={{ backgroundColor: getUserStatusColor(user.userStatus) }}
-                          title={meta.label}
-                        />
-                      )}
                     </div>
 
                     <div className="add-friend-modal__user-info">

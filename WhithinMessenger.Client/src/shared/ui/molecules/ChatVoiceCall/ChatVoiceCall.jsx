@@ -24,6 +24,7 @@ import { createParticipant } from '../../../../entities/video-call/model/types';
 import { userApi } from '../../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { VideoCallGrid } from '../../atoms';
+import UserAvatar from '../../atoms/UserAvatar';
 import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
@@ -159,9 +160,11 @@ const ChatVoiceCall = ({
         const profile = await userApi.getProfile(userId);
         if (!mounted || !profile) return;
         setCurrentUserProfile({
-          avatar: toMediaUrl(profile.avatar),
+          avatar: profile.avatar || null,
           avatarColor: profile.avatarColor || '#5865f2',
-          banner: toBannerValue(profile.banner)
+          banner: toBannerValue(profile.banner),
+          nameplate: profile.nameplate || null,
+          avatarDecoration: profile.avatarDecoration || null,
         });
       } catch (profileError) {
         console.warn('ChatVoiceCall: failed to load current user profile', profileError);
@@ -225,9 +228,11 @@ const ChatVoiceCall = ({
   currentUser.isVideoEnabled = isVideoEnabled;
   currentUser.videoStream = cameraStream;
   currentUser.isCurrentUser = true;
-  currentUser.avatar = currentUserProfile?.avatar || null;
+  currentUser.avatar = currentUserProfile?.avatar ? toMediaUrl(currentUserProfile.avatar) : null;
   currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
   currentUser.banner = currentUserProfile?.banner || null;
+  currentUser.nameplate = currentUserProfile?.nameplate || null;
+  currentUser.avatarDecoration = currentUserProfile?.avatarDecoration || null;
 
   const displayParticipants = useMemo(() => {
     const list = [currentUser];
@@ -262,6 +267,8 @@ const ChatVoiceCall = ({
       videoParticipant.videoStream = participant.videoStream || null;
       videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
       videoParticipant.banner = participant.banner || null;
+      videoParticipant.nameplate = participant.nameplate || null;
+      videoParticipant.avatarDecoration = participant.avatarDecoration || null;
       list.push(videoParticipant);
     });
 
@@ -376,22 +383,13 @@ const ChatVoiceCall = ({
                   }`}
                 >
                   <div className={styles.participantAvatarContainer}>
-                    <div className={styles.participantAvatar}>
-                      <div
-                        className={styles.avatarCircle}
-                        style={!participant.avatar ? { backgroundColor: participant.avatarColor || '#4e5058' } : undefined}
-                      >
-                        {participant.avatar ? (
-                          <img
-                            src={participant.avatar}
-                            alt={participant.name || 'User'}
-                            className={styles.avatarImage}
-                          />
-                        ) : (
-                          (participant.name || 'U').charAt(0).toUpperCase()
-                        )}
-                      </div>
-                    </div>
+                    <UserAvatar
+                      username={participant.name || 'U'}
+                      avatarUrl={participant.avatar}
+                      avatarColor={participant.avatarColor}
+                      avatarDecoration={participant.avatarDecoration}
+                      size={72}
+                    />
                   </div>
                   <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
                   <div className={styles.participantStatusRow}>

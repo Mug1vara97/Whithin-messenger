@@ -15,6 +15,7 @@ public static class MessageDtoMapper
             CreatedAt = message.CreatedAt,
             SenderUsername = message.User?.UserName ?? "Unknown",
             AvatarUrl = message.User?.UserProfile?.Avatar,
+            AvatarDecoration = message.User?.UserProfile?.AvatarDecoration,
             AvatarColor = !string.IsNullOrEmpty(message.User?.UserProfile?.AvatarColor)
                 ? message.User!.UserProfile!.AvatarColor!
                 : GenerateAvatarColor(message.UserId),

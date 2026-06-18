@@ -5,6 +5,8 @@ import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined';
 import { VolumeUp } from '@mui/icons-material';
 import { useCallStore } from '../../../lib/stores/callStore';
 import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
+import UserAvatar from '../../atoms/UserAvatar';
+import UserNameplate from '../../atoms/UserNameplate';
 import {
   getParticipantIsDeafened,
   getParticipantIsMuted,
@@ -53,6 +55,10 @@ const areParticipantsEqual = (a, b) => {
     if (
       pA.odUserId !== pB.odUserId ||
       pA.userId !== pB.userId ||
+      pA.userName !== pB.userName ||
+      pA.nameplate !== pB.nameplate ||
+      pA.avatarDecoration !== pB.avatarDecoration ||
+      pA.avatar !== pB.avatar ||
       pA.isMuted !== pB.isMuted ||
       pA.isSpeaking !== pB.isSpeaking ||
       pA.isDeafened !== pB.isDeafened ||
@@ -156,11 +162,6 @@ const ChannelItem = ({
     return `${MEDIA_BASE_URL}${avatar}`;
   };
 
-  const getInitials = (name) => {
-    if (!name) return '?';
-    return name.charAt(0).toUpperCase();
-  };
-
   return (
     <Draggable
       draggableId={`chat-${channel.chatId || channel.ChatId}`}
@@ -251,37 +252,31 @@ const ChannelItem = ({
                             className={`voice-participant ${isSpeakingLive ? 'speaking' : ''} ${isMutedLive ? 'muted' : ''} ${isDeafenedLive ? 'deafened' : ''} ${participant.isServerMuted ? 'server-muted' : ''} ${participantSnapshot.isDragging ? 'dragging' : ''}`}
                             style={participantProvided.draggableProps.style}
                           >
-                            <div className="voice-participant-avatar">
-                              {participant.avatar ? (
-                                <img
-                                  src={getAvatarUrl(participant.avatar)}
-                                  alt={participant.userName}
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'flex';
-                                  }}
+                            <UserNameplate
+                              nameplate={participant.nameplate}
+                              className="voice-participant-nameplate"
+                            >
+                              <div className="voice-participant-nameplate__row">
+                                <div className="voice-participant-avatar">
+                                  <UserAvatar
+                                    username={participant.userName || participant.name}
+                                    avatarUrl={participant.avatar ? getAvatarUrl(participant.avatar) : null}
+                                    avatarColor={participant.avatarColor}
+                                    size={24}
+                                  />
+                                </div>
+                                <span className="voice-participant-name">{participant.userName}</span>
+                                <VoiceParticipantStatusIcons
+                                  className="voice-participant-status-icons"
+                                  isMuted={isMutedLive}
+                                  isDeafened={isDeafenedLive}
+                                  isServerMuted={participant.isServerMuted}
+                                  isServerDeafened={participant.isServerDeafened}
+                                  isSpeaking={isSpeakingLive}
+                                  variant="inline"
                                 />
-                              ) : null}
-                              <span
-                                className="voice-participant-initials"
-                                style={{
-                                  display: participant.avatar ? 'none' : 'flex',
-                                  backgroundColor: participant.avatarColor || '#5865f2',
-                                }}
-                              >
-                                {getInitials(participant.userName)}
-                              </span>
-                            </div>
-                            <span className="voice-participant-name">{participant.userName}</span>
-                            <VoiceParticipantStatusIcons
-                              className="voice-participant-status-icons"
-                              isMuted={isMutedLive}
-                              isDeafened={isDeafenedLive}
-                              isServerMuted={participant.isServerMuted}
-                              isServerDeafened={participant.isServerDeafened}
-                              isSpeaking={isSpeakingLive}
-                              variant="inline"
-                            />
+                              </div>
+                            </UserNameplate>
                           </div>
                         )}
                       </Draggable>

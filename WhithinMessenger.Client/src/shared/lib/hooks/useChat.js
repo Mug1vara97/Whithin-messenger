@@ -269,6 +269,7 @@ export const useChat = (chatId, username, userId) => {
       contentType: msg.contentType ?? msg.ContentType ?? null,
       sticker: normalizeSticker(msg.sticker ?? msg.Sticker),
       avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
+      avatarDecoration: msg.avatarDecoration ?? msg.AvatarDecoration ?? null,
       avatarColor: msg.avatarColor ?? msg.AvatarColor ?? null,
       repliedMessage: msg.repliedMessage ?? msg.RepliedMessage ?? null,
       forwardedMessage: normalizeForwardedMessage(msg.forwardedMessage ?? msg.ForwardedMessage),

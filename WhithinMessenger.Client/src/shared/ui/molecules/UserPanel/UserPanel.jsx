@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Headset, HeadsetOff, Settings as SettingsIcon } from '@mui/icons-material';
 import { userApi } from '../../../../entities/user/api';
-import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../lib/stores/callStore';
@@ -18,15 +17,10 @@ import {
   toBackendUserStatus,
 } from '../../../lib/utils/userStatus';
 import { PROFILE_UPDATED_EVENT, useProfileModal } from '../../../lib/contexts/ProfileModalContext';
+import UserAvatar from '../../atoms/UserAvatar';
 import styles from './UserPanel.module.css';
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
-
-const resolveAvatarUrl = (avatar) => {
-  if (!avatar) return null;
-  if (avatar.startsWith('http')) return avatar;
-  return `${MEDIA_BASE_URL}${avatar.startsWith('/') ? avatar : `/${avatar}`}`;
-};
 
 const UserPanel = ({
   userId,
@@ -283,38 +277,35 @@ const UserPanel = ({
 
   if (!isOpen) return null;
 
-  const avatarUrl = resolveAvatarUrl(userProfile?.avatar);
   const avatarColor = userProfile?.avatarColor || '#5865F2';
 
   return (
     <>
       <div className={styles['user-panel']}>
         <div className={styles['user-panel-content']}>
-          <div className={styles['user-avatar-container']}>
-            <button
-              type="button"
-              className={styles['user-avatar']}
-              style={{ backgroundColor: avatarColor }}
+          <div className={styles['user-avatar-wrap']}>
+            <UserAvatar
+              username={username}
+              avatarUrl={userProfile?.avatar}
+              avatarColor={avatarColor}
+              avatarDecoration={userProfile?.avatarDecoration}
+              size={40}
               onClick={handleOpenOwnProfile}
-              title="Открыть профиль"
-            >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className={styles['user-avatar-image']} />
-              ) : (
-                (username?.charAt(0) || 'U').toUpperCase()
-              )}
-            </button>
-            <button
-              className={styles['user-avatar-status-button']}
-              onClick={() => setIsStatusMenuOpen((prev) => !prev)}
-              title={getUserStatusLabel(currentStatus)}
-              type="button"
-            >
-              <span
-                className={styles['user-avatar-status']}
-                style={{ backgroundColor: getUserStatusColor(currentStatus) }}
-              />
-            </button>
+              statusIndicatorInteractive
+              statusIndicator={
+                <button
+                  className={styles['user-avatar-status-button']}
+                  onClick={() => setIsStatusMenuOpen((prev) => !prev)}
+                  title={getUserStatusLabel(currentStatus)}
+                  type="button"
+                >
+                  <span
+                    className="user-avatar-presence-dot"
+                    style={{ backgroundColor: getUserStatusColor(currentStatus) }}
+                  />
+                </button>
+              }
+            />
           </div>
 
           <div className={styles['user-identity']} ref={statusMenuRef}>

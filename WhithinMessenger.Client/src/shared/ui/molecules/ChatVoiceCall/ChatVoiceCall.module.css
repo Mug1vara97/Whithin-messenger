@@ -98,20 +98,30 @@
   flex-shrink: 0;
 }
 
-.currentUserParticipant .avatarCircle {
+.currentUserParticipant .user-avatar-frame {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .participantAvatarContainer {
+  --avatar-decoration-scale: 1.22;
+
   position: relative;
   width: 80px;
-  height: 80px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .participantAvatarContainer::after {
   content: '';
   position: absolute;
-  inset: -5px;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 3px solid transparent;
   pointer-events: none;
@@ -129,34 +139,16 @@
     0 0 14px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 40%, transparent);
 }
 
-.participantAvatar {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.avatarCircle {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: var(--primary, #4e5058);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-on-primary, #ffffff);
-  font-weight: 700;
-  font-size: 26px;
-  border: none;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--background, #000000) 35%, transparent);
-}
-
-.avatarImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
+.participantName {
+  max-width: 120px;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--text, #f2f3f5);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--background, #000000) 45%, transparent);
 }
 
 .statusIndicators {
@@ -185,18 +177,6 @@
 
 .audioMutedIndicator {
   background: var(--warning, #f0b132);
-}
-
-.participantName {
-  max-width: 120px;
-  font-size: 13px;
-  line-height: 1.2;
-  color: var(--text, #f2f3f5);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 2px color-mix(in srgb, var(--background, #000000) 45%, transparent);
 }
 
 .participantStatusRow {

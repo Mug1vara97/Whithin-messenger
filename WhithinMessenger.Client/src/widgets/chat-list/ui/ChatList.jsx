@@ -5,7 +5,6 @@ import { SearchBar, UserAvatar, CreateGroupChatModal, UserPanel } from '../../..
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { getUserStatusColor, getUserStatusLabel } from '../../../shared/lib/utils/userStatus';
 import { formatChatListLastMessage } from '../../../shared/lib/utils/formatChatListLastMessage';
 import { formatChatListMessageTime } from '../../../shared/lib/utils/formatChatListMessageTime';
@@ -190,35 +189,31 @@ const ChatList = ({
                 className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''} ${isSavedMessages ? 'chat-item--saved' : ''}`}
                 onClick={() => handleChatSelection(chat)}
               >
-                <div className="chat-avatar-container">
+                <div className="chat-avatar-wrap">
                   {isSavedMessages ? (
                     <div className="chat-avatar chat-avatar--saved">
                       <BookmarkBorder fontSize="small" />
                     </div>
                   ) : (
-                  <div 
-                    className="chat-avatar" 
-                    style={{
-                      backgroundColor: chat.avatarUrl ? 'transparent' : (chat.avatarColor || '#5865F2'),
-                      backgroundImage: chat.avatarUrl?.startsWith('/uploads/') 
-                        ? `url(${BASE_URL}${chat.avatarUrl})` 
-                        : (chat.avatarUrl?.startsWith('http') ? `url(${chat.avatarUrl})` : 'none'),
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    {!chat.avatarUrl && (
-                      <span style={{ color: 'white', fontSize: '16px', fontWeight: 'bold' }}>
-                        {chat.isGroupChat ? 'G' : (chat.username ? chat.username.charAt(0).toUpperCase() : 'U')}
-                      </span>
-                    )}
-                  </div>
-                  )}
-                  {!chat.isGroupChat && !isSavedMessages && (
-                    <div
-                      className="status-indicator"
-                      style={{ backgroundColor: getUserStatusColor(chatPresenceStatus) }}
-                      title={getUserStatusLabel(chatPresenceStatus)}
+                    <UserAvatar
+                      username={
+                        chat.isGroupChat && !chat.avatarUrl
+                          ? 'G'
+                          : chat.username
+                      }
+                      avatarUrl={chat.avatarUrl}
+                      avatarColor={chat.avatarColor || '#5865F2'}
+                      avatarDecoration={chat.isGroupChat ? null : chat.avatarDecoration}
+                      size={40}
+                      statusIndicator={
+                        !chat.isGroupChat ? (
+                          <span
+                            className="user-avatar-presence-dot"
+                            style={{ backgroundColor: getUserStatusColor(chatPresenceStatus) }}
+                            title={getUserStatusLabel(chatPresenceStatus)}
+                          />
+                        ) : null
+                      }
                     />
                   )}
                 </div>
@@ -271,11 +266,12 @@ const ChatList = ({
               >
                 <div className="search-result-content">
                   <div className="search-result-avatar">
-                    <UserAvatar 
+                    <UserAvatar
                       username={user.username}
                       avatarUrl={user.avatarUrl}
                       avatarColor={user.avatarColor}
-                      size="32px"
+                      avatarDecoration={user.avatarDecoration}
+                      size={32}
                     />
                   </div>
                   <div className="search-result-info">

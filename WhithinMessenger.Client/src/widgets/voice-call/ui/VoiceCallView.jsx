@@ -177,7 +177,8 @@ const VoiceCallView = ({
             setCurrentUserProfile({
               avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
               avatarColor: profile.avatarColor || '#5865f2',
-              banner: bannerValue
+              banner: bannerValue,
+              avatarDecoration: profile.avatarDecoration || null,
             });
           }
         })
@@ -222,6 +223,7 @@ const VoiceCallView = ({
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
     currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
     currentUser.banner = currentUserProfile?.banner || null;
+    currentUser.avatarDecoration = currentUserProfile?.avatarDecoration || null;
     
     console.log('🧑 Current user state:', {
       isMuted: currentUser.isMuted,
@@ -264,6 +266,7 @@ const VoiceCallView = ({
       // Добавляем данные профиля
       videoParticipant.avatarColor = participant.avatarColor || '#5865f2';
       videoParticipant.banner = participant.banner || null;
+      videoParticipant.avatarDecoration = participant.avatarDecoration || null;
       videoParticipantsList.push(videoParticipant);
     });
     

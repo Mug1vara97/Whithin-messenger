@@ -2,9 +2,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const crossOriginResourcePolicyPlugin = () => ({
+  name: 'cross-origin-resource-policy-public',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (/\.(webp|png|gif|apng|webm|wasm|worklet\.js)$/i.test(req.url || '')) {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+      }
+      next()
+    })
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), crossOriginResourcePolicyPlugin()],
   define: {
     global: 'globalThis',
   },

@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { WorkspacePremium } from '@mui/icons-material';
 
 import UserAvatar from '../../atoms/UserAvatar';
+import UserNameplate from '../../atoms/UserNameplate';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 
 import {
@@ -90,47 +91,38 @@ const MemberListSidebar = ({
         }}
       >
 
-        <div className="member-list-avatar-wrap">
-
-          <UserAvatar
-
-            username={member.username}
-
-            avatarUrl={avatarUrl}
-
-            avatarColor={member.avatarColor}
-
-            size={32}
-
-          />
-
-          {shouldShowStatusDot && (
-
-            <span
-
-              className="member-list-status-dot"
-
-              style={{ backgroundColor: getUserStatusColor(member.status) }}
-
-              title={getUserStatusLabel(member.status)}
-
-            />
-
-          )}
-
-        </div>
-
-        <span className="member-list-name" style={displayNameStyle}>
-
-          {member.username}
-
-        </span>
-
-        {member.isServerOwner && (
-
-          <WorkspacePremium className="member-list-owner-icon" fontSize="inherit" titleAccess="Владелец сервера" />
-
-        )}
+        <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
+          <div className="member-list-nameplate__row">
+            <div className="member-list-avatar-wrap">
+              <UserAvatar
+                username={member.username}
+                avatarUrl={avatarUrl}
+                avatarColor={member.avatarColor}
+                avatarDecoration={member.avatarDecoration}
+                size={32}
+                statusIndicator={
+                  shouldShowStatusDot ? (
+                    <span
+                      className="user-avatar-presence-dot"
+                      style={{ backgroundColor: getUserStatusColor(member.status) }}
+                      title={getUserStatusLabel(member.status)}
+                    />
+                  ) : null
+                }
+              />
+            </div>
+            <span className="member-list-name" style={displayNameStyle}>
+              {member.username}
+            </span>
+            {member.isServerOwner && (
+              <WorkspacePremium
+                className="member-list-owner-icon"
+                fontSize="inherit"
+                titleAccess="Владелец сервера"
+              />
+            )}
+          </div>
+        </UserNameplate>
 
       </div>
 

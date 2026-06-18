@@ -49,6 +49,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         .Where(m => m.ChatId == c.Id && m.UserId != userId)
                         .Select(m => m.User.UserProfile.Nameplate)
                         .FirstOrDefault(),
+                    AvatarDecoration = _context.Members
+                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
+                        .Select(m => m.User.UserProfile.AvatarDecoration)
+                        .FirstOrDefault(),
                     UserStatus = _context.Members
                         .Where(m => m.ChatId == c.Id && m.UserId != userId)
                         .Select(m => m.User.Status.ToString().ToLower())

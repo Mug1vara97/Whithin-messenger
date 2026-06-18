@@ -32,6 +32,10 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
             .HasMaxLength(255);
 
         builder
+            .Property(e => e.AvatarDecoration)
+            .HasMaxLength(255);
+
+        builder
             .Property(e => e.Description)
             .HasMaxLength(-1);
 

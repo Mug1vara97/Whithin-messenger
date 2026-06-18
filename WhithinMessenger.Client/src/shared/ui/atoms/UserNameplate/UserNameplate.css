@@ -2,15 +2,31 @@
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 28px;
   display: flex;
-  align-items: center;
-  border-radius: 4px;
-  overflow: hidden;
+  align-items: stretch;
 }
 
 .user-nameplate--empty {
   overflow: visible;
+  min-height: 0;
+}
+
+.user-nameplate--decorated {
+  min-height: 42px;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 2px 10px rgba(0, 0, 0, 0.2);
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.user-nameplate--decorated:hover {
+  filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 3px 14px rgba(0, 0, 0, 0.28);
 }
 
 .user-nameplate__media {
@@ -31,16 +47,7 @@
 }
 
 .user-nameplate__shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.55) 0%,
-    rgba(0, 0, 0, 0.2) 42%,
-    rgba(0, 0, 0, 0.02) 72%,
-    transparent 100%
-  );
-  pointer-events: none;
+  display: none;
 }
 
 .user-nameplate__content {
@@ -48,7 +55,8 @@
   z-index: 1;
   min-width: 0;
   width: 100%;
-  padding: 2px 8px;
+  display: flex;
+  align-items: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -56,7 +64,7 @@
     display: none;
   }
 
-  .user-nameplate__shade {
-    background: rgba(0, 0, 0, 0.28);
+  .user-nameplate--decorated:hover {
+    filter: none;
   }
 }

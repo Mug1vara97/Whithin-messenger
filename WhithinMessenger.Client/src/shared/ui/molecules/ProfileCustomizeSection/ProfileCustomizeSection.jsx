@@ -5,6 +5,21 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckIcon from '@mui/icons-material/Check';
 import { userApi } from '../../../../entities/user/api';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
+import {
+  DODO_NAMEPLATE_PATH,
+  NAMEPLATE_ACCEPT,
+  NAMEPLATE_SPEC_HINT,
+  TEST_NAMEPLATE_PATH,
+  validateNameplateFile,
+} from '../../../lib/utils/nameplateHelpers';
+import UserNameplate from '../../atoms/UserNameplate';
+import UserAvatar from '../../atoms/UserAvatar';
+import {
+  AVATAR_DECORATION_ACCEPT,
+  AVATAR_DECORATION_SPEC_HINT,
+  TEST_AVATAR_DECORATION_PATH,
+  validateAvatarDecorationFile,
+} from '../../../lib/utils/avatarDecorationHelpers';
 import './ProfileCustomizeSection.css';
 
 const ACCENT_PRESETS = [
@@ -183,6 +198,8 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
 
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
+  const nameplateInputRef = useRef(null);
+  const avatarDecorationInputRef = useRef(null);
 
   const accentColor = profile?.avatarColor || '#5865f2';
   const bannerColor = isHexColor(profile?.banner) ? profile.banner : null;
@@ -295,7 +312,97 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
     }
   };
 
-  const avatarUrl = resolveMediaUrl(profile?.avatar);
+  const handleApplyTestNameplate = async (path = TEST_NAMEPLATE_PATH) => {
+    if (!userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      await userApi.updateProfileNameplate(userId, path);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось применить табличку');
+    } finally {
+      setUploadBusy(false);
+    }
+  };
+
+  const handleNameplateUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      await validateNameplateFile(file);
+      const { url } = await userApi.uploadProfileNameplate(file);
+      await userApi.updateProfileNameplate(userId, url);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось загрузить табличку');
+    } finally {
+      setUploadBusy(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveNameplate = async () => {
+    if (!userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      await userApi.removeProfileNameplate(userId);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось удалить табличку');
+    } finally {
+      setUploadBusy(false);
+    }
+  };
+
+  const handleApplyTestAvatarDecoration = async (path = TEST_AVATAR_DECORATION_PATH) => {
+    if (!userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      await userApi.updateProfileAvatarDecoration(userId, path);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось применить рамку аватара');
+    } finally {
+      setUploadBusy(false);
+    }
+  };
+
+  const handleAvatarDecorationUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      validateAvatarDecorationFile(file);
+      const { url } = await userApi.uploadProfileAvatarDecoration(file);
+      await userApi.updateProfileAvatarDecoration(userId, url);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось загрузить рамку аватара');
+    } finally {
+      setUploadBusy(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatarDecoration = async () => {
+    if (!userId) return;
+    setUploadBusy(true);
+    setActionError('');
+    try {
+      await userApi.removeProfileAvatarDecoration(userId);
+      await loadProfile();
+    } catch (error) {
+      setActionError(error.message || 'Не удалось удалить рамку аватара');
+    } finally {
+      setUploadBusy(false);
+    }
+  };
 
   return (
     <div className="setting-section profile-customize">
@@ -314,15 +421,14 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
             backgroundPosition: 'center',
           }}
         />
-        <div
-          className="profile-customize__preview-avatar"
-          style={{ backgroundColor: accentColor }}
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" />
-          ) : (
-            <span>{(username || '?').charAt(0).toUpperCase()}</span>
-          )}
+        <div className="profile-customize__preview-avatar-wrap">
+          <UserAvatar
+            username={username}
+            avatarUrl={profile?.avatar}
+            avatarColor={accentColor}
+            avatarDecoration={profile?.avatarDecoration}
+            size={72}
+          />
         </div>
       </div>
 
@@ -409,6 +515,118 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
             >
               <DeleteOutlineIcon sx={{ fontSize: 16 }} />
               Сбросить
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="setting-item profile-customize__block">
+        <h4 className="setting-subheading">Табличка имени</h4>
+        <p className="setting-description">
+          Анимированный фон за именем в списке участников и голосовых каналах.
+          {' '}
+          {NAMEPLATE_SPEC_HINT}
+        </p>
+        <div className="profile-customize__nameplate-preview">
+          <UserNameplate nameplate={profile?.nameplate} className="profile-customize__nameplate-demo">
+            <span className="profile-customize__nameplate-label">{username || 'Пользователь'}</span>
+          </UserNameplate>
+        </div>
+        <div className="profile-customize__actions">
+          <input
+            ref={nameplateInputRef}
+            type="file"
+            accept={NAMEPLATE_ACCEPT}
+            hidden
+            onChange={handleNameplateUpload}
+          />
+          <button
+            type="button"
+            className="profile-customize__btn-primary"
+            disabled={uploadBusy}
+            onClick={() => nameplateInputRef.current?.click()}
+          >
+            Загрузить свою
+          </button>
+          <button
+            type="button"
+            className="profile-customize__btn-secondary"
+            disabled={uploadBusy}
+            onClick={() => handleApplyTestNameplate(TEST_NAMEPLATE_PATH)}
+          >
+            Сакура
+          </button>
+          <button
+            type="button"
+            className="profile-customize__btn-secondary"
+            disabled={uploadBusy}
+            onClick={() => handleApplyTestNameplate(DODO_NAMEPLATE_PATH)}
+          >
+            Dodo
+          </button>
+          {profile?.nameplate && (
+            <button
+              type="button"
+              className="profile-customize__btn-secondary"
+              disabled={uploadBusy}
+              onClick={handleRemoveNameplate}
+            >
+              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+              Убрать
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="setting-item profile-customize__block">
+        <h4 className="setting-subheading">Рамка аватара</h4>
+        <p className="setting-description">
+          Анимированная обводка вокруг аватара, как в Discord.
+          {' '}
+          {AVATAR_DECORATION_SPEC_HINT}
+        </p>
+        <div className="profile-customize__decoration-preview">
+          <UserAvatar
+            username={username}
+            avatarUrl={profile?.avatar}
+            avatarColor={accentColor}
+            avatarDecoration={profile?.avatarDecoration}
+            size={80}
+          />
+        </div>
+        <div className="profile-customize__actions">
+          <input
+            ref={avatarDecorationInputRef}
+            type="file"
+            accept={AVATAR_DECORATION_ACCEPT}
+            hidden
+            onChange={handleAvatarDecorationUpload}
+          />
+          <button
+            type="button"
+            className="profile-customize__btn-primary"
+            disabled={uploadBusy}
+            onClick={() => avatarDecorationInputRef.current?.click()}
+          >
+            Загрузить MP4/WebM/PNG
+          </button>
+          <button
+            type="button"
+            className="profile-customize__btn-secondary"
+            disabled={uploadBusy}
+            onClick={() => handleApplyTestAvatarDecoration()}
+          >
+            Тестовая рамка
+          </button>
+          {profile?.avatarDecoration && (
+            <button
+              type="button"
+              className="profile-customize__btn-secondary"
+              disabled={uploadBusy}
+              onClick={handleRemoveAvatarDecoration}
+            >
+              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+              Убрать
             </button>
           )}
         </div>

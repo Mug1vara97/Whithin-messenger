@@ -9,6 +9,7 @@ public class MessageDto
     public string SenderUsername { get; set; } = string.Empty;
     public string? Status { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? AvatarDecoration { get; set; }
     public string AvatarColor { get; set; } = string.Empty;
     public ReplyMessageDto? RepliedMessage { get; set; }
     public ForwardedMessageDto? ForwardedMessage { get; set; }
