@@ -467,9 +467,9 @@ public class ProfileController : ControllerBase
                 return BadRequest(new { error = "Файл не выбран" });
             }
 
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var claimedExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
             var allowedExtensions = new[] { ".webm", ".png", ".webp" };
-            if (!allowedExtensions.Contains(extension))
+            if (!allowedExtensions.Contains(claimedExtension))
             {
                 return BadRequest(new { error = "Допустимы файлы WebM, PNG или WebP" });
             }
@@ -481,24 +481,29 @@ public class ProfileController : ControllerBase
                 return BadRequest(new { error = "Неподдерживаемый тип файла" });
             }
 
-            if (file.Length > 3 * 1024 * 1024)
-            {
-                return BadRequest(new { error = "Файл слишком большой (максимум 3MB)" });
-            }
-
             var uploadsPath = Path.Combine(_environment.WebRootPath, "uploads", "nameplates");
             if (!Directory.Exists(uploadsPath))
             {
                 Directory.CreateDirectory(uploadsPath);
             }
 
+            await using var input = file.OpenReadStream();
+            var header = new byte[12];
+            var headerLength = await input.ReadAsync(header.AsMemory(0, header.Length));
+            var extension = ResolveNameplateExtension(header.AsSpan(0, headerLength), claimedExtension);
+
             var fileName = $"{Guid.NewGuid()}{extension}";
             var filePath = Path.Combine(uploadsPath, fileName);
             var relativePath = $"/uploads/nameplates/{fileName}";
 
-            await using (var stream = new FileStream(filePath, FileMode.Create))
+            await using (var output = new FileStream(filePath, FileMode.Create))
             {
-                await file.CopyToAsync(stream);
+                if (headerLength > 0)
+                {
+                    await output.WriteAsync(header.AsMemory(0, headerLength));
+                }
+
+                await input.CopyToAsync(output);
             }
 
             return Ok(new { url = relativePath });
@@ -555,6 +560,42 @@ public class ProfileController : ControllerBase
         {
             return StatusCode(500, new { error = "Ошибка при загрузке рамки аватара: " + ex.Message });
         }
+    }
+
+    private static string ResolveNameplateExtension(ReadOnlySpan<byte> header, string claimedExtension)
+    {
+        if (header.Length >= 4
+            && header[0] == 0x1A
+            && header[1] == 0x45
+            && header[2] == 0xDF
+            && header[3] == 0xA3)
+        {
+            return ".webm";
+        }
+
+        if (header.Length >= 12
+            && header[0] == (byte)'R'
+            && header[1] == (byte)'I'
+            && header[2] == (byte)'F'
+            && header[3] == (byte)'F'
+            && header[8] == (byte)'W'
+            && header[9] == (byte)'E'
+            && header[10] == (byte)'B'
+            && header[11] == (byte)'P')
+        {
+            return ".webp";
+        }
+
+        if (header.Length >= 8
+            && header[0] == 0x89
+            && header[1] == (byte)'P'
+            && header[2] == (byte)'N'
+            && header[3] == (byte)'G')
+        {
+            return ".png";
+        }
+
+        return claimedExtension;
     }
 
     private bool EnsureOwnProfile(Guid targetUserId, out IActionResult? forbidResult)
