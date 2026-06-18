@@ -474,8 +474,9 @@ public class ProfileController : ControllerBase
                 return BadRequest(new { error = "Допустимы файлы WebM, PNG или WebP" });
             }
 
-            var allowedTypes = new[] { "video/webm", "image/png", "image/webp" };
-            if (!allowedTypes.Contains(file.ContentType))
+            var contentType = (file.ContentType ?? string.Empty).ToLowerInvariant();
+            var allowedTypes = new[] { "video/webm", "image/png", "image/webp", "application/octet-stream" };
+            if (!string.IsNullOrEmpty(contentType) && !allowedTypes.Contains(contentType))
             {
                 return BadRequest(new { error = "Неподдерживаемый тип файла" });
             }

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
+  isNameplateImage,
   isNameplateVideo,
   resolveNameplateUrl,
 } from '../../../lib/utils/nameplateHelpers';
@@ -53,6 +54,14 @@ const UserNameplate = ({
           playsInline
           preload="auto"
           aria-hidden="true"
+        />
+      ) : isNameplateImage(nameplate) ? (
+        <img
+          className="user-nameplate__media"
+          src={mediaUrl}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
         />
       ) : (
         <div

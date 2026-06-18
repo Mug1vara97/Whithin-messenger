@@ -7,15 +7,54 @@ export const NAMEPLATE_WIDTH = 448;
 export const NAMEPLATE_HEIGHT = 84;
 export const NAMEPLATE_MAX_FILE_BYTES = 3 * 1024 * 1024;
 
-export const NAMEPLATE_ACCEPT = 'video/webm,image/png,image/webp';
+export const NAMEPLATE_ALLOWED_EXTENSIONS = ['.webm', '.png', '.webp'];
+
+export const NAMEPLATE_ACCEPT = 'video/webm,image/png,image/webp,.webm,.png,.webp';
+
 export const NAMEPLATE_SPEC_HINT =
   `Рекомендуемое разрешение: ${NAMEPLATE_WIDTH}×${NAMEPLATE_HEIGHT} px (широкая полоса ~16:3). ` +
-  'Форматы: WebM (VP9, без звука), PNG или WebP. До 3 МБ.';
+  'Форматы: WebP (анимация с прозрачностью), WebM (VP9, без звука) или PNG. До 3 МБ.';
 
 export const TEST_NAMEPLATE_PATH = '/video.webm';
 export const DODO_NAMEPLATE_PATH = '/Dodo.webm';
 
 const DIMENSION_TOLERANCE = 16;
+
+const GENERIC_MIME_TYPES = new Set(['', 'application/octet-stream']);
+
+const EXTENSION_MIME_TYPES = {
+  '.webm': new Set(['video/webm', 'video/x-matroska']),
+  '.png': new Set(['image/png']),
+  '.webp': new Set(['image/webp']),
+};
+
+function resolveNameplateExtension(fileName) {
+  const lower = String(fileName || '').toLowerCase();
+
+  if (lower.endsWith('.webm')) return '.webm';
+  if (lower.endsWith('.webp')) return '.webp';
+  if (lower.endsWith('.png')) return '.png';
+
+  return null;
+}
+
+function isAllowedMimeForExtension(extension, mimeType) {
+  if (GENERIC_MIME_TYPES.has(mimeType)) {
+    return true;
+  }
+
+  return EXTENSION_MIME_TYPES[extension]?.has(mimeType) ?? false;
+}
+
+export function isNameplateFile(file) {
+  if (!file) return false;
+
+  const extension = resolveNameplateExtension(file.name);
+  if (!extension) return false;
+
+  const mimeType = String(file.type || '').toLowerCase();
+  return isAllowedMimeForExtension(extension, mimeType);
+}
 
 function isWithinRecommendedSize(width, height) {
   return (
@@ -86,20 +125,20 @@ export async function validateNameplateFile(file) {
     throw new Error('Файл слишком большой (максимум 3 МБ)');
   }
 
-  const type = (file.type || '').toLowerCase();
-  const name = (file.name || '').toLowerCase();
+  if (!isNameplateFile(file)) {
+    throw new Error('Допустимы WebM, PNG или WebP');
+  }
 
-  if (type === 'video/webm' || name.endsWith('.webm')) {
+  const extension = resolveNameplateExtension(file.name);
+
+  if (extension === '.webm') {
     await validateVideoDimensions(file);
     return;
   }
 
-  if (type === 'image/png' || type === 'image/webp' || name.endsWith('.png') || name.endsWith('.webp')) {
+  if (extension === '.png' || extension === '.webp') {
     await validateImageDimensions(file);
-    return;
   }
-
-  throw new Error('Допустимы WebM, PNG или WebP');
 }
 
 export function resolveNameplateUrl(nameplate) {
@@ -116,6 +155,11 @@ export function resolveNameplateUrl(nameplate) {
 export function isNameplateVideo(nameplate) {
   if (!nameplate) return false;
   return /\.webm($|\?)/i.test(nameplate);
+}
+
+export function isNameplateImage(nameplate) {
+  if (!nameplate) return false;
+  return /\.(png|webp)($|\?)/i.test(nameplate);
 }
 
 export function resolveMemberNameplate(member) {
