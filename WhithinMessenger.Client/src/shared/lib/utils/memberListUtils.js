@@ -274,6 +274,8 @@ export const mapServerMemberToChatParticipant = (member, { resolveStatus } = {})
     username: resolveMemberName(member),
     avatarUrl: resolveMemberAvatar(member),
     avatarColor: resolveMemberAvatarColor(member),
+    nameplate: resolveMemberNameplate(member),
+    avatarDecoration: resolveMemberAvatarDecoration(member),
     userStatus: status,
   };
 };

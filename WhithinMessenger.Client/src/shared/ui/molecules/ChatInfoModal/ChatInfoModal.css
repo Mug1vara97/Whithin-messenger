@@ -577,19 +577,59 @@
 
 .chat-info-participant-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
   background: var(--surface-hover);
   border-radius: 12px;
   transition: all 0.2s ease;
   min-height: 70px;
+  overflow: hidden;
 }
 
 .chat-info-participant-item:hover {
   background: var(--border);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.chat-info-participant-nameplate {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-info-participant-nameplate.user-nameplate--empty .chat-info-participant-nameplate__row {
+  padding: 16px 18px;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-nameplate__row {
+  min-height: 48px;
+  padding: 12px 14px 12px 8px;
+  gap: 10px;
+}
+
+.chat-info-participant-nameplate__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.chat-info-participant-avatar-wrap {
+  --avatar-decoration-scale: 1.22;
+
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  z-index: 2;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-avatar-wrap {
+  --avatar-decoration-scale: 1.2;
 }
 
 .chat-info-participant-avatar {

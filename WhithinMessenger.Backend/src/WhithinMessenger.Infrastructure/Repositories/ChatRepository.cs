@@ -401,6 +401,8 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         AvatarUrl = m.User.UserProfile.Avatar,
                         AvatarColor = m.User.UserProfile.AvatarColor,
                         Banner = m.User.UserProfile.Banner,
+                        Nameplate = m.User.UserProfile.Nameplate,
+                        AvatarDecoration = m.User.UserProfile.AvatarDecoration,
                         UserStatus = m.User.Status.ToString().ToLower(),
                         LastSeen = m.User.LastSeen
                     })

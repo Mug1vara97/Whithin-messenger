@@ -112,8 +112,6 @@ const HomePage = () => {
   const handleJoinVoiceChannel = useCallback((callData) => {
     console.log('HomePage: handleJoinVoiceChannel called with:', callData);
 
-    useCallStore.getState().clearVoiceAutoJoinSuppress();
-
     const withRinging = Boolean(callData.withRinging);
     setActiveChatCall({
       chatId: callData.chatId,

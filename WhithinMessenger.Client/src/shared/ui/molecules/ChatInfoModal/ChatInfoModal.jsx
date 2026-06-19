@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
-import { getUserStatusLabel } from '../../../lib/utils/userStatus';
+import { getUserStatusColor, getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
+import { mapChatParticipantToListItem } from '../../../lib/utils/memberListUtils';
+import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
+import UserNameplate from '../../atoms/UserNameplate/UserNameplate';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AddUserModal from '../AddUserModal/AddUserModal';
 import ChatAvatarUpload from '../ChatAvatarUpload/ChatAvatarUpload';
@@ -340,37 +343,43 @@ const ChatInfoModal = ({
                         </div>
                       ) : participants && participants.length > 0 ? (
                         participants.map((participant) => {
-                          console.log('ChatInfoModal - Rendering participant:', participant);
-                          console.log('ChatInfoModal - Avatar URL:', participant.avatarUrl);
-                          console.log('ChatInfoModal - Avatar Color:', participant.avatarColor);
-                          console.log('ChatInfoModal - Full avatar URL:', participant.avatarUrl ? `${BASE_URL}${participant.avatarUrl}` : 'No avatar');
+                          const member = mapChatParticipantToListItem(participant);
+                          const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
+                          const normalizedStatus = normalizeUserStatus(member.status);
+                          const showStatusDot = normalizedStatus !== PRESENCE_STATUS.OFFLINE;
+
                           return (
-                          <div key={participant.userId} className="chat-info-participant-item">
-                            <div 
-                              className="chat-info-participant-avatar"
-                              style={{
-                                backgroundColor: participant.avatarUrl ? 'transparent' : (participant.avatarColor || '#5865F2'),
-                                backgroundImage: participant.avatarUrl?.startsWith('/uploads/') 
-                                  ? `url(${BASE_URL}${participant.avatarUrl})` 
-                                  : (participant.avatarUrl?.startsWith('http') ? `url(${participant.avatarUrl})` : 'none'),
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center'
-                              }}
-                            >
-                              {!participant.avatarUrl && (
-                                <span style={{ color: 'white', fontSize: '16px', fontWeight: 'bold' }}>
-                                  {participant.username?.charAt(0) || 'U'}
-                                </span>
-                              )}
-                            </div>
-                          <div className="chat-info-participant-info">
-                            <span className="chat-info-participant-name">{participant.username || 'Пользователь'}</span>
-                            <span className="chat-info-participant-status">
-                              {getUserStatusLabel(participant.userStatus)}
-                            </span>
+                          <div key={participant.userId || member.userId} className="chat-info-participant-item">
+                            <UserNameplate nameplate={member.nameplate} className="chat-info-participant-nameplate">
+                              <div className="chat-info-participant-nameplate__row">
+                                <div className="chat-info-participant-avatar-wrap">
+                                  <UserAvatar
+                                    username={member.username}
+                                    avatarUrl={avatarUrl}
+                                    avatarColor={member.avatarColor}
+                                    avatarDecoration={member.avatarDecoration}
+                                    size={32}
+                                    statusIndicator={
+                                      showStatusDot ? (
+                                        <span
+                                          className="user-avatar-presence-dot"
+                                          style={{ backgroundColor: getUserStatusColor(member.status) }}
+                                          title={getUserStatusLabel(member.status)}
+                                        />
+                                      ) : null
+                                    }
+                                  />
+                                </div>
+                                <div className="chat-info-participant-info">
+                                  <span className="chat-info-participant-name">{member.username || 'Пользователь'}</span>
+                                  <span className="chat-info-participant-status">
+                                    {getUserStatusLabel(member.status)}
+                                  </span>
+                                </div>
+                              </div>
+                            </UserNameplate>
                           </div>
-                        </div>
-                        );
+                          );
                         })
                       ) : (
                         <div className="chat-info-no-participants">

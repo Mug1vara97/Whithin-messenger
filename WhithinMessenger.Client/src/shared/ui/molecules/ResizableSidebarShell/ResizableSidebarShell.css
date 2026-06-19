@@ -26,6 +26,11 @@
   touch-action: none;
 }
 
+.resizable-sidebar-shell__handle--left {
+  left: -3px;
+  right: auto;
+}
+
 .resizable-sidebar-shell__handle::after {
   content: '';
   position: absolute;

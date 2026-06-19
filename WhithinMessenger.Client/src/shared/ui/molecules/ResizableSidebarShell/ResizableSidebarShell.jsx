@@ -2,8 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { sidebarPanelWidthStorage } from '../../../lib/utils/sidebarPanelWidthStorage';
 import './ResizableSidebarShell.css';
 
-const ResizableSidebarShell = ({ children }) => {
-  const [width, setWidth] = useState(() => sidebarPanelWidthStorage.get());
+const ResizableSidebarShell = ({
+  children,
+  widthStorage = sidebarPanelWidthStorage,
+  handleEdge = 'right',
+}) => {
+  const [width, setWidth] = useState(() => widthStorage.get());
   const widthRef = useRef(width);
   const resizingRef = useRef(false);
 
@@ -18,14 +22,18 @@ const ResizableSidebarShell = ({ children }) => {
     const startWidth = widthRef.current;
 
     const handleMouseMove = (moveEvent) => {
-      const next = sidebarPanelWidthStorage.set(startWidth + moveEvent.clientX - startX);
+      const delta =
+        handleEdge === 'left'
+          ? startX - moveEvent.clientX
+          : moveEvent.clientX - startX;
+      const next = widthStorage.set(startWidth + delta);
       widthRef.current = next;
       setWidth(next);
     };
 
     const handleMouseUp = () => {
       resizingRef.current = false;
-      sidebarPanelWidthStorage.set(widthRef.current);
+      widthStorage.set(widthRef.current);
       document.body.classList.remove('resizable-sidebar-shell--resizing');
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -34,7 +42,7 @@ const ResizableSidebarShell = ({ children }) => {
     document.body.classList.add('resizable-sidebar-shell--resizing');
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, []);
+  }, [handleEdge, widthStorage]);
 
   return (
     <div
@@ -44,15 +52,27 @@ const ResizableSidebarShell = ({ children }) => {
         '--sidebar-panel-width': `${width}px`,
       }}
     >
+      {handleEdge === 'left' && (
+        <div
+          className="resizable-sidebar-shell__handle resizable-sidebar-shell__handle--left"
+          onMouseDown={handleMouseDown}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панели участников"
+          title="Потяните, чтобы изменить ширину"
+        />
+      )}
       <div className="resizable-sidebar-shell__content">{children}</div>
-      <div
-        className="resizable-sidebar-shell__handle"
-        onMouseDown={handleMouseDown}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Изменить ширину панели"
-        title="Потяните, чтобы изменить ширину"
-      />
+      {handleEdge === 'right' && (
+        <div
+          className="resizable-sidebar-shell__handle"
+          onMouseDown={handleMouseDown}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панели"
+          title="Потяните, чтобы изменить ширину"
+        />
+      )}
     </div>
   );
 };

@@ -100,10 +100,6 @@ const VoiceCallView = ({
 
   const isServerMuted = useCallStore((state) => selectActiveServerMuted(state, serverId));
   const isServerDeafened = useCallStore((state) => selectActiveServerDeafened(state, serverId));
-  const suppressVoiceAutoJoinForChannel = useCallStore(
-    (state) => state.suppressVoiceAutoJoinForChannel
-  );
-
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const {
     showErrorBanner,
@@ -149,12 +145,7 @@ const VoiceCallView = ({
       return;
     }
 
-    const autoJoinSuppressed =
-      suppressVoiceAutoJoinForChannel != null &&
-      isSameVoiceChannel(suppressVoiceAutoJoinForChannel, channelId);
-
-    // После endCall не переподключаемся автоматически, пока пользователь снова не выберет канал
-    if (!isInCall && !autoJoinSuppressed) {
+    if (!isInCall) {
       startCall(channelId, channelName, serverId).catch((err) => {
         console.error('Call start error:', err);
       });

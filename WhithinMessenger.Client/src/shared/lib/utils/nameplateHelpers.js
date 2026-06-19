@@ -2,28 +2,36 @@ import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
 
 export const NAMEPLATE_UI_ENABLED = true;
 
-export const NAMEPLATE_ALLOWED_EXTENSIONS = ['.webm', '.png', '.webp'];
+/** Static nameplate images. Animation is allowed only via WebP. */
+export const NAMEPLATE_STATIC_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
+export const NAMEPLATE_ANIMATED_EXTENSIONS = ['.webp'];
+export const NAMEPLATE_ALLOWED_EXTENSIONS = [
+  ...NAMEPLATE_STATIC_EXTENSIONS,
+  ...NAMEPLATE_ANIMATED_EXTENSIONS,
+];
 
-export const NAMEPLATE_ACCEPT = 'video/webm,image/png,image/webp,.webm,.png,.webp';
+export const NAMEPLATE_ACCEPT = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
 
 export const NAMEPLATE_SPEC_HINT =
-  'Форматы: WebP (анимация с прозрачностью), WebM (VP9, без звука) или PNG.';
+  'Статичные: PNG или JPEG. Анимация — только WebP (448×84, до 3 МБ).';
 
-export const TEST_NAMEPLATE_PATH = '/video.webm';
-export const DODO_NAMEPLATE_PATH = '/Dodo.webm';
+export const TEST_NAMEPLATE_PATH = '/sakura.webp';
+export const DODO_NAMEPLATE_PATH = '/test.webp';
 
 const GENERIC_MIME_TYPES = new Set(['', 'application/octet-stream']);
 
 const EXTENSION_MIME_TYPES = {
-  '.webm': new Set(['video/webm', 'video/x-matroska']),
   '.png': new Set(['image/png']),
+  '.jpg': new Set(['image/jpeg', 'image/jpg', 'image/pjpeg']),
+  '.jpeg': new Set(['image/jpeg', 'image/jpg', 'image/pjpeg']),
   '.webp': new Set(['image/webp']),
 };
 
 function resolveNameplateExtension(fileName) {
   const lower = String(fileName || '').toLowerCase();
 
-  if (lower.endsWith('.webm')) return '.webm';
+  if (lower.endsWith('.jpeg')) return '.jpeg';
+  if (lower.endsWith('.jpg')) return '.jpg';
   if (lower.endsWith('.webp')) return '.webp';
   if (lower.endsWith('.png')) return '.png';
 
@@ -54,7 +62,22 @@ export function validateNameplateFile(file) {
   }
 
   if (!isNameplateFile(file)) {
-    throw new Error('Допустимы WebM, PNG или WebP');
+    throw new Error('Допустимы PNG, JPEG или WebP. Анимация — только WebP.');
+  }
+}
+
+export function isAllowedNameplatePath(nameplate) {
+  if (!nameplate) return true;
+
+  const path = String(nameplate).split('?')[0].toLowerCase();
+  return NAMEPLATE_ALLOWED_EXTENSIONS.some((ext) => path.endsWith(ext));
+}
+
+export function validateNameplatePath(nameplate) {
+  if (!nameplate) return;
+
+  if (!isAllowedNameplatePath(nameplate)) {
+    throw new Error('Табличка: статичные PNG/JPEG или анимированный WebP.');
   }
 }
 
@@ -69,6 +92,7 @@ export function resolveNameplateUrl(nameplate) {
   return nameplate;
 }
 
+/** @deprecated Legacy WebM nameplates — no longer accepted for upload. */
 export function isNameplateVideo(nameplate) {
   if (!nameplate) return false;
   return /\.webm($|\?)/i.test(nameplate);
@@ -76,7 +100,7 @@ export function isNameplateVideo(nameplate) {
 
 export function isNameplateImage(nameplate) {
   if (!nameplate) return false;
-  return /\.(png|webp)($|\?)/i.test(nameplate);
+  return /\.(png|jpe?g|webp)($|\?)/i.test(nameplate);
 }
 
 export function resolveMemberNameplate(member) {

@@ -313,8 +313,6 @@ export const useCallStore = create(
       voiceChannelParticipants: new Map(),
       // Голосовые каналы, видимые в сайдбаре только на время звонка (например, приватный канал после переноса)
       callOnlyVoiceChannels: new Map(),
-      // Блокирует автоподключение к каналу после явного выхода из звонка (VoiceCallView / ChatVoiceCall)
-      suppressVoiceAutoJoinForChannel: null,
       
       // Отдельные состояния для оптимизации (избегаем перерендера демонстрации экрана)
       participantMuteStates: new Map(), // userId -> isMuted
@@ -711,7 +709,6 @@ export const useCallStore = create(
         console.warn('[callStore] Room disconnected, cleaning local call state:', details);
         try {
           await get()._leaveRoomCore();
-          set({ suppressVoiceAutoJoinForChannel: endedChannelId });
         } catch (error) {
           console.error('[callStore] Failed to cleanup after room disconnect:', error);
           set({
@@ -719,7 +716,6 @@ export const useCallStore = create(
             currentRoomId: null,
             currentCall: null,
             currentCallServerId: null,
-            suppressVoiceAutoJoinForChannel: endedChannelId,
           });
         } finally {
           notifyVoiceCallOverlaySync();
@@ -778,8 +774,6 @@ export const useCallStore = create(
 
       clearCallOnlyVoiceChannels: () => set({ callOnlyVoiceChannels: new Map() }),
 
-      clearVoiceAutoJoinSuppress: () => set({ suppressVoiceAutoJoinForChannel: null }),
-      
       // Инициализация VAD для локального пользователя
       initializeLocalVAD: async (stream, audioContext) => {
         const state = get();
@@ -3795,7 +3789,6 @@ export const useCallStore = create(
             currentCall: null,
             currentCallServerId: null,
             callOnlyVoiceChannels: new Map(),
-            suppressVoiceAutoJoinForChannel: endedChannelId,
             participants: [],
             participantMuteStates: new Map(),
             participantAudioStates: new Map(),
@@ -3849,7 +3842,6 @@ export const useCallStore = create(
             currentCall: null,
             currentCallServerId: null,
             callOnlyVoiceChannels: new Map(),
-            suppressVoiceAutoJoinForChannel: endedChannelId,
           });
           notifyVoiceCallOverlaySync();
           if (endedChannelId && typeof window !== 'undefined') {

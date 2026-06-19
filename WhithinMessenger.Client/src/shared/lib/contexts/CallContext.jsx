@@ -155,7 +155,6 @@ export const CallProvider = ({ children }) => {
     joinRoom: useCallStore.getState().joinRoom,
     leaveRoom: useCallStore.getState().leaveRoom,
     endCall: useCallStore.getState().endCall,
-    clearVoiceAutoJoinSuppress: useCallStore.getState().clearVoiceAutoJoinSuppress,
     toggleMute: useCallStore.getState().toggleMute,
     toggleUserMute: useCallStore.getState().toggleUserMute,
     changeUserVolume: useCallStore.getState().changeUserVolume,

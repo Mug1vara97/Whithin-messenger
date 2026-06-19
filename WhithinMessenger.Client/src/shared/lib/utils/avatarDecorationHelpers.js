@@ -20,7 +20,7 @@ export const AVATAR_DECORATION_SPEC_HINT =
   `WebM (VP9 с альфой) — лучший вариант для анимации в Chrome/Electron. Также PNG/APNG, GIF или WebP. ` +
   `~${AVATAR_DECORATION_RECOMMENDED_SIZE}×${AVATAR_DECORATION_RECOMMENDED_SIZE} px, прозрачный центр ~${AVATAR_DECORATION_RECOMMENDED_INNER_HOLE}×${AVATAR_DECORATION_RECOMMENDED_INNER_HOLE} px.`;
 
-export const TEST_AVATAR_DECORATION_PATH = '/avatar-decoration-test.webp';
+export const TEST_AVATAR_DECORATION_PATH = '/testAvatar.webp';
 
 const GENERIC_MIME_TYPES = new Set(['', 'application/octet-stream']);
 

@@ -11,6 +11,7 @@ import {
   NAMEPLATE_SPEC_HINT,
   TEST_NAMEPLATE_PATH,
   validateNameplateFile,
+  validateNameplatePath,
 } from '../../../lib/utils/nameplateHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import UserAvatar from '../../atoms/UserAvatar';
@@ -317,6 +318,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
     setUploadBusy(true);
     setActionError('');
     try {
+      validateNameplatePath(path);
       await userApi.updateProfileNameplate(userId, path);
       await loadProfile();
     } catch (error) {
@@ -562,7 +564,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
             disabled={uploadBusy}
             onClick={() => handleApplyTestNameplate(DODO_NAMEPLATE_PATH)}
           >
-            Dodo
+            Test
           </button>
           {profile?.nameplate && (
             <button

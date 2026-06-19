@@ -174,6 +174,11 @@ public class ProfileController : ControllerBase
                 return forbidResult!;
             }
 
+            if (!string.IsNullOrWhiteSpace(request.Nameplate) && !IsAllowedNameplatePath(request.Nameplate))
+            {
+                return BadRequest(new { error = "Табличка: статичные PNG/JPEG или анимированный WebP." });
+            }
+
             var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
             if (userProfile == null)
             {
@@ -468,14 +473,14 @@ public class ProfileController : ControllerBase
             }
 
             var claimedExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var allowedExtensions = new[] { ".webm", ".png", ".webp" };
+            var allowedExtensions = new[] { ".png", ".jpg", ".jpeg", ".webp" };
             if (!allowedExtensions.Contains(claimedExtension))
             {
-                return BadRequest(new { error = "Допустимы файлы WebM, PNG или WebP" });
+                return BadRequest(new { error = "Допустимы PNG, JPEG или WebP. Анимация — только WebP." });
             }
 
             var contentType = (file.ContentType ?? string.Empty).ToLowerInvariant();
-            var allowedTypes = new[] { "video/webm", "image/png", "image/webp", "application/octet-stream" };
+            var allowedTypes = new[] { "image/png", "image/jpeg", "image/jpg", "image/pjpeg", "image/webp", "application/octet-stream" };
             if (!string.IsNullOrEmpty(contentType) && !allowedTypes.Contains(contentType))
             {
                 return BadRequest(new { error = "Неподдерживаемый тип файла" });
@@ -491,6 +496,10 @@ public class ProfileController : ControllerBase
             var header = new byte[12];
             var headerLength = await input.ReadAsync(header.AsMemory(0, header.Length));
             var extension = ResolveNameplateExtension(header.AsSpan(0, headerLength), claimedExtension);
+            if (extension == ".webm")
+            {
+                return BadRequest(new { error = "WebM не поддерживается. Загрузите WebP для анимации или PNG/JPEG для статичной таблички." });
+            }
 
             var fileName = $"{Guid.NewGuid()}{extension}";
             var filePath = Path.Combine(uploadsPath, fileName);
@@ -562,6 +571,18 @@ public class ProfileController : ControllerBase
         }
     }
 
+    private static readonly HashSet<string> AllowedNameplateExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".webp",
+    };
+
+    private static bool IsAllowedNameplatePath(string path)
+    {
+        var normalized = path.Split('?', '#')[0];
+        var extension = Path.GetExtension(normalized);
+        return AllowedNameplateExtensions.Contains(extension);
+    }
+
     private static string ResolveNameplateExtension(ReadOnlySpan<byte> header, string claimedExtension)
     {
         if (header.Length >= 4
@@ -593,6 +614,14 @@ public class ProfileController : ControllerBase
             && header[3] == (byte)'G')
         {
             return ".png";
+        }
+
+        if (header.Length >= 3
+            && header[0] == 0xFF
+            && header[1] == 0xD8
+            && header[2] == 0xFF)
+        {
+            return claimedExtension is ".jpeg" or ".jpg" ? claimedExtension : ".jpg";
         }
 
         return claimedExtension;

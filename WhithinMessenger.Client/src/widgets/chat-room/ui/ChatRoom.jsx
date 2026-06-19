@@ -52,6 +52,8 @@ import { UserAvatar } from '../../../shared/ui';
 import { VoiceParticipantStatusIcons } from '../../../shared/ui/atoms/VoiceParticipantStatusIcons';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
 import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
+import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
+import { memberListPanelWidthStorage } from '../../../shared/lib/utils/memberListPanelWidthStorage';
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
 import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverrides';
@@ -1886,6 +1888,7 @@ const ChatRoom = ({
           <div className="editing-notice">
             <span className='editing-text'>Редактирование сообщения</span>
             <button 
+              type="button"
               onClick={() => {
                 setEditingMessageId(null);
                 setNewMessage('');
@@ -1913,6 +1916,7 @@ const ChatRoom = ({
               </div>
             </div>
             <button 
+              type="button"
               onClick={() => setReplyingToMessage(null)} 
               className="cancel-reply-button"
             >
@@ -2017,13 +2021,18 @@ const ChatRoom = ({
       </div>
 
       {showMembersSidebar && (
-        <MemberListSidebar
-          members={sidebarMembers}
-          isLoading={isServerChat ? serverMembersLoading : false}
-          emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
-          groupByRoles={isServerChat}
-          serverRoles={isServerChat ? serverRoles : []}
-        />
+        <ResizableSidebarShell
+          widthStorage={memberListPanelWidthStorage}
+          handleEdge="left"
+        >
+          <MemberListSidebar
+            members={sidebarMembers}
+            isLoading={isServerChat ? serverMembersLoading : false}
+            emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
+            groupByRoles={isServerChat}
+            serverRoles={isServerChat ? serverRoles : []}
+          />
+        </ResizableSidebarShell>
       )}
 
       <StickerPicker
