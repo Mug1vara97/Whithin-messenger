@@ -160,6 +160,10 @@
   color: var(--text-muted);
 }
 
+.member-list-section-items--offline .member-list-nameplate.user-nameplate--decorated .member-list-name {
+  color: var(--text-muted);
+}
+
 .member-list-owner-icon {
   flex-shrink: 0;
   width: 16px !important;

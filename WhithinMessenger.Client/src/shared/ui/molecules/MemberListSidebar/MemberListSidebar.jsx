@@ -85,7 +85,7 @@ const MemberListSidebar = ({
 
   const renderMember = (member, showStatusDot = true) => {
     const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-    const displayNameStyle = member.roleColor ? { color: member.roleColor } : undefined;
+    const displayNameStyle = showStatusDot && member.roleColor ? { color: member.roleColor } : undefined;
     const normalizedStatus = normalizeUserStatus(member.status);
     const shouldShowStatusDot = showStatusDot && normalizedStatus !== PRESENCE_STATUS.OFFLINE;
 
