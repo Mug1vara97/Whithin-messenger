@@ -10,6 +10,10 @@ export const memberApi = {
     return connection.invoke("KickMember", serverId, memberId);
   },
 
+  updateMemberNickname: (connection, serverId, memberId, nickname) => {
+    return connection.invoke("UpdateMemberNickname", serverId, memberId, nickname);
+  },
+
   /** Личный чат: ChatController POST /api/chat/create-private (текущий пользователь из JWT). */
   openPrivateChat: async (_currentUserId, targetUserId) => {
     try {

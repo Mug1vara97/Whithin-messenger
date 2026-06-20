@@ -40,6 +40,10 @@ import {
   setActiveCallOverlayCoords,
 } from '../../../lib/utils/activeCallOverlaySettings';
 import { syncDesktopActiveCallOverlaySettings } from '../../../lib/utils/desktopActiveCallOverlayBridge';
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  resolveUserDisplayName,
+} from '../../../lib/utils/userDisplayNameHelpers';
 import { AppSoundSettingsSection } from '../../molecules/AppSoundSettingsSection/AppSoundSettingsSection';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
@@ -125,6 +129,11 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   const [emailMessage, setEmailMessage] = useState('');
   const [emailError, setEmailError] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [displayNameMessage, setDisplayNameMessage] = useState('');
+  const [displayNameError, setDisplayNameError] = useState('');
+  const [isChangingDisplayName, setIsChangingDisplayName] = useState(false);
+  const [accountProfile, setAccountProfile] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [themePresetId, setThemePresetId] = useState(() => getThemePresetId());
 
@@ -135,6 +144,34 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   );
 
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const visibleName = resolveUserDisplayName({
+    displayName: accountProfile?.displayName,
+    username,
+  });
+
+  useEffect(() => {
+    if (!isOpen || !userId) {
+      setAccountProfile(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    userApi
+      .getProfile(userId)
+      .then((data) => {
+        if (cancelled) return;
+        setAccountProfile(data);
+        setDisplayNameDraft(data?.displayName || '');
+      })
+      .catch((error) => {
+        console.error('Error loading account profile:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, userId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -293,6 +330,33 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
     }
   };
 
+  const handleChangeDisplayName = async (e) => {
+    e.preventDefault();
+    setDisplayNameMessage('');
+    setDisplayNameError('');
+
+    if (!userId) return;
+
+    setIsChangingDisplayName(true);
+    try {
+      const result = await userApi.updateDisplayName(userId, displayNameDraft.trim() || null);
+      const updatedProfile = {
+        ...(accountProfile || {}),
+        userId,
+        username: result?.username ?? accountProfile?.username ?? username,
+        displayName: result?.displayName ?? null,
+      };
+      setAccountProfile(updatedProfile);
+      setDisplayNameDraft(updatedProfile.displayName || '');
+      onProfileUpdated?.(updatedProfile);
+      setDisplayNameMessage('Ник обновлён');
+    } catch (error) {
+      setDisplayNameError(error.message || 'Не удалось обновить ник');
+    } finally {
+      setIsChangingDisplayName(false);
+    }
+  };
+
   const handleChangeEmail = async (e) => {
     e.preventDefault();
     setEmailMessage('');
@@ -383,6 +447,50 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
       case 'account':
         return (
           <>
+            <SettingsPanel title="Логин">
+              <SettingsRow
+                title="Имя для входа"
+                description="Используется при авторизации. Изменить нельзя."
+              >
+                <span className="settings-row__value">@{username}</span>
+              </SettingsRow>
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Ник"
+              description="Отображается в чатах, списках участников и профиле. Если не задан — показывается логин."
+            >
+              <form onSubmit={handleChangeDisplayName}>
+                {displayNameError && (
+                  <div className="settings-alert settings-alert--error">{displayNameError}</div>
+                )}
+                {displayNameMessage && (
+                  <div className="settings-alert settings-alert--success">{displayNameMessage}</div>
+                )}
+                <div className="settings-field">
+                  <label htmlFor="settings-display-name">Отображаемое имя</label>
+                  <input
+                    id="settings-display-name"
+                    type="text"
+                    value={displayNameDraft}
+                    onChange={(e) => setDisplayNameDraft(e.target.value)}
+                    placeholder={username}
+                    maxLength={DISPLAY_NAME_MAX_LENGTH}
+                    autoComplete="nickname"
+                  />
+                </div>
+                <div className="settings-form-actions">
+                  <button
+                    type="submit"
+                    className="settings-btn settings-btn--primary"
+                    disabled={isChangingDisplayName}
+                  >
+                    {isChangingDisplayName ? 'Сохранение…' : 'Сохранить ник'}
+                  </button>
+                </div>
+              </form>
+            </SettingsPanel>
+
             <SettingsPanel title="Email">
               <SettingsRow title="Текущий email">
                 <span className="settings-row__value">{userEmail || '—'}</span>
@@ -729,10 +837,11 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
           <div className="settings-modal__sidebar-foot">
             <div className="settings-modal__user">
               <div className="settings-modal__user-avatar">
-                {username.charAt(0).toUpperCase()}
+                {visibleName.charAt(0).toUpperCase()}
               </div>
               <div className="settings-modal__user-meta">
-                <div className="settings-modal__user-name">{username}</div>
+                <div className="settings-modal__user-name">{visibleName}</div>
+                <div className="settings-modal__user-login">@{username}</div>
                 <div className="settings-modal__user-hint">ESC — закрыть</div>
               </div>
             </div>

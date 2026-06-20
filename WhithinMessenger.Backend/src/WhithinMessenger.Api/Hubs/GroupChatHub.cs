@@ -68,6 +68,7 @@ public class GroupChatHub : Hub
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly IUserRepository _userRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
     private readonly IHubContext<NotificationHub> _notificationHubContext;
 
     public GroupChatHub(
@@ -81,6 +82,7 @@ public class GroupChatHub : Hub
         ChatMessageNotificationService chatMessageNotificationService,
         IMessageReceiptService messageReceiptService,
         IUserRepository userRepository,
+        IServerMemberRepository serverMemberRepository,
         IHubContext<NotificationHub> notificationHubContext)
     {
         _mediator = mediator;
@@ -93,7 +95,24 @@ public class GroupChatHub : Hub
         _chatMessageNotificationService = chatMessageNotificationService;
         _messageReceiptService = messageReceiptService;
         _userRepository = userRepository;
+        _serverMemberRepository = serverMemberRepository;
         _notificationHubContext = notificationHubContext;
+    }
+
+    private async Task<string> ResolveChatSenderUsernameAsync(Guid chatId, Guid userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        var chat = await _chatRepository.GetByIdAsync(chatId);
+        string? serverNickname = null;
+        if (chat?.ServerId is Guid serverId)
+        {
+            serverNickname = await _serverMemberRepository.GetNicknameAsync(serverId, userId);
+        }
+
+        return ServerMemberNames.Resolve(
+            serverNickname,
+            user?.UserProfile?.DisplayName,
+            user?.UserName);
     }
 
         public async Task JoinGroup(string chatId)
@@ -376,6 +395,8 @@ public class GroupChatHub : Hub
                     return;
                 }
 
+                var resolvedUsername = await ResolveChatSenderUsernameAsync(parsedChatId, userId.Value);
+
                 var command = new SendMessageCommand(
                     userId.Value,
                     parsedChatId,
@@ -398,7 +419,9 @@ public class GroupChatHub : Hub
                             {
                                 messageId = repliedToMessage.Message.Id,
                                 content = repliedToMessage.Message.Content,
-                                senderUsername = repliedToMessage.Message.User?.UserName ?? "Unknown",
+                                senderUsername = UserDisplayNames.Resolve(
+                                    repliedToMessage.Message.User?.UserProfile?.DisplayName,
+                                    repliedToMessage.Message.User?.UserName),
                                 createdAt = repliedToMessage.Message.CreatedAt,
                                 mediaFiles = repliedToMessage.Message.MediaFiles?.Select(mf => new
                                 {
@@ -446,7 +469,7 @@ public class GroupChatHub : Hub
                             messageId = result.MessageId,
                             senderId = userId.Value,
                             content = message, 
-                            username = username,
+                            username = resolvedUsername,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
                             avatarDecoration = avatarDecoration,
@@ -462,7 +485,7 @@ public class GroupChatHub : Hub
                     await _chatMessageNotificationService.NotifyTextMessageAsync(
                         parsedChatId,
                         userId.Value,
-                        username,
+                        resolvedUsername,
                         result.MessageId,
                         message
                     );
@@ -715,7 +738,7 @@ public class GroupChatHub : Hub
 
                 var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                 var message = messageResult.Message;
-                var username = message.User?.UserName ?? "Unknown";
+                var username = await ResolveChatSenderUsernameAsync(parsedChatId, userId.Value);
 
                 await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", new
                 {
@@ -1695,7 +1718,9 @@ public class GroupChatHub : Hub
             {
                 messageId = source.Id,
                 content = source.Content ?? string.Empty,
-                senderUsername = source.User?.UserName ?? "Unknown",
+                senderUsername = UserDisplayNames.Resolve(
+                    source.User?.UserProfile?.DisplayName,
+                    source.User?.UserName),
                 originalChatName = message.ForwardedFromChat?.Name ?? "Unknown Chat",
                 forwardedMessageContent = message.ForwardedMessageContent ?? string.Empty,
                 contentType = source.ContentType,

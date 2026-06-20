@@ -590,6 +590,58 @@ public class ServerController : ControllerBase
             return StatusCode(500, new { error = "Произошла ошибка: " + ex.Message });
         }
     }
+
+    [HttpPut("{serverId}/members/{memberUserId}/nickname")]
+    public async Task<IActionResult> UpdateMemberNickname(
+        Guid serverId,
+        Guid memberUserId,
+        [FromBody] UpdateServerMemberNicknameRequest request)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var command = new UpdateServerMemberNicknameCommand(
+                serverId,
+                memberUserId,
+                userId,
+                request.Nickname);
+            var result = await _mediator.Send(command);
+            if (!result.Success)
+            {
+                if (result.ErrorMessage?.Contains("не найден") == true)
+                {
+                    return NotFound(new { error = result.ErrorMessage });
+                }
+
+                if (result.ErrorMessage?.Contains("Недостаточно прав") == true)
+                {
+                    return Forbid(result.ErrorMessage);
+                }
+
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            await _serverHub.Clients.Group(serverId.ToString()).SendAsync("MemberNicknameUpdated", new
+            {
+                userId = result.UserId,
+                nickname = result.Nickname,
+                username = result.Username,
+                login = result.Login,
+            });
+
+            return Ok(new
+            {
+                userId = result.UserId,
+                nickname = result.Nickname,
+                username = result.Username,
+                login = result.Login,
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка: " + ex.Message });
+        }
+    }
 }
 
 public class UpdateServerBannerRequest
@@ -607,4 +659,9 @@ public class AddMemberRequest
 public class AddMemberToChannelRequest
 {
     public Guid UserId { get; set; }
+}
+
+public class UpdateServerMemberNicknameRequest
+{
+    public string? Nickname { get; set; }
 }

@@ -50,6 +50,18 @@ const resolveMemberStatus = (member) =>
 
 
 
+const resolveMemberLogin = (member) =>
+
+  member?.login ?? member?.Login ?? null;
+
+
+
+const resolveMemberNickname = (member) =>
+
+  member?.nickname ?? member?.Nickname ?? null;
+
+
+
 const resolveMemberRoles = (member) => member?.roles ?? member?.Roles ?? [];
 
 
@@ -193,6 +205,10 @@ export const mapServerMemberToListItem = (member, { serverOwnerId, resolveStatus
     userId,
 
     username: resolveMemberName(member),
+
+    login: resolveMemberLogin(member),
+
+    nickname: resolveMemberNickname(member),
 
     avatar: resolveMemberAvatar(member),
 

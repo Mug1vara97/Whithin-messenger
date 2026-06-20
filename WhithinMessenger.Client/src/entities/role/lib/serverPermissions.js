@@ -39,5 +39,17 @@ export const canSendVoiceMessages = (permissions, isOwner) =>
 export const canManageMessages = (permissions, isOwner) =>
   hasServerPermission(permissions, isOwner, 'manageMessages');
 
+export const canChangeOwnNickname = (permissions, isOwner) =>
+  hasServerPermission(permissions, isOwner, 'changeOwnNickname');
+
+export const canManageNicknames = (permissions, isOwner) =>
+  hasServerPermission(permissions, isOwner, 'manageNicknames');
+
+export const canEditServerMemberNickname = (permissions, isOwner, currentUserId, memberUserId) => {
+  const isSelf = String(memberUserId) === String(currentUserId);
+  if (isSelf) return canChangeOwnNickname(permissions, isOwner);
+  return canManageNicknames(permissions, isOwner);
+};
+
 export const getServerPermissions = (server) =>
   server?.permissions ?? server?.Permissions ?? {};

@@ -40,6 +40,10 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
             .HasMaxLength(-1);
 
         builder
+            .Property(e => e.DisplayName)
+            .HasMaxLength(32);
+
+        builder
             .HasOne(d => d.User)
             .WithOne(p => p.UserProfile)
             .HasForeignKey<UserProfile>(d => d.UserId);

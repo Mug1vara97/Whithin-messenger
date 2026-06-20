@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Infrastructure.Database.Configurations;
@@ -20,6 +21,10 @@ public class ServerMemberConfiguration : IEntityTypeConfiguration<ServerMember>
 
         builder.Property(e => e.JoinedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder
+            .Property(e => e.Nickname)
+            .HasMaxLength(UserDisplayNames.MaxLength);
 
         builder
             .HasOne(d => d.Server)

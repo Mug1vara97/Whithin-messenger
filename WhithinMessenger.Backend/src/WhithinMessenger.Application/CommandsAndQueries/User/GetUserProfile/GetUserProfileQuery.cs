@@ -13,6 +13,7 @@ public record UserProfileDto
     public string? Description { get; init; }
     public string? Banner { get; init; }
     public string? Nameplate { get; init; }
+    public string? DisplayName { get; init; }
     public string? AvatarDecoration { get; init; }
 }
 

@@ -1,5 +1,6 @@
 using MediatR;
 using WhithinMessenger.Domain.Interfaces;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Application.DTOs;
 using WhithinMessenger.Application.Interfaces;
 
@@ -30,7 +31,7 @@ public class GetFriendsQueryHandler : IRequestHandler<GetFriendsQuery, GetFriend
             friends.Add(new FriendDto
             {
                 UserId = friendUser.Id,
-                Username = friendUser.UserName ?? string.Empty,
+                Username = UserDisplayNames.Resolve(friendProfile?.DisplayName, friendUser.UserName),
                 Avatar = friendProfile?.Avatar,
                 AvatarColor = friendProfile?.AvatarColor,
                 Description = friendProfile?.Description,

@@ -1,0 +1,56 @@
+.kick-confirmation-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  backdrop-filter: blur(2px);
+}
+
+.kick-confirmation-modal .modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.kick-confirmation-modal h3 {
+  margin: 0 0 20px;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.nickname-modal__hint {
+  margin: -12px 0 16px;
+  color: var(--text-muted, #9ca3af);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.nickname-modal__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.nickname-modal__input:focus {
+  outline: none;
+  border-color: var(--primary, #5865f2);
+}

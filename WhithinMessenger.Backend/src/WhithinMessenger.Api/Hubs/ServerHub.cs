@@ -674,6 +674,45 @@ public class ServerHub : Hub
         }
     }
 
+    public async Task UpdateMemberNickname(Guid serverId, Guid userId, string? nickname)
+    {
+        try
+        {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var command = new UpdateServerMemberNicknameCommand(
+                serverId,
+                userId,
+                currentUserId.Value,
+                nickname);
+            var result = await _mediator.Send(command);
+
+            if (result.Success)
+            {
+                await Clients.Group(serverId.ToString()).SendAsync("MemberNicknameUpdated", new
+                {
+                    userId = result.UserId,
+                    nickname = result.Nickname,
+                    username = result.Username,
+                    login = result.Login,
+                });
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при изменении ника: {ex.Message}");
+        }
+    }
+
     public async Task AddMember(Guid serverId, Guid userId)
     {
         try

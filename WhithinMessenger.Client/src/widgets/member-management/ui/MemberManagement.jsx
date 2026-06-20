@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, memo, useCallback, useMemo } from '
 import { Search, SwapVert, MoreVert } from '@mui/icons-material';
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
-import { canManageRoles } from '../../../entities/role/lib/serverPermissions';
+import { canManageRoles, canEditServerMemberNickname } from '../../../entities/role/lib/serverPermissions';
+import ServerMemberNicknameModal from '../../../entities/member/ui/ServerMemberNicknameModal';
 import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { Button } from '../../../shared/ui/atoms/Button';
@@ -17,7 +18,7 @@ const MemberManagement = ({
   isServerOwner,
   onNavigateToChat,
 }) => {
-  const { members, fetchMembers, kickMember, openPrivateChat } = useMembers(connection, serverId, userId);
+  const { members, fetchMembers, kickMember, updateMemberNickname, openPrivateChat } = useMembers(connection, serverId, userId);
   const { roles, fetchRoles, assignRole, removeRole } = useRoles(connection, serverId, userId);
   const { friends, fetchFriends } = useFriends();
   const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
@@ -43,7 +44,17 @@ const MemberManagement = ({
     const query = searchQuery.trim().toLowerCase();
     let list = [...members];
     if (query) {
-      list = list.filter((m) => (m.username || '').toLowerCase().includes(query));
+      list = list.filter((m) => {
+        const haystack = [
+          m.username,
+          m.login,
+          m.nickname,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(query);
+      });
     }
     list.sort((a, b) => {
       const cmp = (a.username || '').localeCompare(b.username || '', 'ru', { sensitivity: 'base' });
@@ -80,15 +91,22 @@ const MemberManagement = ({
   const userCanManageMemberRoles = isServerOwner || canManageRoles(userPermissions, isServerOwner);
   const userCanKickMembers = isServerOwner || userPermissions?.kickMembers;
 
+  const canEditMemberNickname = useCallback(
+    (member) =>
+      canEditServerMemberNickname(userPermissions, isServerOwner, userId, member.userId),
+    [userPermissions, isServerOwner, userId],
+  );
+
   const memberHasMenuActions = useCallback(
     (member) => {
       const fa = friendActionForMember(member.userId);
       if (fa.kind !== 'self') return true;
       if (userCanManageMemberRoles) return true;
+      if (canEditMemberNickname(member)) return true;
       if (userCanKickMembers && String(member.userId) !== String(userId)) return true;
       return false;
     },
-    [friendActionForMember, userCanManageMemberRoles, userCanKickMembers, userId],
+    [friendActionForMember, userCanManageMemberRoles, userCanKickMembers, userId, canEditMemberNickname],
   );
 
   const [contextMenu, setContextMenu] = useState({
@@ -99,6 +117,9 @@ const MemberManagement = ({
   });
 
   const [showKickModal, setShowKickModal] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState('');
+  const [nicknameSaving, setNicknameSaving] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showRoleManagement, setShowRoleManagement] = useState({
     visible: false,
@@ -140,6 +161,40 @@ const MemberManagement = ({
       setShowKickModal(false);
     } catch (error) {
       alert(`Ошибка при исключении участника: ${error.message}`);
+    }
+  };
+
+  const openNicknameModal = (member) => {
+    if (!canEditMemberNickname(member)) return;
+    setSelectedMember(member);
+    setNicknameDraft(member?.nickname || '');
+    setShowNicknameModal(true);
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const handleCloseNicknameModal = useCallback(() => {
+    setShowNicknameModal(false);
+    setSelectedMember(null);
+    setNicknameDraft('');
+  }, []);
+
+  const handleSaveNickname = async () => {
+    if (!selectedMember || !canEditMemberNickname(selectedMember)) {
+      alert('Недостаточно прав для изменения ника');
+      return;
+    }
+    setNicknameSaving(true);
+    try {
+      const trimmed = nicknameDraft.trim();
+      await updateMemberNickname(
+        selectedMember.userId,
+        trimmed.length > 0 ? trimmed : null,
+      );
+      handleCloseNicknameModal();
+    } catch (error) {
+      alert(error?.message || 'Не удалось обновить серверный ник');
+    } finally {
+      setNicknameSaving(false);
     }
   };
 
@@ -251,6 +306,15 @@ const MemberManagement = ({
               Роли
             </button>
           )}
+          {canEditMemberNickname(member) && (
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={() => openNicknameModal(member)}
+            >
+              {String(member.userId) === String(userId) ? 'Мой серверный ник' : 'Серверный ник'}
+            </button>
+          )}
           {(isServerOwner || userPermissions?.kickMembers) && String(member.userId) !== String(userId) && (
             <button
               type="button"
@@ -350,11 +414,13 @@ const MemberManagement = ({
       const isContextMenu = e.target.closest('.context-menu');
       const isRoleModal = e.target.closest('.role-management-modal');
       const isKickModal = e.target.closest('.kick-confirmation-modal');
+      const isNicknameModal = e.target.closest('.nickname-modal');
 
-      if (!isContextMenu && !isRoleModal && !isKickModal) {
+      if (!isContextMenu && !isRoleModal && !isKickModal && !isNicknameModal) {
         setContextMenu((prev) => ({ ...prev, visible: false }));
         setShowRoleManagement({ visible: false, x: 0, y: 0 });
         setShowKickModal(false);
+        setShowNicknameModal(false);
       }
     };
 
@@ -363,6 +429,7 @@ const MemberManagement = ({
         setContextMenu((prev) => ({ ...prev, visible: false }));
         setShowRoleManagement({ visible: false, x: 0, y: 0 });
         setShowKickModal(false);
+        setShowNicknameModal(false);
       }
     };
 
@@ -421,7 +488,20 @@ const MemberManagement = ({
               </div>
             ) : (
               filteredMembers.map((member) => (
-                <div key={member.userId} className="members-table-row">
+                <div
+                  key={member.userId}
+                  className="members-table-row"
+                  onContextMenu={(e) => {
+                    if (!memberHasMenuActions(member)) return;
+                    e.preventDefault();
+                    setContextMenu({
+                      visible: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      memberId: member.userId,
+                    });
+                  }}
+                >
                   <div className="members-table-cell members-table-cell--name">
                     <UserAvatar
                       username={member.username}
@@ -436,7 +516,10 @@ const MemberManagement = ({
                       >
                         {member.username}
                       </span>
-                      <span className="member-handle">{member.username}</span>
+                      <span className="member-handle">
+                        @{member.login || member.username}
+                        {member.nickname ? ' · серверный ник' : ''}
+                      </span>
                     </div>
                   </div>
                   <div className="members-table-cell members-table-cell--roles">
@@ -492,6 +575,18 @@ const MemberManagement = ({
 
       <ContextMenu />
       {showKickModal && <KickConfirmationModal />}
+      {showNicknameModal && (
+        <ServerMemberNicknameModal
+          open={showNicknameModal}
+          member={selectedMember}
+          currentUserId={userId}
+          nicknameDraft={nicknameDraft}
+          saving={nicknameSaving}
+          onDraftChange={setNicknameDraft}
+          onSave={handleSaveNickname}
+          onClose={handleCloseNicknameModal}
+        />
+      )}
       {showRoleManagement.visible && <RoleManagementModal />}
     </div>
   );

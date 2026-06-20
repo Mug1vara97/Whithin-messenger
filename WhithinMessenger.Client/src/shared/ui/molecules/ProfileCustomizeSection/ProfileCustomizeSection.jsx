@@ -21,6 +21,7 @@ import {
   TEST_AVATAR_DECORATION_PATH,
   validateAvatarDecorationFile,
 } from '../../../lib/utils/avatarDecorationHelpers';
+import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import './ProfileCustomizeSection.css';
 
 const ACCENT_PRESETS = [
@@ -204,6 +205,10 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
 
   const accentColor = profile?.avatarColor || '#5865f2';
   const bannerColor = isHexColor(profile?.banner) ? profile.banner : null;
+  const visibleName = resolveUserDisplayName({
+    displayName: profile?.displayName,
+    username,
+  });
 
   const loadProfile = useCallback(async () => {
     if (!userId) return;
@@ -425,7 +430,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
         />
         <div className="profile-customize__preview-avatar-wrap">
           <UserAvatar
-            username={username}
+            username={visibleName}
             avatarUrl={profile?.avatar}
             avatarColor={accentColor}
             avatarDecoration={profile?.avatarDecoration}
@@ -531,7 +536,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
         </p>
         <div className="profile-customize__nameplate-preview">
           <UserNameplate nameplate={profile?.nameplate} className="profile-customize__nameplate-demo">
-            <span className="profile-customize__nameplate-label">{username || 'Пользователь'}</span>
+            <span className="profile-customize__nameplate-label">{visibleName}</span>
           </UserNameplate>
         </div>
         <div className="profile-customize__actions">
@@ -589,7 +594,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
         </p>
         <div className="profile-customize__decoration-preview">
           <UserAvatar
-            username={username}
+            username={visibleName}
             avatarUrl={profile?.avatar}
             avatarColor={accentColor}
             avatarDecoration={profile?.avatarDecoration}

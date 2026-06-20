@@ -54,7 +54,9 @@ public class NotificationRepository : INotificationRepository
                 ReadAt = n.ReadAt,
                 ChatName = n.Chat.Name,
                 ServerName = n.Chat.Server != null ? n.Chat.Server.Name : null,
-                SenderName = n.Message != null ? n.Message.User.UserName : null,
+                SenderName = n.Message != null
+                    ? n.Message.User.UserProfile!.DisplayName ?? n.Message.User.UserName
+                    : null,
                 SenderAvatarUrl = n.Message != null && n.Message.User.UserProfile != null
                     ? n.Message.User.UserProfile.Avatar
                     : null,

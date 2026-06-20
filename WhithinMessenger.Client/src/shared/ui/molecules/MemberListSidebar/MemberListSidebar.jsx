@@ -1,81 +1,95 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 
 import { WorkspacePremium } from '@mui/icons-material';
 
 import UserAvatar from '../../atoms/UserAvatar';
 import UserNameplate from '../../atoms/UserNameplate';
+import ContextMenu from '../ContextMenu/ContextMenu';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 
 import {
-
   getUserStatusColor,
-
   getUserStatusLabel,
-
   normalizeUserStatus,
-
   PRESENCE_STATUS,
-
 } from '../../../lib/utils/userStatus';
 
 import {
-
   groupMembersByPresence,
-
   groupServerMembersByRoles,
-
 } from '../../../lib/utils/memberListUtils';
 
 import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 
 import './MemberListSidebar.css';
 
-
-
 const MemberListSidebar = ({
-
   members = [],
-
   isLoading = false,
-
   emptyLabel = 'Нет участников',
-
   groupByRoles = false,
-
   serverRoles = [],
-
+  serverMemberMenu = false,
+  currentUserId = null,
+  canEditMemberNickname,
+  onEditNickname,
 }) => {
-
   const { openProfile } = useProfileModal();
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    member: null,
+  });
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, visible: false, member: null }));
+  }, []);
 
   const grouped = useMemo(() => {
-
     if (groupByRoles && serverRoles.length > 0) {
-
       return groupServerMembersByRoles(members, serverRoles);
-
     }
-
     return { mode: 'presence', ...groupMembersByPresence(members) };
-
   }, [members, groupByRoles, serverRoles]);
 
+  const handleMemberContextMenu = useCallback(
+    (event, member) => {
+      if (!serverMemberMenu || typeof canEditMemberNickname !== 'function') return;
+      if (!canEditMemberNickname(member.userId)) return;
 
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        member,
+      });
+    },
+    [serverMemberMenu, canEditMemberNickname],
+  );
+
+  const contextMenuItems = useMemo(() => {
+    const member = contextMenu.member;
+    if (!member) return [];
+
+    const isSelf = String(member.userId) === String(currentUserId);
+    return [
+      {
+        text: isSelf ? 'Мой серверный ник' : 'Серверный ник',
+        onClick: () => onEditNickname?.(member),
+      },
+    ];
+  }, [contextMenu.member, currentUserId, onEditNickname]);
 
   const renderMember = (member, showStatusDot = true) => {
-
     const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-
     const displayNameStyle = member.roleColor ? { color: member.roleColor } : undefined;
-
     const normalizedStatus = normalizeUserStatus(member.status);
-
     const shouldShowStatusDot = showStatusDot && normalizedStatus !== PRESENCE_STATUS.OFFLINE;
 
-
-
     return (
-
       <div
         key={String(member.userId)}
         className="member-list-item member-list-item--clickable"
@@ -83,6 +97,7 @@ const MemberListSidebar = ({
         role="button"
         tabIndex={0}
         onClick={() => openProfile(member.userId, member.username, member.status)}
+        onContextMenu={(event) => handleMemberContextMenu(event, member)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -90,7 +105,6 @@ const MemberListSidebar = ({
           }
         }}
       >
-
         <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
           <div className="member-list-nameplate__row">
             <div className="member-list-avatar-wrap">
@@ -123,195 +137,105 @@ const MemberListSidebar = ({
             )}
           </div>
         </UserNameplate>
-
       </div>
-
     );
-
   };
 
-
-
   const renderRoleSection = (section, showStatusDot) => (
-
     <section key={String(section.roleId)} className="member-list-section">
-
       <h3
-
         className="member-list-section-title member-list-section-title--role"
-
         style={section.roleColor ? { color: section.roleColor } : undefined}
-
       >
-
         {section.roleName} — {section.members.length}
-
       </h3>
-
       <div className={`member-list-section-items ${showStatusDot ? '' : 'member-list-section-items--offline'}`}>
-
         {section.members.map((member) => renderMember(member, showStatusDot))}
-
       </div>
-
     </section>
-
   );
-
-
 
   const renderPresenceBucket = (bucket, { showStatusDot, defaultTitle }) => (
-
     <>
-
       {bucket.roleSections.map((section) => renderRoleSection(section, showStatusDot))}
-
       {bucket.ungrouped.length > 0 && (
-
         <section className="member-list-section">
-
           <h3 className="member-list-section-title">
-
             {defaultTitle} — {bucket.ungrouped.length}
-
           </h3>
-
           <div className={`member-list-section-items ${showStatusDot ? '' : 'member-list-section-items--offline'}`}>
-
             {bucket.ungrouped.map((member) => renderMember(member, showStatusDot))}
-
           </div>
-
         </section>
-
       )}
-
     </>
-
   );
-
-
 
   const hasOnlineMembers =
-
     grouped.mode === 'roles'
-
       ? grouped.online.roleSections.length > 0 || grouped.online.ungrouped.length > 0
-
       : grouped.online.length > 0;
 
-
-
   const hasOfflineMembers =
-
     grouped.mode === 'roles'
-
       ? grouped.offline.roleSections.length > 0 || grouped.offline.ungrouped.length > 0
-
       : grouped.offline.length > 0;
 
-
-
   return (
-
     <aside className="member-list-sidebar" aria-label="Список участников">
-
       <div className="member-list-scroll">
-
         {isLoading && members.length === 0 && (
-
           <div className="member-list-empty">Загрузка…</div>
-
         )}
-
-
 
         {!isLoading && members.length === 0 && (
-
           <div className="member-list-empty">{emptyLabel}</div>
-
         )}
-
-
 
         {grouped.mode === 'roles' ? (
-
           <>
-
             {hasOnlineMembers &&
-
               renderPresenceBucket(grouped.online, {
-
                 showStatusDot: true,
-
                 defaultTitle: 'В сети',
-
               })}
-
             {hasOfflineMembers &&
-
               renderPresenceBucket(grouped.offline, {
-
                 showStatusDot: false,
-
                 defaultTitle: 'Не в сети',
-
               })}
-
           </>
-
         ) : (
-
           <>
-
             {grouped.online.length > 0 && (
-
               <section className="member-list-section">
-
                 <h3 className="member-list-section-title">В сети — {grouped.online.length}</h3>
-
                 <div className="member-list-section-items">
-
                   {grouped.online.map((member) => renderMember(member, true))}
-
                 </div>
-
               </section>
-
             )}
-
-
 
             {grouped.offline.length > 0 && (
-
               <section className="member-list-section">
-
                 <h3 className="member-list-section-title">Не в сети — {grouped.offline.length}</h3>
-
                 <div className="member-list-section-items member-list-section-items--offline">
-
                   {grouped.offline.map((member) => renderMember(member, false))}
-
                 </div>
-
               </section>
-
             )}
-
           </>
-
         )}
-
       </div>
 
+      <ContextMenu
+        isOpen={contextMenu.visible}
+        position={{ x: contextMenu.x, y: contextMenu.y }}
+        onClose={closeContextMenu}
+        items={contextMenuItems}
+      />
     </aside>
-
   );
-
 };
 
-
-
 export default MemberListSidebar;
-
-

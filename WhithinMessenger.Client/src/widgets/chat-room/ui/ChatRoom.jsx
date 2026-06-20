@@ -52,6 +52,7 @@ import { UserAvatar } from '../../../shared/ui';
 import { VoiceParticipantStatusIcons } from '../../../shared/ui/atoms/VoiceParticipantStatusIcons';
 import { ChatVoiceCall } from '../../../shared/ui/molecules';
 import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
+import ContextMenu from '../../../shared/ui/molecules/ContextMenu/ContextMenu';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { memberListPanelWidthStorage } from '../../../shared/lib/utils/memberListPanelWidthStorage';
 import { useMembers } from '../../../entities/member/hooks';
@@ -90,7 +91,9 @@ import {
   canAttachFiles,
   canSendVoiceMessages,
   canManageMessages,
+  canEditServerMemberNickname,
 } from '../../../entities/role/lib/serverPermissions';
+import ServerMemberNicknameModal from '../../../entities/member/ui/ServerMemberNicknameModal';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -308,10 +311,20 @@ const ChatRoom = ({
   const [stickerPanelWidth, setStickerPanelWidth] = useState(380);
   const [isSendingSticker, setIsSendingSticker] = useState(false);
   const [showMemberList, setShowMemberList] = useState(true);
+  const [nicknameEditorMember, setNicknameEditorMember] = useState(null);
+  const [nicknameDraft, setNicknameDraft] = useState('');
+  const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [authorContextMenu, setAuthorContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    authorId: null,
+    authorName: '',
+  });
   const notificationConnectionRef = useRef(null);
 
   const serverConnection = useServerHubConnection(isServerChat ? serverId : null);
-  const { members: serverMembers, isLoading: serverMembersLoading } = useMembers(
+  const { members: serverMembers, isLoading: serverMembersLoading, updateMemberNickname } = useMembers(
     serverConnection,
     isServerChat ? serverId : null,
     userId
@@ -345,6 +358,148 @@ const ChatRoom = ({
   const handleStickerPickerToggle = useCallback(() => {
     setStickerPickerOpen((open) => !open);
   }, []);
+
+  const canEditMemberNickname = useCallback(
+    (memberUserId) =>
+      canEditServerMemberNickname(userPermissions, isServerOwner, userId, memberUserId),
+    [userPermissions, isServerOwner, userId],
+  );
+
+  const resolveNicknameEditorMember = useCallback(
+    (sidebarMember) => {
+      const memberUserId = sidebarMember?.userId;
+      if (memberUserId == null) return null;
+      return (
+        serverMembers.find((member) => String(member.userId) === String(memberUserId)) || {
+          userId: memberUserId,
+          username: sidebarMember.username,
+          login: sidebarMember.login,
+          nickname: sidebarMember.nickname,
+        }
+      );
+    },
+    [serverMembers],
+  );
+
+  const handleOpenNicknameEditor = useCallback(
+    (sidebarMember) => {
+      const member = resolveNicknameEditorMember(sidebarMember);
+      if (!member || !canEditMemberNickname(member.userId)) return;
+      setNicknameEditorMember(member);
+      setNicknameDraft(member.nickname || '');
+    },
+    [resolveNicknameEditorMember, canEditMemberNickname],
+  );
+
+  const handleCloseNicknameEditor = useCallback(() => {
+    setNicknameEditorMember(null);
+    setNicknameDraft('');
+  }, []);
+
+  const closeAuthorContextMenu = useCallback(() => {
+    setAuthorContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      authorId: null,
+      authorName: '',
+    });
+  }, []);
+
+  const resolveMemberFromAuthor = useCallback(
+    (authorId, authorName) => {
+      if (authorId == null) return null;
+      const serverMember = serverMembers.find(
+        (member) => String(member.userId) === String(authorId),
+      );
+      return (
+        serverMember || {
+          userId: authorId,
+          username: authorName,
+          login: null,
+          nickname: null,
+        }
+      );
+    },
+    [serverMembers],
+  );
+
+  const handleAuthorContextMenu = useCallback(
+    (event, message) => {
+      if (!isServerChat || isSelectionMode) return;
+
+      const authorId = message?.senderId ?? message?.SenderId;
+      if (!authorId || !canEditMemberNickname(authorId)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      closeContextMenu();
+
+      setAuthorContextMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        authorId,
+        authorName: message?.senderUsername || '',
+      });
+    },
+    [isServerChat, isSelectionMode, canEditMemberNickname, closeContextMenu],
+  );
+
+  const handleOpenNicknameFromAuthorMenu = useCallback(() => {
+    const member = resolveMemberFromAuthor(
+      authorContextMenu.authorId,
+      authorContextMenu.authorName,
+    );
+    closeAuthorContextMenu();
+    if (member) {
+      handleOpenNicknameEditor(member);
+    }
+  }, [
+    authorContextMenu.authorId,
+    authorContextMenu.authorName,
+    resolveMemberFromAuthor,
+    closeAuthorContextMenu,
+    handleOpenNicknameEditor,
+  ]);
+
+  const authorContextMenuItems = useMemo(() => {
+    if (!authorContextMenu.authorId) return [];
+    const isSelf = String(authorContextMenu.authorId) === String(userId);
+    return [
+      {
+        text: isSelf ? 'Мой серверный ник' : 'Серверный ник',
+        onClick: handleOpenNicknameFromAuthorMenu,
+      },
+    ];
+  }, [authorContextMenu.authorId, userId, handleOpenNicknameFromAuthorMenu]);
+
+  const handleSaveServerNickname = useCallback(async () => {
+    if (!nicknameEditorMember || !canEditMemberNickname(nicknameEditorMember.userId)) {
+      alert('Недостаточно прав для изменения ника');
+      return;
+    }
+
+    setNicknameSaving(true);
+    try {
+      const trimmed = nicknameDraft.trim();
+      await updateMemberNickname(
+        nicknameEditorMember.userId,
+        trimmed.length > 0 ? trimmed : null,
+      );
+      handleCloseNicknameEditor();
+    } catch (error) {
+      alert(error?.message || 'Не удалось обновить серверный ник');
+    } finally {
+      setNicknameSaving(false);
+    }
+  }, [
+    nicknameEditorMember,
+    nicknameDraft,
+    canEditMemberNickname,
+    updateMemberNickname,
+    handleCloseNicknameEditor,
+  ]);
 
   const sidebarMembers = useMemo(() => {
     if (isServerChat) {
@@ -395,6 +550,11 @@ const ChatRoom = ({
 
       if (contextMenu.visible) {
         closeContextMenu();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (authorContextMenu.visible) {
+        closeAuthorContextMenu();
         e.stopImmediatePropagation();
         return;
       }
@@ -449,6 +609,8 @@ const ChatRoom = ({
   }, [
     contextMenu.visible,
     closeContextMenu,
+    authorContextMenu.visible,
+    closeAuthorContextMenu,
     forwardModalVisible,
     closeForwardModal,
     showChatInfo,
@@ -1598,7 +1760,10 @@ const ChatRoom = ({
               onContextMenu={(e) => handleContextMenuClick(e, msg.messageId)}
               onClick={(e) => handleMessageSelectToggle(e, msg.messageId)}
             >
-              <div className="message-avatar-wrap">
+              <div
+                className="message-avatar-wrap"
+                onContextMenu={(event) => handleAuthorContextMenu(event, msg)}
+              >
                 <UserAvatar
                   username={msg.senderUsername}
                   avatarUrl={msg.avatarUrl}
@@ -1624,6 +1789,7 @@ const ChatRoom = ({
                       event.stopPropagation();
                       handleOpenAuthorProfile(msg);
                     }}
+                    onContextMenu={(event) => handleAuthorContextMenu(event, msg)}
                   >
                     {msg.senderUsername}
                   </button>
@@ -2031,6 +2197,10 @@ const ChatRoom = ({
             emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
             groupByRoles={isServerChat}
             serverRoles={isServerChat ? serverRoles : []}
+            serverMemberMenu={isServerChat}
+            currentUserId={userId}
+            canEditMemberNickname={canEditMemberNickname}
+            onEditNickname={handleOpenNicknameEditor}
           />
         </ResizableSidebarShell>
       )}
@@ -2128,6 +2298,24 @@ const ChatRoom = ({
         onClose={() => setPollModalOpen(false)}
         onSubmit={handleCreatePoll}
         isSubmitting={isCreatingPoll}
+      />
+
+      <ServerMemberNicknameModal
+        open={Boolean(nicknameEditorMember)}
+        member={nicknameEditorMember}
+        currentUserId={userId}
+        nicknameDraft={nicknameDraft}
+        saving={nicknameSaving}
+        onDraftChange={setNicknameDraft}
+        onSave={handleSaveServerNickname}
+        onClose={handleCloseNicknameEditor}
+      />
+
+      <ContextMenu
+        isOpen={authorContextMenu.visible}
+        position={{ x: authorContextMenu.x, y: authorContextMenu.y }}
+        onClose={closeAuthorContextMenu}
+        items={authorContextMenuItems}
       />
     </div>
   );

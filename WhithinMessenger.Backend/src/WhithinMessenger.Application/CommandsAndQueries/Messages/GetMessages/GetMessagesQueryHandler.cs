@@ -8,11 +8,16 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
 {
     private readonly IMessageRepository _messageRepository;
     private readonly IChatRepository _chatRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
 
-    public GetMessagesQueryHandler(IMessageRepository messageRepository, IChatRepository chatRepository)
+    public GetMessagesQueryHandler(
+        IMessageRepository messageRepository,
+        IChatRepository chatRepository,
+        IServerMemberRepository serverMemberRepository)
     {
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
+        _serverMemberRepository = serverMemberRepository;
     }
 
     public async Task<GetMessagesResult> Handle(GetMessagesQuery request, CancellationToken cancellationToken)
@@ -56,9 +61,16 @@ public class GetMessagesQueryHandler : IRequestHandler<GetMessagesQuery, GetMess
                     cancellationToken);
             }
 
+            Dictionary<Guid, string?>? serverNicknames = null;
+            var chat = await _chatRepository.GetByIdAsync(request.ChatId, cancellationToken);
+            if (chat?.ServerId is Guid serverId)
+            {
+                serverNicknames = await _serverMemberRepository.GetNicknamesMapAsync(serverId, cancellationToken);
+            }
+
             var messageDtos = messages.Select(m =>
             {
-                var dto = MessageDtoMapper.Map(m, request.UserId);
+                var dto = MessageDtoMapper.Map(m, request.UserId, serverNicknames);
                 if (request.UserId.HasValue && m.UserId == request.UserId.Value)
                 {
                     dto.Status = statuses.GetValueOrDefault(m.Id, MessageStatusHelper.Sent);

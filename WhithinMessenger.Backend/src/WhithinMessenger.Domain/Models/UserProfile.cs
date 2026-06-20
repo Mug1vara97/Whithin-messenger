@@ -12,6 +12,9 @@ public class UserProfile
 
     public string? Description { get; set; }
 
+    /// <summary>Отображаемый ник. Логин — <see cref="ApplicationUser.UserName"/>.</summary>
+    public string? DisplayName { get; set; }
+
     public string? Banner { get; set; }
 
     public string? Nameplate { get; set; }

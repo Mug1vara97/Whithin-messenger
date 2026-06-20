@@ -147,6 +147,14 @@
   text-overflow: ellipsis;
 }
 
+.settings-modal__user-login {
+  font-size: 11px;
+  color: var(--text-muted, #949ba4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .settings-modal__user-meta {
   min-width: 0;
 }

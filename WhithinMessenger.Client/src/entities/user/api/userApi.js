@@ -37,6 +37,18 @@ export const userApi = {
     }
   },
 
+  async updateDisplayName(userId, displayName) {
+    try {
+      const response = await apiClient.post('/profile/update-display-name', {
+        UserId: userId,
+        DisplayName: displayName,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось обновить ник'));
+    }
+  },
+
   async updateAvatarColor(userId, avatarColor) {
     try {
       const response = await apiClient.post('/profile/update-avatar-color', {

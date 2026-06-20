@@ -26,6 +26,7 @@ public static class AuditLogActionTypes
 
     public const string MemberKick = "member_kick";
     public const string MemberAdd = "member_add";
+    public const string MemberNicknameUpdate = "member_nickname_update";
 
     public const string ServerUpdate = "server_update";
     public const string ServerPrivacyUpdate = "server_privacy_update";
@@ -65,6 +66,7 @@ public static class AuditLogLabels
         [AuditLogActionTypes.MemberRoleRemove] = "Роль снята с участника",
         [AuditLogActionTypes.MemberKick] = "Участник исключён",
         [AuditLogActionTypes.MemberAdd] = "Участник добавлен",
+        [AuditLogActionTypes.MemberNicknameUpdate] = "Изменён серверный ник",
         [AuditLogActionTypes.ServerUpdate] = "Обновление сервера",
         [AuditLogActionTypes.ServerPrivacyUpdate] = "Изменение приватности сервера",
         [AuditLogActionTypes.MessageDelete] = "Удаление сообщения",

@@ -17,6 +17,7 @@ import {
   toBackendUserStatus,
 } from '../../../lib/utils/userStatus';
 import { PROFILE_UPDATED_EVENT, useProfileModal } from '../../../lib/contexts/ProfileModalContext';
+import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import UserAvatar from '../../atoms/UserAvatar';
 import styles from './UserPanel.module.css';
 
@@ -278,6 +279,10 @@ const UserPanel = ({
   if (!isOpen) return null;
 
   const avatarColor = userProfile?.avatarColor || '#5865F2';
+  const visibleName = resolveUserDisplayName({
+    displayName: userProfile?.displayName,
+    username,
+  });
 
   return (
     <>
@@ -285,7 +290,7 @@ const UserPanel = ({
         <div className={styles['user-panel-content']}>
           <div className={styles['user-avatar-wrap']}>
             <UserAvatar
-              username={username}
+              username={visibleName}
               avatarUrl={userProfile?.avatar}
               avatarColor={avatarColor}
               avatarDecoration={userProfile?.avatarDecoration}
@@ -315,7 +320,7 @@ const UserPanel = ({
               title="Изменить статус"
               type="button"
             >
-              <span className={styles.username}>{username || 'Пользователь'}</span>
+              <span className={styles.username}>{visibleName || 'Пользователь'}</span>
               <span className={styles['user-status-text']}>{getUserStatusLabel(currentStatus)}</span>
             </button>
 

@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 using WhithinMessenger.Domain.Models;
@@ -32,7 +33,9 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                     MessageId = m.Id,
                     Content = m.Content,
                     CreatedAt = m.CreatedAt,
-                    SenderUsername = m.User.UserName ?? "Unknown",
+                    SenderUsername = UserDisplayNames.Resolve(
+                        m.User.UserProfile?.DisplayName,
+                        m.User.UserName),
                     AvatarUrl = m.User.UserProfile?.Avatar,
                     AvatarColor = !string.IsNullOrEmpty(m.User.UserProfile?.AvatarColor)
                         ? m.User.UserProfile.AvatarColor
@@ -42,7 +45,9 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                         {
                             MessageId = m.RepliedToMessage.Id,
                             Content = m.RepliedToMessage.Content,
-                            SenderUsername = m.RepliedToMessage.User?.UserName ?? "Unknown",
+                            SenderUsername = UserDisplayNames.Resolve(
+                                m.RepliedToMessage.User?.UserProfile?.DisplayName,
+                                m.RepliedToMessage.User?.UserName),
                             MediaFiles = m.RepliedToMessage.MediaFiles?.Select(mf => new MediaFileDto
                             {
                                 Id = mf.Id,

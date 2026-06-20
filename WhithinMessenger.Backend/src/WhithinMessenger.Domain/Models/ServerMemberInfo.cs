@@ -4,6 +4,8 @@ public class ServerMemberInfo
 {
     public Guid UserId { get; set; }
     public string Username { get; set; } = string.Empty;
+    public string Login { get; set; } = string.Empty;
+    public string? Nickname { get; set; }
     public string? Avatar { get; set; }
     public string? AvatarColor { get; set; }
     public string? Nameplate { get; set; }

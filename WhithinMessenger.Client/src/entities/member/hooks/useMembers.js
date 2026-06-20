@@ -43,6 +43,19 @@ export const useMembers = (connection, serverId, userId) => {
     }
   }, [connection, serverId]);
 
+  const updateMemberNickname = useCallback(async (memberId, nickname) => {
+    if (!connection || !serverId) return;
+
+    try {
+      setError(null);
+      await memberApi.updateMemberNickname(connection, serverId, memberId, nickname);
+    } catch (err) {
+      console.error('Error updating member nickname:', err);
+      setError(err.message);
+      throw err;
+    }
+  }, [connection, serverId]);
+
   const openPrivateChat = useCallback(async (targetUserId) => {
     if (!userId) return;
 
@@ -74,9 +87,27 @@ export const useMembers = (connection, serverId, userId) => {
       await memberApi.getServerMembers(connection, serverId);
     };
 
+    const handleNicknameUpdated = (payload) => {
+      const updatedUserId = payload?.userId ?? payload?.UserId;
+      if (!updatedUserId) return;
+      setMembers((prev) =>
+        prev.map((member) =>
+          String(member.userId) === String(updatedUserId)
+            ? {
+                ...member,
+                nickname: payload?.nickname ?? payload?.Nickname ?? null,
+                username: payload?.username ?? payload?.Username ?? member.username,
+                login: payload?.login ?? payload?.Login ?? member.login,
+              }
+            : member,
+        ),
+      );
+    };
+
     connection.on("ServerMembersLoaded", handleMembersLoaded);
     connection.on("RoleAssigned", handleRoleAssigned);
     connection.on("RoleRemoved", handleRoleRemoved);
+    connection.on("MemberNicknameUpdated", handleNicknameUpdated);
 
     fetchMembers();
 
@@ -84,6 +115,7 @@ export const useMembers = (connection, serverId, userId) => {
       connection.off("ServerMembersLoaded", handleMembersLoaded);
       connection.off("RoleAssigned", handleRoleAssigned);
       connection.off("RoleRemoved", handleRoleRemoved);
+      connection.off("MemberNicknameUpdated", handleNicknameUpdated);
     };
   }, [connection, serverId]);
 
@@ -93,6 +125,7 @@ export const useMembers = (connection, serverId, userId) => {
     error,
     fetchMembers,
     kickMember,
+    updateMemberNickname,
     openPrivateChat
   };
 };

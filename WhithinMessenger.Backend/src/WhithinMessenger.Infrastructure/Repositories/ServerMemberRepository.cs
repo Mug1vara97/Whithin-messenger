@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Infrastructure.Database;
@@ -47,30 +48,56 @@ public class ServerMemberRepository : IServerMemberRepository
             .Include(sm => sm.User)
             .ThenInclude(u => u.UserServerRoles)
             .ThenInclude(ur => ur.Role)
-            .Select(sm => new ServerMemberInfo
-            {
-                UserId = sm.UserId,
-                Username = sm.User.UserName ?? string.Empty,
-                Avatar = sm.User.UserProfile != null ? sm.User.UserProfile.Avatar : null,
-                AvatarColor = sm.User.UserProfile != null ? sm.User.UserProfile.AvatarColor : null,
-                Nameplate = sm.User.UserProfile != null ? sm.User.UserProfile.Nameplate : null,
-                AvatarDecoration = sm.User.UserProfile != null ? sm.User.UserProfile.AvatarDecoration : null,
-                UserStatus = sm.User.Status.ToString().ToLower(),
-                LastSeen = sm.User.LastSeen.DateTime,
-                JoinedAt = sm.JoinedAt.DateTime,
-                Roles = sm.User.UserServerRoles
-                    .Where(ur => ur.Role.ServerId == serverId)
-                    .Select(ur => new ServerMemberRole
-                    {
-                        RoleId = ur.Role.Id,
-                        RoleName = ur.Role.RoleName,
-                        Color = ur.Role.Color ?? string.Empty
-                    })
-                    .ToList()
-            })
             .ToListAsync(cancellationToken);
 
-        return members;
+        return members.Select(sm => new ServerMemberInfo
+        {
+            UserId = sm.UserId,
+            Nickname = sm.Nickname,
+            Login = sm.User.UserName ?? string.Empty,
+            Username = ServerMemberNames.Resolve(
+                sm.Nickname,
+                sm.User.UserProfile?.DisplayName,
+                sm.User.UserName),
+            Avatar = sm.User.UserProfile?.Avatar,
+            AvatarColor = sm.User.UserProfile?.AvatarColor,
+            Nameplate = sm.User.UserProfile?.Nameplate,
+            AvatarDecoration = sm.User.UserProfile?.AvatarDecoration,
+            UserStatus = sm.User.Status.ToString().ToLower(),
+            LastSeen = sm.User.LastSeen.DateTime,
+            JoinedAt = sm.JoinedAt.DateTime,
+            Roles = sm.User.UserServerRoles
+                .Where(ur => ur.Role.ServerId == serverId)
+                .Select(ur => new ServerMemberRole
+                {
+                    RoleId = ur.Role.Id,
+                    RoleName = ur.Role.RoleName,
+                    Color = ur.Role.Color ?? string.Empty,
+                })
+                .ToList(),
+        }).ToList();
+    }
+
+    public async Task<string?> GetNicknameAsync(
+        Guid serverId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ServerMembers
+            .AsNoTracking()
+            .Where(sm => sm.ServerId == serverId && sm.UserId == userId)
+            .Select(sm => sm.Nickname)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Dictionary<Guid, string?>> GetNicknamesMapAsync(
+        Guid serverId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ServerMembers
+            .AsNoTracking()
+            .Where(sm => sm.ServerId == serverId && sm.Nickname != null && sm.Nickname != string.Empty)
+            .ToDictionaryAsync(sm => sm.UserId, sm => sm.Nickname, cancellationToken);
     }
 
     public async Task<ServerMember?> GetByServerAndUserAsync(Guid serverId, Guid userId, CancellationToken cancellationToken = default)

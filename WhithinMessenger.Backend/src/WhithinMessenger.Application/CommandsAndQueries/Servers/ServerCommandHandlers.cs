@@ -1932,3 +1932,116 @@ public class RemoveMemberFromChannelCommandHandler : IRequestHandler<RemoveMembe
         }
     }
 }
+
+public class UpdateServerMemberNicknameCommandHandler
+    : IRequestHandler<UpdateServerMemberNicknameCommand, UpdateServerMemberNicknameResult>
+{
+    private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly IServerRepository _serverRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IServerAuditLogService _auditLog;
+
+    public UpdateServerMemberNicknameCommandHandler(
+        IServerMemberRepository serverMemberRepository,
+        IServerRepository serverRepository,
+        IUserRepository userRepository,
+        ServerPermissionChecker permissionChecker,
+        IServerAuditLogService auditLog)
+    {
+        _serverMemberRepository = serverMemberRepository;
+        _serverRepository = serverRepository;
+        _userRepository = userRepository;
+        _permissionChecker = permissionChecker;
+        _auditLog = auditLog;
+    }
+
+    public async Task<UpdateServerMemberNicknameResult> Handle(
+        UpdateServerMemberNicknameCommand request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+            if (server == null)
+            {
+                return Fail("Сервер не найден");
+            }
+
+            var member = await _serverMemberRepository.GetByServerAndUserAsync(
+                request.ServerId,
+                request.TargetUserId,
+                cancellationToken);
+            if (member == null)
+            {
+                return Fail("Пользователь не является участником сервера");
+            }
+
+            var isSelf = request.TargetUserId == request.CurrentUserId;
+            if (isSelf)
+            {
+                if (!await _permissionChecker.HasPermissionAsync(
+                        request.ServerId,
+                        request.CurrentUserId,
+                        "changeOwnNickname",
+                        cancellationToken))
+                {
+                    return Fail("Недостаточно прав для изменения своего ника");
+                }
+            }
+            else if (!await _permissionChecker.HasPermissionAsync(
+                         request.ServerId,
+                         request.CurrentUserId,
+                         "manageNicknames",
+                         cancellationToken))
+            {
+                return Fail("Недостаточно прав для изменения ников участников");
+            }
+
+            var normalized = UserDisplayNames.Normalize(request.Nickname);
+            if (normalized != null && normalized.Length > UserDisplayNames.MaxLength)
+            {
+                return Fail($"Ник не может быть длиннее {UserDisplayNames.MaxLength} символов");
+            }
+
+            member.Nickname = normalized;
+            await _serverMemberRepository.UpdateAsync(member, cancellationToken);
+
+            var user = await _userRepository.GetByIdAsync(request.TargetUserId, cancellationToken);
+            var resolvedUsername = ServerMemberNames.Resolve(
+                member.Nickname,
+                user?.UserProfile?.DisplayName,
+                user?.UserName);
+
+            await _auditLog.LogAsync(
+                request.ServerId,
+                request.CurrentUserId,
+                AuditLogActionTypes.MemberNicknameUpdate,
+                AuditLogTargetTypes.Member,
+                request.TargetUserId,
+                new
+                {
+                    targetName = resolvedUsername,
+                    nickname = member.Nickname,
+                    login = user?.UserName,
+                },
+                cancellationToken);
+
+            return new UpdateServerMemberNicknameResult
+            {
+                Success = true,
+                UserId = request.TargetUserId,
+                Nickname = member.Nickname,
+                Username = resolvedUsername,
+                Login = user?.UserName ?? string.Empty,
+            };
+        }
+        catch (Exception ex)
+        {
+            return Fail(ex.Message);
+        }
+    }
+
+    private static UpdateServerMemberNicknameResult Fail(string message) =>
+        new() { Success = false, ErrorMessage = message };
+}

@@ -10,6 +10,9 @@ public class ServerMember
 
     public DateTimeOffset JoinedAt { get; set; }
 
+    /// <summary>Серверный ник (переопределяет глобальный display name на этом сервере).</summary>
+    public string? Nickname { get; set; }
+
     public Server Server { get; set; } = null!;
 
     public ApplicationUser User { get; set; } = null!;

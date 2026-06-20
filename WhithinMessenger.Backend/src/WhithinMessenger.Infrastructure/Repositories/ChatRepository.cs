@@ -31,7 +31,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     ChatId = c.Id,
                     Username = _context.Members
                         .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserName)
+                        .Select(m => m.User.UserProfile!.DisplayName ?? m.User.UserName)
                         .FirstOrDefault() ?? string.Empty,
                     UserId = _context.Members
                         .Where(m => m.ChatId == c.Id && m.UserId != userId)
@@ -397,7 +397,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Select(m => new ChatParticipantInfo
                     {
                         UserId = m.UserId,
-                        Username = m.User.UserName,
+                        Username = m.User.UserProfile!.DisplayName ?? m.User.UserName,
                         AvatarUrl = m.User.UserProfile.Avatar,
                         AvatarColor = m.User.UserProfile.AvatarColor,
                         Banner = m.User.UserProfile.Banner,
@@ -464,7 +464,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
                         return new ChatInfoDto
                         {
                             ChatId = chat.Id,
-                            Name = otherMember.User.UserName ?? "Пользователь",
+                            Name = UserDisplayNames.Resolve(
+                                otherMember.User.UserProfile?.DisplayName,
+                                otherMember.User.UserName,
+                                "Пользователь"),
                             Type = "private",
                             Avatar = otherMember.User.UserProfile?.Avatar,
                             AvatarColor = otherMember.User.UserProfile?.AvatarColor,

@@ -11,6 +11,7 @@ import {
   getUserStatusLabel,
   normalizeUserStatus,
 } from '../../../lib/utils/userStatus';
+import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import AvatarDecorationMedia from '../../atoms/UserAvatar/AvatarDecorationMedia';
@@ -47,14 +48,23 @@ const ProfileModal = ({
   const { getConnection } = useConnectionContext();
   const viewerId = user?.id || user?.userId || user?.Id;
 
-  const displayName = profile?.username || username || 'Пользователь';
-  const accentColor = profile?.avatarColor || '#5865f2';
-  const presenceStatus = normalizeUserStatus(profile?.status ?? initialStatus);
+  const profileUserId = profile?.userId ?? profile?.UserId;
+  const profileMatchesUser =
+    profileUserId != null && userId != null && String(profileUserId) === String(userId);
+  const activeProfile = profileMatchesUser ? profile : null;
+
+  const loginUsername = activeProfile?.username || username || '';
+  const visibleName = resolveUserDisplayName({
+    displayName: activeProfile?.displayName,
+    username: loginUsername,
+  });
+  const accentColor = activeProfile?.avatarColor || '#5865f2';
+  const presenceStatus = normalizeUserStatus(activeProfile?.status ?? initialStatus);
   const presenceLabel = getUserStatusLabel(presenceStatus);
   const presenceColor = getUserStatusColor(presenceStatus);
 
   const bannerStyle = useMemo(() => {
-    const banner = profile?.banner;
+    const banner = activeProfile?.banner;
     if (isBannerImage(banner)) {
       return {
         backgroundImage: `url(${resolveMediaUrl(banner)})`,
@@ -71,7 +81,7 @@ const ProfileModal = ({
       backgroundImage: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}99 45%, #1e1f22 100%)`,
       backgroundColor: accentColor,
     };
-  }, [profile?.banner, accentColor]);
+  }, [activeProfile?.banner, accentColor]);
 
   const loadProfile = useCallback(async () => {
     if (!userId) return;
@@ -86,18 +96,26 @@ const ProfileModal = ({
   }, [userId, onProfileUpdated]);
 
   useEffect(() => {
-    if (isOpen && userId) {
-      loadProfile();
-      setIsEditingBio(false);
-      setBioError('');
-      if (initialStatus != null) {
-        setProfile((prev) => ({
-          ...(prev || {}),
-          status: normalizeUserStatus(initialStatus),
-        }));
-      }
-    }
+    if (!isOpen || !userId) return;
+
+    setProfile(
+      initialStatus != null ? { status: normalizeUserStatus(initialStatus) } : null,
+    );
+    setBioDraft('');
+    setCopyHint('');
+    setIsEditingBio(false);
+    setBioError('');
+    loadProfile();
   }, [isOpen, userId, loadProfile, initialStatus]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setProfile(null);
+    setBioDraft('');
+    setCopyHint('');
+    setIsEditingBio(false);
+    setBioError('');
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !userId || !getConnection || !viewerId) return undefined;
@@ -171,8 +189,8 @@ const ProfileModal = ({
     }
   };
 
-  const memberSince = profile?.createdAt
-    ? new Date(profile.createdAt).toLocaleDateString('ru-RU', {
+  const memberSince = activeProfile?.createdAt
+    ? new Date(activeProfile.createdAt).toLocaleDateString('ru-RU', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -181,8 +199,8 @@ const ProfileModal = ({
 
   if (!isOpen) return null;
 
-  const avatarUrl = resolveMediaUrl(profile?.avatar);
-  const avatarDecorationUrl = resolveAvatarDecorationUrl(profile?.avatarDecoration);
+  const avatarUrl = resolveMediaUrl(activeProfile?.avatar);
+  const avatarDecorationUrl = resolveAvatarDecorationUrl(activeProfile?.avatarDecoration);
   const hasAvatarDecoration = Boolean(avatarDecorationUrl);
 
   return (
@@ -221,7 +239,7 @@ const ProfileModal = ({
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="profile-modal__avatar-img" />
                 ) : (
-                  <span>{displayName.charAt(0).toUpperCase()}</span>
+                  <span>{visibleName.charAt(0).toUpperCase()}</span>
                 )}
               </div>
               {hasAvatarDecoration && (
@@ -242,9 +260,12 @@ const ProfileModal = ({
           </div>
 
           <div className="profile-modal__identity">
-            <UserNameplate nameplate={profile?.nameplate} className="profile-modal__nameplate">
-              <h2 className="profile-modal__name">{displayName}</h2>
+            <UserNameplate nameplate={activeProfile?.nameplate} className="profile-modal__nameplate">
+              <h2 className="profile-modal__name">{visibleName}</h2>
             </UserNameplate>
+            {loginUsername && (
+              <p className="profile-modal__login">@{loginUsername}</p>
+            )}
           </div>
         </div>
 
@@ -258,11 +279,11 @@ const ProfileModal = ({
                     type="button"
                     className="profile-modal__text-btn"
                     onClick={() => {
-                      setBioDraft(profile?.description || '');
+                      setBioDraft(activeProfile?.description || '');
                       setIsEditingBio(true);
                     }}
                   >
-                    {profile?.description ? 'Изменить' : 'Добавить'}
+                    {activeProfile?.description ? 'Изменить' : 'Добавить'}
                   </button>
                 )}
               </div>
@@ -287,7 +308,7 @@ const ProfileModal = ({
                         className="profile-modal__btn profile-modal__btn--ghost"
                         onClick={() => {
                           setIsEditingBio(false);
-                          setBioDraft(profile?.description || '');
+                          setBioDraft(activeProfile?.description || '');
                           setBioError('');
                         }}
                       >
@@ -306,8 +327,8 @@ const ProfileModal = ({
                   {bioError && <p className="profile-modal__error">{bioError}</p>}
                 </div>
               ) : (
-                <p className={`profile-modal__bio ${!profile?.description ? 'is-empty' : ''}`}>
-                  {profile?.description ||
+                <p className={`profile-modal__bio ${!activeProfile?.description ? 'is-empty' : ''}`}>
+                  {activeProfile?.description ||
                     (isOwnProfile
                       ? 'Добавьте описание, чтобы друзья знали вас лучше.'
                       : 'Нет описания')}

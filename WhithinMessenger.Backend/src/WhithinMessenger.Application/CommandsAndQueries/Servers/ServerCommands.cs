@@ -519,3 +519,33 @@ public class RemoveMemberFromChannelResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
 }
+
+public class UpdateServerMemberNicknameCommand : IRequest<UpdateServerMemberNicknameResult>
+{
+    public Guid ServerId { get; set; }
+    public Guid TargetUserId { get; set; }
+    public Guid CurrentUserId { get; set; }
+    public string? Nickname { get; set; }
+
+    public UpdateServerMemberNicknameCommand(
+        Guid serverId,
+        Guid targetUserId,
+        Guid currentUserId,
+        string? nickname)
+    {
+        ServerId = serverId;
+        TargetUserId = targetUserId;
+        CurrentUserId = currentUserId;
+        Nickname = nickname;
+    }
+}
+
+public class UpdateServerMemberNicknameResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+    public Guid UserId { get; set; }
+    public string? Nickname { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Login { get; set; } = string.Empty;
+}

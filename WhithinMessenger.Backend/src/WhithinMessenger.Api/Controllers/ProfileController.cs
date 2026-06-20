@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using WhithinMessenger.Api.Attributes;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Domain.Utils;
@@ -14,6 +15,7 @@ namespace WhithinMessenger.Api.Controllers;
 public class ProfileController : ControllerBase
 {
     private const int MaxDescriptionLength = 190;
+    private const int MaxDisplayNameLength = UserDisplayNames.MaxLength;
 
     private readonly IUserProfileRepository _userProfileRepository;
     private readonly WithinDbContext _context;
@@ -65,6 +67,7 @@ public class ProfileController : ControllerBase
             {
                 userId = userProfile.UserId,
                 username = user?.UserName,
+                displayName = userProfile.DisplayName,
                 avatar = userProfile.Avatar,
                 avatarColor = userProfile.AvatarColor,
                 description = userProfile.Description,
@@ -160,6 +163,47 @@ public class ProfileController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = "Ошибка при обновлении описания: " + ex.Message });
+        }
+    }
+
+    [HttpPost("update-display-name")]
+    [RequireAuth]
+    public async Task<IActionResult> UpdateDisplayName([FromBody] UpdateDisplayNameRequest request)
+    {
+        try
+        {
+            if (!EnsureOwnProfile(request.UserId, out var forbidResult))
+            {
+                return forbidResult!;
+            }
+
+            var displayName = UserDisplayNames.Normalize(request.DisplayName);
+            if (displayName != null && displayName.Length > MaxDisplayNameLength)
+            {
+                return BadRequest(new { error = $"Ник не может быть длиннее {MaxDisplayNameLength} символов" });
+            }
+
+            var userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            if (userProfile == null)
+            {
+                return NotFound(new { error = "Профиль пользователя не найден" });
+            }
+
+            userProfile.DisplayName = displayName;
+            await _userProfileRepository.UpdateAsync(userProfile);
+
+            var user = await _context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == request.UserId);
+
+            return Ok(new
+            {
+                username = user?.UserName,
+                displayName = userProfile.DisplayName,
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при обновлении ника: " + ex.Message });
         }
     }
 
@@ -663,6 +707,12 @@ public class UpdateDescriptionRequest
 {
     public Guid UserId { get; set; }
     public string? Description { get; set; }
+}
+
+public class UpdateDisplayNameRequest
+{
+    public Guid UserId { get; set; }
+    public string? DisplayName { get; set; }
 }
 
 public class UpdateAvatarColorRequest

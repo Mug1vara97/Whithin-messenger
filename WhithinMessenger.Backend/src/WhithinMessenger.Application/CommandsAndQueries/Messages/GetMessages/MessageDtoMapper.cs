@@ -1,10 +1,14 @@
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 
 public static class MessageDtoMapper
 {
-    public static MessageDto Map(Message message, Guid? viewerUserId = null)
+    public static MessageDto Map(
+        Message message,
+        Guid? viewerUserId = null,
+        IReadOnlyDictionary<Guid, string?>? serverNicknamesByUserId = null)
     {
         return new MessageDto
         {
@@ -13,7 +17,7 @@ public static class MessageDtoMapper
             Content = message.Content,
             ContentType = message.ContentType,
             CreatedAt = message.CreatedAt,
-            SenderUsername = message.User?.UserName ?? "Unknown",
+            SenderUsername = ResolveSenderUsername(message, serverNicknamesByUserId),
             AvatarUrl = message.User?.UserProfile?.Avatar,
             AvatarDecoration = message.User?.UserProfile?.AvatarDecoration,
             AvatarColor = !string.IsNullOrEmpty(message.User?.UserProfile?.AvatarColor)
@@ -26,7 +30,9 @@ public static class MessageDtoMapper
                 {
                     MessageId = message.RepliedToMessage.Id,
                     Content = message.RepliedToMessage.Content,
-                    SenderUsername = message.RepliedToMessage.User?.UserName ?? "Unknown",
+                    SenderUsername = ResolveSenderUsername(
+                        message.RepliedToMessage,
+                        serverNicknamesByUserId),
                     MediaFiles = message.RepliedToMessage.MediaFiles?.Select(MessageDtoMappers.MapMediaFile).ToList()
                         ?? new List<MediaFileDto>(),
                 }
@@ -50,6 +56,23 @@ public static class MessageDtoMapper
             MediaFiles = message.MediaFiles?.Select(MessageDtoMappers.MapMediaFile).ToList() ?? new List<MediaFileDto>(),
             Poll = PollDtoMapper.Map(message.Poll, viewerUserId),
         };
+    }
+
+    private static string ResolveSenderUsername(
+        Message message,
+        IReadOnlyDictionary<Guid, string?>? serverNicknamesByUserId)
+    {
+        string? serverNickname = null;
+        if (serverNicknamesByUserId != null &&
+            serverNicknamesByUserId.TryGetValue(message.UserId, out var nick))
+        {
+            serverNickname = nick;
+        }
+
+        return ServerMemberNames.Resolve(
+            serverNickname,
+            message.User?.UserProfile?.DisplayName,
+            message.User?.UserName);
     }
 
     private static string GenerateAvatarColor(Guid userId)

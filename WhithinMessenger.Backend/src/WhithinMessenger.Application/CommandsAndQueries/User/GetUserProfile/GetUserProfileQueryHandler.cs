@@ -29,6 +29,7 @@ public class GetUserProfileQueryHandler : IRequestHandler<GetUserProfileQuery, U
             Description = userProfile.Description,
             Banner = userProfile.Banner,
             Nameplate = userProfile.Nameplate,
+            DisplayName = userProfile.DisplayName,
             AvatarDecoration = userProfile.AvatarDecoration,
         };
     }

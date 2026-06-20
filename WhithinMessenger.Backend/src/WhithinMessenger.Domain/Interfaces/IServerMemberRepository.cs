@@ -18,5 +18,7 @@ namespace WhithinMessenger.Domain.Interfaces
         Task RemoveAsync(ServerMember serverMember, CancellationToken cancellationToken = default);
         Task<bool> IsUserMemberAsync(Guid serverId, Guid userId, CancellationToken cancellationToken = default);
         Task<List<ServerMemberInfo>> GetServerMembersAsync(Guid serverId, CancellationToken cancellationToken = default);
+        Task<string?> GetNicknameAsync(Guid serverId, Guid userId, CancellationToken cancellationToken = default);
+        Task<Dictionary<Guid, string?>> GetNicknamesMapAsync(Guid serverId, CancellationToken cancellationToken = default);
     }
 }

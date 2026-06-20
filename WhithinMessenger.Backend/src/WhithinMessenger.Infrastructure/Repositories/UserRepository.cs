@@ -85,11 +85,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     u.UserName.ToLower().Contains(normalizedName) ||
                     u.UserName.ToLower().Replace(" ", "").Contains(normalizedName.Replace(" ", "")) ||
                     u.UserName.ToLower().StartsWith(normalizedName) ||
-                    u.UserName.ToLower().EndsWith(normalizedName))
+                    u.UserName.ToLower().EndsWith(normalizedName) ||
+                    (u.UserProfile.DisplayName != null && u.UserProfile.DisplayName.ToLower().Contains(normalizedName)))
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
-                    Username = u.UserName,
+                    Username = u.UserProfile.DisplayName ?? u.UserName,
                     AvatarUrl = u.UserProfile.Avatar,
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
@@ -142,11 +143,12 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     u.UserName.ToLower().Contains(normalizedName) ||
                     u.UserName.ToLower().Replace(" ", "").Contains(normalizedName.Replace(" ", "")) ||
                     u.UserName.ToLower().StartsWith(normalizedName) ||
-                    u.UserName.ToLower().EndsWith(normalizedName))
+                    u.UserName.ToLower().EndsWith(normalizedName) ||
+                    (u.UserProfile.DisplayName != null && u.UserProfile.DisplayName.ToLower().Contains(normalizedName)))
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
-                    Username = u.UserName,
+                    Username = u.UserProfile.DisplayName ?? u.UserName,
                     AvatarUrl = u.UserProfile.Avatar,
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
@@ -195,7 +197,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
-                    Username = u.UserName,
+                    Username = u.UserProfile.DisplayName ?? u.UserName,
                     AvatarUrl = u.UserProfile.Avatar,
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),
@@ -257,7 +259,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .Select(u => new UserSearchInfo
                 {
                     UserId = u.Id,
-                    Username = u.UserName,
+                    Username = u.UserProfile.DisplayName ?? u.UserName,
                     AvatarUrl = u.UserProfile.Avatar,
                     AvatarColor = u.UserProfile.AvatarColor,
                     UserStatus = u.Status.ToString().ToLower(),

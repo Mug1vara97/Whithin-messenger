@@ -419,6 +419,30 @@
   justify-content: flex-end;
 }
 
+.nickname-modal__hint {
+  margin: -12px 0 16px;
+  color: var(--text-muted, #9ca3af);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.nickname-modal__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.nickname-modal__input:focus {
+  outline: none;
+  border-color: var(--primary, #5865f2);
+}
+
 .no-roles {
   padding: 16px;
   text-align: center;
