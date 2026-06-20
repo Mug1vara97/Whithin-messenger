@@ -354,7 +354,9 @@ const ChatInfoModal = ({
                               <div className="chat-info-participant-nameplate__row">
                                 <div className="chat-info-participant-avatar-wrap">
                                   <UserAvatar
-                                    username={member.username}
+                                    displayName={member.displayName}
+                                    login={member.login}
+                                    username={member.login}
                                     avatarUrl={avatarUrl}
                                     avatarColor={member.avatarColor}
                                     avatarDecoration={member.avatarDecoration}

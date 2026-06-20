@@ -16,26 +16,42 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
         public async Task<Message?> GetByIdAsync(Guid messageId, CancellationToken cancellationToken = default)
         {
+            return await ApplyMessageIncludes(_context.Messages.Where(m => m.Id == messageId))
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<Guid?> GetSenderUserIdAsync(Guid messageId, CancellationToken cancellationToken = default)
+        {
             return await _context.Messages
+                .AsNoTracking()
+                .Where(m => m.Id == messageId)
+                .Select(m => (Guid?)m.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<Message?> GetReplyPreviewAsync(Guid messageId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Messages
+                .AsNoTracking()
                 .Include(m => m.User)
                     .ThenInclude(u => u.UserProfile)
-                .Include(m => m.ForwardedFromMessage)
-                    .ThenInclude(m => m.User)
-                .Include(m => m.ForwardedFromMessage)
-                    .ThenInclude(m => m.MediaFiles)
-                .Include(m => m.ForwardedFromMessage)
-                    .ThenInclude(m => m.Sticker)
-                .Include(m => m.ForwardedFromChat)
-                .Include(m => m.ForwardedByUser)
-                .Include(m => m.RepliedToMessage)
-                    .ThenInclude(m => m.User)
                 .Include(m => m.MediaFiles)
                 .Include(m => m.Sticker)
-                .Include(m => m.Poll)
-                    .ThenInclude(p => p!.Options.OrderBy(o => o.SortOrder))
-                        .ThenInclude(o => o.Votes)
-                            .ThenInclude(v => v.User)
-                                .ThenInclude(u => u.UserProfile)
+                .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+        }
+
+        public async Task<Message?> GetByIdWithForwardAsync(Guid messageId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Messages
+                .AsNoTracking()
+                .Include(m => m.ForwardedFromMessage)
+                    .ThenInclude(m => m!.User)
+                        .ThenInclude(u => u.UserProfile)
+                .Include(m => m.ForwardedFromMessage)
+                    .ThenInclude(m => m!.MediaFiles)
+                .Include(m => m.ForwardedFromMessage)
+                    .ThenInclude(m => m!.Sticker)
+                .Include(m => m.ForwardedFromChat)
                 .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
         }
 

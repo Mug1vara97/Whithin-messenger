@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import {
   AttachFile,
+  Add,
   Image as ImageIcon,
   InsertDriveFile,
   PollOutlined,
@@ -19,6 +20,8 @@ export function ChatAttachMenu({
   onDocumentSelect,
   onPollClick,
   onDefaultClick,
+  usePlusIcon = false,
+  triggerClassName = '',
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState(null);
@@ -221,14 +224,14 @@ export function ChatAttachMenu({
         <button
           ref={triggerRef}
           type="button"
-          className="media-button chat-attach-menu__trigger"
+          className={`media-button chat-attach-menu__trigger ${triggerClassName}`.trim()}
           disabled={disabled}
           onClick={handleButtonClick}
           title="Прикрепить файл"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
         >
-          <AttachFile />
+          {usePlusIcon ? <Add fontSize="small" /> : <AttachFile />}
         </button>
       </div>
       {dropdown}

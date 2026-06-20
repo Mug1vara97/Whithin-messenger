@@ -111,6 +111,7 @@ const MemberListSidebar = ({
               <UserAvatar
                 displayName={member.displayName}
                 login={member.login}
+                username={member.login}
                 avatarUrl={avatarUrl}
                 avatarColor={member.avatarColor}
                 avatarDecoration={member.avatarDecoration}

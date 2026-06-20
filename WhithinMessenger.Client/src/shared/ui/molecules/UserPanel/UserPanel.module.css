@@ -7,7 +7,7 @@
     border-top: 1px solid var(--border, #4f545c);
     display: flex;
     align-items: center;
-    height: 63px;
+    height: var(--user-panel-height, 63px);
     flex-shrink: 0;
 }
 

@@ -42,6 +42,18 @@ export const useChat = (chatId, username, userId, displayName) => {
   const typingExpiryTimersRef = useRef(new Map());
   const typingIdleTimerRef = useRef(null);
   const typingHeartbeatRef = useRef(null);
+
+  const scrollMessagesToBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'auto',
+      block: 'end',
+    });
+  }, []);
   const lastTypingSentRef = useRef(false);
 
   const clearTypingHeartbeat = useCallback(() => {
@@ -644,10 +656,7 @@ export const useChat = (chatId, username, userId, displayName) => {
         currentChatIdRef.current = chatIdStr;
 
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({
-            behavior: 'auto',
-            block: 'end',
-          });
+          scrollMessagesToBottom();
         }, 100);
       } catch (error) {
         if (loadGenerationRef.current !== loadGen) return;
@@ -717,22 +726,14 @@ export const useChat = (chatId, username, userId, displayName) => {
       return;
     }
 
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: 'auto',
-        block: 'end',
-      });
-    }, 100);
-  }, [messages.length]);
+    requestAnimationFrame(() => {
+      scrollMessagesToBottom();
+    });
+  }, [messages.length, scrollMessagesToBottom]);
 
   const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: "auto",
-        block: "end"
-      });
-    }
-  }, []);
+    scrollMessagesToBottom();
+  }, [scrollMessagesToBottom]);
 
   const loadOlderMessages = useCallback(async () => {
     const conn = connectionRef.current;
@@ -779,8 +780,8 @@ export const useChat = (chatId, username, userId, displayName) => {
     }
   }, [hasMoreOlder, isLoadingOlder, loadOlderMessages]);
 
-  const sendMessage = useCallback(async (content, repliedMessageId = null, forwardedMessage = null) => {
-    if (!content.trim() || !connection) return;
+  const sendMessage = useCallback((content, repliedMessageId = null, forwardedMessage = null) => {
+    if (!content.trim() || !connection) return false;
 
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage = normalizeMessage({
@@ -817,32 +818,34 @@ export const useChat = (chatId, username, userId, displayName) => {
       });
     }
 
-    try {
-      if (typingIdleTimerRef.current) {
-        clearTimeout(typingIdleTimerRef.current);
-        typingIdleTimerRef.current = null;
+    void (async () => {
+      try {
+        if (typingIdleTimerRef.current) {
+          clearTimeout(typingIdleTimerRef.current);
+          typingIdleTimerRef.current = null;
+        }
+        await notifyStopTyping();
+        await connection.invoke('SendMessage',
+          content,
+          username,
+          chatId,
+          repliedMessageId,
+          forwardedMessage
+        );
+      } catch (error) {
+        console.error('Error sending message:', error);
+        pendingOptimisticIdRef.current = null;
+        pendingConfirmedMessageRef.current = null;
+        setMessages((prev) => prev.map((msg) => (
+          String(msg.messageId) === tempId
+            ? { ...msg, status: MessageStatus.FAILED }
+            : msg
+        )));
+        setError('Ошибка отправки сообщения');
       }
-      await notifyStopTyping();
-      await connection.invoke('SendMessage', 
-        content, 
-        username, 
-        chatId, 
-        repliedMessageId,
-        forwardedMessage
-      );
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      pendingOptimisticIdRef.current = null;
-      pendingConfirmedMessageRef.current = null;
-      setMessages((prev) => prev.map((msg) => (
-        String(msg.messageId) === tempId
-          ? { ...msg, status: MessageStatus.FAILED }
-          : msg
-      )));
-      setError('Ошибка отправки сообщения');
-      return false;
-    }
+    })();
+
+    return true;
   }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId, currentUserDisplayName, currentUserLogin]);
 
   const editMessage = useCallback(async (messageId, newContent) => {

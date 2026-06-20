@@ -9,6 +9,9 @@ namespace WhithinMessenger.Domain.Interfaces
     public interface IMessageRepository
     {
         Task<Message?> GetByIdAsync(Guid messageId, CancellationToken cancellationToken = default);
+        Task<Guid?> GetSenderUserIdAsync(Guid messageId, CancellationToken cancellationToken = default);
+        Task<Message?> GetReplyPreviewAsync(Guid messageId, CancellationToken cancellationToken = default);
+        Task<Message?> GetByIdWithForwardAsync(Guid messageId, CancellationToken cancellationToken = default);
         Task<List<Message>> GetByChatIdAsync(Guid chatId, CancellationToken cancellationToken = default);
         Task<List<Message>> GetByChatIdPageAsync(
             Guid chatId,

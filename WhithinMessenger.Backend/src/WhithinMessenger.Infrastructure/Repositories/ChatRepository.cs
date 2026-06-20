@@ -397,7 +397,15 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Select(m => new ChatParticipantInfo
                     {
                         UserId = m.UserId,
-                        Username = m.User.UserProfile!.DisplayName ?? m.User.UserName,
+                        Login = m.User.UserName ?? string.Empty,
+                        DisplayName = m.User.UserProfile!.DisplayName != null
+                            && m.User.UserProfile.DisplayName.Trim() != string.Empty
+                            ? m.User.UserProfile.DisplayName.Trim()
+                            : null,
+                        Username = m.User.UserProfile!.DisplayName != null
+                            && m.User.UserProfile.DisplayName.Trim() != string.Empty
+                            ? m.User.UserProfile.DisplayName.Trim()
+                            : (m.User.UserName ?? string.Empty),
                         AvatarUrl = m.User.UserProfile.Avatar,
                         AvatarColor = m.User.UserProfile.AvatarColor,
                         Banner = m.User.UserProfile.Banner,

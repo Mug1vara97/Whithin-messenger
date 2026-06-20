@@ -106,7 +106,7 @@
   padding: 10px 12px;
   border-radius: 8px;
   background: var(--background-secondary, #2b2d31);
-  border-left: 3px solid var(--primary, #5865f2);
+  border-left: 3px solid var(--primary);
   flex-shrink: 0;
 }
 
@@ -117,7 +117,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--primary, #5865f2);
+  color: var(--primary);
 }
 
 .forward-message-modal__preview-author {
@@ -503,7 +503,6 @@
 
 [data-theme-preset='cyberpunk'] .forward-message-modal__preview {
   background: rgba(0, 0, 0, 0.35);
-  border-left-color: var(--cp-yellow);
 }
 
 [data-theme-preset='cyberpunk'] .forward-message-modal__preview-author {

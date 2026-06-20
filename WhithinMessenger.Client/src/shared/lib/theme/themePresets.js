@@ -862,6 +862,7 @@ export const THEME_PRESETS = {
       '--server-list-background': '#cccccc',
       '--icon': '#333333',
       '--icon-hover': '#000000',
+      '--text-on-primary': '#ffffff',
     },
   },
   [THEME_PRESET_IDS.DOS_BLUE]: {

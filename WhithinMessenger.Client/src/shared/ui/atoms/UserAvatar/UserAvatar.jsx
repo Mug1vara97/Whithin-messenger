@@ -38,10 +38,12 @@ const UserAvatar = ({
   const isClickable = Boolean(onClick);
   const decorationUrl = resolveAvatarDecorationUrl(avatarDecoration);
   const hasDecoration = Boolean(decorationUrl);
+  const hasDisplayName = Boolean(displayName?.trim());
+  const hasLogin = Boolean(login?.trim());
   const avatarInitial = resolveAvatarInitial({
     displayName,
     login,
-    fallback: displayName == null && login == null ? username : undefined,
+    fallback: !hasDisplayName && !hasLogin ? username : undefined,
   });
 
   const content = !displayInitials ? (

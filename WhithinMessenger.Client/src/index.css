@@ -38,6 +38,11 @@
   /* Специальные цвета */
   --server-list-background: #1e1f22;
   --bottom: #36393f;
+  --user-panel-height: 63px;
+  --composer-height: 50px;
+  --composer-action-size: 36px;
+  --composer-icon-size: 24px;
+  --composer-sticker-icon-size: 27px;
   
   /* RGB значения для rgba */
   --primary-rgb: 88, 101, 242;

@@ -7,7 +7,113 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { extractFirstHexFromThemeValue } from '../../../lib/theme/appTheme';
 import './StartupPreloader.css';
+
+function readCssVar(name, fallback = '') {
+  if (typeof document === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function cssVarToHex(name, fallback) {
+  return extractFirstHexFromThemeValue(readCssVar(name, fallback)) || fallback;
+}
+
+function hexToNumber(hex) {
+  return parseInt(hex.replace('#', ''), 16);
+}
+
+function hexLuminance(hex) {
+  const normalized = extractFirstHexFromThemeValue(hex);
+  if (!normalized) return 0.5;
+  const n = parseInt(normalized.replace('#', ''), 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((value) => {
+    const channel = value / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function readThemePalette() {
+  const primaryHex = cssVarToHex('--primary', '#5865f2');
+  const primaryHoverHex = cssVarToHex('--primary-hover', '#4752c4');
+  const backgroundHex = cssVarToHex('--background', '#36393f');
+  const backgroundPrimaryHex = cssVarToHex('--background-primary', '#2f3136');
+  const surfaceHoverHex = cssVarToHex('--surface-hover', '#40444b');
+  const textHex = cssVarToHex('--text', '#dcddde');
+  const textSecondaryHex = cssVarToHex('--text-secondary', '#b9bbbe');
+  const borderHex = cssVarToHex('--border', '#4f545c');
+
+  const isLightTheme = hexLuminance(backgroundHex) > 0.45;
+  const primaryIsTooDark = hexLuminance(primaryHex) < 0.22;
+  const accentHex = primaryIsTooDark ? textHex : primaryHex;
+  const accentHoverHex = primaryIsTooDark ? borderHex : primaryHoverHex;
+  const pixelTintHex = primaryIsTooDark
+    ? (isLightTheme ? surfaceHoverHex : textSecondaryHex)
+    : primaryHex;
+
+  return {
+    primary: hexToNumber(accentHex),
+    primaryHover: hexToNumber(accentHoverHex),
+    background: hexToNumber(backgroundHex),
+    backgroundPrimary: hexToNumber(backgroundPrimaryHex),
+    text: textHex,
+    textSecondary: hexToNumber(isLightTheme ? textHex : textSecondaryHex),
+    isLightTheme,
+    pixelTintHex,
+  };
+}
+
+function applyPixelTint(pixelPass, pixelTintHex, isLightTheme) {
+  if (!pixelPass) return;
+
+  const tintLuminance = hexLuminance(pixelTintHex);
+  if (tintLuminance < 0.15) {
+    pixelPass.uniforms.tint.value.set(
+      isLightTheme ? 0.94 : 1,
+      isLightTheme ? 0.94 : 1,
+      isLightTheme ? 0.96 : 1,
+    );
+    return;
+  }
+
+  const n = parseInt(pixelTintHex.replace('#', ''), 16);
+  if (Number.isNaN(n)) return;
+  pixelPass.uniforms.tint.value.set(
+    ((n >> 16) & 255) / 255,
+    ((n >> 8) & 255) / 255,
+    (n & 255) / 255,
+  );
+}
+
+function applyThemeToD20({
+  keyLight,
+  rimLight,
+  ambientLight,
+  innerMaterial,
+  d20Material,
+  edgeMaterial,
+  edgeGlowMaterial,
+  labelMaterials,
+  pixelPass,
+}) {
+  const theme = readThemePalette();
+  if (keyLight) keyLight.color.setHex(theme.primary);
+  if (rimLight) rimLight.color.setHex(theme.primaryHover);
+  if (ambientLight) ambientLight.color.setHex(theme.textSecondary);
+  if (innerMaterial) innerMaterial.color.setHex(theme.backgroundPrimary);
+  if (d20Material) {
+    d20Material.color.setHex(theme.background);
+    d20Material.opacity = theme.isLightTheme ? 0.52 : 0.32;
+  }
+  if (edgeMaterial) edgeMaterial.color.setHex(theme.primary);
+  if (edgeGlowMaterial) edgeGlowMaterial.color.setHex(theme.primary);
+  labelMaterials?.forEach((material) => {
+    material.color.setHex(theme.textSecondary);
+  });
+  applyPixelTint(pixelPass, theme.pixelTintHex, theme.isLightTheme);
+}
 
 const PIXELATE_SHADER = {
   uniforms: {
@@ -108,10 +214,14 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
     let labelGroup;
     const labelTextures = [];
     const labelMaterials = [];
+    let keyLight;
+    let rimLight;
+    let ambientLight;
     let composer;
     let pixelPass;
     let crtPass;
     let frameId = 0;
+    let handleThemeChange = null;
 
     const resize = () => {
       if (!renderer || !camera || !composer) return;
@@ -152,9 +262,11 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       renderer.setClearColor(0x000000, 0);
       viewport.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xb9bbbe, 0.28);
-      const keyLight = new THREE.DirectionalLight(0x5865f2, 0.42);
-      const rimLight = new THREE.DirectionalLight(0x7289da, 0.28);
+      const theme = readThemePalette();
+
+      ambientLight = new THREE.AmbientLight(theme.textSecondary, 0.28);
+      keyLight = new THREE.DirectionalLight(theme.primary, 0.42);
+      rimLight = new THREE.DirectionalLight(theme.primaryHover, 0.28);
       keyLight.position.set(8, 7, 6);
       rimLight.position.set(-6, -4, 5);
       scene.add(ambientLight, keyLight, rimLight);
@@ -162,14 +274,14 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       d20Geometry = new THREE.IcosahedronGeometry(2.7, 0);
       innerGeometry = new THREE.IcosahedronGeometry(2.56, 0);
       innerMaterial = new THREE.MeshBasicMaterial({
-        color: 0x2f3136,
+        color: theme.backgroundPrimary,
         transparent: true,
         opacity: 0.96
       });
       const innerMesh = new THREE.Mesh(innerGeometry, innerMaterial);
 
       d20Material = new THREE.MeshBasicMaterial({
-        color: 0x36393f,
+        color: theme.background,
         transparent: true,
         opacity: 0.32
       });
@@ -183,7 +295,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       lineGeometry = new LineSegmentsGeometry();
       lineGeometry.setPositions(edgeGeometry.attributes.position.array);
       edgeMaterial = new LineMaterial({
-        color: 0x5865f2,
+        color: theme.primary,
         linewidth: 2.8,
         transparent: true,
         opacity: 0.95
@@ -194,7 +306,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       lineGlowGeometry = new LineSegmentsGeometry();
       lineGlowGeometry.setPositions(edgeGeometry.attributes.position.array);
       edgeGlowMaterial = new LineMaterial({
-        color: 0x5865f2,
+        color: theme.primary,
         linewidth: 7.2,
         transparent: true,
         opacity: 0.2
@@ -229,7 +341,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#dcddde';
+        ctx.fillStyle = theme.text;
         ctx.fillText(String(d20FaceNumbers[i / 3] ?? (i / 3) + 1), 8, 8.5);
 
         const texture = new THREE.CanvasTexture(canvas);
@@ -265,6 +377,33 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       composer.addPass(crtPass);
       composer.addPass(new OutputPass());
 
+      applyThemeToD20({
+        keyLight,
+        rimLight,
+        ambientLight,
+        innerMaterial,
+        d20Material,
+        edgeMaterial,
+        edgeGlowMaterial,
+        labelMaterials,
+        pixelPass,
+      });
+
+      handleThemeChange = () => {
+        applyThemeToD20({
+          keyLight,
+          rimLight,
+          ambientLight,
+          innerMaterial,
+          d20Material,
+          edgeMaterial,
+          edgeGlowMaterial,
+          labelMaterials,
+          pixelPass,
+        });
+      };
+      window.addEventListener('themePresetChanged', handleThemeChange);
+
       resize();
       window.addEventListener('resize', resize);
 
@@ -293,6 +432,9 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
 
     return () => {
       window.__startupPreloaderActive = false;
+      if (handleThemeChange) {
+        window.removeEventListener('themePresetChanged', handleThemeChange);
+      }
       window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', resize);
       if (d20Geometry) d20Geometry.dispose();

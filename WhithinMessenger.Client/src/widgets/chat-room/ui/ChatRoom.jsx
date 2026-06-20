@@ -22,7 +22,7 @@ import {
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
 import { resolveMessageAvatarIdentity } from '../../../shared/lib/utils/userDisplayNameHelpers';
-import { MessageInput, MessageStatusIndicator } from '../../../shared/ui';
+import { MessageStatusIndicator } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
@@ -74,7 +74,6 @@ import {
   Videocam,
   FolderZip,
   InsertDriveFile,
-  EmojiEmotions,
   BookmarkBorder,
   ReplyOutlined,
   ForwardOutlined,
@@ -95,6 +94,8 @@ import {
   canEditServerMemberNickname,
 } from '../../../entities/role/lib/serverPermissions';
 import ServerMemberNicknameModal from '../../../entities/member/ui/ServerMemberNicknameModal';
+import SendIcon from '../../../shared/ui/atoms/SendIcon';
+import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
 
 const ChatRoom = ({ 
@@ -298,6 +299,9 @@ const ChatRoom = ({
 
   const [newMessage, setNewMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState(null);
+  const hasComposerText = newMessage.trim().length > 0;
+  const showSendAction = hasComposerText || Boolean(editingMessageId);
+  const showMicAction = canVoice && !editingMessageId && !hasComposerText;
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [isPrivateChat, setIsPrivateChat] = useState(false);
   const [otherUserInCall] = useState(false);
@@ -964,27 +968,25 @@ const ChatRoom = ({
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    const trimmedMessage = newMessage.trim();
-    let success = false;
+    const content = newMessage.trim();
+    const replySnapshot = replyingToMessage;
 
     if (editingMessageId) {
-      console.log('Editing message:', editingMessageId, 'with content:', newMessage);
-      success = await editMessage(editingMessageId, newMessage);
-    } else {
-      console.log('Sending new message:', newMessage);
-      success = await sendMessage(
-        newMessage, 
-        replyingToMessage?.messageId || null,
-        null
-      );
+      const success = await editMessage(editingMessageId, content);
+      if (success) {
+        setEditingMessageId(null);
+        setNewMessage('');
+      }
+      return;
     }
 
-    if (success) {
-      if (editingMessageId) {
-        setEditingMessageId(null);
-      }
-      setReplyingToMessage(null);
-      setNewMessage('');
+    setReplyingToMessage(null);
+    setNewMessage('');
+
+    const sent = sendMessage(content, replySnapshot?.messageId || null, null);
+    if (!sent) {
+      setNewMessage(content);
+      setReplyingToMessage(replySnapshot);
     }
   }, [newMessage, replyingToMessage, editingMessageId, editMessage, sendMessage]);
 
@@ -1440,7 +1442,7 @@ const ChatRoom = ({
       </div>
 
       <div className="chat-room-body">
-      <div className="chat-room-main">
+      <div className={`chat-room-main${replyingToMessage ? ' is-replying' : ''}${editingMessageId ? ' is-editing' : ''}`}>
 
       {!isServerChat && isCallActiveInThisChat && (
         <ChatVoiceCall
@@ -2051,7 +2053,7 @@ const ChatRoom = ({
         />
       ) : (canSend || editingMessageId || !isServerChat) && (
       <form
-        className={`input-container ${replyingToMessage ? 'replying' : ''}`}
+        className={`input-container${replyingToMessage ? ' replying' : ''}${editingMessageId ? ' editing' : ''}`}
         onSubmit={handleSendMessage}
       >
         <>
@@ -2105,7 +2107,7 @@ const ChatRoom = ({
             <span className="recording-hint">
               {isRecordingVideoNote ? 'Видеокружок…' : 'Запись... (ESC для отмены)'}
             </span>
-            <button 
+            <button
               type="button"
               onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
               className="cancel-recording-button"
@@ -2115,7 +2117,18 @@ const ChatRoom = ({
             </button>
           </div>
         ) : (
-          <>
+          <div className="chat-composer">
+            {!editingMessageId && canAttach && (
+              <ChatAttachMenu
+                disabled={!canSend}
+                usePlusIcon
+                triggerClassName="chat-composer__action-btn chat-composer__action-btn--attach"
+                onMediaSelect={queueMediaSend}
+                onDocumentSelect={queueMediaSend}
+                onPollClick={() => setPollModalOpen(true)}
+              />
+            )}
+
             <input
               ref={inputRef}
               type="text"
@@ -2130,61 +2143,62 @@ const ChatRoom = ({
                   ? 'Редактируйте сообщение...'
                   : replyingToMessage
                     ? 'Напишите ответ...'
-                    : 'Введите сообщение...'
+                    : groupName
+                      ? `Написать #${groupName}`
+                      : 'Написать сообщение...'
               }
               className="message-input no-focus-outline"
               autoComplete="off"
               spellCheck={true}
             />
-            <button type="submit" className="send-button">
-              {editingMessageId ? 'Сохранить' : 'Отправить'}
-            </button>
-          </>
-        )}
-        
-        {!editingMessageId && (
-          <>
-            {canVoice && (
-            <div className="voice-message-wrapper">
-              {(isRecording || isRecordingVideoNote) && (
-                <button 
-                  type="button"
-                  onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
-                  className="cancel-recording-button-left"
-                  title="Отменить запись"
+
+            <div className="chat-composer__actions">
+              {showSendAction ? (
+                <button
+                  type="submit"
+                  className="chat-composer__action-btn chat-composer__action-btn--send"
+                  title={editingMessageId ? 'Сохранить' : 'Отправить'}
+                  disabled={!newMessage.trim()}
                 >
-                  Отменить
+                  <SendIcon className="chat-composer__send-icon" />
+                </button>
+              ) : showMicAction ? (
+                <div className="voice-message-wrapper">
+                  {(isRecording || isRecordingVideoNote) && (
+                    <button
+                      type="button"
+                      onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
+                      className="cancel-recording-button-left"
+                      title="Отменить запись"
+                    >
+                      Отменить
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAudioRecording}
+                    disabled={isRecordingVideoNote}
+                    className={`chat-composer__action-btn chat-composer__action-btn--mic ${isRecording ? 'chat-composer__action-btn--recording' : ''}`}
+                    title={isRecording ? 'Нажмите для остановки и отправки' : 'Записать голосовое сообщение'}
+                  >
+                    {isRecording ? <Stop fontSize="small" /> : <Mic fontSize="small" />}
+                  </button>
+                </div>
+              ) : null}
+
+              {!editingMessageId && (
+                <button
+                  type="button"
+                  onClick={handleStickerPickerToggle}
+                  className={`chat-composer__action-btn chat-composer__action-btn--sticker ${isStickerPanelOpen ? 'chat-composer__action-btn--active' : ''}`}
+                  title="Стикеры"
+                  disabled={isSendingSticker}
+                >
+                  <StickerIcon className="chat-composer__sticker-icon" />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleAudioRecording}
-                disabled={isRecordingVideoNote}
-                className={`voice-record-button ${isRecording ? 'recording' : ''}`}
-                title={isRecording ? "Нажмите для остановки и отправки" : "Нажмите для начала записи"}
-              >
-                {isRecording ? <Stop /> : <Mic />}
-              </button>
             </div>
-            )}
-            {canAttach && (
-              <ChatAttachMenu
-                disabled={!canSend}
-                onMediaSelect={queueMediaSend}
-                onDocumentSelect={queueMediaSend}
-                onPollClick={() => setPollModalOpen(true)}
-              />
-            )}
-            <button
-              type="button"
-              onClick={handleStickerPickerToggle}
-              className={`media-button ${isStickerPanelOpen ? 'active' : ''}`}
-              title="Стикеры"
-              disabled={isSendingSticker}
-            >
-              <EmojiEmotions />
-            </button>
-          </>
+          </div>
         )}
         </>
       </form>

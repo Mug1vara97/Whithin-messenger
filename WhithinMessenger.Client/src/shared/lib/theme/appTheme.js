@@ -75,6 +75,23 @@ function hexToRgbTriplet(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
+function hexLuminance(hex) {
+  const normalized = extractFirstHexFromThemeValue(hex);
+  if (!normalized) return 0.5;
+  const n = parseInt(normalized.replace('#', ''), 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((value) => {
+    const channel = value / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function resolveTextOnPrimary(theme) {
+  if (theme['--text-on-primary']) return theme['--text-on-primary'];
+  const primaryLuminance = hexLuminance(theme['--primary']);
+  return primaryLuminance > 0.55 ? '#0a0a0a' : '#ffffff';
+}
+
 export function getMergedTheme() {
   const presetId = getThemePresetId();
   const base = getBaseThemeForPreset(presetId, DEFAULT_THEME);
@@ -159,6 +176,7 @@ export function applyThemeToRoot(theme) {
   }
   root.style.setProperty('--icon', merged['--icon'] || merged['--text-secondary'] || merged['--text']);
   root.style.setProperty('--icon-hover', merged['--icon-hover'] || merged['--text']);
+  root.style.setProperty('--text-on-primary', resolveTextOnPrimary(merged));
 }
 
 export function applySavedTheme() {

@@ -62,6 +62,8 @@ namespace WhithinMessenger.Domain.Interfaces
     {
         public Guid UserId { get; init; }
         public string Username { get; init; } = string.Empty;
+        public string Login { get; init; } = string.Empty;
+        public string? DisplayName { get; init; }
         public string? AvatarUrl { get; init; }
         public string? AvatarColor { get; init; }
         public string? Banner { get; init; }

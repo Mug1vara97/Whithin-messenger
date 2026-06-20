@@ -426,18 +426,19 @@ public class GroupChatHub : Hub
                     object? repliedMessage = null;
                     if (repliedToMessageId.HasValue)
                     {
-                        var repliedToMessage = await _mediator.Send(new GetMessageByIdQuery(repliedToMessageId.Value));
-                        if (repliedToMessage.Success)
+                        var repliedToMessage = await _messageRepository.GetReplyPreviewAsync(
+                            repliedToMessageId.Value);
+                        if (repliedToMessage != null)
                         {
                             repliedMessage = new
                             {
-                                messageId = repliedToMessage.Message.Id,
-                                content = repliedToMessage.Message.Content,
+                                messageId = repliedToMessage.Id,
+                                content = repliedToMessage.Content,
                                 senderUsername = UserDisplayNames.Resolve(
-                                    repliedToMessage.Message.User?.UserProfile?.DisplayName,
-                                    repliedToMessage.Message.User?.UserName),
-                                createdAt = repliedToMessage.Message.CreatedAt,
-                                mediaFiles = repliedToMessage.Message.MediaFiles?.Select(mf => new
+                                    repliedToMessage.User?.UserProfile?.DisplayName,
+                                    repliedToMessage.User?.UserName),
+                                createdAt = repliedToMessage.CreatedAt,
+                                mediaFiles = repliedToMessage.MediaFiles?.Select(mf => new
                                 {
                                     id = mf.Id,
                                     fileName = mf.FileName,
@@ -453,24 +454,11 @@ public class GroupChatHub : Hub
                         }
                     }
 
-                    var messageQuery = new GetMessageByIdQuery(result.MessageId.Value);
-                    var messageResult = await _mediator.Send(messageQuery);
-                    
-                    object? mediaFiles = null;
-                    if (messageResult.Success && messageResult.Message != null)
+                    object? forwardedMessage = null;
+                    if (forwardedFromMessageId.HasValue)
                     {
-                        mediaFiles = messageResult.Message.MediaFiles?.Select(mf => new
-                        {
-                            id = mf.Id,
-                            fileName = mf.FileName,
-                            originalFileName = mf.OriginalFileName,
-                            filePath = mf.FilePath,
-                            contentType = mf.ContentType,
-                            fileSize = mf.FileSize,
-                            thumbnailPath = mf.ThumbnailPath,
-                            createdAt = mf.CreatedAt,
-                            isVideoNote = mf.IsVideoNote
-                        }).ToList();
+                        var forwardedSource = await _messageRepository.GetByIdWithForwardAsync(result.MessageId.Value);
+                        forwardedMessage = BuildForwardedMessagePayload(forwardedSource);
                     }
 
                     var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
@@ -491,10 +479,8 @@ public class GroupChatHub : Hub
                             avatarDecoration = avatarDecoration,
                             avatarColor = avatarColor,
                             repliedMessage = repliedMessage,
-                            forwardedMessage = messageResult.Success
-                                ? BuildForwardedMessagePayload(messageResult.Message)
-                                : null,
-                            mediaFiles = mediaFiles,
+                            forwardedMessage = forwardedMessage,
+                            mediaFiles = (object?)null,
                             status = MessageStatusHelper.Sent
                         });
 

@@ -50,15 +50,17 @@ const resolveMemberStatus = (member) =>
 
 
 
-const resolveMemberLogin = (member) =>
+const resolveMemberLogin = (member) => {
+  const login = member?.login ?? member?.Login ?? null;
+  const trimmed = typeof login === 'string' ? login.trim() : login;
+  return trimmed || null;
+};
 
-  member?.login ?? member?.Login ?? null;
-
-
-
-const resolveMemberDisplayName = (member) =>
-
-  member?.displayName ?? member?.DisplayName ?? null;
+const resolveMemberDisplayName = (member) => {
+  const displayName = member?.displayName ?? member?.DisplayName ?? null;
+  const trimmed = typeof displayName === 'string' ? displayName.trim() : displayName;
+  return trimmed || null;
+};
 
 
 
@@ -245,20 +247,18 @@ export const mapServerMemberToListItem = (member, { serverOwnerId, resolveStatus
 
 
 export const mapChatParticipantToListItem = (participant, { resolveStatus } = {}) => {
-
   const userId = resolveMemberId(participant);
-
-
+  const login = resolveMemberLogin(participant);
+  const displayName = resolveMemberDisplayName(participant);
+  // Legacy payloads only expose merged Username (= DisplayName ?? Login, no server nick).
+  const legacyLogin =
+    !login && !displayName ? resolveMemberName(participant) : null;
 
   return {
-
     userId,
-
     username: resolveMemberName(participant),
-
-    login: resolveMemberLogin(participant),
-
-    displayName: resolveMemberDisplayName(participant),
+    login: login ?? legacyLogin,
+    displayName,
 
     avatar: resolveMemberAvatar(participant),
 

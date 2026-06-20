@@ -63,6 +63,17 @@
   filter: drop-shadow(0 0 20px rgba(var(--primary-rgb, 88, 101, 242), 0.35));
 }
 
+[data-theme-mode='light'] .startup-preloader__viewport {
+  filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.16));
+}
+
+[data-theme-mode='light'] .startup-preloader__fallback-d20 {
+  color: var(--text, #000000);
+  text-shadow:
+    0 0 16px rgba(0, 0, 0, 0.12),
+    0 0 32px rgba(0, 0, 0, 0.08);
+}
+
 .startup-preloader__viewport.is-hidden {
   display: none;
 }

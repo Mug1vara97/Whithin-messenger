@@ -78,8 +78,8 @@ public class MessageReceiptService : IMessageReceiptService
         Guid messageId,
         CancellationToken cancellationToken = default)
     {
-        var message = await _messageRepository.GetByIdAsync(messageId, cancellationToken);
-        if (message == null)
+        var senderUserId = await _messageRepository.GetSenderUserIdAsync(messageId, cancellationToken);
+        if (senderUserId == null)
         {
             return;
         }
@@ -93,7 +93,7 @@ public class MessageReceiptService : IMessageReceiptService
 
         var status = await _messageRepository.GetMessageStatusAsync(
             messageId,
-            message.UserId,
+            senderUserId.Value,
             recipientCount,
             cancellationToken);
 
