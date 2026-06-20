@@ -7,6 +7,8 @@ public class MessageDto
     public string Content { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
     public string SenderUsername { get; set; } = string.Empty;
+    public string? SenderDisplayName { get; set; }
+    public string SenderLogin { get; set; } = string.Empty;
     public string? Status { get; set; }
     public string? AvatarUrl { get; set; }
     public string? AvatarDecoration { get; set; }

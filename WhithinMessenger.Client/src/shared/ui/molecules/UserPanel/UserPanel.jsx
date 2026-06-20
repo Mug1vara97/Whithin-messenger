@@ -16,10 +16,17 @@ import {
   PRESENCE_STATUS,
   toBackendUserStatus,
 } from '../../../lib/utils/userStatus';
+import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT, useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import UserAvatar from '../../atoms/UserAvatar';
 import styles from './UserPanel.module.css';
+
+const resolveProfileDisplayName = (profile) =>
+  profile?.displayName ?? profile?.DisplayName ?? null;
+
+const resolveProfileLogin = (profile, fallbackLogin) =>
+  profile?.username ?? profile?.Username ?? fallbackLogin ?? '';
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -29,6 +36,7 @@ const UserPanel = ({
   isOpen,
   serverId = null,
 }) => {
+  const { user, updateUser } = useAuthContext();
   const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
   const isMuted = useCallStore((state) => state.isMuted);
   const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
@@ -49,11 +57,20 @@ const UserPanel = ({
 
   const getStorageKey = () => (userId ? `whithin:user-status:${userId}` : 'whithin:user-status');
 
+  const syncAuthDisplayName = (profile) => {
+    if (typeof updateUser !== 'function') return;
+    const nextDisplayName = resolveProfileDisplayName(profile);
+    if (nextDisplayName !== (user?.displayName ?? user?.DisplayName ?? null)) {
+      updateUser({ displayName: nextDisplayName });
+    }
+  };
+
   const fetchUserProfile = async () => {
     if (!userId) return;
     try {
       const data = await userApi.getProfile(userId);
       setUserProfile(data);
+      syncAuthDisplayName(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
     }
@@ -65,6 +82,7 @@ const UserPanel = ({
     const handleProfileUpdated = (event) => {
       if (String(event.detail?.userId) === String(userId)) {
         setUserProfile(event.detail);
+        syncAuthDisplayName(event.detail);
       }
     };
 
@@ -73,10 +91,9 @@ const UserPanel = ({
   }, [userId]);
 
   useEffect(() => {
-    if (isOpen && userId) {
-      fetchUserProfile();
-    }
-  }, [isOpen, userId]);
+    if (!userId) return;
+    fetchUserProfile();
+  }, [userId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -279,9 +296,15 @@ const UserPanel = ({
   if (!isOpen) return null;
 
   const avatarColor = userProfile?.avatarColor || '#5865F2';
+  const profileDisplayName =
+    resolveProfileDisplayName(userProfile) ??
+    user?.displayName ??
+    user?.DisplayName ??
+    null;
+  const login = resolveProfileLogin(userProfile, username);
   const visibleName = resolveUserDisplayName({
-    displayName: userProfile?.displayName,
-    username,
+    displayName: profileDisplayName,
+    username: login,
   });
 
   return (
@@ -290,7 +313,8 @@ const UserPanel = ({
         <div className={styles['user-panel-content']}>
           <div className={styles['user-avatar-wrap']}>
             <UserAvatar
-              username={visibleName}
+              displayName={profileDisplayName}
+              login={login}
               avatarUrl={userProfile?.avatar}
               avatarColor={avatarColor}
               avatarDecoration={userProfile?.avatarDecoration}

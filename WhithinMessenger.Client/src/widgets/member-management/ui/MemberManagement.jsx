@@ -504,7 +504,8 @@ const MemberManagement = ({
                 >
                   <div className="members-table-cell members-table-cell--name">
                     <UserAvatar
-                      username={member.username}
+                      displayName={member.displayName ?? member.DisplayName}
+                      login={member.login ?? member.Login}
                       avatarUrl={member.avatar ? `${BASE_URL}${member.avatar}` : null}
                       avatarColor={member.avatarColor}
                       size={36}

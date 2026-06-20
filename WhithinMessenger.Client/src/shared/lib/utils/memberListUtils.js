@@ -56,6 +56,12 @@ const resolveMemberLogin = (member) =>
 
 
 
+const resolveMemberDisplayName = (member) =>
+
+  member?.displayName ?? member?.DisplayName ?? null;
+
+
+
 const resolveMemberNickname = (member) =>
 
   member?.nickname ?? member?.Nickname ?? null;
@@ -208,6 +214,8 @@ export const mapServerMemberToListItem = (member, { serverOwnerId, resolveStatus
 
     login: resolveMemberLogin(member),
 
+    displayName: resolveMemberDisplayName(member),
+
     nickname: resolveMemberNickname(member),
 
     avatar: resolveMemberAvatar(member),
@@ -247,6 +255,10 @@ export const mapChatParticipantToListItem = (participant, { resolveStatus } = {}
     userId,
 
     username: resolveMemberName(participant),
+
+    login: resolveMemberLogin(participant),
+
+    displayName: resolveMemberDisplayName(participant),
 
     avatar: resolveMemberAvatar(participant),
 

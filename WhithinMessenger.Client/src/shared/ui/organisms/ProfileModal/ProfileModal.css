@@ -224,7 +224,7 @@
 }
 
 .profile-modal__nameplate.user-nameplate--decorated .profile-modal__name {
-  color: #e8eef8;
+  color: var(--text, #f2f3f5);
 }
 
 .profile-modal__name {

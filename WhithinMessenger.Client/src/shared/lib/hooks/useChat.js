@@ -20,7 +20,7 @@ export const formatTypingLabel = (users) => {
   return `${users.length} человек печатают…`;
 };
 
-export const useChat = (chatId, username, userId) => {
+export const useChat = (chatId, username, userId, displayName) => {
   const [messages, setMessages] = useState([]);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -265,6 +265,8 @@ export const useChat = (chatId, username, userId) => {
       messageId: msg.messageId ?? msg.MessageId ?? msg.id ?? msg.Id,
       senderId,
       senderUsername: msg.senderUsername ?? msg.SenderUsername ?? msg.username ?? msg.UserName ?? '',
+      senderDisplayName: msg.senderDisplayName ?? msg.SenderDisplayName ?? null,
+      senderLogin: msg.senderLogin ?? msg.SenderLogin ?? '',
       content: msg.content ?? msg.Content ?? '',
       contentType: msg.contentType ?? msg.ContentType ?? null,
       sticker: normalizeSticker(msg.sticker ?? msg.Sticker),
@@ -284,6 +286,9 @@ export const useChat = (chatId, username, userId) => {
         : null,
     };
   }, [normalizeForwardedMessage, normalizeMediaFile, normalizePoll, normalizeSticker, userId, username]);
+
+  const currentUserDisplayName = displayName ?? null;
+  const currentUserLogin = username ?? '';
 
   const isPersistedMessageId = useCallback((messageId) => (
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(messageId ?? ''))
@@ -782,6 +787,8 @@ export const useChat = (chatId, username, userId) => {
       messageId: tempId,
       senderId: userId,
       senderUsername: username,
+      senderDisplayName: currentUserDisplayName,
+      senderLogin: currentUserLogin,
       content,
       createdAt: new Date().toISOString(),
       status: MessageStatus.SENDING,
@@ -836,7 +843,7 @@ export const useChat = (chatId, username, userId) => {
       setError('Ошибка отправки сообщения');
       return false;
     }
-  }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId]);
+  }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId, currentUserDisplayName, currentUserLogin]);
 
   const editMessage = useCallback(async (messageId, newContent) => {
     if (!connection) return;

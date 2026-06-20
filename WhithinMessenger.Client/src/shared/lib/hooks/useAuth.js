@@ -194,6 +194,7 @@ export const useAuth = () => {
 
   return {
     user,
+    updateUser,
     isLoading: userLoading || isAuthLoading,
     isAuthenticated: !!user,
     error,

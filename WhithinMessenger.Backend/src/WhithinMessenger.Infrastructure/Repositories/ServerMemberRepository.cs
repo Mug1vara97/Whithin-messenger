@@ -55,6 +55,7 @@ public class ServerMemberRepository : IServerMemberRepository
             UserId = sm.UserId,
             Nickname = sm.Nickname,
             Login = sm.User.UserName ?? string.Empty,
+            DisplayName = UserDisplayNames.Normalize(sm.User.UserProfile?.DisplayName),
             Username = ServerMemberNames.Resolve(
                 sm.Nickname,
                 sm.User.UserProfile?.DisplayName,

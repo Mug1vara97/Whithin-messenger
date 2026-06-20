@@ -430,7 +430,8 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
         />
         <div className="profile-customize__preview-avatar-wrap">
           <UserAvatar
-            username={visibleName}
+            displayName={profile?.displayName}
+            login={username}
             avatarUrl={profile?.avatar}
             avatarColor={accentColor}
             avatarDecoration={profile?.avatarDecoration}
@@ -594,7 +595,8 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
         </p>
         <div className="profile-customize__decoration-preview">
           <UserAvatar
-            username={visibleName}
+            displayName={profile?.displayName}
+            login={username}
             avatarUrl={profile?.avatar}
             avatarColor={accentColor}
             avatarDecoration={profile?.avatarDecoration}

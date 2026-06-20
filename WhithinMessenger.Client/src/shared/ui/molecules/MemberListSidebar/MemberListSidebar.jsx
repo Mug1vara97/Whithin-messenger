@@ -109,7 +109,8 @@ const MemberListSidebar = ({
           <div className="member-list-nameplate__row">
             <div className="member-list-avatar-wrap">
               <UserAvatar
-                username={member.username}
+                displayName={member.displayName}
+                login={member.login}
                 avatarUrl={avatarUrl}
                 avatarColor={member.avatarColor}
                 avatarDecoration={member.avatarDecoration}

@@ -11,7 +11,7 @@ import {
   getUserStatusLabel,
   normalizeUserStatus,
 } from '../../../lib/utils/userStatus';
-import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
+import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import AvatarDecorationMedia from '../../atoms/UserAvatar/AvatarDecorationMedia';
@@ -53,10 +53,41 @@ const ProfileModal = ({
     profileUserId != null && userId != null && String(profileUserId) === String(userId);
   const activeProfile = profileMatchesUser ? profile : null;
 
-  const loginUsername = activeProfile?.username || username || '';
-  const visibleName = resolveUserDisplayName({
-    displayName: activeProfile?.displayName,
-    username: loginUsername,
+  const login = activeProfile?.username?.trim() || '';
+  const profileDisplayName = activeProfile?.displayName ?? activeProfile?.DisplayName ?? null;
+  const openerVisibleName = (username || '').trim();
+  const visibleName = (() => {
+    if (isOwnProfile) {
+      if (activeProfile) {
+        return resolveUserDisplayName({
+          displayName: profileDisplayName,
+          username: login,
+        });
+      }
+      return resolveUserDisplayName({
+        displayName: user?.displayName ?? user?.DisplayName,
+        username: login || openerVisibleName,
+        fallback: openerVisibleName || 'Пользователь',
+      });
+    }
+
+    if (openerVisibleName) {
+      return openerVisibleName;
+    }
+
+    if (activeProfile) {
+      return resolveUserDisplayName({
+        displayName: profileDisplayName,
+        username: login,
+      });
+    }
+
+    return 'Пользователь';
+  })();
+  const avatarInitial = resolveAvatarInitial({
+    displayName: profileDisplayName,
+    login,
+    fallback: username || 'П',
   });
   const accentColor = activeProfile?.avatarColor || '#5865f2';
   const presenceStatus = normalizeUserStatus(activeProfile?.status ?? initialStatus);
@@ -239,7 +270,7 @@ const ProfileModal = ({
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="profile-modal__avatar-img" />
                 ) : (
-                  <span>{visibleName.charAt(0).toUpperCase()}</span>
+                  <span>{avatarInitial}</span>
                 )}
               </div>
               {hasAvatarDecoration && (
@@ -263,8 +294,8 @@ const ProfileModal = ({
             <UserNameplate nameplate={activeProfile?.nameplate} className="profile-modal__nameplate">
               <h2 className="profile-modal__name">{visibleName}</h2>
             </UserNameplate>
-            {loginUsername && (
-              <p className="profile-modal__login">@{loginUsername}</p>
+            {login && (
+              <p className="profile-modal__login">@{login}</p>
             )}
           </div>
         </div>

@@ -232,6 +232,8 @@ const MessageItem = ({
       {showAvatar && (
         <div className="message-avatar-wrap">
           <UserAvatar
+            displayName={message.senderDisplayName}
+            login={message.senderLogin}
             username={message.senderUsername}
             avatarUrl={message.avatarUrl}
             avatarColor={message.avatarColor}

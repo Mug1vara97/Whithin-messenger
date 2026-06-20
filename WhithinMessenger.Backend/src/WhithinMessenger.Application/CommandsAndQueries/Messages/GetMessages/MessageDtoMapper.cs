@@ -18,6 +18,8 @@ public static class MessageDtoMapper
             ContentType = message.ContentType,
             CreatedAt = message.CreatedAt,
             SenderUsername = ResolveSenderUsername(message, serverNicknamesByUserId),
+            SenderDisplayName = UserDisplayNames.Normalize(message.User?.UserProfile?.DisplayName),
+            SenderLogin = message.User?.UserName ?? string.Empty,
             AvatarUrl = message.User?.UserProfile?.Avatar,
             AvatarDecoration = message.User?.UserProfile?.AvatarDecoration,
             AvatarColor = !string.IsNullOrEmpty(message.User?.UserProfile?.AvatarColor)

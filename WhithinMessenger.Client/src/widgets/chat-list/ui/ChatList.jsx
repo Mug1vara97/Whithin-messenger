@@ -316,8 +316,8 @@ const ChatList = ({
           />
         )}
         <UserPanel
-          userId={user?.id}
-          username={user?.username || user?.userName}
+          userId={user?.id || user?.userId || user?.Id}
+          username={user?.username || user?.UserName || user?.userName}
           isOpen={true}
         />
       </div>

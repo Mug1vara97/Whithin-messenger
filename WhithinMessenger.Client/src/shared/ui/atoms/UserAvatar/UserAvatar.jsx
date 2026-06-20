@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import AvatarDecorationMedia from './AvatarDecorationMedia';
 import './UserAvatar.css';
 
 const UserAvatar = ({
   username,
+  displayName,
+  login,
   avatarUrl,
   avatarColor,
   avatarDecoration,
@@ -35,6 +38,11 @@ const UserAvatar = ({
   const isClickable = Boolean(onClick);
   const decorationUrl = resolveAvatarDecorationUrl(avatarDecoration);
   const hasDecoration = Boolean(decorationUrl);
+  const avatarInitial = resolveAvatarInitial({
+    displayName,
+    login,
+    fallback: displayName == null && login == null ? username : undefined,
+  });
 
   const content = !displayInitials ? (
     <img
@@ -49,7 +57,7 @@ const UserAvatar = ({
       }}
     />
   ) : (
-    username?.charAt(0).toUpperCase() || '?'
+    avatarInitial
   );
 
   return (

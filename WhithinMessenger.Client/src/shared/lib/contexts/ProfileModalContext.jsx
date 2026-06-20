@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { ProfileModal, SettingsModal } from '../../ui/organisms';
 import { useAuthContext } from './AuthContext';
+import { resolveUserDisplayName } from '../utils/userDisplayNameHelpers';
 
 const ProfileModalContext = createContext(null);
 
@@ -11,7 +12,7 @@ const dispatchProfileUpdated = (profile) => {
 };
 
 export const ProfileModalProvider = ({ children }) => {
-  const { user } = useAuthContext();
+  const { user, updateUser } = useAuthContext();
   const currentUserId = user?.id || user?.userId || user?.Id;
   const currentUsername = user?.username || user?.Username || user?.userName;
 
@@ -49,8 +50,12 @@ export const ProfileModalProvider = ({ children }) => {
         // ignore storage errors
       }
     }
-    openProfile(currentUserId, currentUsername, status);
-  }, [currentUserId, currentUsername, openProfile]);
+    const currentVisibleName = resolveUserDisplayName({
+      displayName: user?.displayName ?? user?.DisplayName,
+      username: currentUsername,
+    });
+    openProfile(currentUserId, currentVisibleName, status);
+  }, [currentUserId, currentUsername, openProfile, user?.DisplayName, user?.displayName]);
 
   const openSettings = useCallback((tab = 'account') => {
     setSettingsInitialTab(tab);
@@ -67,7 +72,17 @@ export const ProfileModalProvider = ({ children }) => {
 
   const handleProfileUpdated = useCallback((profile) => {
     dispatchProfileUpdated(profile);
-  }, []);
+    if (typeof updateUser !== 'function') return;
+    const profileUserId = profile?.userId ?? profile?.UserId;
+    if (
+      profileUserId != null &&
+      currentUserId != null &&
+      String(profileUserId) === String(currentUserId)
+    ) {
+      const nextDisplayName = profile?.displayName ?? profile?.DisplayName ?? null;
+      updateUser({ displayName: nextDisplayName });
+    }
+  }, [currentUserId, updateUser]);
 
   const isOwnProfile =
     profileView.userId != null &&

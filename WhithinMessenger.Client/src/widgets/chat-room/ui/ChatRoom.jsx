@@ -21,6 +21,7 @@ import {
   filterDeletableMessages,
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
+import { resolveMessageAvatarIdentity } from '../../../shared/lib/utils/userDisplayNameHelpers';
 import { MessageInput, MessageStatusIndicator } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
@@ -120,6 +121,7 @@ const ChatRoom = ({
   const getConnection = connectionContext?.getConnection;
   const navigate = useNavigate();
   const username = user?.username;
+  const userDisplayName = user?.displayName ?? user?.DisplayName ?? null;
   const userId = user?.id || user?.userId;
   const { openProfile } = useProfileModal();
 
@@ -154,7 +156,7 @@ const ChatRoom = ({
     handleComposerTextChange,
     handleMessagesScroll,
     loadOlderMessages,
-  } = useChat(chatId, username, userId);
+  } = useChat(chatId, username, userId, userDisplayName);
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
 
@@ -1605,6 +1607,7 @@ const ChatRoom = ({
 
         {!isLoading && messages.map((msg, messageIndex) => {
           const isOwn = msg.senderUsername === username;
+          const avatarIdentity = resolveMessageAvatarIdentity(msg, serverMembers);
           const isCallLog = isCallLogMessage(msg);
 
           if (isCallLog) {
@@ -1765,7 +1768,8 @@ const ChatRoom = ({
                 onContextMenu={(event) => handleAuthorContextMenu(event, msg)}
               >
                 <UserAvatar
-                  username={msg.senderUsername}
+                  displayName={avatarIdentity.displayName}
+                  login={avatarIdentity.login}
                   avatarUrl={msg.avatarUrl}
                   avatarColor={msg.avatarColor}
                   avatarDecoration={msg.avatarDecoration}
@@ -1994,7 +1998,8 @@ const ChatRoom = ({
         {uploadingFile && (
           <div className="message my-message uploading-message">
             <UserAvatar 
-              username={username}
+              displayName={userDisplayName}
+              login={username}
               avatarUrl={null}
               avatarColor="#5865F2"
             />

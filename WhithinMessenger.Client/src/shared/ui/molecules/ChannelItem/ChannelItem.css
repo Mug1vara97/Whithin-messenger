@@ -273,7 +273,7 @@
 
 .voice-participant-nameplate.user-nameplate--decorated .voice-participant-name,
 .voice-participant-nameplate.user-nameplate--decorated .voice-participant-nameplate__row .voice-participant-name {
-  color: #e8eef8;
+  color: var(--text);
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
 }

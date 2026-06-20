@@ -86,6 +86,8 @@ const MessageSearch = ({
                 >
                   <div className="message-search-result-user">
                     <UserAvatar
+                      displayName={msg.senderDisplayName}
+                      login={msg.senderLogin}
                       username={msg.senderUsername}
                       avatarUrl={msg.avatarUrl}
                       avatarColor={msg.avatarColor}

@@ -99,7 +99,9 @@ public class GroupChatHub : Hub
         _notificationHubContext = notificationHubContext;
     }
 
-    private async Task<string> ResolveChatSenderUsernameAsync(Guid chatId, Guid userId)
+    private async Task<(string VisibleName, string? DisplayName, string Login)> ResolveChatSenderIdentityAsync(
+        Guid chatId,
+        Guid userId)
     {
         var user = await _userRepository.GetByIdAsync(userId);
         var chat = await _chatRepository.GetByIdAsync(chatId);
@@ -109,10 +111,21 @@ public class GroupChatHub : Hub
             serverNickname = await _serverMemberRepository.GetNicknameAsync(serverId, userId);
         }
 
-        return ServerMemberNames.Resolve(
+        var visibleName = ServerMemberNames.Resolve(
             serverNickname,
             user?.UserProfile?.DisplayName,
             user?.UserName);
+
+        return (
+            visibleName,
+            UserDisplayNames.Normalize(user?.UserProfile?.DisplayName),
+            user?.UserName ?? string.Empty);
+    }
+
+    private async Task<string> ResolveChatSenderUsernameAsync(Guid chatId, Guid userId)
+    {
+        var identity = await ResolveChatSenderIdentityAsync(chatId, userId);
+        return identity.VisibleName;
     }
 
         public async Task JoinGroup(string chatId)
@@ -396,6 +409,7 @@ public class GroupChatHub : Hub
                 }
 
                 var resolvedUsername = await ResolveChatSenderUsernameAsync(parsedChatId, userId.Value);
+                var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
 
                 var command = new SendMessageCommand(
                     userId.Value,
@@ -470,6 +484,8 @@ public class GroupChatHub : Hub
                             senderId = userId.Value,
                             content = message, 
                             username = resolvedUsername,
+                            senderDisplayName = senderIdentity.DisplayName,
+                            senderLogin = senderIdentity.Login,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
                             avatarDecoration = avatarDecoration,
@@ -738,7 +754,8 @@ public class GroupChatHub : Hub
 
                 var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
                 var message = messageResult.Message;
-                var username = await ResolveChatSenderUsernameAsync(parsedChatId, userId.Value);
+                var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
+                var username = senderIdentity.VisibleName;
 
                 await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", new
                 {
@@ -746,6 +763,8 @@ public class GroupChatHub : Hub
                     senderId = userId.Value,
                     content = message.Content,
                     username,
+                    senderDisplayName = senderIdentity.DisplayName,
+                    senderLogin = senderIdentity.Login,
                     chatId = parsedChatId,
                     contentType = message.ContentType,
                     avatarUrl = userProfile?.Avatar,
@@ -940,6 +959,7 @@ public class GroupChatHub : Hub
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
                     string? avatarUrl = userProfile?.Avatar;
                     string? avatarDecoration = userProfile?.AvatarDecoration;
+                    var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
 
                     // Уведомляем всех участников чата о новом медиафайле
                     await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
@@ -947,7 +967,9 @@ public class GroupChatHub : Hub
                             messageId = result.MessageId,
                             senderId = userId.Value,
                             content = mediaUrl, 
-                            username = username,
+                            username = senderIdentity.VisibleName,
+                            senderDisplayName = senderIdentity.DisplayName,
+                            senderLogin = senderIdentity.Login,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
                             avatarDecoration = avatarDecoration,
@@ -1458,13 +1480,16 @@ public class GroupChatHub : Hub
         await _messageRepository.AddAsync(message);
 
         var userProfile = await _mediator.Send(new GetUserProfileQuery(session.CallerId));
+        var senderIdentity = await ResolveChatSenderIdentityAsync(session.ChatId, session.CallerId);
 
         await Clients.Group(session.ChatId.ToString()).SendAsync("MessageSent", new
         {
             messageId = message.Id,
             senderId = session.CallerId,
             content = payload,
-            username = session.CallerName,
+            username = senderIdentity.VisibleName,
+            senderDisplayName = senderIdentity.DisplayName,
+            senderLogin = senderIdentity.Login,
             chatId = session.ChatId,
             contentType = "call_log",
             createdAt = message.CreatedAt,
