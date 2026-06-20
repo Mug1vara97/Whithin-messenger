@@ -156,11 +156,7 @@
   text-shadow: none;
 }
 
-.member-list-section-items--offline .member-list-name {
-  color: var(--text-muted);
-}
-
-.member-list-section-items--offline .member-list-nameplate.user-nameplate--decorated .member-list-name {
+.member-list-section-items--offline .member-list-nameplate.user-nameplate--empty .member-list-name {
   color: var(--text-muted);
 }
 

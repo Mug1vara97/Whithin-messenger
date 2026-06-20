@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { voiceCallApi } from '../../../entities/voice-call/api/voiceCallApi';
+import { voiceCallApi, isIntentionalLiveKitDisconnect } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
 import { VoiceActivityDetector } from '../utils/voiceActivityDetector';
@@ -140,6 +140,11 @@ const bumpVoiceJoinGeneration = () => {
 };
 
 const isVoiceJoinCurrent = (generation) => generation === voiceJoinGeneration;
+
+const isBenignVoiceJoinError = (error) => {
+  const message = error?.message ?? error;
+  return isIntentionalLiveKitDisconnect(message);
+};
 
 const enqueueVoiceJoin = (task) => {
   const run = () => task();
@@ -702,6 +707,10 @@ export const useCallStore = create(
       },
 
       handleRoomDisconnected: async (details = {}) => {
+        if (isIntentionalLiveKitDisconnect(details?.reason)) {
+          return;
+        }
+
         const state = get();
         const endedChannelId = normalizeChannelId(state.currentRoomId || details.roomId);
         if (!endedChannelId || !state.isInCall) return;
@@ -2134,6 +2143,7 @@ export const useCallStore = create(
               currentRoomId: normalizedRoomId,
               currentCallServerId: serverId ? String(serverId) : null,
               isInCall: true,
+              error: null,
               currentCall: {
                 channelId: normalizedRoomId,
                 channelName: finalChannelName,
@@ -2193,9 +2203,11 @@ export const useCallStore = create(
               });
             }
           } catch (error) {
-            if (isVoiceJoinCurrent(joinGen)) {
+            if (isVoiceJoinCurrent(joinGen) && !isBenignVoiceJoinError(error)) {
               console.error('Failed to join room:', error);
               set({ error: error.message });
+            } else if (isBenignVoiceJoinError(error)) {
+              console.log('Ignored benign voice join disconnect:', error?.message ?? error);
             }
           } finally {
             endVoiceJoinSoundSuppress();

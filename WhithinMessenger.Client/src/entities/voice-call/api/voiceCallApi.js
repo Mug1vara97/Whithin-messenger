@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-import { Room, RoomEvent, Track, TrackPublication, VideoPresets } from 'livekit-client';
+import { Room, RoomEvent, Track, TrackPublication, VideoPresets, DisconnectReason } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { serverApi } from '../../server/api/serverApi';
 
@@ -92,6 +92,16 @@ async function releaseLiveKitLocalCapture(room) {
   }
 }
 
+export function isIntentionalLiveKitDisconnect(reason) {
+  if (reason == null) return false;
+  if (reason === DisconnectReason.CLIENT_INITIATED) return true;
+
+  const normalized = String(reason).trim().toLowerCase();
+  return normalized.includes('client initiated')
+    || normalized.includes('user initiated')
+    || normalized === 'client_initiated';
+}
+
 class VoiceCallApi {
   constructor() {
     this.socket = null;
@@ -103,6 +113,7 @@ class VoiceCallApi {
     this.eventHandlers = new Map();
     this.hadSocketSession = false;
     this.suppressReconnectEvent = false;
+    this.suppressRoomDisconnectEvents = 0;
     this.recentPeerJoinedAt = new Map();
   }
 
@@ -373,13 +384,25 @@ class VoiceCallApi {
     });
   }
 
+  async disconnectLiveKitRoom(room = this.room) {
+    if (!room) return;
+
+    this.suppressRoomDisconnectEvents += 1;
+    try {
+      await releaseLiveKitLocalCapture(room);
+      await room.disconnect();
+    } finally {
+      this.suppressRoomDisconnectEvents = Math.max(0, this.suppressRoomDisconnectEvents - 1);
+    }
+  }
+
   async disconnect() {
     this.suppressReconnectEvent = true;
 
     if (this.room) {
-      await releaseLiveKitLocalCapture(this.room);
-      await this.room.disconnect();
+      const roomToClose = this.room;
       this.room = null;
+      await this.disconnectLiveKitRoom(roomToClose);
     }
     
     if (this.socket) {
@@ -396,10 +419,10 @@ class VoiceCallApi {
     const previousRoomId = this.roomId;
     
     if (this.room) {
-      await releaseLiveKitLocalCapture(this.room);
-      await this.room.disconnect();
+      const roomToLeave = this.room;
       this.room = null;
       this.roomId = null;
+      await this.disconnectLiveKitRoom(roomToLeave);
     }
     
     // Отправляем событие на сервер о выходе из канала
@@ -498,8 +521,7 @@ class VoiceCallApi {
       const oldRoom = this.room;
       this.room = null;
       try {
-        await releaseLiveKitLocalCapture(oldRoom);
-        await oldRoom.disconnect();
+        await this.disconnectLiveKitRoom(oldRoom);
       } catch (err) {
         console.warn('Error disconnecting from previous room:', err);
       }
@@ -593,6 +615,14 @@ class VoiceCallApi {
     if (!this.room) return;
 
     this.room.on(RoomEvent.Disconnected, (reason) => {
+      if (
+        this.suppressRoomDisconnectEvents > 0
+        || isIntentionalLiveKitDisconnect(reason)
+      ) {
+        console.log('LiveKit room disconnected (ignored):', reason);
+        return;
+      }
+
       console.warn('LiveKit room disconnected:', reason);
       this.emit('roomDisconnected', { reason, roomId: this.roomId });
       this.room = null;
