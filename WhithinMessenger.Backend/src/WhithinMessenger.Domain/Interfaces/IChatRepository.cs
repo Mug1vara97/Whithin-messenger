@@ -22,6 +22,8 @@ namespace WhithinMessenger.Domain.Interfaces
         Task<bool> IsUserParticipantAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default);
         Task<ChatType?> GetChatTypeByNameAsync(string typeName, CancellationToken cancellationToken = default);
         Task<ChatInfo> EnsureSavedMessagesChatAsync(Guid userId, CancellationToken cancellationToken = default);
+        Task<bool> SetChatPinnedAsync(Guid userId, Guid chatId, bool isPinned, CancellationToken cancellationToken = default);
+        Task<bool> ReorderPinnedChatsAsync(Guid userId, IReadOnlyList<Guid> chatIds, CancellationToken cancellationToken = default);
     }
 
     public class ChatInfo
@@ -40,6 +42,9 @@ namespace WhithinMessenger.Domain.Interfaces
         public string? LastMessage { get; set; }
         public DateTimeOffset LastMessageTime { get; init; }
         public int UnreadCount { get; set; }
+        public bool IsPinned { get; init; }
+        public DateTimeOffset? PinnedAt { get; init; }
+        public int? PinOrder { get; init; }
     }
 
     public interface ICreatePrivateChatResult

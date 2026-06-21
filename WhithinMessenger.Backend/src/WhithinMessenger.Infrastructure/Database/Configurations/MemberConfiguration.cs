@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WhithinMessenger.Domain.Models;
 
@@ -20,6 +20,9 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
 
         builder.Property(e => e.JoinedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.Property(e => e.IsPinned)
+            .HasDefaultValue(false);
 
         builder
             .HasOne(d => d.Chat)

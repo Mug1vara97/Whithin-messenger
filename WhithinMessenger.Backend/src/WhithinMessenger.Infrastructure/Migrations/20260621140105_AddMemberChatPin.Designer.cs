@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WhithinMessenger.Infrastructure.Database;
@@ -11,9 +12,11 @@ using WhithinMessenger.Infrastructure.Database;
 namespace WhithinMessenger.Infrastructure.Migrations
 {
     [DbContext(typeof(WithinDbContext))]
-    partial class WithinDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260621140105_AddMemberChatPin")]
+    partial class AddMemberChatPin
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -569,9 +572,6 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<int?>("PinOrder")
-                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("PinnedAt")
                         .HasColumnType("timestamp with time zone");

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import tokenManager from '../../../lib/services/tokenManager';
+import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
 import './ChatAvatarUpload.css';
 
 const getAuthHeaders = () => {
@@ -128,18 +129,13 @@ const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarU
       <div className="chat-avatar-upload-content">
         {/* Текущий аватар */}
         <div className="chat-avatar-current">
-          <div 
-            className="chat-avatar-preview"
-            style={{
-              backgroundColor: currentAvatar ? 'transparent' : (currentAvatarColor || '#5865F2'),
-              backgroundImage: currentAvatar?.startsWith('/uploads/') 
-                ? `url(${BASE_URL}${currentAvatar})` 
-                : (currentAvatar?.startsWith('http') ? `url(${currentAvatar})` : 'none'),
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          >
-            {!currentAvatar && 'G'}
+          <div className="chat-avatar-preview-wrap">
+            <UserAvatar
+              username={currentAvatar ? null : 'G'}
+              avatarUrl={currentAvatar}
+              avatarColor={currentAvatarColor}
+              size={64}
+            />
           </div>
           <span className="chat-avatar-label">Текущий аватар</span>
         </div>

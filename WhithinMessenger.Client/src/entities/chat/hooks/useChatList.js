@@ -4,16 +4,49 @@ import * as signalR from '@microsoft/signalr';
 import tokenManager from '../../../shared/lib/services/tokenManager';
 import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
 
-const sortChats = (items) => [...items].sort((a, b) => {
-  const aSaved = Boolean(a.isSavedMessages ?? a.IsSavedMessages);
-  const bSaved = Boolean(b.isSavedMessages ?? b.IsSavedMessages);
-  if (aSaved && !bSaved) return -1;
-  if (!aSaved && bSaved) return 1;
+const getPinOrder = (chat) => {
+  const order = chat?.pinOrder ?? chat?.PinOrder;
+  return order == null ? Number.MAX_SAFE_INTEGER : Number(order);
+};
 
-  const timeA = new Date(a.lastMessageTime || 0).getTime();
-  const timeB = new Date(b.lastMessageTime || 0).getTime();
-  return timeB - timeA;
-});
+const comparePinnedChats = (a, b) => {
+  const orderA = getPinOrder(a);
+  const orderB = getPinOrder(b);
+  if (orderA !== orderB) return orderA - orderB;
+
+  const pinnedAtA = new Date(a.pinnedAt ?? a.PinnedAt ?? 0).getTime();
+  const pinnedAtB = new Date(b.pinnedAt ?? b.PinnedAt ?? 0).getTime();
+  return pinnedAtA - pinnedAtB;
+};
+
+const sortChats = (items) => {
+  const saved = [];
+  const pinned = [];
+  const unpinned = [];
+
+  items.forEach((chat) => {
+    if (Boolean(chat.isSavedMessages ?? chat.IsSavedMessages)) {
+      saved.push(chat);
+      return;
+    }
+
+    if (Boolean(chat.isPinned ?? chat.IsPinned)) {
+      pinned.push(chat);
+      return;
+    }
+
+    unpinned.push(chat);
+  });
+
+  pinned.sort(comparePinnedChats);
+  unpinned.sort((a, b) => {
+    const timeA = new Date(a.lastMessageTime || 0).getTime();
+    const timeB = new Date(b.lastMessageTime || 0).getTime();
+    return timeB - timeA;
+  });
+
+  return [...saved, ...pinned, ...unpinned];
+};
 
 const normalizeChatListItem = (chat) => {
   if (!chat || typeof chat !== 'object') {
@@ -32,6 +65,9 @@ const normalizeChatListItem = (chat) => {
     userStatus: chat.userStatus ?? chat.UserStatus ?? null,
     isGroupChat: Boolean(chat.isGroupChat ?? chat.IsGroupChat),
     isSavedMessages: Boolean(chat.isSavedMessages ?? chat.IsSavedMessages),
+    isPinned: Boolean(chat.isPinned ?? chat.IsPinned),
+    pinnedAt: chat.pinnedAt ?? chat.PinnedAt ?? null,
+    pinOrder: chat.pinOrder ?? chat.PinOrder ?? null,
     lastMessage: chat.lastMessage ?? chat.LastMessage ?? '',
     lastMessageTime: chat.lastMessageTime ?? chat.LastMessageTime ?? null,
     unreadCount: chat.unreadCount ?? chat.UnreadCount ?? 0,
@@ -328,6 +364,41 @@ export const useChatList = (userId, onChatCreated = null) => {
     throw new Error('Group chat creation not implemented yet');
   }, []);
 
+  const setChatPinned = useCallback(async (chatId, isPinned) => {
+    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+      return false;
+    }
+
+    try {
+      await connectionRef.current.invoke(isPinned ? 'PinChat' : 'UnpinChat', chatId);
+      return true;
+    } catch (error) {
+      console.error('Error setting chat pin:', error);
+      return false;
+    }
+  }, []);
+
+  const pinChat = useCallback(async (chatId) => setChatPinned(chatId, true), [setChatPinned]);
+  const unpinChat = useCallback(async (chatId) => setChatPinned(chatId, false), [setChatPinned]);
+
+  const reorderPinnedChats = useCallback(async (orderedChatIds) => {
+    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+      return false;
+    }
+
+    if (!Array.isArray(orderedChatIds) || orderedChatIds.length === 0) {
+      return true;
+    }
+
+    try {
+      await connectionRef.current.invoke('ReorderPinnedChats', orderedChatIds);
+      return true;
+    } catch (error) {
+      console.error('Error reordering pinned chats:', error);
+      return false;
+    }
+  }, []);
+
   const unreadCountByChat = useMemo(() => {
     return chats.reduce((acc, chat) => {
       const chatId = chat.chatId || chat.chat_id;
@@ -349,5 +420,8 @@ export const useChatList = (userId, onChatCreated = null) => {
     searchUsers,
     createPrivateChat,
     createGroupChat,
+    pinChat,
+    unpinChat,
+    reorderPinnedChats,
   };
 };

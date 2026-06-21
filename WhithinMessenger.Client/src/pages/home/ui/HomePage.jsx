@@ -71,7 +71,7 @@ const HomePage = () => {
     navigate(`/channels/@me/${createdChatId}`);
   }, [navigate]);
 
-  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers } = useChatList(user?.id || null, handleChatCreatedNavigate);
+  const { chats, createPrivateChat, unreadCountByChat: messageUnreadCountByChat, initialChatsLoaded, refreshChats, searchResults, isSearching, isLoading, searchUsers, pinChat, unpinChat, reorderPinnedChats } = useChatList(user?.id || null, handleChatCreatedNavigate);
   const savedMessagesChatId = useMemo(
     () => chats.find((chat) => chat.isSavedMessages)?.chatId ?? null,
     [chats],
@@ -864,7 +864,7 @@ const HomePage = () => {
         const prevId = String(prev?.chatId || prev?.chat_id || '');
         const nextId = String(foundChat.chatId || foundChat.chat_id || '');
         if (prevId === nextId) {
-          return prev;
+          return { ...prev, ...foundChat };
         }
         return foundChat;
       });
@@ -1186,6 +1186,9 @@ const HomePage = () => {
                   isLoading={isLoading}
                   searchUsers={searchUsers}
                   createPrivateChat={createPrivateChat}
+                  pinChat={pinChat}
+                  unpinChat={unpinChat}
+                  reorderPinnedChats={reorderPinnedChats}
                 />
               )}
             </ResizableSidebarShell>
@@ -1246,6 +1249,9 @@ const HomePage = () => {
                       activeChatCall={activeChatCall}
                       onEndChatCall={handleEndChatCall}
                       onMessagesActivity={scheduleMarkChatNotificationsRead}
+                      isPinned={Boolean(selectedChat.isPinned ?? selectedChat.IsPinned)}
+                      pinChat={pinChat}
+                      unpinChat={unpinChat}
                     />
                   )}
                 </div>

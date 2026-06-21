@@ -271,8 +271,17 @@ const ChatInfoModal = ({
           {/* Единый layout для всех типов чатов: слева информация о чате, справа табы */}
           <div className="chat-info-private-layout">
             {/* Левая панель с информацией о чате */}
-            <div className="chat-info-user-panel">
-              <div className="chat-info-user-content">
+            <div
+              className={`chat-info-user-panel${
+                chatInfo?.type === 'group' ? ' chat-info-user-panel--group' : ''
+              }`}
+            >
+              <div
+                className={`chat-info-user-content${
+                  chatInfo?.type === 'group' ? ' chat-info-user-content--group' : ''
+                }`}
+              >
+                <div className="chat-info-user-header">
                 {chatInfo?.type === 'private' && (
                   <div
                     className="chat-info-user-banner"
@@ -281,27 +290,35 @@ const ChatInfoModal = ({
                 )}
                 {/* Аватар с красивой рамкой */}
                 <div className={`chat-info-avatar-container${chatInfo?.type === 'private' ? ' with-banner' : ''}`}>
-                  <div 
-                    className="chat-info-user-avatar"
-                    style={{
-                      backgroundColor: chatInfo?.type === 'group' 
-                        ? (chatAvatar ? 'transparent' : (chatAvatarColor || '#5865F2'))
-                        : (chatInfo?.avatarColor || '#5865F2'),
-                      backgroundImage: chatInfo?.type === 'group'
-                        ? (chatAvatar?.startsWith('/uploads/') 
-                            ? `url(${BASE_URL}${chatAvatar})` 
-                            : (chatAvatar?.startsWith('http') ? `url(${chatAvatar})` : 'none'))
-                        : (chatInfo?.avatar?.startsWith('/uploads/') 
-                            ? `url(${BASE_URL}${chatInfo.avatar})` 
-                            : (chatInfo?.avatar?.startsWith('http') ? `url(${chatInfo.avatar})` : 'none')),
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    {((chatInfo?.type === 'group' && !chatAvatar) || 
-                      (chatInfo?.type === 'private' && !chatInfo?.avatar)) && (
-                      chatInfo?.name?.charAt(0) || (chatInfo?.type === 'private' ? 'U' : 'G')
-                    )}
+                  <div className="chat-info-avatar-wrap">
+                    <UserAvatar
+                      username={
+                        chatInfo?.type === 'group' && !chatAvatar
+                          ? 'G'
+                          : chatInfo?.name
+                      }
+                      displayName={chatInfo?.type === 'group' ? null : chatInfo?.name}
+                      login={chatInfo?.type === 'group' ? null : chatInfo?.name}
+                      avatarUrl={
+                        chatInfo?.type === 'group'
+                          ? chatAvatar
+                          : chatInfo?.avatar
+                      }
+                      avatarColor={
+                        chatInfo?.type === 'group'
+                          ? chatAvatarColor
+                          : chatInfo?.avatarColor
+                      }
+                      avatarDecoration={
+                        chatInfo?.type === 'group' ? null : chatInfo?.avatarDecoration
+                      }
+                      size={100}
+                      statusIndicator={
+                        chatInfo?.type === 'private' && chatInfo?.status ? (
+                          <UserAvatarPresenceDot status={chatInfo.status} />
+                        ) : null
+                      }
+                    />
                   </div>
                 </div>
                 
@@ -320,6 +337,7 @@ const ChatInfoModal = ({
                       Удалить чат
                     </button>
                   )}
+                </div>
                 </div>
 
                 {/* Панель участников для групповых чатов */}
@@ -348,7 +366,11 @@ const ChatInfoModal = ({
                           const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
 
                           return (
-                          <div key={participant.userId || member.userId} className="chat-info-participant-item">
+                          <div
+                            key={participant.userId || member.userId}
+                            className="chat-info-participant-item"
+                            title={`${member.username || 'Пользователь'} — ${getUserStatusLabel(member.status)}`}
+                          >
                             <div className="chat-info-participant-item__layout">
                               <div className="user-avatar-slot chat-info-participant-avatar-wrap">
                                 <UserAvatar
@@ -368,9 +390,6 @@ const ChatInfoModal = ({
                                 <div className="chat-info-participant-nameplate__body">
                                   <span className="chat-info-participant-name">
                                     {member.username || 'Пользователь'}
-                                  </span>
-                                  <span className="chat-info-participant-status">
-                                    {getUserStatusLabel(member.status)}
                                   </span>
                                 </div>
                               </UserNameplate>

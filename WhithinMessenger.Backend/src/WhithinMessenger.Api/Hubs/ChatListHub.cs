@@ -6,6 +6,8 @@ using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetUserChats;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.CreatePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.CreateGroupChat;
+using WhithinMessenger.Application.CommandsAndQueries.Chats.ReorderPinnedChats;
+using WhithinMessenger.Application.CommandsAndQueries.Chats.SetChatPin;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
@@ -174,6 +176,81 @@ namespace WhithinMessenger.Api.Hubs
             {
                 await Clients.Caller.SendAsync("error", "Произошла ошибка при создании группового чата: " + ex.Message);
             }
+        }
+
+        public async Task PinChat(Guid chatId)
+        {
+            await SetChatPinInternal(chatId, isPinned: true);
+        }
+
+        public async Task UnpinChat(Guid chatId)
+        {
+            await SetChatPinInternal(chatId, isPinned: false);
+        }
+
+        public async Task ReorderPinnedChats(List<Guid> chatIds)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var command = new ReorderPinnedChatsCommand(userId.Value, chatIds ?? []);
+                var result = await _mediator.Send(command);
+
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("error", result.ErrorMessage ?? "Не удалось изменить порядок закреплённых чатов");
+                    return;
+                }
+
+                await BroadcastUserChatsAsync(userId.Value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ChatListHub: Error reordering pinned chats");
+                await Clients.Caller.SendAsync("error", "Произошла ошибка при изменении порядка чатов: " + ex.Message);
+            }
+        }
+
+        private async Task SetChatPinInternal(Guid chatId, bool isPinned)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("error", "Пользователь не авторизован");
+                    return;
+                }
+
+                var command = new SetChatPinCommand(userId.Value, chatId, isPinned);
+                var result = await _mediator.Send(command);
+
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("error", result.ErrorMessage ?? "Не удалось изменить закрепление чата");
+                    return;
+                }
+
+                await BroadcastUserChatsAsync(userId.Value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ChatListHub: Error setting chat pin for chat {ChatId}", chatId);
+                await Clients.Caller.SendAsync("error", "Произошла ошибка при закреплении чата: " + ex.Message);
+            }
+        }
+
+        private async Task BroadcastUserChatsAsync(Guid userId)
+        {
+            var query = new GetUserChatsQuery(userId);
+            var chatsResult = await _mediator.Send(query);
+            await Clients.User(userId.ToString()).SendAsync("receivechats", chatsResult.Chats);
         }
 
 

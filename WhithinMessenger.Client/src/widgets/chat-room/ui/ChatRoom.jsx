@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
+import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
+import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
@@ -99,6 +101,8 @@ import ServerMemberRoleModal from '../../../entities/member/ui/ServerMemberRoleM
 import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { getFriendActionForMember } from '../../../shared/lib/utils/friendActionForMember';
 import { buildServerUserContextMenuItems } from '../../../shared/lib/utils/buildServerUserContextMenuItems';
+import { buildDmContextMenuItems } from '../../../shared/lib/utils/buildDmContextMenuItems';
+import { inviteUserToServer } from '../../../shared/lib/utils/inviteUserToServer';
 import SendIcon from '../../../shared/ui/atoms/SendIcon';
 import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
@@ -120,7 +124,10 @@ const ChatRoom = ({
   isSavedMessages = false,
   savedMessagesChatId = null,
   /** When messages load/update; parent debounces the server «mark chat read» call */
-  onMessagesActivity
+  onMessagesActivity,
+  isPinned = false,
+  pinChat,
+  unpinChat,
 }) => {
   const { user } = useAuthContext();
   const connectionContext = useConnectionContext();
@@ -130,6 +137,8 @@ const ChatRoom = ({
   const userDisplayName = user?.displayName ?? user?.DisplayName ?? null;
   const userId = user?.id || user?.userId;
   const { openProfile, openOwnProfile } = useProfileModal();
+  const { markChatAsRead } = useNotificationContext();
+  const { servers } = useServerContext();
 
   const isMessageOwn = useCallback(
     (message) => {
@@ -578,6 +587,68 @@ const ChatRoom = ({
     [serverMembers],
   );
 
+  const buildDmMenuItems = useCallback(
+    (targetUserId, targetUsername, targetStatus = null) => {
+      if (targetUserId == null) return [];
+
+      const friendAction = getFriendActionForMember(targetUserId, {
+        userId,
+        friends,
+        pendingRequests,
+        sentRequests,
+      });
+
+      return buildDmContextMenuItems({
+        chatId,
+        targetUserId,
+        targetUsername: targetUsername || groupName || 'пользователя',
+        hasUnread: false,
+        isPinned,
+        friendAction,
+        servers: servers || [],
+        handlers: {
+          onMarkAsRead: () => markChatAsRead(chatId),
+          onPin: typeof pinChat === 'function' ? () => { void pinChat(chatId); } : undefined,
+          onUnpin: typeof unpinChat === 'function' ? () => { void unpinChat(chatId); } : undefined,
+          onProfile: () => openProfile(targetUserId, targetUsername, targetStatus),
+          onStartCall: () => setShowCallTypeSelector(true),
+          onInviteToServer: (serverId) => {
+            void inviteUserToServer(serverId, targetUserId)
+              .then(() => alert('Пользователь приглашён на сервер'))
+              .catch((error) => alert(error?.message || 'Не удалось пригласить на сервер'));
+          },
+          onRemoveFriend:
+            friendAction?.kind === 'friend'
+              ? () => {
+                  void handleRemoveFriend(targetUserId);
+                }
+              : undefined,
+          onIgnore: () => alert('Игнорирование пока не реализовано'),
+          onBlock: () => alert('Блокировка пока не реализована'),
+          onMute: () => alert('Заглушение пока не реализовано'),
+          onCopyUserId: () => handleCopyUserId(targetUserId),
+          onCopyChannelId: () => handleCopyUserId(chatId),
+        },
+      });
+    },
+    [
+      chatId,
+      groupName,
+      isPinned,
+      pinChat,
+      unpinChat,
+      userId,
+      friends,
+      pendingRequests,
+      sentRequests,
+      servers,
+      markChatAsRead,
+      openProfile,
+      handleRemoveFriend,
+      handleCopyUserId,
+    ],
+  );
+
   const buildUserContextMenuItems = useCallback(
     (targetMember, menuPosition = null) => {
       const memberUserId = targetMember?.userId;
@@ -684,8 +755,51 @@ const ChatRoom = ({
     [isSelectionMode, isSavedMessages, userId, isServerChat, closeContextMenu],
   );
 
+  const handlePrivateChatHeaderContextMenu = useCallback(
+    (event) => {
+      if (!isPrivateChat || isServerChat || isSavedMessages) return;
+
+      const otherUserId =
+        chatUserProfile?.otherUserId ??
+        chatUserProfile?.userId ??
+        chatUserProfile?.UserId;
+      if (!otherUserId || String(otherUserId) === String(userId)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      closeContextMenu();
+
+      setAuthorContextMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        authorId: otherUserId,
+        authorName: groupName || chatUserProfile?.username || '',
+        authorStatus: chatUserProfile?.status ?? null,
+      });
+    },
+    [
+      isPrivateChat,
+      isServerChat,
+      isSavedMessages,
+      chatUserProfile,
+      userId,
+      groupName,
+      closeContextMenu,
+    ],
+  );
+
   const authorContextMenuItems = useMemo(() => {
     if (!authorContextMenu.authorId) return [];
+
+    if (isPrivateChat && !isServerChat) {
+      return buildDmMenuItems(
+        authorContextMenu.authorId,
+        authorContextMenu.authorName,
+        authorContextMenu.authorStatus,
+      );
+    }
+
     const member = resolveMemberFromAuthor(
       authorContextMenu.authorId,
       authorContextMenu.authorName,
@@ -696,7 +810,7 @@ const ChatRoom = ({
       x: authorContextMenu.x,
       y: authorContextMenu.y,
     });
-  }, [authorContextMenu, resolveMemberFromAuthor, buildUserContextMenuItems]);
+  }, [authorContextMenu, isPrivateChat, isServerChat, buildDmMenuItems, resolveMemberFromAuthor, buildUserContextMenuItems]);
 
   const handleSaveServerNickname = useCallback(async () => {
     if (!nicknameEditorMember || !canEditMemberNickname(nicknameEditorMember.userId)) {
@@ -928,8 +1042,13 @@ const ChatRoom = ({
         .then(chatInfo => {
           console.log('ChatRoom - Loaded chat info via API:', chatInfo);
           setChatUserProfile({
+            userId: chatInfo.otherUserId ?? chatInfo.OtherUserId ?? null,
+            otherUserId: chatInfo.otherUserId ?? chatInfo.OtherUserId ?? null,
+            username: chatInfo.name ?? chatInfo.Name ?? null,
             avatar: chatInfo.type === 'group' ? chatInfo.chatAvatar : chatInfo.avatar,
             avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor,
+            avatarDecoration: chatInfo.avatarDecoration ?? chatInfo.AvatarDecoration ?? null,
+            status: chatInfo.userStatus ?? chatInfo.UserStatus ?? null,
             banner: chatInfo.banner ?? chatInfo.Banner ?? null,
           });
         })
@@ -993,8 +1112,13 @@ const ChatRoom = ({
     const handleChatInfoReceived = (chatInfo) => {
       console.log('ChatRoom - Chat info received:', chatInfo);
       setChatUserProfile({
+        userId: chatInfo.otherUserId ?? chatInfo.OtherUserId ?? null,
+        otherUserId: chatInfo.otherUserId ?? chatInfo.OtherUserId ?? null,
+        username: chatInfo.name ?? chatInfo.Name ?? null,
         avatar: chatInfo.type === 'group' ? chatInfo.chatAvatar : chatInfo.avatar,
         avatarColor: chatInfo.type === 'group' ? chatInfo.chatAvatarColor : chatInfo.avatarColor,
+        avatarDecoration: chatInfo.avatarDecoration ?? chatInfo.AvatarDecoration ?? null,
+        status: chatInfo.userStatus ?? chatInfo.UserStatus ?? null,
         banner: chatInfo.banner ?? chatInfo.Banner ?? null,
       });
     };
@@ -1062,6 +1186,11 @@ const ChatRoom = ({
       }
     }
   }, [showChatInfo, chatId, connection, isPrivateChat, isGroupChat, isServerChat]);
+
+  useEffect(() => {
+    if (!isPrivateChat || isServerChat || !connection || !chatId) return;
+    loadChatInfo();
+  }, [isPrivateChat, isServerChat, connection, chatId, loadChatInfo]);
 
   useEffect(() => {
     if (!showChatInfo || !chatId) {
@@ -1628,7 +1757,11 @@ const ChatRoom = ({
     >
       <div className="chat-header">
         <div className="header-left">
-          <div className="user-info" onClick={() => setShowChatInfo(true)}>
+          <div
+            className="user-info"
+            onClick={() => setShowChatInfo(true)}
+            onContextMenu={handlePrivateChatHeaderContextMenu}
+          >
             <h2 className="username clickable-chat-title">{groupName}</h2>
           </div>
         </div>
@@ -2524,7 +2657,9 @@ const ChatRoom = ({
           name: groupName || 'Чат',
           type: isPrivateChat ? 'private' : 'group',
           avatar: chatUserProfile?.avatar,
-          avatarColor: chatUserProfile?.avatarColor || '#5865F2',
+          avatarColor: chatUserProfile?.avatarColor,
+          avatarDecoration: chatUserProfile?.avatarDecoration,
+          status: chatUserProfile?.status,
           banner: chatUserProfile?.banner ?? null,
           chatAvatar: chatUserProfile?.avatar,
           chatAvatarColor: chatUserProfile?.avatarColor

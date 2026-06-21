@@ -23,74 +23,88 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var oneOnOneChats = await _context.Members
                 .AsNoTracking()
-                .Where(m => m.UserId == userId)
-                .Select(m => m.Chat)
-                .Where(c => c.Type.TypeName == "Private")
-                .Select(c => new ChatInfo
+                .Where(m => m.UserId == userId && m.Chat.Type.TypeName == "Private")
+                .Select(m => new ChatInfo
                 {
-                    ChatId = c.Id,
+                    ChatId = m.ChatId,
+                    IsPinned = m.IsPinned,
+                    PinnedAt = m.PinnedAt,
+                    PinOrder = m.PinOrder,
                     Username = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserProfile!.DisplayName ?? m.User.UserName)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.UserProfile!.DisplayName ?? member.User.UserName)
                         .FirstOrDefault() ?? string.Empty,
                     UserId = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.UserId)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.UserId)
                         .FirstOrDefault(),
                     AvatarUrl = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserProfile.Avatar)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.UserProfile.Avatar)
                         .FirstOrDefault(),
                     AvatarColor = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserProfile.AvatarColor)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.UserProfile.AvatarColor)
                         .FirstOrDefault(),
                     Nameplate = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserProfile.Nameplate)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.UserProfile.Nameplate)
                         .FirstOrDefault(),
                     AvatarDecoration = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.UserProfile.AvatarDecoration)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.UserProfile.AvatarDecoration)
                         .FirstOrDefault(),
                     UserStatus = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.Status.ToString().ToLower())
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.Status.ToString().ToLower())
                         .FirstOrDefault() ?? "offline",
                     LastSeen = _context.Members
-                        .Where(m => m.ChatId == c.Id && m.UserId != userId)
-                        .Select(m => m.User.LastSeen)
+                        .Where(member => member.ChatId == m.ChatId && member.UserId != userId)
+                        .Select(member => member.User.LastSeen)
                         .FirstOrDefault(),
                     IsGroupChat = false,
                     LastMessageTime = _context.Messages
-                        .Where(m => m.ChatId == c.Id)
-                        .Max(m => (DateTimeOffset?)m.CreatedAt) ?? DateTimeOffset.MinValue,
+                        .Where(message => message.ChatId == m.ChatId)
+                        .Max(message => (DateTimeOffset?)message.CreatedAt) ?? DateTimeOffset.MinValue,
                 })
                 .ToListAsync(cancellationToken);
 
             var groupChats = await _context.Members
                 .AsNoTracking()
-                .Where(m => m.UserId == userId)
-                .Select(m => m.Chat)
-                .Where(c => c.Type.TypeName == "Group")
-                .Select(c => new ChatInfo
+                .Where(m => m.UserId == userId && m.Chat.Type.TypeName == "Group")
+                .Select(m => new ChatInfo
                 {
-                    ChatId = c.Id,
-                    Username = c.Name ?? string.Empty,
+                    ChatId = m.ChatId,
+                    IsPinned = m.IsPinned,
+                    PinnedAt = m.PinnedAt,
+                    PinOrder = m.PinOrder,
+                    Username = m.Chat.Name ?? string.Empty,
                     UserId = userId,
-                    AvatarUrl = c.Avatar,
-                    AvatarColor = c.AvatarColor,
+                    AvatarUrl = m.Chat.Avatar,
+                    AvatarColor = m.Chat.AvatarColor,
                     IsGroupChat = true,
                     LastMessageTime = _context.Messages
-                        .Where(m => m.ChatId == c.Id)
-                        .Max(m => (DateTimeOffset?)m.CreatedAt) ?? DateTimeOffset.MinValue,
+                        .Where(message => message.ChatId == m.ChatId)
+                        .Max(message => (DateTimeOffset?)message.CreatedAt) ?? DateTimeOffset.MinValue,
                 })
                 .ToListAsync(cancellationToken);
 
             var chats = oneOnOneChats
                 .Concat(groupChats)
+                .ToList();
+
+            var pinnedChats = chats
+                .Where(c => c.IsPinned)
+                .OrderBy(c => c.PinOrder ?? int.MaxValue)
+                .ThenBy(c => c.PinnedAt ?? DateTimeOffset.MinValue)
+                .ToList();
+
+            var unpinnedChats = chats
+                .Where(c => !c.IsPinned)
                 .OrderByDescending(c => c.LastMessageTime)
                 .ToList();
+
+            chats = pinnedChats.Concat(unpinnedChats).ToList();
 
             chats.Insert(0, savedChat);
 
@@ -697,6 +711,95 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 Console.WriteLine($"ChatRepository - Error checking user participation: {ex.Message}");
                 return false;
             }
+        }
+
+        public async Task<bool> SetChatPinnedAsync(
+            Guid userId,
+            Guid chatId,
+            bool isPinned,
+            CancellationToken cancellationToken = default)
+        {
+            var member = await _context.Members
+                .Include(m => m.Chat)
+                .ThenInclude(c => c.Type)
+                .FirstOrDefaultAsync(m => m.UserId == userId && m.ChatId == chatId, cancellationToken);
+
+            if (member == null)
+            {
+                return false;
+            }
+
+            if (member.Chat.Type.TypeName == ChatTypeNames.Saved)
+            {
+                return false;
+            }
+
+            member.IsPinned = isPinned;
+            if (isPinned)
+            {
+                member.PinnedAt = DateTimeOffset.UtcNow;
+
+                var otherPinnedMembers = await _context.Members
+                    .Where(m => m.UserId == userId && m.IsPinned && m.ChatId != chatId)
+                    .OrderBy(m => m.PinOrder ?? int.MaxValue)
+                    .ThenBy(m => m.PinnedAt ?? DateTimeOffset.MinValue)
+                    .ToListAsync(cancellationToken);
+
+                for (var index = 0; index < otherPinnedMembers.Count; index++)
+                {
+                    if (otherPinnedMembers[index].PinOrder == null)
+                    {
+                        otherPinnedMembers[index].PinOrder = index;
+                    }
+                }
+
+                var maxPinOrder = otherPinnedMembers.Count > 0
+                    ? otherPinnedMembers.Max(m => m.PinOrder ?? -1)
+                    : -1;
+                member.PinOrder = maxPinOrder + 1;
+            }
+            else
+            {
+                member.PinnedAt = null;
+                member.PinOrder = null;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<bool> ReorderPinnedChatsAsync(
+            Guid userId,
+            IReadOnlyList<Guid> chatIds,
+            CancellationToken cancellationToken = default)
+        {
+            if (chatIds.Count == 0)
+            {
+                return true;
+            }
+
+            var pinnedMembers = await _context.Members
+                .Where(m => m.UserId == userId && m.IsPinned)
+                .ToListAsync(cancellationToken);
+
+            var pinnedChatIds = pinnedMembers
+                .Select(m => m.ChatId)
+                .ToHashSet();
+
+            if (chatIds.Count != pinnedMembers.Count
+                || chatIds.Any(chatId => !pinnedChatIds.Contains(chatId)))
+            {
+                return false;
+            }
+
+            var membersByChatId = pinnedMembers.ToDictionary(m => m.ChatId);
+            for (var index = 0; index < chatIds.Count; index++)
+            {
+                membersByChatId[chatIds[index]].PinOrder = index;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
         }
     }
 }

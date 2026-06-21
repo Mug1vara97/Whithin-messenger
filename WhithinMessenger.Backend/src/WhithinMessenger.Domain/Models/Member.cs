@@ -1,4 +1,4 @@
-﻿namespace WhithinMessenger.Domain.Models;
+namespace WhithinMessenger.Domain.Models;
 
 public class Member
 {
@@ -9,6 +9,12 @@ public class Member
     public Guid ChatId { get; set; }
 
     public DateTimeOffset JoinedAt { get; set; }
+
+    public bool IsPinned { get; set; }
+
+    public DateTimeOffset? PinnedAt { get; set; }
+
+    public int? PinOrder { get; set; }
 
     public required Chat Chat { get; set; }
 

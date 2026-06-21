@@ -69,7 +69,7 @@
   width: 4px;
   height: 40px;
   border-radius: 0 10px 10px 0;
-  background: var(--text, #f2f3f5);
+  background: var(--rail-tab-bg, var(--primary, #5865f2));
   pointer-events: none;
   z-index: 25;
   opacity: 0;
@@ -77,7 +77,7 @@
     transform var(--rail-time-out, var(--rail-duration)) cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.2s ease;
   will-change: transform;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--rail-tab-bg, var(--primary, #5865f2)) 45%, transparent);
 }
 
 .rail-selection-notch--visible {
@@ -179,6 +179,20 @@
 
 .server-button svg {
   color: inherit;
+}
+
+.server-button.rail-tab-button.rail-tab-active,
+.server-button.rail-tab-button.rail-tab-active:hover,
+.server-button.rail-tab-button.rail-tab-active:focus-visible {
+  color: var(
+    --rail-tab-icon-active,
+    var(--text-on-primary, var(--background-primary, #0f172a))
+  );
+}
+
+.server-button.rail-tab-button.rail-tab-active svg,
+.server-button.rail-tab-button.rail-tab-active .MuiSvgIcon-root {
+  color: inherit !important;
 }
 
 .logout-button {

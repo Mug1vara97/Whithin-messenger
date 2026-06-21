@@ -199,7 +199,7 @@ const ServerList = ({
                 }}
                 title="Чаты"
               >
-                <ChatOutlinedIcon sx={{ fontSize: 22 }} />
+                <ChatOutlinedIcon sx={{ fontSize: 22, color: 'inherit' }} />
               </NavLink>
             </li>
           </ul>
