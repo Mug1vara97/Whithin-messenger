@@ -48,22 +48,32 @@ const ContextMenu = ({
         zIndex: 1000
       }}
     >
-      {items.map((item, index) => (
-        <div
-          key={index}
-          className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
-          onClick={() => {
-            if (!item.disabled && item.onClick) {
-              item.onClick();
-              onClose();
-            }
-          }}
-        >
-          {item.icon && <span className="context-menu-icon">{item.icon}</span>}
-          <span className="context-menu-text">{item.text}</span>
-          {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
-        </div>
-      ))}
+      {items.map((item, index) => {
+        if (item.separator) {
+          return <div key={`sep-${index}`} className="context-menu-separator" role="separator" />;
+        }
+
+        return (
+          <div
+            key={index}
+            className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
+            onClick={() => {
+              if (!item.disabled && item.onClick) {
+                item.onClick();
+                onClose();
+              }
+            }}
+          >
+            {item.icon && <span className="context-menu-icon">{item.icon}</span>}
+            <span className="context-menu-text">{item.text}</span>
+            {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
+            {item.hasSubmenu && <span className="context-menu-chevron" aria-hidden>›</span>}
+            {item.trailingBadge && (
+              <span className="context-menu-badge">{item.trailingBadge}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

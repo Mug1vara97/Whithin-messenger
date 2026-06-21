@@ -9,7 +9,6 @@ import {
   selectActiveServerMuted,
 } from '../../../lib/voice/serverVoiceModerationState';
 import {
-  getUserStatusColor,
   getUserStatusLabel,
   getUserStatusOptions,
   normalizeUserStatus,
@@ -20,6 +19,7 @@ import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT, useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import UserAvatar from '../../atoms/UserAvatar';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import styles from './UserPanel.module.css';
 
 const resolveProfileDisplayName = (profile) =>
@@ -309,9 +309,9 @@ const UserPanel = ({
 
   return (
     <>
-      <div className={styles['user-panel']}>
+      <div className={`user-panel ${styles['user-panel']}`}>
         <div className={styles['user-panel-content']}>
-          <div className={styles['user-avatar-wrap']}>
+          <div className="user-avatar-slot">
             <UserAvatar
               displayName={profileDisplayName}
               login={login}
@@ -323,15 +323,12 @@ const UserPanel = ({
               statusIndicatorInteractive
               statusIndicator={
                 <button
-                  className={styles['user-avatar-status-button']}
+                  className="user-avatar-status-button"
                   onClick={() => setIsStatusMenuOpen((prev) => !prev)}
                   title={getUserStatusLabel(currentStatus)}
                   type="button"
                 >
-                  <span
-                    className="user-avatar-presence-dot"
-                    style={{ backgroundColor: getUserStatusColor(currentStatus) }}
-                  />
+                  <UserAvatarPresenceDot status={currentStatus} />
                 </button>
               }
             />

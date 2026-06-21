@@ -1,0 +1,629 @@
+/*
+ * Frosted Glass — defaults from DiscordStyles/FrostedGlass
+ * https://github.com/DiscordStyles/FrostedGlass
+ *
+ * serverlist-brightness: 0.8 | left-brightness: 0.8 | middle-brightness: 0.6 | right-brightness: 0.8
+ * background-image-blur: 5px
+ */
+
+#app-wallpaper-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+html[data-frosted-glass='enabled'] {
+  background: transparent !important;
+}
+
+#app-wallpaper-root[hidden] {
+  display: none;
+}
+
+.app-wallpaper-root__image {
+  position: absolute;
+  /* Slight bleed hides blur edge fringing without zooming the wallpaper */
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.app-wallpaper-root__dim {
+  display: none;
+}
+
+[data-frosted-glass='enabled'] {
+  --fg-serverlist: 0.8;
+  --fg-left: 0.8;
+  --fg-middle: 0.6;
+  --fg-right: 0.8;
+  --fg-hover: rgb(255, 255, 255, 0.05);
+  --fg-selected: rgb(255, 255, 255, 0.08);
+
+  --background: transparent;
+  --background-primary: transparent;
+  --bottom: transparent;
+  --server-list-background: transparent;
+  --surface: transparent;
+  --hover: var(--fg-hover);
+  --surface-hover: var(--fg-hover);
+  --background-modifier-hover: var(--fg-hover);
+  --background-modifier-selected: var(--fg-selected);
+  --electron-titlebar-bg: var(--fg-fill-serverlist);
+}
+
+[data-frosted-glass='enabled'][data-frosted-overlay-tint='theme'] {
+  --fg-tint-serverlist-rgb: var(--server-list-background-rgb, 30, 31, 34);
+  --fg-tint-left-rgb: var(--surface-rgb, 47, 49, 54);
+  --fg-tint-header-rgb: var(--background-rgb, 54, 57, 63);
+  --fg-tint-composer-rgb: var(--background-primary-rgb, 47, 49, 54);
+  --fg-tint-middle-rgb: var(--background-rgb, 54, 57, 63);
+  --fg-tint-right-rgb: var(--surface-rgb, 47, 49, 54);
+  --fg-tint-secondary-rgb: var(--background-secondary-rgb, 46, 48, 54);
+  --fg-fill-serverlist: rgba(var(--server-list-background-rgb, 30, 31, 34), var(--fg-serverlist));
+  --fg-fill-left: rgba(var(--surface-rgb, 47, 49, 54), var(--fg-left));
+  --fg-fill-header: rgba(var(--background-rgb, 54, 57, 63), var(--fg-left));
+  --fg-fill-composer: rgba(var(--background-primary-rgb, 47, 49, 54), var(--fg-left));
+  --fg-fill-middle: rgba(var(--background-rgb, 54, 57, 63), var(--fg-middle));
+  --fg-fill-right: rgba(var(--surface-rgb, 47, 49, 54), var(--fg-right));
+  --fg-input: rgba(var(--background-secondary-rgb, 46, 48, 54), 0.3);
+  --background-secondary: rgba(var(--background-secondary-rgb, 46, 48, 54), 0.3);
+  --in-app-notif-bg: rgba(var(--background-rgb, 54, 57, 63), 0.75);
+}
+
+[data-frosted-glass='enabled'][data-frosted-overlay-tint='default'] {
+  --fg-tint-serverlist-rgb: 0, 0, 0;
+  --fg-tint-left-rgb: 0, 0, 0;
+  --fg-tint-header-rgb: 0, 0, 0;
+  --fg-tint-composer-rgb: 0, 0, 0;
+  --fg-tint-middle-rgb: 0, 0, 0;
+  --fg-tint-right-rgb: 0, 0, 0;
+  --fg-tint-secondary-rgb: 0, 0, 0;
+  --fg-fill-serverlist: rgb(0 0 0 / var(--fg-serverlist));
+  --fg-fill-left: rgb(0 0 0 / var(--fg-left));
+  --fg-fill-header: rgb(0 0 0 / var(--fg-left));
+  --fg-fill-composer: rgb(0 0 0 / var(--fg-left));
+  --fg-fill-middle: rgb(0 0 0 / var(--fg-middle));
+  --fg-fill-right: rgb(0 0 0 / var(--fg-right));
+  --fg-input: rgb(0 0 0 / 0.3);
+  --background-secondary: rgb(0 0 0 / 0.3);
+  --in-app-notif-bg: rgb(0 0 0 / 0.75);
+}
+
+[data-frosted-glass='enabled'] {
+  --fg-fill-serverlist: rgba(var(--fg-tint-serverlist-rgb, 30, 31, 34), var(--fg-serverlist));
+  --fg-fill-left: rgba(var(--fg-tint-left-rgb, 47, 49, 54), var(--fg-left));
+  --fg-fill-header: rgba(var(--fg-tint-header-rgb, 54, 57, 63), var(--fg-left));
+  --fg-fill-composer: rgba(var(--fg-tint-composer-rgb, 47, 49, 54), var(--fg-left));
+  --fg-fill-middle: rgba(var(--fg-tint-middle-rgb, 54, 57, 63), var(--fg-middle));
+  --fg-fill-right: rgba(var(--fg-tint-right-rgb, 47, 49, 54), var(--fg-right));
+  --fg-input: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.3);
+  --background-secondary: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.3);
+  --in-app-notif-bg: rgba(var(--fg-tint-middle-rgb, 54, 57, 63), 0.75);
+}
+
+/* Shell — always transparent */
+[data-frosted-glass='enabled'],
+[data-frosted-glass='enabled'] html,
+[data-frosted-glass='enabled'] body,
+[data-frosted-glass='enabled'] #root,
+[data-frosted-glass='enabled'] .app,
+[data-frosted-glass='enabled'] .loading-container,
+[data-frosted-glass='enabled'] .home-page,
+[data-frosted-glass='enabled'] .home-content,
+[data-frosted-glass='enabled'] .main-layout,
+[data-frosted-glass='enabled'] .content-area,
+[data-frosted-glass='enabled'] .main-area,
+[data-frosted-glass='enabled'] .chat-area,
+[data-frosted-glass='enabled'] .group-chat-container,
+[data-frosted-glass='enabled'] .chat-room-body,
+[data-frosted-glass='enabled'] .chat-room-main,
+[data-frosted-glass='enabled'] .chat-messages-panel,
+[data-frosted-glass='enabled'] .messages,
+[data-frosted-glass='enabled'] .server-panel,
+[data-frosted-glass='enabled'] .chat-sidebar,
+[data-frosted-glass='enabled'] .chat-sidebar-main,
+[data-frosted-glass='enabled'] .chat-list-container,
+[data-frosted-glass='enabled'] .chat-list-header,
+[data-frosted-glass='enabled'] .resizable-sidebar-shell,
+[data-frosted-glass='enabled'] .resizable-sidebar-shell__content,
+[data-frosted-glass='enabled'] .friends-page,
+[data-frosted-glass='enabled'] .server-settings-page,
+[data-frosted-glass='enabled'] .server-settings-main,
+[data-frosted-glass='enabled'] .server-panel-header,
+[data-frosted-glass='enabled'] .server-channels,
+[data-frosted-glass='enabled'] [class*='user-panel'] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+[data-frosted-glass='enabled'] #root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+/* === Default layout (Discord columns) === */
+[data-frosted-glass='enabled'] .main-layout > div[class*='server-list'] {
+  background: var(--fg-fill-serverlist) !important;
+}
+
+[data-frosted-glass='enabled'] .server-panel,
+[data-frosted-glass='enabled'] .chat-sidebar {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'] .friends-panel,
+[data-frosted-glass='enabled'] .server-discovery {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'] .startup-preloader {
+  background:
+    linear-gradient(
+      165deg,
+      rgb(var(--background-primary-rgb, 47, 49, 54)) 0%,
+      rgb(var(--background-rgb, 54, 57, 63)) 45%,
+      rgb(var(--surface-rgb, 47, 49, 54)) 100%
+    ) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-frosted-glass='enabled'] .group-chat-container {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .chat-messages-panel {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'] .main-area:has(> .no-selection),
+[data-frosted-glass='enabled'] .main-area:has(> .no-chat-selected) {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'] .main-area > .no-selection,
+[data-frosted-glass='enabled'] .main-area > .no-chat-selected {
+  background: transparent !important;
+  max-width: none;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+[data-frosted-glass='enabled'] [class*='member-list-sidebar'],
+[data-frosted-glass='enabled'] .member-list-sidebar {
+  background: var(--fg-fill-right) !important;
+}
+
+[data-frosted-glass='enabled'] .server-settings-sidebar {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'] .server-settings-scroll {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'] #electron-titlebar-fill {
+  background: var(--fg-fill-serverlist) !important;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+[data-frosted-glass='enabled'] #electron-titlebar-drag-shim {
+  background: transparent !important;
+}
+
+/* === System24 — per-panel brightness like FrostedGlass regions === */
+[data-frosted-glass='enabled'][data-interface-design='system24'] .home-page,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-panel,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-settings-page,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-settings-main,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-messages-panel .messages,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .member-list-sidebar .member-list-scroll,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar-main .chat-list-container,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar-main .chat-list,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar-main .search-results-container {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .main-layout > div[class*='server-list'] {
+  background: var(--fg-fill-serverlist) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-panel-header,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-channels,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar-main,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .user-panel,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-settings-sidebar {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-messages-panel,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .friends-panel,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-settings-page-header,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .server-settings-scroll {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-header,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .input-container {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .member-list-sidebar {
+  background: var(--fg-fill-right) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .main-area:has(> .no-selection),
+[data-frosted-glass='enabled'][data-interface-design='system24'] .main-area:has(> .no-chat-selected) {
+  background: var(--fg-fill-middle) !important;
+  border: var(--system24-panel-border);
+  box-sizing: border-box;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] {
+  --system24-label-bg: rgba(var(--fg-tint-middle-rgb), 0.72);
+}
+
+/* === Midnight — per-panel brightness like FrostedGlass regions === */
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .home-page,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-panel,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-page,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-main,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-messages-panel .messages,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .member-list-sidebar .member-list-scroll,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .chat-list-container,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .chat-list,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .search-results-container {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-layout > div[class*='server-list'] {
+  background: var(--fg-fill-serverlist) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-panel-header,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-channels,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .user-panel,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-sidebar {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-messages-panel,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .friends-panel,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-page-header,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-scroll {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-header,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .input-container {
+  background: var(--fg-fill-left) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .member-list-sidebar {
+  background: var(--fg-fill-right) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area:has(> .no-selection),
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area:has(> .no-chat-selected) {
+  background: var(--fg-fill-middle) !important;
+  border: var(--midnight-panel-border);
+  border-radius: var(--midnight-radius-lg);
+  box-sizing: border-box;
+}
+
+/* === Chat list (DM sidebar) === */
+[data-frosted-glass='enabled'] .chat-list-wrapper,
+[data-frosted-glass='enabled'] .chat-list,
+[data-frosted-glass='enabled'] .chat-list-container,
+[data-frosted-glass='enabled'] .friends-section,
+[data-frosted-glass='enabled'] .chat-list-header,
+[data-frosted-glass='enabled'] .search-results-container,
+[data-frosted-glass='enabled'] .search-result-item {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .chat-item {
+  background: transparent !important;
+  border-bottom-color: var(--border) !important;
+}
+
+[data-frosted-glass='enabled'] .chat-item:hover,
+[data-frosted-glass='enabled'] .chat-item.active {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .chat-item.has-unread {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .friends-section {
+  border-bottom-color: var(--border) !important;
+}
+
+[data-frosted-glass='enabled'] .friends-button,
+[data-frosted-glass='enabled'] .add-chat-button {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .friends-button:hover,
+[data-frosted-glass='enabled'] .friends-button.active,
+[data-frosted-glass='enabled'] .add-chat-button:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .chat-avatar--saved {
+  background: rgba(var(--fg-tint-secondary-rgb), 0.35) !important;
+}
+
+[data-frosted-glass='enabled'] .search-result-item:hover {
+  background: var(--fg-hover) !important;
+}
+
+/* === FrostedGlass chat chrome — tinted from theme palette === */
+[data-frosted-glass='enabled'] .chat-header {
+  background: var(--fg-fill-header) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+[data-frosted-glass='enabled'] .input-container {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .chat-composer,
+[data-frosted-glass='enabled'] .chat-composer:focus-within {
+  background: var(--fg-fill-composer) !important;
+  border: none !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-composer,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-composer:focus-within {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .chat-sidebar-main .search-header,
+[data-frosted-glass='enabled'] .search-header {
+  background: transparent !important;
+  border-bottom-color: var(--border) !important;
+  box-sizing: border-box;
+  width: 100%;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+[data-frosted-glass='enabled'] .search-bar {
+  background: transparent !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-frosted-glass='enabled'] .search-bar-input {
+  background: var(--fg-input) !important;
+  border-color: transparent !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-frosted-glass='enabled'] .search-bar-input:focus {
+  border-color: rgb(255, 255, 255, 0.12) !important;
+}
+
+[data-frosted-glass='enabled'] .search-bar-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* === Chat header & header buttons === */
+[data-frosted-glass='enabled'] .user-info,
+[data-frosted-glass='enabled'] .voice-call-button,
+[data-frosted-glass='enabled'] .member-list-toggle {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .user-info:hover,
+[data-frosted-glass='enabled'] .voice-call-button:hover,
+[data-frosted-glass='enabled'] .member-list-toggle:hover,
+[data-frosted-glass='enabled'] .media-upload-button:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .member-list-toggle.active {
+  background: var(--fg-selected) !important;
+}
+
+[data-frosted-glass='enabled'] .media-upload-button {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-field {
+  background: var(--fg-input) !important;
+  border-color: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-field.is-focused,
+[data-frosted-glass='enabled'] .message-search-field.has-value {
+  background: rgba(var(--fg-tint-secondary-rgb), 0.35) !important;
+  border-color: rgb(255, 255, 255, 0.1) !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-field::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+[data-frosted-glass='enabled'] .message-search-clear,
+[data-frosted-glass='enabled'] .message-search-results-close {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-clear:hover,
+[data-frosted-glass='enabled'] .message-search-results-close:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-results {
+  background: rgba(var(--fg-tint-middle-rgb), 0.78) !important;
+  border-color: rgb(255, 255, 255, 0.08) !important;
+}
+
+[data-frosted-glass='enabled'] .message-search-result-item:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .member-list-item:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .member-list-scroll {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .member-list-section,
+[data-frosted-glass='enabled'] .member-list-section-items,
+[data-frosted-glass='enabled'] .member-list-item {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .member-list-nameplate.user-nameplate--decorated .member-list-nameplate__body {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-nameplate__body {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .voice-channel-participants,
+[data-frosted-glass='enabled'] .voice-participant,
+[data-frosted-glass='enabled'] .voice-participant__layout {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .voice-participant-nameplate.user-nameplate--decorated .voice-participant-nameplate__body {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .voice-participant:hover {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .voice-participant:has(.user-nameplate--decorated):hover {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .main-area .voice-call-container,
+[data-frosted-glass='enabled'] .group-chat-container .chat-voice-call,
+[data-frosted-glass='enabled'] .chat-voice-call-join-preview {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area .voice-call-container,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .group-chat-container .chat-voice-call,
+[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-voice-call-join-preview {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .main-area .voice-call-container,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .group-chat-container .chat-voice-call,
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-voice-call-join-preview {
+  background: var(--fg-fill-middle) !important;
+}
+
+[data-frosted-glass='enabled'] .channel-item {
+  background: transparent !important;
+}
+
+[data-frosted-glass='enabled'] .channel-item:hover,
+[data-frosted-glass='enabled'] .channel-item.active {
+  background: var(--fg-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .chat-typing-indicator {
+  background: linear-gradient(to top, var(--fg-fill-composer) 72%, transparent) !important;
+}
+
+[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-typing-indicator {
+  background: linear-gradient(to top, var(--fg-fill-middle) 72%, transparent) !important;
+}
+
+[data-frosted-glass='enabled'] .chat-pinned-bar {
+  background: rgba(var(--fg-tint-middle-rgb), calc(var(--fg-middle) + 0.1)) !important;
+}
+
+/* Settings preview */
+.frosted-glass-settings__preview {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  background: #111;
+}
+
+.frosted-glass-settings__preview-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(5px);
+}
+
+.frosted-glass-settings__preview-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 28%;
+  background: rgba(var(--fg-tint-left-rgb, var(--surface-rgb, 47, 49, 54)), 0.8);
+}
+
+.frosted-glass-settings__preview-chat {
+  position: absolute;
+  left: 28%;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(var(--fg-tint-middle-rgb, var(--background-rgb, 54, 57, 63)), 0.6);
+}
+
+.frosted-glass-settings__preview[data-frosted-overlay-tint='default'] .frosted-glass-settings__preview-sidebar {
+  background: rgb(0, 0, 0, 0.8);
+}
+
+.frosted-glass-settings__preview[data-frosted-overlay-tint='default'] .frosted-glass-settings__preview-chat {
+  background: rgb(0, 0, 0, 0.6);
+}
+
+.frosted-glass-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.frosted-glass-settings__file-btn input {
+  display: none;
+}
+
+.frosted-glass-settings__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}

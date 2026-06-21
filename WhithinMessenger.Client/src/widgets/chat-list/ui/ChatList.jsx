@@ -1,11 +1,10 @@
 import React, { useState, useCallback, memo, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { People, BookmarkBorder } from '@mui/icons-material';
-import { SearchBar, UserAvatar, CreateGroupChatModal, UserPanel } from '../../../shared/ui';
+import { SearchBar, UserAvatar, UserAvatarPresenceDot, CreateGroupChatModal, UserPanel } from '../../../shared/ui';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { getUserStatusColor, getUserStatusLabel } from '../../../shared/lib/utils/userStatus';
 import { formatChatListLastMessage } from '../../../shared/lib/utils/formatChatListLastMessage';
 import { formatChatListMessageTime } from '../../../shared/lib/utils/formatChatListMessageTime';
 import './ChatList.css';
@@ -189,7 +188,7 @@ const ChatList = ({
                 className={`chat-item ${selectedChat?.chatId === chat.chatId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''} ${isSavedMessages ? 'chat-item--saved' : ''}`}
                 onClick={() => handleChatSelection(chat)}
               >
-                <div className="chat-avatar-wrap">
+                <div className="user-avatar-slot chat-avatar-wrap">
                   {isSavedMessages ? (
                     <div className="chat-avatar chat-avatar--saved">
                       <BookmarkBorder fontSize="small" />
@@ -207,11 +206,7 @@ const ChatList = ({
                       size={40}
                       statusIndicator={
                         !chat.isGroupChat ? (
-                          <span
-                            className="user-avatar-presence-dot"
-                            style={{ backgroundColor: getUserStatusColor(chatPresenceStatus) }}
-                            title={getUserStatusLabel(chatPresenceStatus)}
-                          />
+                          <UserAvatarPresenceDot status={chatPresenceStatus} />
                         ) : null
                       }
                     />
@@ -306,15 +301,17 @@ const ChatList = ({
   return (
     <div className="chat-list-wrapper">
       <div className="chat-sidebar">
-        <SearchBar onSearchChange={handleSearchChange} />
-        {isSearching ? renderSearchResults() : renderChatList()}
-        {showModal && (
-          <CreateGroupChatModal
-            isOpen={showModal}
-            onClose={() => setShowModal(false)}
-            onChatCreated={handleCreateGroupChat}
-          />
-        )}
+        <div className="chat-sidebar-main">
+          <SearchBar onSearchChange={handleSearchChange} />
+          {isSearching ? renderSearchResults() : renderChatList()}
+          {showModal && (
+            <CreateGroupChatModal
+              isOpen={showModal}
+              onClose={() => setShowModal(false)}
+              onChatCreated={handleCreateGroupChat}
+            />
+          )}
+        </div>
         <UserPanel
           userId={user?.id || user?.userId || user?.Id}
           username={user?.username || user?.UserName || user?.userName}

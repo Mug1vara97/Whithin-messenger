@@ -24,10 +24,13 @@
 }
 
 .server-panel-header.with-banner {
-  border-bottom: none;
   min-height: 150px;
   height: 120px;
   overflow: visible;
+}
+
+html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-panel-header.with-banner {
+  border-bottom: none;
 }
 
 .server-panel-banner {
@@ -65,9 +68,12 @@
   min-height: 52px;
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
   color: var(--text);
+}
+
+html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-info {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .server-panel-header.with-banner .server-info {
@@ -145,7 +151,17 @@
 
 .server-channels {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.server-channels-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px 0;
 }
 
@@ -231,20 +247,20 @@
 
 
 /* Скроллбар */
-.server-channels::-webkit-scrollbar {
+.server-channels-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.server-channels::-webkit-scrollbar-track {
+.server-channels-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.server-channels::-webkit-scrollbar-thumb {
+.server-channels-scroll::-webkit-scrollbar-thumb {
   background-color: var(--border);
   border-radius: 3px;
 }
 
-.server-channels::-webkit-scrollbar-thumb:hover {
+.server-channels-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--textMuted);
 }
 

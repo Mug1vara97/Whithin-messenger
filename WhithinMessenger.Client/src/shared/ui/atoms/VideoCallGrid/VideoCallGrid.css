@@ -44,7 +44,7 @@
 .video-tile {
   position: relative;
   background: #1e1f22;
-  border-radius: 8px;
+  border-radius: var(--voice-call-tile-radius, 8px);
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -60,7 +60,7 @@
   right: 0;
   bottom: 0;
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--voice-call-tile-radius, 8px);
   pointer-events: none;
   transition: all 0.15s ease;
 }
@@ -146,6 +146,12 @@
   place-items: center;
   overflow: visible;
   z-index: 2;
+}
+
+.tile-avatar-wrap--contrast-outline .user-avatar {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 0 4px rgba(0, 0, 0, 0.28);
 }
 
 .tile-avatar-wrap--overlay {

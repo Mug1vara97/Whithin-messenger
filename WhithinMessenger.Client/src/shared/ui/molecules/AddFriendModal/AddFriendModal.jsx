@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, PersonAdd, Close, PersonSearch } from '@mui/icons-material';
 import { userApi } from '@/entities/user/api';
 import UserAvatar from '../../atoms/UserAvatar';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
-import { getUserStatusColor, getUserStatusLabel } from '../../../lib/utils/userStatus';
+import { getUserStatusLabel } from '../../../lib/utils/userStatus';
 import './AddFriendModal.css';
 
 const getFriendshipMeta = (user) => {
@@ -179,7 +180,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
 
                 return (
                   <li key={user.userId} className="add-friend-modal__row">
-                    <div className="add-friend-modal__avatar-wrap">
+                    <div className="user-avatar-slot add-friend-modal__avatar-wrap">
                       <UserAvatar
                         username={user.username}
                         avatarUrl={user.avatarUrl}
@@ -188,11 +189,7 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
                         size="medium"
                         statusIndicator={
                           meta.tone === 'status' ? (
-                            <span
-                              className="user-avatar-presence-dot"
-                              style={{ backgroundColor: getUserStatusColor(user.userStatus) }}
-                              title={meta.label}
-                            />
+                            <UserAvatarPresenceDot status={user.userStatus} title={meta.label} />
                           ) : null
                         }
                       />

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { extractFirstHexFromThemeValue } from '../../../lib/theme/appTheme';
+import { resolveElectronWindowBackgroundColor } from '../../../lib/theme/appBackgroundSettings';
 import './ElectronTitlebar.css';
 
 const APP_DISPLAY_NAME = 'Whithin';
@@ -29,13 +29,6 @@ const iconClose = (
   </svg>
 );
 
-function readTitlebarBackgroundColor() {
-  const styles = getComputedStyle(document.documentElement);
-  const raw = styles.getPropertyValue('--server-list-background').trim()
-    || styles.getPropertyValue('--background').trim();
-  return extractFirstHexFromThemeValue(raw) || raw || '#1e1f22';
-}
-
 function hasElectronWindowControls() {
   return Boolean(
     window.electronAPI?.isElectron
@@ -52,21 +45,28 @@ export function ElectronTitlebar() {
     document.body.classList.add('electron-titlebar-chrome');
 
     const syncWindowBackground = () => {
-      const color = readTitlebarBackgroundColor();
-      window.electronAPI?.syncWindowBackground?.(color);
+      const isFrostedGlass = document.documentElement.getAttribute('data-frosted-glass') === 'enabled';
+      window.electronAPI?.syncWindowBackground?.(
+        resolveElectronWindowBackgroundColor(isFrostedGlass),
+      );
     };
 
     syncWindowBackground();
+    window.electronAPI?.syncWindowShape?.({
+      frostedGlass: document.documentElement.getAttribute('data-frosted-glass') === 'enabled',
+    });
     window.addEventListener('themePresetChanged', syncWindowBackground);
+    window.addEventListener('appBackgroundVisualChanged', syncWindowBackground);
     const observer = new MutationObserver(syncWindowBackground);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme-preset', 'style'],
+      attributeFilter: ['data-theme-preset', 'data-frosted-glass', 'data-interface-design', 'style'],
     });
 
     return () => {
       document.body.classList.remove('electron-titlebar-chrome');
       window.removeEventListener('themePresetChanged', syncWindowBackground);
+      window.removeEventListener('appBackgroundVisualChanged', syncWindowBackground);
       observer.disconnect();
     };
   }, [showChrome]);

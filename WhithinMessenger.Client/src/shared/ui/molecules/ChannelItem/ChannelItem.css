@@ -212,7 +212,7 @@
 
 .voice-channel-participants.dragging-over {
   background-color: rgba(88, 101, 242, 0.1);
-  border-radius: 4px;
+  border-radius: var(--voice-participant-radius, 4px);
   padding: 4px;
 }
 
@@ -221,11 +221,20 @@
   align-items: stretch;
   min-width: 0;
   padding: 2px 0;
-  border-radius: 8px;
+  border-radius: var(--voice-participant-radius, 8px);
   overflow: visible;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.15s ease;
   cursor: grab;
   user-select: none;
+}
+
+.voice-participant__layout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .voice-participant:hover {
@@ -235,28 +244,37 @@
 .voice-participant-nameplate {
   flex: 1;
   min-width: 0;
+  align-self: center;
+  overflow: visible;
 }
 
-.voice-participant-nameplate__row {
+.voice-participant-nameplate__body {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   width: 100%;
-  min-height: 36px;
-  padding: 4px 8px 4px 8px;
+  min-height: 0;
+  padding: 2px 6px 2px 2px;
   box-sizing: border-box;
 }
 
-.voice-participant-nameplate.user-nameplate--empty .voice-participant-nameplate__row {
+.voice-participant-nameplate.user-nameplate--empty {
   min-height: 0;
-  padding: 4px 8px;
 }
 
 .voice-participant-nameplate.user-nameplate--decorated {
-  min-height: 0;
-  overflow: visible;
+  --voice-participant-nameplate-pull: 22px;
+
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  margin-left: calc(-1 * var(--voice-participant-nameplate-pull));
+  padding-left: calc(var(--voice-participant-nameplate-pull) + 10px);
+  border-radius: var(--voice-participant-nameplate-radius, 8px);
   box-shadow: none;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .voice-participant-nameplate.user-nameplate--decorated:hover {
@@ -264,15 +282,90 @@
   box-shadow: none;
 }
 
-.voice-participant-nameplate.user-nameplate--decorated .voice-participant-nameplate__row {
-  padding: 5px 10px 5px 10px;
-  gap: 10px;
-  min-height: 32px;
+.voice-participant-nameplate.user-nameplate--decorated .user-nameplate__content {
+  height: 100%;
+}
+
+.voice-participant-nameplate.user-nameplate--decorated .voice-participant-nameplate__body {
+  height: 100%;
+  padding: 0 8px 0 0;
+}
+
+.voice-participant-nameplate.user-nameplate--decorated .user-nameplate__media {
+  object-position: center right;
+}
+
+.voice-participant-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  z-index: 2;
+}
+
+.voice-participant-avatar-wrap .user-avatar-frame {
+  box-shadow: none;
+}
+
+.voice-participant-avatar-wrap .user-avatar-frame--decorated {
+  overflow: visible;
+}
+
+.voice-participant-avatar-wrap .user-avatar-decoration-layer,
+.voice-participant-avatar-wrap .user-avatar-decoration {
+  display: none !important;
+}
+
+.voice-participant-avatar-wrap .user-avatar {
+  border: none;
+  box-shadow: none;
+}
+
+.voice-participant-avatar-wrap .user-avatar-presence-dot,
+.voice-participant-avatar-wrap .user-avatar-status-anchor {
+  display: none;
+}
+
+.voice-participant-avatar-wrap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.12s ease;
   box-sizing: border-box;
 }
 
-.voice-participant-nameplate.user-nameplate--decorated .voice-participant-name,
-.voice-participant-nameplate.user-nameplate--decorated .voice-participant-nameplate__row .voice-participant-name {
+.voice-participant.speaking .voice-participant-avatar-wrap::after {
+  opacity: 1;
+  border-color: var(--voice-speaking-color, var(--success, #43b581));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 35%, transparent),
+    0 0 10px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 35%, transparent);
+}
+
+.voice-participant-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-participant-nameplate.user-nameplate--decorated .voice-participant-name {
   color: var(--text);
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
@@ -292,71 +385,6 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.voice-participant-avatar {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  overflow: visible;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 2;
-}
-
-.voice-participant-avatar::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-  box-sizing: border-box;
-}
-
-.voice-participant.speaking .voice-participant-avatar::after {
-  opacity: 1;
-  border-color: var(--voice-speaking-color, var(--success, #43b581));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--voice-speaking-color, var(--success, #43b581)) 35%, transparent);
-}
-
-.voice-participant-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.voice-participant-initials {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: white;
-  text-transform: uppercase;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
-.voice-participant-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-.voice-participant:hover .voice-participant-name {
-  color: var(--text);
-}
-
 .voice-participant.muted .voice-participant-name {
   color: var(--text-muted);
 }
@@ -366,6 +394,10 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.voice-participant-status-icons .voice-status-icon.speaking {
+  display: none;
 }
 
 .voice-participant-muted-icon,

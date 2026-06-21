@@ -1,0 +1,724 @@
+/**
+ * System24-inspired TUI layout — https://github.com/refact0r/system24
+ * Activated with [data-interface-design='system24'] on <html>.
+ *
+ * Panels are separated by --system24-gap; each panel has its own 2px border.
+ * Labels sit on the border via ::after; label bg matches gap (--background), not panel surface.
+ */
+
+[data-interface-design='system24'] {
+  --system24-gap: 12px;
+  --system24-border: 2px;
+  --system24-divider: 4px;
+  --system24-font: 'DM Mono', 'Consolas', 'Courier New', monospace;
+  --system24-label-bg: var(--background);
+  --system24-label-offset: 10px;
+  --system24-panel-border: var(--system24-border) solid var(--border);
+  --system24-border-hover: var(--primary);
+  --system24-border-transition: 0.2s ease;
+}
+
+[data-interface-design='system24'] body,
+[data-interface-design='system24'] #root,
+[data-interface-design='system24'] .app {
+  font-family: var(--system24-font);
+  font-weight: 300;
+  letter-spacing: -0.05ch;
+}
+
+/* Shell: gap color shows between panels (bg-4) */
+[data-interface-design='system24'] .home-page {
+  box-sizing: border-box;
+  height: 100vh;
+  padding: var(--system24-gap);
+  background: var(--background);
+  gap: 0;
+}
+
+[data-interface-design='system24'] .home-content,
+[data-interface-design='system24'] .main-layout,
+[data-interface-design='system24'] .content-area {
+  background: transparent;
+  min-height: 0;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .main-layout {
+  gap: var(--system24-gap);
+  border: none;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .content-area {
+  gap: var(--system24-gap);
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .content-area > .resizable-sidebar-shell,
+[data-interface-design='system24'] .chat-room-body > .resizable-sidebar-shell {
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .content-area > .resizable-sidebar-shell .resizable-sidebar-shell__content {
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .main-area {
+  background: transparent;
+  border: none;
+  overflow: visible;
+  min-width: 0;
+}
+
+[data-interface-design='system24'] .main-area > div {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+/* Shared bordered panel chrome */
+[data-interface-design='system24'] .main-layout > div[class*='server-list'],
+[data-interface-design='system24'] .server-panel-header,
+[data-interface-design='system24'] .server-channels,
+[data-interface-design='system24'] .chat-sidebar-main,
+[data-interface-design='system24'] .user-panel,
+[data-interface-design='system24'] .chat-header,
+[data-interface-design='system24'] .chat-messages-panel,
+[data-interface-design='system24'] .input-container,
+[data-interface-design='system24'] .member-list-sidebar,
+[data-interface-design='system24'] .friends-panel,
+[data-interface-design='system24'] .server-settings-sidebar,
+[data-interface-design='system24'] .server-settings-page-header,
+[data-interface-design='system24'] .server-settings-scroll,
+[data-interface-design='system24'] .main-area .voice-call-container,
+[data-interface-design='system24'] .group-chat-container .chat-voice-call {
+  position: relative;
+  overflow: visible;
+  border: var(--system24-panel-border);
+  border-radius: 0;
+  transition: border var(--system24-border-transition);
+}
+
+[data-interface-design='system24'] .main-layout > div[class*='server-list']:hover,
+[data-interface-design='system24'] .server-panel-header:hover,
+[data-interface-design='system24'] .server-channels:hover,
+[data-interface-design='system24'] .chat-sidebar-main:hover,
+[data-interface-design='system24'] .user-panel:hover,
+[data-interface-design='system24'] .chat-header:hover,
+[data-interface-design='system24'] .chat-messages-panel:hover,
+[data-interface-design='system24'] .input-container:hover,
+[data-interface-design='system24'] .member-list-sidebar:hover,
+[data-interface-design='system24'] .friends-panel:hover,
+[data-interface-design='system24'] .server-settings-sidebar:hover,
+[data-interface-design='system24'] .server-settings-page-header:hover,
+[data-interface-design='system24'] .server-settings-scroll:hover,
+[data-interface-design='system24'] .main-area .voice-call-container:hover,
+[data-interface-design='system24'] .group-chat-container .chat-voice-call:hover {
+  border: var(--system24-border) solid var(--system24-border-hover);
+}
+
+/* Panel labels — absolute on border, like system24 panel-labels.css */
+[data-interface-design='system24'] .main-layout > div[class*='server-list']::after,
+[data-interface-design='system24'] .server-panel-header::after,
+[data-interface-design='system24'] .server-channels::after,
+[data-interface-design='system24'] .chat-sidebar-main::after,
+[data-interface-design='system24'] .server-panel .user-panel::after,
+[data-interface-design='system24'] .chat-sidebar .user-panel::after,
+[data-interface-design='system24'] .chat-header::after,
+[data-interface-design='system24'] .chat-messages-panel::after,
+[data-interface-design='system24'] .input-container::after,
+[data-interface-design='system24'] .member-list-sidebar::after,
+[data-interface-design='system24'] .friends-panel::after,
+[data-interface-design='system24'] .server-settings-sidebar::after,
+[data-interface-design='system24'] .server-settings-page-header::after,
+[data-interface-design='system24'] .server-settings-scroll::after,
+[data-interface-design='system24'] .main-area .voice-call-container::after,
+[data-interface-design='system24'] .group-chat-container .chat-voice-call::after {
+  display: block;
+  position: absolute;
+  top: calc(-1 * var(--system24-label-offset));
+  left: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--text-muted);
+  background-color: var(--system24-label-bg);
+  z-index: 100;
+  pointer-events: none;
+  transition: color var(--system24-border-transition);
+  line-height: 1.2;
+}
+
+[data-interface-design='system24'] .main-layout > div[class*='server-list']:hover::after,
+[data-interface-design='system24'] .server-panel-header:hover::after,
+[data-interface-design='system24'] .server-channels:hover::after,
+[data-interface-design='system24'] .chat-sidebar-main:hover::after,
+[data-interface-design='system24'] .server-panel .user-panel:hover::after,
+[data-interface-design='system24'] .chat-sidebar .user-panel:hover::after,
+[data-interface-design='system24'] .chat-header:hover::after,
+[data-interface-design='system24'] .chat-messages-panel:hover::after,
+[data-interface-design='system24'] .input-container:hover::after,
+[data-interface-design='system24'] .member-list-sidebar:hover::after,
+[data-interface-design='system24'] .friends-panel:hover::after,
+[data-interface-design='system24'] .server-settings-sidebar:hover::after,
+[data-interface-design='system24'] .server-settings-page-header:hover::after,
+[data-interface-design='system24'] .server-settings-scroll:hover::after,
+[data-interface-design='system24'] .main-area .voice-call-container:hover::after,
+[data-interface-design='system24'] .group-chat-container .chat-voice-call:hover::after {
+  color: var(--system24-border-hover);
+}
+
+[data-interface-design='system24'] .main-layout > div[class*='server-list']::after {
+  content: 'nav';
+}
+
+[data-interface-design='system24'] .server-panel-header::after {
+  content: 'channel';
+}
+
+[data-interface-design='system24'] .server-channels::after {
+  content: 'channels';
+}
+
+[data-interface-design='system24'] .chat-sidebar-main::after {
+  content: 'direct';
+}
+
+[data-interface-design='system24'] .server-panel .user-panel::after,
+[data-interface-design='system24'] .chat-sidebar .user-panel::after {
+  content: 'user';
+}
+
+[data-interface-design='system24'] .chat-header::after {
+  content: 'channel';
+}
+
+[data-interface-design='system24'] .chat-messages-panel::after {
+  content: 'chat';
+}
+
+[data-interface-design='system24'] .input-container::after {
+  content: 'input';
+}
+
+[data-interface-design='system24'] .member-list-sidebar::after {
+  content: 'members';
+}
+
+[data-interface-design='system24'] .friends-panel::after {
+  content: 'friends';
+}
+
+[data-interface-design='system24'] .server-settings-sidebar::after {
+  content: 'menu';
+}
+
+[data-interface-design='system24'] .server-settings-page-header::after {
+  content: 'page';
+}
+
+[data-interface-design='system24'] .server-settings-scroll::after {
+  content: 'content';
+}
+
+[data-interface-design='system24'] .main-area .voice-call-container::after,
+[data-interface-design='system24'] .group-chat-container .chat-voice-call::after {
+  content: 'voice channel';
+}
+
+/* Server rail */
+[data-interface-design='system24'] .main-layout > div[class*='server-list'] {
+  margin: 0;
+  height: 100%;
+  overflow: visible;
+  border: var(--system24-panel-border);
+  background: var(--server-list-background, var(--surface));
+}
+
+/* Sidebar columns: stacked panels with gap */
+[data-interface-design='system24'] .server-panel,
+[data-interface-design='system24'] .chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--system24-gap);
+  height: 100%;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .server-panel {
+  border-right: none;
+}
+
+[data-interface-design='system24'] .chat-sidebar {
+  border-right: none;
+}
+
+[data-interface-design='system24'] .server-panel-header,
+[data-interface-design='system24'] .server-channels {
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+[data-interface-design='system24'] .server-panel .server-panel-header,
+[data-interface-design='system24'] .server-panel .server-panel-header.with-banner {
+  display: flex;
+  flex-direction: column;
+  border: var(--system24-border) solid var(--border);
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .server-panel .server-panel-header:hover,
+[data-interface-design='system24'] .server-panel .server-panel-header.with-banner:hover {
+  border: var(--system24-border) solid var(--system24-border-hover);
+}
+
+[data-interface-design='system24'] .server-panel .server-panel-header .server-info {
+  flex: 0 0 auto;
+  align-self: auto;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  border-bottom: none;
+}
+
+[data-interface-design='system24'] .server-panel .server-panel-header.with-banner .server-info {
+  background: transparent;
+}
+
+[data-interface-design='system24'] .server-channels {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .server-channels-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+}
+
+[data-interface-design='system24'] .chat-sidebar-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .chat-sidebar-main .chat-list-container,
+[data-interface-design='system24'] .chat-sidebar-main .search-results-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+[data-interface-design='system24'] .server-panel .user-panel,
+[data-interface-design='system24'] .chat-sidebar .user-panel,
+[data-interface-design='system24'] .input-container {
+  margin-top: 0;
+  height: var(--user-panel-height, 63px);
+  min-height: var(--user-panel-height, 63px);
+  padding: 0.575rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+[data-interface-design='system24'] .server-panel .user-panel,
+[data-interface-design='system24'] .chat-sidebar .user-panel {
+  border: var(--system24-border) solid var(--border);
+}
+
+[data-interface-design='system24'] .server-panel .user-panel:hover,
+[data-interface-design='system24'] .chat-sidebar .user-panel:hover {
+  border: var(--system24-border) solid var(--system24-border-hover);
+}
+
+[data-interface-design='system24'] .input-container {
+  width: 100%;
+  pointer-events: auto;
+  flex-direction: column;
+  justify-content: center;
+}
+
+[data-interface-design='system24'] .input-container.replying,
+[data-interface-design='system24'] .input-container.editing {
+  height: auto;
+  min-height: var(--user-panel-height, 63px);
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0.575rem;
+}
+
+[data-interface-design='system24'] .chat-composer {
+  border-radius: 0 !important;
+  background: transparent !important;
+  min-height: 0;
+  height: auto;
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  gap: 8px;
+}
+
+[data-interface-design='system24'] .chat-composer:focus-within {
+  background: transparent !important;
+}
+
+/* Chat column */
+[data-interface-design='system24'] .group-chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--system24-gap);
+  height: 100%;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .chat-header {
+  flex-shrink: 0;
+  margin: 0;
+  background: var(--surface);
+  border: var(--system24-border) solid var(--border);
+}
+
+[data-interface-design='system24'] .chat-room-body {
+  flex: 1;
+  min-height: 0;
+  gap: var(--system24-gap);
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .chat-room-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--system24-gap);
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+  --chat-composer-inset: 0px;
+  --chat-composer-inset-expanded: 0px;
+}
+
+[data-interface-design='system24'] .chat-messages-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  background: var(--background, var(--surface));
+}
+
+[data-interface-design='system24'] .chat-messages-panel .messages {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px var(--chat-content-padding-x, 30px);
+}
+
+[data-interface-design='system24'] .chat-pinned-bar {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .chat-room-main.is-replying .messages,
+[data-interface-design='system24'] .chat-room-main.is-editing .messages {
+  padding-bottom: 20px;
+}
+
+[data-interface-design='system24'] .chat-typing-indicator {
+  bottom: 0;
+}
+
+/* Members sidebar */
+[data-interface-design='system24'] .member-list-sidebar {
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: var(--system24-border) solid var(--border);
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .member-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+[data-interface-design='system24'] .chat-room-body > .resizable-sidebar-shell,
+[data-interface-design='system24'] .chat-room-body > .resizable-sidebar-shell .resizable-sidebar-shell__content {
+  overflow: visible;
+}
+
+/* Active channel strip */
+[data-interface-design='system24'] .channel-item.active,
+[data-interface-design='system24'] [class*='channel-item'].active {
+  box-shadow: inset var(--system24-divider) 0 0 0 var(--primary);
+}
+
+/* Square server icons only */
+[data-interface-design='system24'] .server-item,
+[data-interface-design='system24'] [class*='server-item'] {
+  border-radius: 0 !important;
+}
+
+/* TUI typography */
+[data-interface-design='system24'] .chat-list-header,
+[data-interface-design='system24'] .server-panel-header h3,
+[data-interface-design='system24'] .chat-header h2,
+[data-interface-design='system24'] .member-list-section-title {
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+/*
+ * Square scrollbars (system24 unrounding).
+ * Chrome 121+ prefers scrollbar-color/scrollbar-width and renders native Fluent
+ * scrollbars (rounded, with arrow buttons). Reset those on WebKit so ::-webkit-scrollbar
+ * styling wins and thumbs stay square.
+ */
+@supports selector(::-webkit-scrollbar) {
+  html[data-interface-design='system24'],
+  html[data-interface-design='system24'] * {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html[data-interface-design='system24'] {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--background);
+  }
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar-track {
+  background: var(--background) !important;
+  border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar-thumb {
+  background: var(--border) !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary) !important;
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar-corner {
+  background: var(--background) !important;
+  border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'] ::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent !important;
+}
+
+html[data-interface-design='system24'] .messages::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'] .server-channels-scroll::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'] .member-list-scroll::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'] .chat-list-container::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'] .server-settings-scroll::-webkit-scrollbar-thumb {
+  border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] ::-webkit-scrollbar-thumb {
+  background: var(--border) !important;
+  border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary) !important;
+}
+
+/* Unrounding for controls, not avatars */
+[data-interface-design='system24'] button,
+[data-interface-design='system24'] input,
+[data-interface-design='system24'] textarea,
+[data-interface-design='system24'] select,
+[data-interface-design='system24'] .settings-panel__card,
+[data-interface-design='system24'] .create-modal,
+[data-interface-design='system24'] [class*='modal'],
+[data-interface-design='system24'] .chat-composer {
+  border-radius: 0 !important;
+}
+
+[data-interface-design='system24'] .settings-modal,
+[data-interface-design='system24'] .settings-panel__card {
+  border: var(--system24-panel-border);
+}
+
+/* Server settings page */
+[data-interface-design='system24'] .server-settings-page {
+  padding: var(--system24-gap);
+  gap: var(--system24-gap);
+  background: var(--background);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+[data-interface-design='system24'] .server-settings-sidebar {
+  border-right: var(--system24-panel-border);
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .server-settings-main {
+  gap: var(--system24-gap);
+  background: transparent;
+  overflow: visible;
+}
+
+[data-interface-design='system24'] .server-settings-page-header {
+  background: var(--surface);
+}
+
+[data-interface-design='system24'] .server-settings-page-header h1 {
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+[data-interface-design='system24'] .server-settings-scroll {
+  background: var(--surface);
+  border-radius: 0;
+}
+
+[data-interface-design='system24'] .server-header {
+  border-bottom: 1px solid var(--border);
+}
+
+[data-interface-design='system24'] .server-header .server-name {
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+[data-interface-design='system24'] .back-to-server-btn {
+  border-radius: 0 !important;
+}
+
+[data-interface-design='system24'] .nav-section-title {
+  text-transform: lowercase;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+[data-interface-design='system24'] .settings-nav-item {
+  border-radius: 0 !important;
+}
+
+[data-interface-design='system24'] .settings-nav-item.active {
+  background: transparent;
+  color: var(--primary);
+  box-shadow: inset var(--system24-divider) 0 0 0 var(--primary);
+}
+
+[data-interface-design='system24'] .settings-nav-item.active svg {
+  color: var(--primary);
+}
+
+/* Voice list + user panel controls — slight inner rounding */
+[data-interface-design='system24'] {
+  --system24-radius-inner: 6px;
+  --voice-participant-radius: var(--system24-radius-inner);
+  --voice-participant-nameplate-radius: var(--system24-radius-inner);
+  --user-panel-control-radius: var(--system24-radius-inner);
+  --user-panel-menu-radius: calc(var(--system24-radius-inner) + 2px);
+  --voice-call-panel-radius: 0;
+  --voice-call-panel-border: var(--system24-panel-border);
+  --voice-call-tile-radius: var(--system24-radius-inner);
+  --voice-call-dock-radius: 0;
+  --voice-call-dock-border: var(--system24-panel-border);
+  --voice-call-button-radius: var(--system24-radius-inner);
+  --voice-call-disconnect-radius: var(--system24-radius-inner);
+  --voice-call-banner-radius: var(--system24-radius-inner);
+}
+
+[data-interface-design='system24'] .voice-participant-nameplate.user-nameplate--decorated {
+  overflow: hidden;
+}
+
+[data-interface-design='system24'] .voice-channel-participants.dragging-over {
+  border-radius: var(--system24-radius-inner);
+}
+
+/* Voice / video call window */
+[data-interface-design='system24'] .main-area .voice-call-container {
+  border: var(--system24-panel-border);
+  border-radius: 0;
+  overflow: visible;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+[data-interface-design='system24'] .main-area .voice-call-container .call-container {
+  overflow: hidden;
+}
+
+[data-interface-design='system24'] .group-chat-container .chat-voice-call {
+  border: var(--system24-panel-border);
+  border-bottom: var(--system24-panel-border);
+  border-radius: 0;
+  overflow: visible;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+[data-interface-design='system24'] .chat-voice-call-join-preview {
+  border-bottom: var(--system24-panel-border);
+  border-radius: 0;
+}
+
+[data-interface-design='system24'] .voice-call-chrome .call-control-dock {
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-interface-design='system24'] .voice-call-container .small-tile,
+[data-interface-design='system24'] .voice-call-container .screen-share-tile,
+[data-interface-design='system24'] .voice-call-container .screenShareParticipant,
+[data-interface-design='system24'] .voice-call-container .screenShareVideoContainer {
+  border-radius: var(--system24-radius-inner);
+}
+
+[data-interface-design='system24'] .voice-call-container .small-tile .tile-border,
+[data-interface-design='system24'] .voice-call-container .screen-share-tile .tile-border {
+  border-radius: var(--system24-radius-inner);
+}

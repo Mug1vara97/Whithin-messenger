@@ -91,9 +91,14 @@ import {
   canAttachFiles,
   canSendVoiceMessages,
   canManageMessages,
+  canManageRoles,
   canEditServerMemberNickname,
 } from '../../../entities/role/lib/serverPermissions';
 import ServerMemberNicknameModal from '../../../entities/member/ui/ServerMemberNicknameModal';
+import ServerMemberRoleModal from '../../../entities/member/ui/ServerMemberRoleModal/ServerMemberRoleModal';
+import { useFriends, useFriendRequests } from '../../../entities/friend';
+import { getFriendActionForMember } from '../../../shared/lib/utils/friendActionForMember';
+import { buildServerUserContextMenuItems } from '../../../shared/lib/utils/buildServerUserContextMenuItems';
 import SendIcon from '../../../shared/ui/atoms/SendIcon';
 import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
@@ -124,15 +129,34 @@ const ChatRoom = ({
   const username = user?.username;
   const userDisplayName = user?.displayName ?? user?.DisplayName ?? null;
   const userId = user?.id || user?.userId;
-  const { openProfile } = useProfileModal();
+  const { openProfile, openOwnProfile } = useProfileModal();
+
+  const isMessageOwn = useCallback(
+    (message) => {
+      const senderId = message?.senderId ?? message?.SenderId;
+      if (senderId != null && userId != null) {
+        return String(senderId) === String(userId);
+      }
+      return message?.senderUsername === username;
+    },
+    [userId, username],
+  );
 
   const handleOpenAuthorProfile = useCallback(
     (message) => {
       const authorId = message?.senderId ?? message?.SenderId;
       if (!authorId) return;
-      openProfile(authorId, message?.senderUsername);
+      if (String(authorId) === String(userId)) {
+        openOwnProfile(message?.senderStatus ?? message?.SenderStatus ?? null);
+        return;
+      }
+      openProfile(
+        authorId,
+        message?.senderUsername,
+        message?.senderStatus ?? message?.SenderStatus ?? null,
+      );
     },
-    [openProfile]
+    [openProfile, openOwnProfile, userId],
   );
   const {
     messages,
@@ -326,20 +350,33 @@ const ChatRoom = ({
     y: 0,
     authorId: null,
     authorName: '',
+    authorStatus: null,
   });
+  const [roleModal, setRoleModal] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+    member: null,
+  });
+  const [kickTargetMember, setKickTargetMember] = useState(null);
   const notificationConnectionRef = useRef(null);
 
   const serverConnection = useServerHubConnection(isServerChat ? serverId : null);
-  const { members: serverMembers, isLoading: serverMembersLoading, updateMemberNickname } = useMembers(
-    serverConnection,
-    isServerChat ? serverId : null,
-    userId
-  );
-  const { roles: serverRoles, fetchRoles: fetchServerRoles } = useRoles(
-    serverConnection,
-    isServerChat ? serverId : null,
-    userId
-  );
+  const {
+    members: serverMembers,
+    isLoading: serverMembersLoading,
+    updateMemberNickname,
+    openPrivateChat,
+    kickMember,
+  } = useMembers(serverConnection, isServerChat ? serverId : null, userId);
+  const {
+    roles: serverRoles,
+    fetchRoles: fetchServerRoles,
+    assignRole,
+    removeRole,
+  } = useRoles(serverConnection, isServerChat ? serverId : null, userId);
+  const { friends, fetchFriends, removeFriend } = useFriends();
+  const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
   const { resolveStatus } = usePresenceOverrides(userId);
 
   useEffect(() => {
@@ -409,11 +446,121 @@ const ChatRoom = ({
       y: 0,
       authorId: null,
       authorName: '',
+      authorStatus: null,
     });
   }, []);
 
+  const closeRoleModal = useCallback(() => {
+    setRoleModal({ open: false, x: 0, y: 0, member: null });
+  }, []);
+
+  const handleOpenPrivateChat = useCallback(
+    async (targetUserId) => {
+      try {
+        const chatData = await openPrivateChat(targetUserId);
+        const newChatId = chatData?.chatId ?? chatData?.ChatId;
+        if (!newChatId) {
+          throw new Error('Сервер не вернул идентификатор чата');
+        }
+        navigate(`/channels/@me/${newChatId}`);
+      } catch (error) {
+        alert(error?.message || 'Не удалось открыть личный чат');
+      }
+    },
+    [openPrivateChat, navigate],
+  );
+
+  const handleAddFriend = useCallback(
+    async (targetUserId) => {
+      try {
+        await sendRequest(targetUserId);
+        await fetchFriends();
+      } catch (error) {
+        alert(error?.message || 'Не удалось отправить запрос в друзья');
+      }
+    },
+    [sendRequest, fetchFriends],
+  );
+
+  const handleAcceptFriend = useCallback(
+    async (friendshipId) => {
+      try {
+        await acceptRequest(friendshipId);
+        await fetchFriends();
+      } catch (error) {
+        alert(error?.message || 'Не удалось принять запрос');
+      }
+    },
+    [acceptRequest, fetchFriends],
+  );
+
+  const handleRemoveFriend = useCallback(
+    async (targetUserId) => {
+      try {
+        await removeFriend(targetUserId);
+        await fetchFriends();
+      } catch (error) {
+        alert(error?.message || 'Не удалось удалить из друзей');
+      }
+    },
+    [removeFriend, fetchFriends],
+  );
+
+  const handleCopyUserId = useCallback(async (targetUserId) => {
+    try {
+      await navigator.clipboard.writeText(String(targetUserId));
+    } catch {
+      alert('Не удалось скопировать ID');
+    }
+  }, []);
+
+  const openRoleModal = useCallback((member, x, y) => {
+    setRoleModal({
+      open: true,
+      x: Math.max(8, x - 230),
+      y,
+      member,
+    });
+  }, []);
+
+  const handleRoleToggle = useCallback(
+    async (roleId, checked) => {
+      if (!roleModal.member) return;
+      try {
+        if (checked) {
+          await assignRole(roleModal.member.userId, roleId);
+        } else {
+          await removeRole(roleModal.member.userId, roleId);
+        }
+      } catch (error) {
+        alert(error?.message || 'Не удалось обновить роль');
+      }
+    },
+    [roleModal.member, assignRole, removeRole],
+  );
+
+  const handleConfirmKick = useCallback(async () => {
+    if (!kickTargetMember) return;
+    try {
+      await kickMember(kickTargetMember.userId);
+      setKickTargetMember(null);
+    } catch (error) {
+      alert(error?.message || 'Не удалось удалить участника с сервера');
+    }
+  }, [kickMember, kickTargetMember]);
+
+  useEffect(() => {
+    if (!roleModal.member) return;
+    const updatedMember = serverMembers.find(
+      (member) => String(member.userId) === String(roleModal.member.userId),
+    );
+    if (updatedMember) {
+      setRoleModal((prev) => ({ ...prev, member: updatedMember }));
+    }
+  }, [serverMembers, roleModal.member?.userId]);
+
   const resolveMemberFromAuthor = useCallback(
-    (authorId, authorName) => {
+    (authorId, authorName, authorStatus) => {
       if (authorId == null) return null;
       const serverMember = serverMembers.find(
         (member) => String(member.userId) === String(authorId),
@@ -424,18 +571,102 @@ const ChatRoom = ({
           username: authorName,
           login: null,
           nickname: null,
+          status: authorStatus,
         }
       );
     },
     [serverMembers],
   );
 
+  const buildUserContextMenuItems = useCallback(
+    (targetMember, menuPosition = null) => {
+      const memberUserId = targetMember?.userId;
+      if (memberUserId == null) return [];
+
+      const friendAction = getFriendActionForMember(memberUserId, {
+        userId,
+        friends,
+        pendingRequests,
+        sentRequests,
+      });
+      const canEditNick = isServerChat && canEditMemberNickname(memberUserId);
+      const canManageMemberRoles =
+        isServerChat && (isServerOwner || canManageRoles(userPermissions, isServerOwner));
+      const canKick =
+        isServerChat &&
+        (isServerOwner || userPermissions?.kickMembers) &&
+        String(memberUserId) !== String(userId);
+      const resolvedMember = resolveNicknameEditorMember(targetMember);
+
+      return buildServerUserContextMenuItems({
+        targetUserId: memberUserId,
+        currentUserId: userId,
+        friendAction,
+        isServerContext: isServerChat,
+        canEditNickname: canEditNick,
+        canManageRoles: canManageMemberRoles,
+        canKick,
+        handlers: {
+          onProfile: () =>
+            openProfile(memberUserId, targetMember.username, targetMember.status),
+          onMessage: () => handleOpenPrivateChat(memberUserId),
+          onAddFriend: () => handleAddFriend(memberUserId),
+          onAcceptFriend: handleAcceptFriend,
+          onRemoveFriend: () => handleRemoveFriend(memberUserId),
+          onEditNickname: () => {
+            if (resolvedMember) {
+              handleOpenNicknameEditor(resolvedMember);
+            }
+          },
+          onManageRoles: () => {
+            if (resolvedMember && menuPosition) {
+              openRoleModal(resolvedMember, menuPosition.x, menuPosition.y);
+            }
+          },
+          onKick: () => {
+            if (resolvedMember) {
+              setKickTargetMember(resolvedMember);
+            }
+          },
+          onCopyId: () => handleCopyUserId(memberUserId),
+        },
+      });
+    },
+    [
+      userId,
+      friends,
+      pendingRequests,
+      sentRequests,
+      isServerChat,
+      canEditMemberNickname,
+      isServerOwner,
+      userPermissions,
+      resolveNicknameEditorMember,
+      openProfile,
+      handleOpenPrivateChat,
+      handleAddFriend,
+      handleAcceptFriend,
+      handleRemoveFriend,
+      handleOpenNicknameEditor,
+      openRoleModal,
+      handleCopyUserId,
+    ],
+  );
+
+  const getUserContextMenuItems = useCallback(
+    (member, menuPosition) => buildUserContextMenuItems(member, menuPosition),
+    [buildUserContextMenuItems],
+  );
+
   const handleAuthorContextMenu = useCallback(
     (event, message) => {
-      if (!isServerChat || isSelectionMode) return;
+      if (isSelectionMode || isSavedMessages) return;
 
       const authorId = message?.senderId ?? message?.SenderId;
-      if (!authorId || !canEditMemberNickname(authorId)) return;
+      if (!authorId) return;
+
+      const isSelf = String(authorId) === String(userId);
+      if (isSelf && !isServerChat) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -446,39 +677,26 @@ const ChatRoom = ({
         x: event.clientX,
         y: event.clientY,
         authorId,
-        authorName: message?.senderUsername || '',
+        authorName: message?.senderUsername || message?.SenderUsername || '',
+        authorStatus: message?.senderStatus ?? message?.SenderStatus ?? null,
       });
     },
-    [isServerChat, isSelectionMode, canEditMemberNickname, closeContextMenu],
+    [isSelectionMode, isSavedMessages, userId, isServerChat, closeContextMenu],
   );
-
-  const handleOpenNicknameFromAuthorMenu = useCallback(() => {
-    const member = resolveMemberFromAuthor(
-      authorContextMenu.authorId,
-      authorContextMenu.authorName,
-    );
-    closeAuthorContextMenu();
-    if (member) {
-      handleOpenNicknameEditor(member);
-    }
-  }, [
-    authorContextMenu.authorId,
-    authorContextMenu.authorName,
-    resolveMemberFromAuthor,
-    closeAuthorContextMenu,
-    handleOpenNicknameEditor,
-  ]);
 
   const authorContextMenuItems = useMemo(() => {
     if (!authorContextMenu.authorId) return [];
-    const isSelf = String(authorContextMenu.authorId) === String(userId);
-    return [
-      {
-        text: isSelf ? 'Мой серверный ник' : 'Серверный ник',
-        onClick: handleOpenNicknameFromAuthorMenu,
-      },
-    ];
-  }, [authorContextMenu.authorId, userId, handleOpenNicknameFromAuthorMenu]);
+    const member = resolveMemberFromAuthor(
+      authorContextMenu.authorId,
+      authorContextMenu.authorName,
+      authorContextMenu.authorStatus,
+    );
+    if (!member) return [];
+    return buildUserContextMenuItems(member, {
+      x: authorContextMenu.x,
+      y: authorContextMenu.y,
+    });
+  }, [authorContextMenu, resolveMemberFromAuthor, buildUserContextMenuItems]);
 
   const handleSaveServerNickname = useCallback(async () => {
     if (!nicknameEditorMember || !canEditMemberNickname(nicknameEditorMember.userId)) {
@@ -564,6 +782,16 @@ const ChatRoom = ({
         e.stopImmediatePropagation();
         return;
       }
+      if (roleModal.open) {
+        closeRoleModal();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (kickTargetMember) {
+        setKickTargetMember(null);
+        e.stopImmediatePropagation();
+        return;
+      }
       if (isSelectionMode) {
         exitSelectionMode();
         e.stopImmediatePropagation();
@@ -617,6 +845,9 @@ const ChatRoom = ({
     closeContextMenu,
     authorContextMenu.visible,
     closeAuthorContextMenu,
+    roleModal.open,
+    closeRoleModal,
+    kickTargetMember,
     forwardModalVisible,
     closeForwardModal,
     showChatInfo,
@@ -1039,7 +1270,7 @@ const ChatRoom = ({
     const message = messages.find(m => m.messageId === messageId);
     if (!message) return;
 
-    const isOwn = message.senderUsername === username;
+    const isOwn = isMessageOwn(message);
     const canDelete = isOwn || canModerateMessages;
 
     if (!canDelete) {
@@ -1192,7 +1423,7 @@ const ChatRoom = ({
     }
 
     const message = messages.find(m => m.messageId === messageId);
-    const isOwnMessage = message?.senderUsername === username;
+    const isOwnMessage = isMessageOwn(message);
     const canDelete = isOwnMessage || canModerateMessages;
     const canEdit = isOwnMessage || canModerateMessages;
 
@@ -1524,6 +1755,7 @@ const ChatRoom = ({
         </div>
       )}
 
+      <div className="chat-messages-panel">
       {!isLoading && visiblePinnedMessages.length > 0 && (
         <button
           type="button"
@@ -1608,7 +1840,7 @@ const ChatRoom = ({
         )}
 
         {!isLoading && messages.map((msg, messageIndex) => {
-          const isOwn = msg.senderUsername === username;
+          const isOwn = isMessageOwn(msg);
           const avatarIdentity = resolveMessageAvatarIdentity(msg, serverMembers);
           const isCallLog = isCallLogMessage(msg);
 
@@ -1793,6 +2025,10 @@ const ChatRoom = ({
                     className="message-username profile-open-trigger"
                     onClick={(event) => {
                       event.stopPropagation();
+                      if (isSelectionMode) {
+                        handleMessageSelectToggle(event, msg.messageId);
+                        return;
+                      }
                       handleOpenAuthorProfile(msg);
                     }}
                     onContextMenu={(event) => handleAuthorContextMenu(event, msg)}
@@ -2041,6 +2277,7 @@ const ChatRoom = ({
 
         <div ref={messagesEndRef} />
       </div>
+      </div>
 
       {isSelectionMode ? (
         <MessageSelectionBar
@@ -2216,10 +2453,7 @@ const ChatRoom = ({
             emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
             groupByRoles={isServerChat}
             serverRoles={isServerChat ? serverRoles : []}
-            serverMemberMenu={isServerChat}
-            currentUserId={userId}
-            canEditMemberNickname={canEditMemberNickname}
-            onEditNickname={handleOpenNicknameEditor}
+            getUserContextMenuItems={getUserContextMenuItems}
           />
         </ResizableSidebarShell>
       )}
@@ -2329,6 +2563,49 @@ const ChatRoom = ({
         onSave={handleSaveServerNickname}
         onClose={handleCloseNicknameEditor}
       />
+
+      <ServerMemberRoleModal
+        open={roleModal.open}
+        position={{ x: roleModal.x, y: roleModal.y }}
+        member={roleModal.member}
+        roles={serverRoles}
+        onClose={closeRoleModal}
+        onToggleRole={handleRoleToggle}
+      />
+
+      {kickTargetMember && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setKickTargetMember(null);
+            }
+          }}
+        >
+          <div className="modal-content call-mode-modal">
+            <h3>Удалить с сервера</h3>
+            <p>
+              Вы уверены, что хотите удалить {kickTargetMember.username} с сервера?
+            </p>
+            <div className="call-mode-actions">
+              <button
+                type="button"
+                className="call-mode-button direct"
+                onClick={() => setKickTargetMember(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="call-mode-button notify"
+                onClick={() => void handleConfirmKick()}
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ContextMenu
         isOpen={authorContextMenu.visible}

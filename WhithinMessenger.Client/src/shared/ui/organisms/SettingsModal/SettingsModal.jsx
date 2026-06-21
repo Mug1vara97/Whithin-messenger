@@ -22,6 +22,11 @@ import {
   THEME_PRESET_LIST,
 } from '../../../lib/theme/appTheme';
 import {
+  getInterfaceDesignId,
+  persistInterfaceDesign,
+  INTERFACE_DESIGNS,
+} from '../../../lib/theme/interfaceDesignSettings';
+import {
   getInAppNotificationsEnabled,
   setInAppNotificationsEnabled,
   getNotificationPosition,
@@ -45,6 +50,7 @@ import {
   resolveUserDisplayName,
 } from '../../../lib/utils/userDisplayNameHelpers';
 import { AppSoundSettingsSection } from '../../molecules/AppSoundSettingsSection/AppSoundSettingsSection';
+import { FrostedGlassSettingsSection } from '../../molecules/FrostedGlassSettingsSection/FrostedGlassSettingsSection';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
 
@@ -136,6 +142,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   const [accountProfile, setAccountProfile] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [themePresetId, setThemePresetId] = useState(() => getThemePresetId());
+  const [interfaceDesignId, setInterfaceDesignId] = useState(() => getInterfaceDesignId());
 
   const isElectron = soundpadBridge.isElectronAvailable();
   const tabs = useMemo(
@@ -640,8 +647,43 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
         return (
           <>
             <SettingsPanel
+              title="Стиль интерфейса"
+              description="Изменяет компоновку и форму элементов, не только цвета."
+            >
+              <SettingsRow title="Режим оформления">
+                <select
+                  className="settings-select"
+                  value={interfaceDesignId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setInterfaceDesignId(nextId);
+                    persistInterfaceDesign(nextId);
+                    const design = INTERFACE_DESIGNS.find((item) => item.id === nextId);
+                    if (design?.suggestedThemeId) {
+                      setThemePresetId(design.suggestedThemeId);
+                      persistThemePreset(design.suggestedThemeId);
+                    }
+                  }}
+                >
+                  {INTERFACE_DESIGNS.map((design) => (
+                    <option key={design.id} value={design.id}>
+                      {design.name}
+                    </option>
+                  ))}
+                </select>
+              </SettingsRow>
+              {INTERFACE_DESIGNS.find((design) => design.id === interfaceDesignId)?.description && (
+                <div className="settings-row">
+                  <p className="settings-row__desc" style={{ margin: 0 }}>
+                    {INTERFACE_DESIGNS.find((design) => design.id === interfaceDesignId).description}
+                  </p>
+                </div>
+              )}
+            </SettingsPanel>
+
+            <SettingsPanel
               title="Тема"
-              description="Внешний вид интерфейса приложения."
+              description="Цветовая палитра интерфейса. Совместима со стилем System24 и стеклянным фоном."
             >
               <SettingsRow title="Тема оформления">
                 <select
@@ -667,6 +709,13 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                   </p>
                 </div>
               )}
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Стеклянный фон"
+              description="Пользовательское изображение с эффектом матового стекла (Frosted Glass)."
+            >
+              <FrostedGlassSettingsSection />
             </SettingsPanel>
 
             {isElectron && (

@@ -95,21 +95,21 @@ const UserAvatar = ({
         >
           {content}
         </div>
-      </div>
-      {hasDecoration && (
-        <div className="user-avatar-decoration-layer" aria-hidden="true">
-          <AvatarDecorationMedia src={decorationUrl} />
-        </div>
-      )}
-      {statusIndicator && (
-        <div className="user-avatar-status-anchor">
-          <div
-            className={`user-avatar-status-indicator${statusIndicatorInteractive ? ' user-avatar-status-indicator--interactive' : ''}`.trim()}
-          >
-            {statusIndicator}
+        {hasDecoration && (
+          <div className="user-avatar-decoration-layer" aria-hidden="true">
+            <AvatarDecorationMedia src={decorationUrl} />
           </div>
-        </div>
-      )}
+        )}
+        {statusIndicator && (
+          <div className="user-avatar-status-anchor">
+            <div
+              className={`user-avatar-status-indicator${statusIndicatorInteractive ? ' user-avatar-status-indicator--interactive' : ''}`.trim()}
+            >
+              {statusIndicator}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

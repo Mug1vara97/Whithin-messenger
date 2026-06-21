@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   navigationReload: () => ipcRenderer.send('electron:navigation-reload'),
 
   syncWindowBackground: (color) => ipcRenderer.send('electron:sync-window-background', color),
+  syncWindowShape: (options) => ipcRenderer.send('electron:sync-window-shape', options),
   setBadgeCount: (count) => ipcRenderer.send('electron:set-badge-count', count),
   focusWindow: () => ipcRenderer.send('electron:focus-window'),
 
@@ -97,4 +98,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       globalShortcutListener = null;
     }
   },
+
+  pickBackgroundImage: () => ipcRenderer.invoke('electron:pick-background-image'),
+  loadBackgroundImage: (filePath) => ipcRenderer.invoke('electron:load-background-image', filePath),
+  clearBackgroundImage: () => ipcRenderer.invoke('electron:clear-background-image'),
 });

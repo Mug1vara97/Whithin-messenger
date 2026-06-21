@@ -1263,6 +1263,7 @@ const ServerPanel = ({
           }
         }}
       >
+        <div className="server-channels-scroll">
         <CategoriesList
           categories={memoizedCategories}
           selectedChat={selectedChat}
@@ -1288,6 +1289,7 @@ const ServerPanel = ({
           userId={user?.id}
           userName={user?.username || user?.userName}
         />
+        </div>
       </div>
 
       <CreateChannelModal

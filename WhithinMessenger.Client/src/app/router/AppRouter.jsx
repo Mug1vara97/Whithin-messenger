@@ -21,6 +21,7 @@ const AppRouter = () => {
   const [isMinBootTimePassed, setIsMinBootTimePassed] = useState(false);
   const [isBootExiting, setIsBootExiting] = useState(false);
   const [isBootCompleted, setIsBootCompleted] = useState(false);
+  const shouldShowBootPreloader = !isBootCompleted;
 
   useEffect(() => {
     const minDisplayTimer = window.setTimeout(() => {
@@ -46,8 +47,6 @@ const AppRouter = () => {
       window.clearTimeout(exitTimer);
     };
   }, [isBootCompleted, isBootExiting, isLoading, isMinBootTimePassed]);
-
-  const shouldShowBootPreloader = !isBootCompleted;
 
   if (shouldShowBootPreloader) {
     // Continue rendering below; preloader is rendered as overlay.

@@ -66,6 +66,15 @@
   overflow: visible;
 }
 
+.member-list-item__layout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
 .member-list-item--clickable {
   cursor: pointer;
 }
@@ -81,58 +90,53 @@
 .member-list-nameplate {
   flex: 1;
   min-width: 0;
+  align-self: center;
   overflow: visible;
 }
 
-.member-list-nameplate__row {
+.member-list-nameplate__body {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   width: 100%;
-  min-height: 36px;
-  padding: 5px 10px 5px 6px;
+  height: 40px;
+  padding: 0 8px 0 4px;
   box-sizing: border-box;
 }
 
-.member-list-nameplate.user-nameplate--empty .member-list-nameplate__row {
-  min-height: 36px;
-  padding: 4px 8px;
+.member-list-nameplate.user-nameplate--empty {
+  height: 40px;
 }
 
 .member-list-nameplate.user-nameplate--decorated {
-  overflow: visible;
-  min-height: 0;
-  box-shadow: none;
+  --member-list-nameplate-pull: 30px;
+
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  margin-left: calc(-1 * var(--member-list-nameplate-pull));
+  padding-left: calc(var(--member-list-nameplate-pull) + 16px);
+  border-radius: 12px;
+  box-sizing: border-box;
 }
 
-.member-list-nameplate.user-nameplate--decorated:hover {
-  filter: none;
-  box-shadow: none;
+.member-list-nameplate.user-nameplate--decorated .user-nameplate__content {
+  height: 100%;
 }
 
-.member-list-nameplate.user-nameplate--decorated .member-list-nameplate__row {
-  min-height: 48px;
-  padding: 6px 10px 6px 4px;
-  gap: 8px;
+.member-list-nameplate.user-nameplate--decorated .member-list-nameplate__body {
+  height: 100%;
+  padding: 0 10px 0 0;
 }
 
-/* Слот шире аватара — рамка не залезает на ник */
+.member-list-nameplate.user-nameplate--decorated .user-nameplate__media {
+  object-position: center right;
+}
+
+/* Layout hook for member list row — slot sizing from .user-avatar-slot in UserAvatar.css */
 .member-list-avatar-wrap {
-  --avatar-decoration-scale: 1.22;
-
-  position: relative;
-  flex-shrink: 0;
-  width: 40px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  overflow: visible;
   z-index: 2;
-}
-
-.member-list-nameplate.user-nameplate--decorated .member-list-avatar-wrap {
-  --avatar-decoration-scale: 1.2;
 }
 
 .member-list-name {

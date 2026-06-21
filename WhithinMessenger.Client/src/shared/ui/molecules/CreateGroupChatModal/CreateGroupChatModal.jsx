@@ -4,7 +4,7 @@ import { userApi } from '../../../../entities/user/api/userApi';
 import { useConnectionContext } from '../../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../../shared/lib/contexts/AuthContext';
 import UserAvatar from '../../atoms/UserAvatar';
-import { getUserStatusColor } from '../../../lib/utils/userStatus';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import './CreateGroupChatModal.css';
 
 const CreateGroupChatModal = ({ isOpen, onClose, onChatCreated }) => {
@@ -189,20 +189,15 @@ const CreateGroupChatModal = ({ isOpen, onClose, onChatCreated }) => {
             ) : (
               filteredUsers.map((user, index) => (
                 <div key={user.userId || user.id || index} className="user-item">
-                  <div className="user-item__avatar">
+                  <div className="user-avatar-slot user-item__avatar">
                     <UserAvatar
                       username={user.username}
                       avatarUrl={user.avatar && user.avatar !== '/default-avatar.png' ? user.avatar : null}
                       avatarColor={user.avatarColor || '#5865F2'}
                       size={40}
                       statusIndicator={
-                        <span
-                          className="user-avatar-presence-dot"
-                          style={{
-                            backgroundColor: getUserStatusColor(
-                              user.isOnline ? 'online' : 'offline'
-                            ),
-                          }}
+                        <UserAvatarPresenceDot
+                          status={user.isOnline ? 'online' : 'offline'}
                         />
                       }
                     />

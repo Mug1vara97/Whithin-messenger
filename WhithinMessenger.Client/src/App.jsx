@@ -8,6 +8,8 @@ import { ElectronTitlebar } from './shared/ui/molecules/ElectronTitlebar';
 import { useGlobalTextScramble } from './shared/lib/hooks/useGlobalTextScramble';
 import { useAppLifecycleCleanup } from './shared/lib/hooks/useAppLifecycleCleanup';
 import { setupThemeWindowSync } from './shared/lib/theme/appTheme';
+import { applyAppBackgroundSettings } from './shared/lib/theme/appBackgroundSettings';
+import { applyInterfaceDesign } from './shared/lib/theme/interfaceDesignSettings';
 import { isThemeColorsWindow } from './shared/lib/theme/themeWindow';
 import { AppBadgeSync } from './shared/lib/hooks/AppBadgeSync';
 import './shared/lib/styles/profileOpenTrigger.css';
@@ -20,6 +22,21 @@ function MainApp() {
   });
 
   useEffect(() => setupThemeWindowSync(), []);
+  useEffect(() => {
+    const refreshGlass = () => applyAppBackgroundSettings();
+    const refreshDesign = () => {
+      applyInterfaceDesign();
+      applyAppBackgroundSettings();
+    };
+    window.addEventListener('themePresetChanged', refreshGlass);
+    window.addEventListener('themeColorsChanged', refreshGlass);
+    window.addEventListener('interfaceDesignChanged', refreshDesign);
+    return () => {
+      window.removeEventListener('themePresetChanged', refreshGlass);
+      window.removeEventListener('themeColorsChanged', refreshGlass);
+      window.removeEventListener('interfaceDesignChanged', refreshDesign);
+    };
+  }, []);
   useAppLifecycleCleanup();
 
   return (

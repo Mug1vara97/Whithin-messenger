@@ -300,7 +300,7 @@ const ChatVoiceCall = ({
   return (
     <div
       ref={containerRef}
-      className={styles.voiceCallContainer}
+      className={`chat-voice-call ${styles.voiceCallContainer}`}
       style={containerStyle}
     >
       <div className={styles.voiceCallWrapper}>

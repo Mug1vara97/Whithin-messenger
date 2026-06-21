@@ -16,10 +16,6 @@
   opacity: 1;
 }
 
-.friend-item__avatar {
-  flex-shrink: 0;
-}
-
 .friend-item__info {
   flex: 1;
   min-width: 0;

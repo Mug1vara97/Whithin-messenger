@@ -8,9 +8,9 @@
   background:
     linear-gradient(
       165deg,
-      var(--background-primary, #2f3136) 0%,
-      var(--background, #36393f) 45%,
-      var(--surface, #2f3136) 100%
+      rgb(var(--background-primary-rgb, 47, 49, 54)) 0%,
+      rgb(var(--background-rgb, 54, 57, 63)) 45%,
+      rgb(var(--surface-rgb, 47, 49, 54)) 100%
     );
   overflow: hidden;
   transition: opacity 420ms ease, visibility 420ms ease;

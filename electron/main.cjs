@@ -108,6 +108,19 @@ const TITLE_BAR_OVERLAY_HEIGHT = 32;
 /** Зона справа: reload + три кнопки окна */
 const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 176;
 
+const FROSTED_GLASS_WINDOW_FLAG_PATH = path.join(app.getPath('userData'), 'whithin-frosted-glass-window');
+
+/** Раньше флаг включал transparent-окно; удаляем, чтобы не ломать OS-скругление после обновления */
+function clearLegacyFrostedGlassWindowFlag() {
+  try {
+    if (fs.existsSync(FROSTED_GLASS_WINDOW_FLAG_PATH)) {
+      fs.unlinkSync(FROSTED_GLASS_WINDOW_FLAG_PATH);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 let mainWindow = null;
 
 function createWindowsBadgeOverlay(count) {
@@ -1250,6 +1263,8 @@ function createWindow() {
   if (process.platform === 'win32' || process.platform === 'linux') {
     windowOptions.frame = false;
     windowOptions.thickFrame = true;
+    /* Скругление углов — нативное Win11/macOS; не работает с transparent: true */
+    windowOptions.roundedCorners = true;
   }
 
   mainWindow = new BrowserWindow(windowOptions);
@@ -1449,6 +1464,7 @@ if (!gotSingleInstanceLock) {
     { useSystemPicker: true }
   );
 
+  clearLegacyFrostedGlassWindowFlag();
   createWindow();
   createTray();
   registerGlobalShortcuts(DEFAULT_VOICE_SHORTCUTS);
@@ -1499,6 +1515,16 @@ ipcMain.on('electron:window-close', (event) => {
   }
 });
 
+function isTransparentWindowColor(color) {
+  if (typeof color !== 'string') {
+    return false;
+  }
+  const normalized = color.trim().toLowerCase();
+  return normalized === 'transparent'
+    || normalized === '#00000000'
+    || normalized === '#0000';
+}
+
 ipcMain.on('electron:sync-window-background', (event, color) => {
   if (typeof color !== 'string' || !color.trim()) {
     return;
@@ -1508,9 +1534,32 @@ ipcMain.on('electron:sync-window-background', (event, color) => {
     return;
   }
   try {
-    win.setBackgroundColor(color.trim());
+    const normalized = color.trim();
+    const transparent = isTransparentWindowColor(normalized);
+    win.setBackgroundColor(transparent ? '#00000000' : normalized);
+
+    if (process.platform === 'win32' && typeof win.setBackgroundMaterial === 'function') {
+      win.setBackgroundMaterial('none');
+    }
   } catch (err) {
     console.warn('electron:sync-window-background failed:', err);
+  }
+});
+
+ipcMain.on('electron:sync-window-shape', (event, options) => {
+  const frostedGlass = Boolean(options?.frostedGlass);
+
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+
+  try {
+    if (typeof win.setHasShadow === 'function') {
+      win.setHasShadow(!frostedGlass);
+    }
+  } catch (err) {
+    console.warn('electron:sync-window-shape failed:', err);
   }
 });
 
@@ -1596,6 +1645,101 @@ ipcMain.on('electron:remove-shortcut-listener', (event) => {
     console.log('[mouse-bind-debug] shortcut listener removed, sender id:', event.sender.id);
     shortcutCallbackWebContents = null;
   }
+});
+
+function getWallpaperDir() {
+  return path.join(app.getPath('userData'), 'wallpapers');
+}
+
+function ensureWallpaperDir() {
+  const dir = getWallpaperDir();
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function mimeFromImageExt(ext) {
+  switch (String(ext || '').toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    default:
+      return 'image/jpeg';
+  }
+}
+
+function readWallpaperDataUrl(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  return `data:${mimeFromImageExt(path.extname(filePath))};base64,${buffer.toString('base64')}`;
+}
+
+function isWallpaperPathAllowed(filePath) {
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    return false;
+  }
+  const normalized = path.normalize(filePath.trim());
+  const wallpaperRoot = path.normalize(getWallpaperDir());
+  return normalized.startsWith(wallpaperRoot);
+}
+
+ipcMain.handle('electron:pick-background-image', async (event) => {
+  const { dialog } = require('electron');
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win || undefined, {
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
+  });
+
+  if (result.canceled || !result.filePaths?.[0]) {
+    return null;
+  }
+
+  const sourcePath = result.filePaths[0];
+  const stat = fs.statSync(sourcePath);
+  if (stat.size > 12 * 1024 * 1024) {
+    throw new Error('Изображение слишком большое (максимум 12 МБ)');
+  }
+
+  ensureWallpaperDir();
+  const ext = path.extname(sourcePath) || '.jpg';
+  const destPath = path.join(getWallpaperDir(), `wallpaper${ext}`);
+  fs.copyFileSync(sourcePath, destPath);
+
+  return {
+    filePath: destPath,
+    dataUrl: readWallpaperDataUrl(destPath),
+  };
+});
+
+ipcMain.handle('electron:load-background-image', (_event, filePath) => {
+  if (!isWallpaperPathAllowed(filePath) || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  return {
+    filePath,
+    dataUrl: readWallpaperDataUrl(filePath),
+  };
+});
+
+ipcMain.handle('electron:clear-background-image', async () => {
+  const dir = getWallpaperDir();
+  if (!fs.existsSync(dir)) {
+    return true;
+  }
+
+  for (const entry of fs.readdirSync(dir)) {
+    if (entry.startsWith('wallpaper.')) {
+      fs.unlinkSync(path.join(dir, entry));
+    }
+  }
+
+  return true;
 });
 
 app.on('window-all-closed', () => {

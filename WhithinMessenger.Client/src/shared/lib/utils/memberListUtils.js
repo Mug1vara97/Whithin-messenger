@@ -448,7 +448,13 @@ export const groupServerMembersByRoles = (members, serverRoles = []) => {
 
     online: groupPresenceBucketByRoles(online, serverRoles),
 
-    offline: groupPresenceBucketByRoles(offline, serverRoles),
+    offline: {
+
+      roleSections: [],
+
+      ungrouped: sortMembers(offline),
+
+    },
 
   };
 

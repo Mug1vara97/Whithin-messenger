@@ -28,6 +28,8 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { Slider } from '@mui/material';
 import { useVoiceParticipantModeration } from '../../molecules/VoiceParticipantModerationMenu';
 import UserAvatar from '../UserAvatar/UserAvatar';
+import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
+import { colorsMatchForTileAvatarOutline } from '../../../lib/utils/colorMatchHelpers';
 import './VideoCallGrid.css';
 
 /** Максимум участников на одной странице сетки (есть CSS для 1–9) */
@@ -441,14 +443,25 @@ const VideoCallGrid = ({
     }
   }, [fullscreenScreenShareId]);
 
-  const renderTileAvatar = (participant, isSmall, { overlay = false } = {}) => {
+  const renderTileAvatar = (participant, isSmall, { overlay = false, tileBackgroundColor = null } = {}) => {
     const avatarSize = isSmall ? 60 : 100;
+    const avatarColor = participant.avatarColor || getAvatarColor(participant.name);
+    const hasAvatarDecoration = Boolean(resolveAvatarDecorationUrl(participant.avatarDecoration));
+    const needsContrastOutline =
+      !hasAvatarDecoration &&
+      tileBackgroundColor &&
+      colorsMatchForTileAvatarOutline(tileBackgroundColor, avatarColor);
+
     const avatarNode = (
-      <div className={`tile-avatar-wrap${overlay ? ' tile-avatar-wrap--overlay' : ''}`}>
+      <div
+        className={`tile-avatar-wrap${overlay ? ' tile-avatar-wrap--overlay' : ''}${
+          needsContrastOutline ? ' tile-avatar-wrap--contrast-outline' : ''
+        }`}
+      >
         <UserAvatar
           username={participant.name || 'U'}
           avatarUrl={participant.avatar}
-          avatarColor={participant.avatarColor || getAvatarColor(participant.name)}
+          avatarColor={avatarColor}
           avatarDecoration={participant.avatarDecoration}
           size={avatarSize}
         />
@@ -554,7 +567,8 @@ const VideoCallGrid = ({
                 const bannerIsImage = isBannerImage(participant.banner);
                 const bannerColor = participant.banner && !bannerIsImage ? participant.banner : null;
                 const backgroundColor = bannerColor || participant.avatarColor || getAvatarColor(participant.name);
-                
+                const isSolidColorTile = !bannerIsImage;
+
                 return (
                   <div style={{ 
                     width: '100%',
@@ -567,7 +581,10 @@ const VideoCallGrid = ({
                       backgroundPosition: 'center'
                     } : {})
                   }}>
-                {renderTileAvatar(participant, isSmall, { overlay: true })}
+                {renderTileAvatar(participant, isSmall, {
+                  overlay: true,
+                  tileBackgroundColor: isSolidColorTile ? backgroundColor : null,
+                })}
                   </div>
                 );
               })()

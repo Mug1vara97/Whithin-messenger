@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Person, PersonOff, MoreVert, Check, Close } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
-import { getUserStatusColor, getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
+import { getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
 import './FriendItem.css';
 
 const FriendItem = ({ 
@@ -56,7 +57,7 @@ const FriendItem = ({
           }
         }}
       >
-        <div className="friend-item__avatar">
+        <div className="user-avatar-slot friend-item__avatar">
           <UserAvatar
             username={profileUsername}
             avatarUrl={friend.avatar || friend.requesterAvatar}
@@ -64,13 +65,7 @@ const FriendItem = ({
             avatarDecoration={friend.avatarDecoration || friend.requesterAvatarDecoration}
             size="medium"
             statusIndicator={
-              !isRequest ? (
-                <span
-                  className="user-avatar-presence-dot"
-                  style={{ backgroundColor: getUserStatusColor(friend.status) }}
-                  title={getUserStatusLabel(friend.status)}
-                />
-              ) : null
+              !isRequest ? <UserAvatarPresenceDot status={friend.status} /> : null
             }
           />
         </div>

@@ -57,7 +57,6 @@ const areParticipantsEqual = (a, b) => {
       pA.userId !== pB.userId ||
       pA.userName !== pB.userName ||
       pA.nameplate !== pB.nameplate ||
-      pA.avatarDecoration !== pB.avatarDecoration ||
       pA.avatar !== pB.avatar ||
       pA.isMuted !== pB.isMuted ||
       pA.isSpeaking !== pB.isSpeaking ||
@@ -252,31 +251,35 @@ const ChannelItem = ({
                             className={`voice-participant ${isSpeakingLive ? 'speaking' : ''} ${isMutedLive ? 'muted' : ''} ${isDeafenedLive ? 'deafened' : ''} ${participant.isServerMuted ? 'server-muted' : ''} ${participantSnapshot.isDragging ? 'dragging' : ''}`}
                             style={participantProvided.draggableProps.style}
                           >
-                            <UserNameplate
-                              nameplate={participant.nameplate}
-                              className="voice-participant-nameplate"
-                            >
-                              <div className="voice-participant-nameplate__row">
-                                <div className="voice-participant-avatar">
-                                  <UserAvatar
-                                    username={participant.userName || participant.name}
-                                    avatarUrl={participant.avatar ? getAvatarUrl(participant.avatar) : null}
-                                    avatarColor={participant.avatarColor}
-                                    size={24}
-                                  />
-                                </div>
-                                <span className="voice-participant-name">{participant.userName}</span>
-                                <VoiceParticipantStatusIcons
-                                  className="voice-participant-status-icons"
-                                  isMuted={isMutedLive}
-                                  isDeafened={isDeafenedLive}
-                                  isServerMuted={participant.isServerMuted}
-                                  isServerDeafened={participant.isServerDeafened}
-                                  isSpeaking={isSpeakingLive}
-                                  variant="inline"
+                            <div className="voice-participant__layout">
+                              <div className="voice-participant-avatar-wrap">
+                                <UserAvatar
+                                  displayName={participant.displayName}
+                                  login={participant.login}
+                                  username={participant.userName || participant.name}
+                                  avatarUrl={participant.avatar ? getAvatarUrl(participant.avatar) : null}
+                                  avatarColor={participant.avatarColor}
+                                  size={30}
                                 />
                               </div>
-                            </UserNameplate>
+                              <UserNameplate
+                                nameplate={participant.nameplate}
+                                className="voice-participant-nameplate"
+                              >
+                                <div className="voice-participant-nameplate__body">
+                                  <span className="voice-participant-name">{participant.userName}</span>
+                                  <VoiceParticipantStatusIcons
+                                    className="voice-participant-status-icons"
+                                    isMuted={isMutedLive}
+                                    isDeafened={isDeafenedLive}
+                                    isServerMuted={participant.isServerMuted}
+                                    isServerDeafened={participant.isServerDeafened}
+                                    isSpeaking={isSpeakingLive}
+                                    variant="inline"
+                                  />
+                                </div>
+                              </UserNameplate>
+                            </div>
                           </div>
                         )}
                       </Draggable>

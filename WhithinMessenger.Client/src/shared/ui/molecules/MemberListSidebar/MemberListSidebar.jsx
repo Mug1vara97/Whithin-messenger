@@ -3,16 +3,10 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { WorkspacePremium } from '@mui/icons-material';
 
 import UserAvatar from '../../atoms/UserAvatar';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import UserNameplate from '../../atoms/UserNameplate';
 import ContextMenu from '../ContextMenu/ContextMenu';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
-
-import {
-  getUserStatusColor,
-  getUserStatusLabel,
-  normalizeUserStatus,
-  PRESENCE_STATUS,
-} from '../../../lib/utils/userStatus';
 
 import {
   groupMembersByPresence,
@@ -29,10 +23,7 @@ const MemberListSidebar = ({
   emptyLabel = 'Нет участников',
   groupByRoles = false,
   serverRoles = [],
-  serverMemberMenu = false,
-  currentUserId = null,
-  canEditMemberNickname,
-  onEditNickname,
+  getUserContextMenuItems,
 }) => {
   const { openProfile } = useProfileModal();
   const [contextMenu, setContextMenu] = useState({
@@ -55,8 +46,9 @@ const MemberListSidebar = ({
 
   const handleMemberContextMenu = useCallback(
     (event, member) => {
-      if (!serverMemberMenu || typeof canEditMemberNickname !== 'function') return;
-      if (!canEditMemberNickname(member.userId)) return;
+      if (typeof getUserContextMenuItems !== 'function') return;
+      const items = getUserContextMenuItems(member);
+      if (!items?.length) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -67,27 +59,20 @@ const MemberListSidebar = ({
         member,
       });
     },
-    [serverMemberMenu, canEditMemberNickname],
+    [getUserContextMenuItems],
   );
 
   const contextMenuItems = useMemo(() => {
-    const member = contextMenu.member;
-    if (!member) return [];
-
-    const isSelf = String(member.userId) === String(currentUserId);
-    return [
-      {
-        text: isSelf ? 'Мой серверный ник' : 'Серверный ник',
-        onClick: () => onEditNickname?.(member),
-      },
-    ];
-  }, [contextMenu.member, currentUserId, onEditNickname]);
+    if (!contextMenu.member || typeof getUserContextMenuItems !== 'function') return [];
+    return getUserContextMenuItems(contextMenu.member, {
+      x: contextMenu.x,
+      y: contextMenu.y,
+    });
+  }, [contextMenu.member, contextMenu.x, contextMenu.y, getUserContextMenuItems]);
 
   const renderMember = (member, showStatusDot = true) => {
     const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-    const displayNameStyle = showStatusDot && member.roleColor ? { color: member.roleColor } : undefined;
-    const normalizedStatus = normalizeUserStatus(member.status);
-    const shouldShowStatusDot = showStatusDot && normalizedStatus !== PRESENCE_STATUS.OFFLINE;
+    const displayNameStyle = member.roleColor ? { color: member.roleColor } : undefined;
 
     return (
       <div
@@ -105,40 +90,34 @@ const MemberListSidebar = ({
           }
         }}
       >
-        <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
-          <div className="member-list-nameplate__row">
-            <div className="member-list-avatar-wrap">
-              <UserAvatar
-                displayName={member.displayName}
-                login={member.login}
-                username={member.login}
-                avatarUrl={avatarUrl}
-                avatarColor={member.avatarColor}
-                avatarDecoration={member.avatarDecoration}
-                size={32}
-                statusIndicator={
-                  shouldShowStatusDot ? (
-                    <span
-                      className="user-avatar-presence-dot"
-                      style={{ backgroundColor: getUserStatusColor(member.status) }}
-                      title={getUserStatusLabel(member.status)}
-                    />
-                  ) : null
-                }
-              />
-            </div>
-            <span className="member-list-name" style={displayNameStyle}>
-              {member.username}
-            </span>
-            {member.isServerOwner && (
-              <WorkspacePremium
-                className="member-list-owner-icon"
-                fontSize="inherit"
-                titleAccess="Владелец сервера"
-              />
-            )}
+        <div className="member-list-item__layout">
+          <div className="user-avatar-slot member-list-avatar-wrap">
+            <UserAvatar
+              displayName={member.displayName}
+              login={member.login}
+              username={member.login}
+              avatarUrl={avatarUrl}
+              avatarColor={member.avatarColor}
+              avatarDecoration={member.avatarDecoration}
+              size={40}
+              statusIndicator={<UserAvatarPresenceDot status={member.status} />}
+            />
           </div>
-        </UserNameplate>
+          <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
+            <div className="member-list-nameplate__body">
+              <span className="member-list-name" style={displayNameStyle}>
+                {member.username}
+              </span>
+              {member.isServerOwner && (
+                <WorkspacePremium
+                  className="member-list-owner-icon"
+                  fontSize="inherit"
+                  titleAccess="Владелец сервера"
+                />
+              )}
+            </div>
+          </UserNameplate>
+        </div>
       </div>
     );
   };

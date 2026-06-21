@@ -42,6 +42,14 @@
   border-bottom: 1px solid #40444b;
 }
 
+.chat-messages-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .group-chat-container .messages {
   flex: 1;
   overflow-y: auto;

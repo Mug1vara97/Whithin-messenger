@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
-import { getUserStatusColor, getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
+import { getUserStatusLabel } from '../../../lib/utils/userStatus';
 import { mapChatParticipantToListItem } from '../../../lib/utils/memberListUtils';
 import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
+import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import UserNameplate from '../../atoms/UserNameplate/UserNameplate';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AddUserModal from '../AddUserModal/AddUserModal';
@@ -345,41 +346,35 @@ const ChatInfoModal = ({
                         participants.map((participant) => {
                           const member = mapChatParticipantToListItem(participant);
                           const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-                          const normalizedStatus = normalizeUserStatus(member.status);
-                          const showStatusDot = normalizedStatus !== PRESENCE_STATUS.OFFLINE;
 
                           return (
                           <div key={participant.userId || member.userId} className="chat-info-participant-item">
-                            <UserNameplate nameplate={member.nameplate} className="chat-info-participant-nameplate">
-                              <div className="chat-info-participant-nameplate__row">
-                                <div className="chat-info-participant-avatar-wrap">
-                                  <UserAvatar
-                                    displayName={member.displayName}
-                                    login={member.login}
-                                    username={member.login}
-                                    avatarUrl={avatarUrl}
-                                    avatarColor={member.avatarColor}
-                                    avatarDecoration={member.avatarDecoration}
-                                    size={32}
-                                    statusIndicator={
-                                      showStatusDot ? (
-                                        <span
-                                          className="user-avatar-presence-dot"
-                                          style={{ backgroundColor: getUserStatusColor(member.status) }}
-                                          title={getUserStatusLabel(member.status)}
-                                        />
-                                      ) : null
-                                    }
-                                  />
-                                </div>
-                                <div className="chat-info-participant-info">
-                                  <span className="chat-info-participant-name">{member.username || 'Пользователь'}</span>
+                            <div className="chat-info-participant-item__layout">
+                              <div className="user-avatar-slot chat-info-participant-avatar-wrap">
+                                <UserAvatar
+                                  displayName={member.displayName}
+                                  login={member.login}
+                                  username={member.login}
+                                  avatarUrl={avatarUrl}
+                                  avatarColor={member.avatarColor}
+                                  avatarDecoration={member.avatarDecoration}
+                                  size={40}
+                                  statusIndicator={
+                                    <UserAvatarPresenceDot status={member.status} />
+                                  }
+                                />
+                              </div>
+                              <UserNameplate nameplate={member.nameplate} className="chat-info-participant-nameplate">
+                                <div className="chat-info-participant-nameplate__body">
+                                  <span className="chat-info-participant-name">
+                                    {member.username || 'Пользователь'}
+                                  </span>
                                   <span className="chat-info-participant-status">
                                     {getUserStatusLabel(member.status)}
                                   </span>
                                 </div>
-                              </div>
-                            </UserNameplate>
+                              </UserNameplate>
+                            </div>
                           </div>
                           );
                         })

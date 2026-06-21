@@ -571,104 +571,117 @@
 .chat-info-participants-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   padding-right: 8px;
+  overflow: visible;
 }
 
 .chat-info-participant-item {
   display: flex;
   align-items: stretch;
-  gap: 0;
+  min-height: 0;
   padding: 0;
-  background: var(--surface-hover);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  min-height: 70px;
-  overflow: hidden;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+  overflow: visible;
+}
+
+.chat-info-participant-item__layout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  box-sizing: border-box;
 }
 
 .chat-info-participant-item:hover {
-  background: var(--border);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: var(--surface-hover);
+}
+
+.chat-info-participant-item:has(.user-nameplate--decorated):hover {
+  background: transparent;
 }
 
 .chat-info-participant-nameplate {
   flex: 1;
   min-width: 0;
+  align-self: center;
+  overflow: visible;
 }
 
-.chat-info-participant-nameplate.user-nameplate--empty .chat-info-participant-nameplate__row {
-  padding: 16px 18px;
-}
-
-.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-nameplate__row {
-  min-height: 48px;
-  padding: 12px 14px 12px 8px;
-  gap: 10px;
-}
-
-.chat-info-participant-nameplate__row {
+.chat-info-participant-nameplate__body {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 8px 0 4px;
+  box-sizing: border-box;
+}
+
+.chat-info-participant-nameplate.user-nameplate--empty {
+  height: 40px;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated {
+  --chat-info-nameplate-pull: 30px;
+
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  margin-left: calc(-1 * var(--chat-info-nameplate-pull));
+  padding-left: calc(var(--chat-info-nameplate-pull) + 16px);
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated .user-nameplate__content {
+  height: 100%;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-nameplate__body {
+  height: 100%;
+  padding: 0 10px 0 0;
+}
+
+.chat-info-participant-nameplate.user-nameplate--decorated .user-nameplate__media {
+  object-position: center right;
 }
 
 .chat-info-participant-avatar-wrap {
-  --avatar-decoration-scale: 1.22;
-
-  position: relative;
-  flex-shrink: 0;
-  width: 40px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  overflow: visible;
   z-index: 2;
 }
 
-.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-avatar-wrap {
-  --avatar-decoration-scale: 1.2;
-}
-
-.chat-info-participant-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  font-weight: bold;
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(88, 101, 242, 0.3);
-}
-
-.chat-info-participant-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-  min-width: 0;
-}
-
 .chat-info-participant-name {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
 }
 
+.chat-info-participant-nameplate.user-nameplate--decorated .chat-info-participant-name {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.chat-info-participant-nameplate.user-nameplate--empty .chat-info-participant-name {
+  font-weight: 500;
+  text-shadow: none;
+}
+
 .chat-info-participant-status {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-size: 12px;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-info-participants-empty {
@@ -776,7 +789,6 @@
 }
 
 .chat-info-user-avatar,
-.chat-info-participant-avatar,
 .chat-info-chat-avatar {
   color: #fff;
 }

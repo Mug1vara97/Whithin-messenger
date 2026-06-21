@@ -75,6 +75,55 @@ function hexToRgbTriplet(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
+export const THEME_RGB_VAR_MAP = [
+  ['--background-rgb', '--background'],
+  ['--background-primary-rgb', '--background-primary'],
+  ['--background-secondary-rgb', '--background-secondary'],
+  ['--surface-rgb', '--surface'],
+  ['--server-list-background-rgb', '--server-list-background'],
+];
+
+function parseColorRgbTriplet(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  const hex = extractFirstHexFromThemeValue(raw);
+  if (hex) {
+    return hexToRgbTriplet(hex);
+  }
+
+  const rgbaMatch = raw.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbaMatch) {
+    return `${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}`;
+  }
+
+  return null;
+}
+
+/** RGB triplets for frosted-glass rgba(var(--*-rgb), alpha) overlays. */
+export function applyThemeRgbVars(root, theme) {
+  if (typeof document === 'undefined' || !root) {
+    return;
+  }
+
+  const merged = { ...DEFAULT_THEME, ...theme };
+  THEME_RGB_VAR_MAP.forEach(([rgbVar, themeKey]) => {
+    root.style.removeProperty(rgbVar);
+    const rgb = parseColorRgbTriplet(merged[themeKey]);
+    if (rgb) {
+      root.style.setProperty(rgbVar, rgb);
+    }
+  });
+}
+
+function notifyThemeColorsChanged() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('themeColorsChanged'));
+}
+
 function hexLuminance(hex) {
   const normalized = extractFirstHexFromThemeValue(hex);
   if (!normalized) return 0.5;
@@ -177,6 +226,7 @@ export function applyThemeToRoot(theme) {
   root.style.setProperty('--icon', merged['--icon'] || merged['--text-secondary'] || merged['--text']);
   root.style.setProperty('--icon-hover', merged['--icon-hover'] || merged['--text']);
   root.style.setProperty('--text-on-primary', resolveTextOnPrimary(merged));
+  applyThemeRgbVars(root, merged);
 }
 
 export function applySavedTheme() {
@@ -189,6 +239,7 @@ export function persistTheme(partial) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   clearThemePreview();
   applyThemeToRoot(next);
+  notifyThemeColorsChanged();
 }
 
 export function resetTheme() {
@@ -196,6 +247,7 @@ export function resetTheme() {
   clearThemePreview();
   applyThemePresetAttribute(getThemePresetId());
   applyThemeToRoot(getMergedTheme());
+  notifyThemeColorsChanged();
 }
 
 /** Предпросмотр в основном окне, пока редактор открыт в отдельном. */
@@ -234,6 +286,7 @@ export function setupThemeWindowSync() {
         const parsed = JSON.parse(event.newValue);
         const { __previewTs, ...theme } = parsed;
         applyThemeToRoot({ ...DEFAULT_THEME, ...theme });
+        notifyThemeColorsChanged();
       } catch {
         /* ignore */
       }
@@ -241,12 +294,14 @@ export function setupThemeWindowSync() {
     }
     if (event.key === PREVIEW_KEY && !event.newValue) {
       applyThemeToRoot(getMergedTheme());
+      notifyThemeColorsChanged();
       return;
     }
     if (event.key === STORAGE_KEY || event.key === THEME_PRESET_STORAGE_KEY) {
       clearThemePreview();
       applyThemePresetAttribute(getThemePresetId());
       applyThemeToRoot(getMergedTheme());
+      notifyThemeColorsChanged();
     }
   };
 
@@ -260,6 +315,7 @@ export function setupThemeWindowSync() {
     ) {
       clearThemePreview();
       applyThemeToRoot(getMergedTheme());
+      notifyThemeColorsChanged();
     }
   };
 

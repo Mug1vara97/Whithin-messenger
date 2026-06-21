@@ -1,0 +1,92 @@
+.server-member-role-modal {
+  background: var(--background-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.server-member-role-modal__content {
+  padding: 12px;
+}
+
+.server-member-role-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.server-member-role-modal__header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.server-member-role-modal__member-name {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.server-member-role-modal__close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.server-member-role-modal__close:hover {
+  color: var(--text);
+}
+
+.server-member-role-modal__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.server-member-role-modal__role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.server-member-role-modal__role-item:hover {
+  background: var(--hover);
+}
+
+.server-member-role-modal__role-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.server-member-role-modal__role-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.server-member-role-modal__empty {
+  padding: 8px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.server-member-role-modal__empty p {
+  margin: 0 0 4px;
+}
