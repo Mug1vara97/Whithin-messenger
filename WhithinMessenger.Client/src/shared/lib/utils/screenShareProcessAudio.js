@@ -53,7 +53,8 @@ export class ScreenShareProcessAudioSession {
     }
   }
 
-  async start(pid) {
+  async start(pid, options = {}) {
+    const { exclude = false } = options;
     if (!pid || pid <= 0) {
       throw new Error('Invalid process id for screen-share audio');
     }
@@ -71,9 +72,21 @@ export class ScreenShareProcessAudioSession {
       throw new Error('Process audio capture permission denied');
     }
 
-    const started = await window.processAudioCapture.startCapture(pid);
+    const startCapture = exclude
+      ? window.processAudioCapture.startCaptureExclude
+      : window.processAudioCapture.startCapture;
+
+    if (typeof startCapture !== 'function') {
+      throw new Error(exclude
+        ? 'Process audio exclude capture is not available'
+        : 'Process audio capture is not available');
+    }
+
+    const started = await startCapture.call(window.processAudioCapture, pid);
     if (!started) {
-      throw new Error(`Failed to start process audio capture for pid ${pid}`);
+      throw new Error(exclude
+        ? `Failed to start system audio capture excluding pid ${pid}`
+        : `Failed to start process audio capture for pid ${pid}`);
     }
 
     const track = canUseMediaStreamTrackGenerator()

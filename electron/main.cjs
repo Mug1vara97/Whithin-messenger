@@ -1627,11 +1627,14 @@ if (!gotSingleInstanceLock) {
 
         let audioSource = null;
         if (shouldCaptureAudio && !isWhithinWindow) {
-          if (selectedSourceType === 'screen') {
-            audioSource = 'loopback';
-          } else if (selectedSourceType === 'window' && !pendingSelection?.processPid) {
-            // HWND -> PID failed; fall back to system loopback instead of broken window-source.
-            audioSource = 'loopback';
+          const usesProcessAudioCapture =
+            (selectedSourceType === 'window' && pendingSelection?.processPid)
+            || (selectedSourceType === 'screen' && pendingSelection?.excludeSelfPid);
+
+          if (!usesProcessAudioCapture) {
+            if (selectedSourceType === 'screen' || selectedSourceType === 'window') {
+              audioSource = 'loopback';
+            }
           }
         }
 
@@ -1641,6 +1644,7 @@ if (!gotSingleInstanceLock) {
           captureAudio: shouldCaptureAudio,
           audioSource: audioSource ? (typeof audioSource === 'string' ? audioSource : 'window-source') : null,
           processPid: pendingSelection?.processPid ?? null,
+          excludeSelfPid: pendingSelection?.excludeSelfPid ?? null,
         });
 
         safeCallback({
@@ -1847,18 +1851,21 @@ ipcMain.handle('electron:choose-screen-source', async () => {
   const processPid = selection.type === 'window'
     ? getProcessIdFromWindowSourceId(selection.id)
     : null;
+  const excludeSelfPid = process.platform === 'win32' ? process.pid : null;
 
   selectedScreenSource = {
     id: selection.id,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
     processPid,
+    excludeSelfPid,
   };
   lastSelectedScreenSource = {
     id: selection.id,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
     processPid,
+    excludeSelfPid,
     selectedAt: Date.now()
   };
 
@@ -1869,12 +1876,19 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     });
   }
 
+  if (selection.captureAudio && selection.type === 'screen') {
+    console.log('[screen-audio] screen capture will exclude app audio:', {
+      excludeSelfPid,
+    });
+  }
+
   return {
     id: selection.id,
     name: selection.name,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
     processPid,
+    excludeSelfPid,
   };
 });
 
@@ -1892,6 +1906,7 @@ ipcMain.handle('electron:arm-screen-capture', (_event, options = {}) => {
     type: lastSelectedScreenSource.type,
     captureAudio,
     processPid: lastSelectedScreenSource.processPid ?? null,
+    excludeSelfPid: lastSelectedScreenSource.excludeSelfPid ?? null,
   };
   return true;
 });

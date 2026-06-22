@@ -142,9 +142,31 @@ class VoiceCallApi {
 
   shouldUseProcessAudioCapture(includeAudio, captureOptions = {}) {
     if (!includeAudio) return false;
-    if (captureOptions.sourceType !== 'window') return false;
-    if (!captureOptions.processPid) return false;
-    return ScreenShareProcessAudioSession.isAvailable();
+    if (!ScreenShareProcessAudioSession.isAvailable()) return false;
+
+    if (captureOptions.sourceType === 'window' && captureOptions.processPid) {
+      return true;
+    }
+
+    if (captureOptions.sourceType === 'screen' && captureOptions.excludeSelfPid) {
+      return true;
+    }
+
+    return false;
+  }
+
+  getProcessAudioCaptureTarget(captureOptions = {}) {
+    if (captureOptions.sourceType === 'screen') {
+      return {
+        pid: captureOptions.excludeSelfPid,
+        exclude: true,
+      };
+    }
+
+    return {
+      pid: captureOptions.processPid,
+      exclude: false,
+    };
   }
 
   async acquireScreenShareStream(includeAudio = true, captureOptions = {}) {
@@ -155,6 +177,7 @@ class VoiceCallApi {
     const isElectron = Boolean(window.electronAPI?.isElectron);
     const useProcessAudio = isElectron && this.shouldUseProcessAudioCapture(includeAudio, captureOptions);
     const useDisplayMediaAudio = includeAudio && !useProcessAudio;
+    const processAudioTarget = this.getProcessAudioCaptureTarget(captureOptions);
 
     if (isElectron && window.electronAPI?.armScreenCapture) {
       await window.electronAPI.armScreenCapture({
@@ -192,6 +215,7 @@ class VoiceCallApi {
       isElectron,
       useProcessAudio,
       processPid: captureOptions.processPid ?? null,
+      excludeSelfPid: captureOptions.excludeSelfPid ?? null,
       sourceType: captureOptions.sourceType ?? null,
     });
 
@@ -202,14 +226,19 @@ class VoiceCallApi {
         await this.stopProcessAudioSession();
         const processAudioSession = new ScreenShareProcessAudioSession();
         try {
-          const audioStream = await processAudioSession.start(captureOptions.processPid);
+          const audioStream = await processAudioSession.start(processAudioTarget.pid, {
+            exclude: processAudioTarget.exclude,
+          });
           const audioTrack = audioStream.getAudioTracks()[0];
           if (!audioTrack) {
             throw new Error('Process audio capture returned no audio track');
           }
           stream.addTrack(audioTrack);
           this.processAudioSession = processAudioSession;
-          console.log('[screen-audio] merged process audio track for pid', captureOptions.processPid);
+          console.log('[screen-audio] merged process audio track', {
+            pid: processAudioTarget.pid,
+            exclude: processAudioTarget.exclude,
+          });
         } catch (processAudioError) {
           await processAudioSession.stop();
           console.warn('[screen-audio] process audio capture failed, continuing video-only:', processAudioError);

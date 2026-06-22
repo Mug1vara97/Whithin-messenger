@@ -3902,6 +3902,7 @@ export const useCallStore = create(
               sourceId: selectedSource.id,
               sourceType: selectedSource.type,
               processPid: selectedSource.processPid,
+              excludeSelfPid: selectedSource.excludeSelfPid,
             });
           }
 
@@ -3922,6 +3923,7 @@ export const useCallStore = create(
               sourceId: selectedSource.id,
               sourceType: selectedSource.type,
               processPid: selectedSource.processPid,
+              excludeSelfPid: selectedSource.excludeSelfPid,
             } : {},
           });
           
