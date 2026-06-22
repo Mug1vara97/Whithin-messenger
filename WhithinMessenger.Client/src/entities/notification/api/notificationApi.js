@@ -17,6 +17,11 @@ export const notificationApi = {
     await apiClient.put(`/notification/${notificationId}/read`);
   },
 
+  async markAllAsRead() {
+    const response = await apiClient.put('/notification/read-all');
+    return response.data;
+  },
+
   async markChatAsRead(chatId) {
     await apiClient.put(`/notification/chat/${chatId}/read`);
   },

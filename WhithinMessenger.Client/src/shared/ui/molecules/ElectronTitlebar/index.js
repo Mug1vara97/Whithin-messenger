@@ -1,1 +1,1 @@
-export { ElectronTitlebar } from './ElectronTitlebar';
+export { ElectronTitlebar, hasElectronTitlebarChrome } from './ElectronTitlebar';

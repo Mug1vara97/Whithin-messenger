@@ -124,6 +124,29 @@ public class NotificationRepository : INotificationRepository
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> MarkAllAsReadAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var notifications = await _context.Notifications
+            .Where(n => n.UserId == userId && !n.IsRead)
+            .ToListAsync(cancellationToken);
+
+        if (notifications.Count == 0)
+        {
+            return Array.Empty<Guid>();
+        }
+
+        var readAt = DateTimeOffset.UtcNow;
+        foreach (var notification in notifications)
+        {
+            notification.IsRead = true;
+            notification.ReadAt = readAt;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return notifications.Select(n => n.Id).ToList();
+    }
 }
 
 

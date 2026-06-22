@@ -82,16 +82,37 @@ function attachExternalLinksPolicy(webContents) {
       shell.openExternal(url).catch(() => {});
       return { action: 'deny' };
     }
+
+    const isThemeColorsWindow = /\/theme-colors(?:\?|#|$)/.test(url);
+    const overrideBrowserWindowOptions = {
+      title: APP_DISPLAY_NAME,
+      autoHideMenuBar: true,
+      backgroundColor: SERVER_LIST_BAR_COLOR,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.cjs'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+      },
+    };
+
+    if (isThemeColorsWindow) {
+      overrideBrowserWindowOptions.width = 580;
+      overrideBrowserWindowOptions.height = 860;
+      overrideBrowserWindowOptions.minWidth = 420;
+      overrideBrowserWindowOptions.minHeight = 520;
+      overrideBrowserWindowOptions.resizable = true;
+    }
+
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      overrideBrowserWindowOptions.frame = false;
+      overrideBrowserWindowOptions.thickFrame = true;
+      overrideBrowserWindowOptions.roundedCorners = true;
+    }
+
     return {
       action: 'allow',
-      overrideBrowserWindowOptions: {
-        webPreferences: {
-          preload: path.join(__dirname, 'preload.cjs'),
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: false
-        }
-      }
+      overrideBrowserWindowOptions,
     };
   });
 }
@@ -108,7 +129,7 @@ const APP_ICON_ICO_PATH = path.join(__dirname, 'app-icon.ico');
 const TITLE_BAR_OVERLAY_HEIGHT = 32;
 
 /** Зона справа: reload + три кнопки окна */
-const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 176;
+const TITLEBAR_DRAG_RIGHT_RESERVE_PX = 210;
 
 const FROSTED_GLASS_WINDOW_FLAG_PATH = path.join(app.getPath('userData'), 'whithin-frosted-glass-window');
 

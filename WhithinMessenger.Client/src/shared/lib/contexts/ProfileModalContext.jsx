@@ -1,7 +1,8 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ProfileModal, SettingsModal } from '../../ui/organisms';
 import { useAuthContext } from './AuthContext';
 import { resolveUserDisplayName } from '../utils/userDisplayNameHelpers';
+import { SOUNDPAD_OPEN_MANAGER_EVENT } from '../soundpad/soundpadPanelEvents';
 
 const ProfileModalContext = createContext(null);
 
@@ -61,6 +62,12 @@ export const ProfileModalProvider = ({ children }) => {
     setSettingsInitialTab(tab);
     setShowSettings(true);
   }, []);
+
+  useEffect(() => {
+    const onOpenSoundpadSettings = () => openSettings('soundpad');
+    window.addEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadSettings);
+    return () => window.removeEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadSettings);
+  }, [openSettings]);
 
   const handleOpenSettingsFromProfile = useCallback(
     (tab) => {

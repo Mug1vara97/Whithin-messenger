@@ -1,6 +1,7 @@
 import React from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import UserAvatar from '../../atoms/UserAvatar';
+import { hasElectronTitlebarChrome } from '../../molecules/ElectronTitlebar';
 import './InAppNotificationStack.css';
 
 const InAppNotificationStack = ({
@@ -13,9 +14,13 @@ const InAppNotificationStack = ({
   if (items.length === 0) return null;
 
   const positionClass = `in-app-notifications--${position}`;
+  const withTitlebarClass = hasElectronTitlebarChrome() ? 'in-app-notifications--with-titlebar' : '';
 
   return (
-    <div className={`in-app-notifications ${positionClass}`} aria-live="polite">
+    <div
+      className={`in-app-notifications ${positionClass} ${withTitlebarClass}`.trim()}
+      aria-live="polite"
+    >
       <button
         type="button"
         className="in-app-notifications__hide-all"

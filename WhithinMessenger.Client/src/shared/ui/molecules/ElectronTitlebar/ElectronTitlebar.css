@@ -4,7 +4,7 @@
   --electron-titlebar-nav: var(--icon, var(--text-secondary, #9aa1ac));
   --electron-titlebar-nav-hover: var(--icon-hover, #d2d6de);
   --electron-titlebar-height: 32px;
-  --electron-titlebar-controls-reserve: 176px;
+  --electron-titlebar-controls-reserve: 210px;
 }
 
 [data-theme-preset='cyberpunk'] .electron-titlebar-app-name {
@@ -68,6 +68,11 @@ body.electron-titlebar-chrome .server-settings-page,
 body.electron-titlebar-chrome .server-settings-loading,
 body.electron-titlebar-chrome .server-settings-error {
   min-height: 100% !important;
+}
+
+body.electron-titlebar-chrome .theme-colors-page {
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
 #electron-titlebar-fill {

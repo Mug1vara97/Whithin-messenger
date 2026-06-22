@@ -5,6 +5,7 @@ using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.DeleteNotification;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.GetNotifications;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.GetUnreadCount;
+using WhithinMessenger.Application.CommandsAndQueries.Notifications.MarkAllAsRead;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.MarkAsRead;
 using WhithinMessenger.Application.CommandsAndQueries.Notifications.MarkChatAsRead;
 using WhithinMessenger.Api.Attributes;
@@ -123,6 +124,26 @@ public class NotificationController : ControllerBase
         }
 
         return Ok(new { message = "Notification marked as read" });
+    }
+
+    [HttpPut("read-all")]
+    public async Task<IActionResult> MarkAllAsRead()
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var command = new MarkAllAsReadCommand(userId.Value);
+        var result = await _mediator.Send(command);
+
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(new { message = $"Marked {result.MarkedCount} notifications as read", markedCount = result.MarkedCount });
     }
 
     [HttpPut("chat/{chatId}/read")]

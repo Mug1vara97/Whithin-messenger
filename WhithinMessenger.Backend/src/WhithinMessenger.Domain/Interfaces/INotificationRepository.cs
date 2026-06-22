@@ -12,6 +12,7 @@ public interface INotificationRepository
     Task DeleteAsync(Guid notificationId, CancellationToken cancellationToken = default);
     Task MarkAsReadAsync(Guid notificationId, Guid userId, CancellationToken cancellationToken = default);
     Task MarkChatAsReadAsync(Guid chatId, Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> MarkAllAsReadAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public class NotificationDto

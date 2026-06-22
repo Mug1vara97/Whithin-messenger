@@ -1,0 +1,76 @@
+.notification-bell-btn {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--icon, var(--text-secondary, #b5bac1));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notification-bell-btn:hover {
+  color: var(--icon-hover, #f2f3f5);
+}
+
+.notification-bell-btn.is-open {
+  background: color-mix(in srgb, var(--primary, #5865f2) 18%, transparent);
+  color: var(--primary, #5865f2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary, #5865f2) 35%, transparent);
+}
+
+.notification-bell-btn.has-unread:not(.is-open) {
+  color: var(--text, #f2f3f5);
+}
+
+.notification-bell-btn__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ed4245;
+  border: 2px solid var(--notification-badge-ring, #1e1f22);
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+/* Electron titlebar sizing */
+.notification-bell-btn--titlebar {
+  width: 30px;
+  height: 24px;
+  min-width: 30px;
+  margin-right: 2px;
+  color: var(--electron-titlebar-nav);
+}
+
+.notification-bell-btn--titlebar:hover {
+  color: var(--electron-titlebar-nav-hover);
+  background: color-mix(in srgb, var(--electron-titlebar-nav) 12%, transparent);
+}
+
+.notification-bell-btn--titlebar.is-open {
+  color: var(--primary, #5865f2);
+  background: color-mix(in srgb, var(--primary, #5865f2) 18%, transparent);
+}
+
+.notification-bell-btn--titlebar .notification-bell-btn__dot {
+  border-color: var(--electron-titlebar-bg, #1e1f22);
+}
+
+/* Server rail sizing */
+.notification-bell-btn--rail {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.notification-bell-btn--rail .notification-bell-btn__dot {
+  top: 4px;
+  right: 4px;
+  border-color: var(--server-list-background, #1e1f22);
+}

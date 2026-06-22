@@ -17,32 +17,78 @@ export const normalizeNotification = (notification) => ({
   senderAvatarColor: pick(notification, 'senderAvatarColor', 'SenderAvatarColor', 'avatarColor', 'AvatarColor'),
   messageId: pick(notification, 'messageId', 'MessageId'),
   type: pick(notification, 'type', 'Type'),
-  content: pick(notification, 'content', 'Content', 'messageContent', 'MessageContent') || '',
+  content: pick(notification, 'content', 'Content') || '',
+  messageContent: pick(notification, 'messageContent', 'MessageContent'),
   isRead: notification?.isRead ?? notification?.IsRead ?? false,
   createdAt: pick(notification, 'createdAt', 'CreatedAt'),
 });
 
+const isServerNotification = (item) =>
+  Boolean(item.serverId) || item.type === 'server_message' || item.type === 'ServerMessage';
+
+const isGroupNotification = (item) =>
+  item.type === 'group_message' || item.type === 'GroupMessage';
+
+const formatChannelLabel = (chatName) => {
+  if (!chatName) return null;
+  return chatName.startsWith('#') ? chatName : `#${chatName}`;
+};
+
 export const getNotificationTypeLabel = (type, serverId) => {
-  if (type === 'direct_message') return 'Личное сообщение';
+  if (type === 'direct_message' || type === 'DirectMessage') return 'Личное сообщение';
+  if (type === 'mention' || type === 'Mention') return 'Упоминание';
   if (serverId || type === 'server_message') return 'Сервер';
-  if (type === 'group_message') return 'Группа';
+  if (type === 'group_message' || type === 'GroupMessage') return 'Группа';
   return 'Уведомление';
+};
+
+export const isMentionNotification = (notification) => {
+  const type = (normalizeNotification(notification).type || '').toLowerCase();
+  return type === 'mention';
 };
 
 export const getNotificationLocation = (notification) => {
   const item = normalizeNotification(notification);
   const { serverId, serverName, chatName, type } = item;
 
-  if (serverId || type === 'server_message') {
-    const channelLabel = chatName
-      ? (chatName.startsWith('#') ? chatName : `#${chatName}`)
-      : null;
+  if (serverId || type === 'server_message' || type === 'ServerMessage') {
+    const channelLabel = formatChannelLabel(chatName);
     const parts = [serverName, channelLabel].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : 'Канал сервера';
   }
 
-  if (type === 'group_message' && chatName) {
+  if (isGroupNotification(item) && chatName) {
     return chatName;
+  }
+
+  return null;
+};
+
+/** Заголовок строки в списке уведомлений */
+export const getNotificationRowTitle = (notification) => {
+  const item = normalizeNotification(notification);
+
+  if (isServerNotification(item)) {
+    return formatChannelLabel(item.chatName) || item.serverName || 'Канал сервера';
+  }
+
+  if (isGroupNotification(item)) {
+    return item.chatName || item.senderName || 'Групповой чат';
+  }
+
+  return item.senderName || item.chatName || getNotificationTypeLabel(item.type, item.serverId);
+};
+
+/** Подзаголовок: сервер / отправитель */
+export const getNotificationRowSubtitle = (notification) => {
+  const item = normalizeNotification(notification);
+
+  if (isServerNotification(item)) {
+    return [item.serverName, item.senderName].filter(Boolean).join(' · ') || null;
+  }
+
+  if (isGroupNotification(item)) {
+    return item.senderName || null;
   }
 
   return null;
@@ -51,10 +97,10 @@ export const getNotificationLocation = (notification) => {
 export const getNotificationMessageText = (notification) => {
   const item = normalizeNotification(notification);
   const { content, senderName, chatName } = item;
-  if (!content) return '';
-
-  const storedPreview = pick(notification, 'messageContent', 'MessageContent');
+  const storedPreview = item.messageContent || pick(notification, 'messageContent', 'MessageContent');
   if (storedPreview) return storedPreview;
+
+  if (!content) return '';
 
   if (senderName) {
     const directPrefix = `${senderName}: `;
@@ -68,6 +114,16 @@ export const getNotificationMessageText = (notification) => {
         return content.slice(inChatPrefix.length);
       }
     }
+  }
+
+  const inChatMatch = content.match(/^(.+?) в (.+?):\s*(.+)$/s);
+  if (inChatMatch) {
+    return inChatMatch[3];
+  }
+
+  const colonMatch = content.match(/^[^:]+:\s*(.+)$/s);
+  if (colonMatch) {
+    return colonMatch[1];
   }
 
   return content;

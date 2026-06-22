@@ -43,12 +43,15 @@
 
     .hide-all {
       flex: 0 0 auto;
+      flex-shrink: 0;
       border: none;
       background: var(--notif-bg, #2f3136);
       color: var(--notif-primary, #5865f2);
       font-size: 14px;
       font-weight: 500;
-      padding: 10px 14px;
+      line-height: 1.25;
+      padding: 12px 14px;
+      min-height: 42px;
       cursor: pointer;
       text-align: center;
       transition: background-color 0.15s ease, color 0.15s ease;
@@ -69,7 +72,6 @@
     }
 
     .host.is-bottom .list {
-      flex-direction: column-reverse;
       border-top: none;
       border-bottom: 1px solid color-mix(in srgb, var(--notif-border, #4f545c) 70%, transparent);
     }
@@ -227,6 +229,16 @@
     const listEl = document.getElementById('list');
     const hideAllEl = document.getElementById('hideAll');
     let items = [];
+    let lastReportedHeight = 0;
+    let lastThemeKey = '';
+
+    function themeKey(theme) {
+      if (!theme) return '';
+      return JSON.stringify({
+        presetId: theme.presetId || '',
+        vars: theme.vars || {},
+      });
+    }
 
     function escapeHtml(value) {
       return String(value ?? '')
@@ -280,12 +292,56 @@
       return `<div class="avatar" style="background:${bg}">${escapeHtml(initial)}</div>`;
     }
 
+    function buildCardHtml(item) {
+      return `
+        <article class="card" data-id="${escapeHtml(item.id)}">
+          <button type="button" class="close" data-dismiss="${escapeHtml(item.id)}" aria-label="Закрыть">×</button>
+          ${renderAvatar(item)}
+          <div class="body">
+            <div class="title">${escapeHtml(item.title)}</div>
+            ${item.subtitle ? `<div class="subtitle">${escapeHtml(item.subtitle)}</div>` : ''}
+            <div class="message">${escapeHtml(item.message)}</div>
+          </div>
+        </article>
+      `;
+    }
+
+    function syncCards(displayItems) {
+      const existingById = new Map();
+      for (const card of listEl.querySelectorAll('.card')) {
+        existingById.set(card.dataset.id, card);
+      }
+
+      const nextIds = new Set(displayItems.map((item) => String(item.id)));
+      for (const [id, card] of existingById) {
+        if (!nextIds.has(id)) {
+          card.remove();
+          existingById.delete(id);
+        }
+      }
+
+      displayItems.forEach((item, index) => {
+        const id = String(item.id);
+        let card = existingById.get(id);
+        if (!card) {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = buildCardHtml(item).trim();
+          card = wrapper.firstElementChild;
+        }
+
+        if (listEl.children[index] !== card) {
+          listEl.insertBefore(card, listEl.children[index] || null);
+        }
+      });
+    }
+
     function reportHostHeight() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (hostEl.hidden) return;
-          const height = Math.ceil(hostEl.getBoundingClientRect().height);
-          if (height > 0) {
+          const height = Math.ceil(hideAllEl.offsetHeight + listEl.scrollHeight);
+          if (height > 0 && height !== lastReportedHeight) {
+            lastReportedHeight = height;
             window.notificationHostAPI.reportHeight(height);
           }
         });
@@ -296,21 +352,14 @@
       if (!items.length) {
         hostEl.hidden = true;
         listEl.innerHTML = '';
+        lastReportedHeight = 0;
         return;
       }
 
       hostEl.hidden = false;
-      listEl.innerHTML = items.map((item) => `
-        <article class="card" data-id="${escapeHtml(item.id)}">
-          <button type="button" class="close" data-dismiss="${escapeHtml(item.id)}" aria-label="Закрыть">×</button>
-          ${renderAvatar(item)}
-          <div class="body">
-            <div class="title">${escapeHtml(item.title)}</div>
-            ${item.subtitle ? `<div class="subtitle">${escapeHtml(item.subtitle)}</div>` : ''}
-            <div class="message">${escapeHtml(item.message)}</div>
-          </div>
-        </article>
-      `).join('');
+      const isBottom = hostEl.classList.contains('is-bottom');
+      const displayItems = isBottom ? [...items].reverse() : items;
+      syncCards(displayItems);
       reportHostHeight();
     }
 
@@ -350,8 +399,10 @@
     });
 
     window.notificationHostAPI.onData((data) => {
-      if (data?.theme) {
+      const nextThemeKey = themeKey(data?.theme);
+      if (data?.theme && nextThemeKey !== lastThemeKey) {
         applyTheme(data.theme);
+        lastThemeKey = nextThemeKey;
       }
       const position = data?.position || 'top-right';
       hostEl.classList.toggle('is-bottom', String(position).startsWith('bottom'));

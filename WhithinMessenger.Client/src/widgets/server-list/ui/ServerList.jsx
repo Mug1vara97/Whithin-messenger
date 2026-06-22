@@ -4,9 +4,10 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import { Settings, Palette, GraphicEq, Explore } from '@mui/icons-material';
+import { Settings, Explore } from '@mui/icons-material';
 import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
-import { openThemeColorsWindow } from '../../../shared/lib/theme/openThemeColorsWindow';
+import { NotificationBellButton } from '../../../shared/ui/atoms/NotificationBellButton';
+import { isElectronDesktop } from '../../../shared/lib/utils/desktopNotificationBridge';
 import styles from './ServerList.module.css';
 
 /** Ключ слота панели под текущий URL (серверы живут на /server/:id, не на /channels/...). */
@@ -23,9 +24,10 @@ const ServerList = ({
   onDiscoverClick,
   onCreateServerClick,
   onSettingsClick,
-  onSoundpadClick,
   onNotificationsClick,
-  unreadNotificationsCount = 0
+  unreadNotificationsCount = 0,
+  unreadCountByServer = {},
+  notificationsPanelOpen = false,
 }) => {
   const { logout } = useAuthContext();
   const location = useLocation();
@@ -43,6 +45,7 @@ const ServerList = ({
   const [notchVisible, setNotchVisible] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const activeRailKey = getActiveRailKey(location.pathname);
+  const showNotificationsInRail = !isElectronDesktop();
 
   const updateRailNotch = useCallback(() => {
     const root = listRootRef.current;
@@ -155,21 +158,121 @@ const ServerList = ({
     }
   }, [servers, reorderServers]);
 
-  if (isLoading) {
-    return (
-      <div className={styles['server-list']}>
-        <div className={styles['server-list-loading']}>Загрузка серверов...</div>
-      </div>
-    );
-  }
+  const renderServersScroll = () => {
+    if (isLoading) {
+      return (
+        <div className={styles['server-list-servers-loading']} aria-busy="true">
+          Загрузка…
+        </div>
+      );
+    }
 
-  if (error) {
+    if (error) {
+      return (
+        <div className={styles['server-list-servers-error']} title={error}>
+          !
+        </div>
+      );
+    }
+
     return (
-      <div className={styles['server-list']}>
-        <div className={styles['server-list-error']}>Ошибка: {error}</div>
-      </div>
+      <Droppable droppableId="servers" direction="vertical">
+        {(provided) => (
+          <div
+            {...provided.droppableProps}
+            ref={provided.innerRef}
+            className={styles['server-list-droppable']}
+          >
+            {servers.map((server, index) => {
+            const serverId = String(server.serverId);
+            const serverUnreadCount = unreadCountByServer[serverId] || 0;
+            const isServerActive = activeRailKey === serverId;
+
+            return (
+            <Draggable
+              key={server.serverId.toString()}
+              draggableId={server.serverId.toString()}
+              index={index}
+              isDragDisabled={!server.serverId}
+            >
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.draggableProps}
+                  {...provided.dragHandleProps}
+                  data-rail-slot={String(server.serverId)}
+                  className={`${styles['server-item']} ${snapshot.isDragging ? styles.dragging : ''}`}
+                  style={{
+                    ...provided.draggableProps.style,
+                    cursor: isDragging ? 'grabbing' : 'grab'
+                  }}
+                >
+                  <NavLink
+                    to={`/server/${server.serverId}`}
+                    className={({ isActive }) =>
+                      [
+                        styles['server-button'],
+                        styles['rail-tab-button'],
+                        isActive ? styles['rail-tab-active'] : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                    }
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      if (skipNextServerLinkClick.current) {
+                        e.preventDefault();
+                        skipNextServerLinkClick.current = false;
+                        return;
+                      }
+                      onDiscoverClick && onDiscoverClick(false);
+                      onServerSelected && onServerSelected(server);
+                    }}
+                  >
+                    {server.avatar ? (
+                      <img
+                        src={`${BASE_URL}${server.avatar}`}
+                        alt={server.name}
+                        style={{
+                          width: 'inherit',
+                          height: 'inherit',
+                          borderRadius: 'inherit',
+                          objectFit: 'cover'
+                        }}
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector('.server-fallback')) {
+                            const fallback = document.createElement('span');
+                            fallback.className = 'server-fallback';
+                            fallback.textContent = server.name?.charAt(0)?.toUpperCase() || '?';
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span>{server.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                    )}
+                    {serverUnreadCount > 0 && !isServerActive && (
+                      <span className={styles['server-unread-badge']} aria-label={`${serverUnreadCount} непрочитанных уведомлений`}>
+                        {serverUnreadCount > 99 ? '99+' : serverUnreadCount}
+                      </span>
+                    )}
+                  </NavLink>
+                </div>
+              )}
+            </Draggable>
+            );
+            })}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     );
-  }
+  };
 
   return (
     <div ref={listRootRef} className={styles['server-list']}>
@@ -209,90 +312,7 @@ const ServerList = ({
             className={styles['server-list-servers-scroll']}
             onWheel={handleServerListWheel}
           >
-            <Droppable droppableId="servers" direction="vertical">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className={styles['server-list-droppable']}
-                >
-                  {servers.map((server, index) => (
-                  <Draggable
-                    key={server.serverId.toString()}
-                    draggableId={server.serverId.toString()}
-                    index={index}
-                    isDragDisabled={!server.serverId}
-                  >
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        data-rail-slot={String(server.serverId)}
-                        className={`${styles['server-item']} ${snapshot.isDragging ? styles.dragging : ''}`}
-                        style={{
-                          ...provided.draggableProps.style,
-                          cursor: isDragging ? 'grabbing' : 'grab'
-                        }}
-                      >
-                        <NavLink
-                          to={`/server/${server.serverId}`}
-                          className={({ isActive }) =>
-                            [
-                              styles['server-button'],
-                              styles['rail-tab-button'],
-                              isActive ? styles['rail-tab-active'] : ''
-                            ]
-                              .filter(Boolean)
-                              .join(' ')
-                          }
-                          draggable={false}
-                          onDragStart={(e) => e.preventDefault()}
-                          onClick={(e) => {
-                            if (skipNextServerLinkClick.current) {
-                              e.preventDefault();
-                              skipNextServerLinkClick.current = false;
-                              return;
-                            }
-                            onDiscoverClick && onDiscoverClick(false);
-                            onServerSelected && onServerSelected(server);
-                          }}
-                        >
-                          {server.avatar ? (
-                            <img
-                              src={`${BASE_URL}${server.avatar}`}
-                              alt={server.name}
-                              style={{
-                                width: 'inherit',
-                                height: 'inherit',
-                                borderRadius: 'inherit',
-                                objectFit: 'cover'
-                              }}
-                              draggable={false}
-                              onDragStart={(e) => e.preventDefault()}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                const parent = e.target.parentElement;
-                                if (parent && !parent.querySelector('.server-fallback')) {
-                                  const fallback = document.createElement('span');
-                                  fallback.className = 'server-fallback';
-                                  fallback.textContent = server.name?.charAt(0)?.toUpperCase() || '?';
-                                  parent.appendChild(fallback);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <span>{server.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                          )}
-                        </NavLink>
-                      </div>
-                    )}
-                  </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
+            {renderServersScroll()}
           </div>
 
           <ul className={`${styles['server-list-ul']} ${styles['server-list-bottom']}`}>
@@ -314,48 +334,16 @@ const ServerList = ({
                 <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
               </div>
             </li>
-            <li className={styles['server-item']}>
-              <button
-                type="button"
-                className={`${styles['server-button']} ${styles['notification-button']}`}
-                onClick={onNotificationsClick}
-                title="Уведомления"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                </svg>
-                {unreadNotificationsCount > 0 && (
-                  <span className={styles['notification-badge']}>
-                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                  </span>
-                )}
-              </button>
-            </li>
-            <li className={styles['server-item']}>
-              <button
-                type="button"
-                className={`${styles['server-button']} ${styles['theme-paint-button']}`}
-                onClick={openThemeColorsWindow}
-                title="Цвета интерфейса"
-              >
-                <Palette />
-              </button>
-            </li>
-            {onSoundpadClick && (
+            {showNotificationsInRail && (
               <li className={styles['server-item']}>
-                <button
-                  type="button"
-                  className={`${styles['server-button']} ${styles['soundpad-button']}`}
-                  onClick={onSoundpadClick}
-                  title="Саундпад"
-                >
-                  <GraphicEq />
-                </button>
+                <NotificationBellButton
+                  unreadCount={unreadNotificationsCount}
+                  isOpen={notificationsPanelOpen}
+                  onClick={onNotificationsClick}
+                  variant="rail"
+                  iconSize={20}
+                  className={`${styles['server-button']} ${styles['notification-button']}`}
+                />
               </li>
             )}
             <li className={styles['server-item']}>
@@ -405,6 +393,7 @@ export default memo(ServerList, (prevProps, nextProps) => {
     prevProps.selectedServerId === nextProps.selectedServerId &&
     prevProps.onServerSelected === nextProps.onServerSelected &&
     prevProps.onDiscoverClick === nextProps.onDiscoverClick &&
-    prevProps.unreadNotificationsCount === nextProps.unreadNotificationsCount
+    prevProps.unreadNotificationsCount === nextProps.unreadNotificationsCount &&
+    prevProps.unreadCountByServer === nextProps.unreadCountByServer
   );
 });

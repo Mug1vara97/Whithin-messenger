@@ -2,8 +2,8 @@ const path = require('node:path');
 const { BrowserWindow, screen, ipcMain } = require('electron');
 
 const TOAST_WIDTH = 360;
-const TOAST_CARD_HEIGHT = 76;
-const HEADER_HEIGHT = 38;
+const TOAST_CARD_HEIGHT = 92;
+const HEADER_HEIGHT = 42;
 const MARGIN = 12;
 const MAX_VISIBLE = 5;
 const AUTO_DISMISS_MS = 3 * 60 * 1000;
@@ -12,6 +12,7 @@ let hostWindow = null;
 let notificationQueue = [];
 let notificationSettings = { position: 'top-right' };
 let notificationTheme = null;
+let lastAppliedBounds = null;
 const recentDesktopNotifications = new Map();
 const expireTimers = new Map();
 const DESKTOP_NOTIFICATION_DEDUPE_MS = 3000;
@@ -35,7 +36,7 @@ function getHostBounds(count, measuredHeight) {
   const estimatedHeight = getHostHeight(layoutCount);
   const height =
     measuredHeight != null
-      ? Math.min(getHostHeight(MAX_VISIBLE), Math.max(HEADER_HEIGHT + 40, Math.round(measuredHeight)))
+      ? Math.max(HEADER_HEIGHT + TOAST_CARD_HEIGHT, Math.round(measuredHeight))
       : estimatedHeight;
   const width = TOAST_WIDTH;
 
@@ -103,6 +104,7 @@ function closeHostWindow() {
     hostWindow.close();
   }
   hostWindow = null;
+  lastAppliedBounds = null;
 }
 
 function applyHostBounds(count, measuredHeight) {
@@ -111,7 +113,42 @@ function applyHostBounds(count, measuredHeight) {
   }
 
   const bounds = getHostBounds(count, measuredHeight);
-  hostWindow.setBounds(bounds);
+  const current = hostWindow.getBounds();
+
+  if (
+    lastAppliedBounds &&
+    lastAppliedBounds.x === bounds.x &&
+    lastAppliedBounds.y === bounds.y &&
+    lastAppliedBounds.width === bounds.width &&
+    lastAppliedBounds.height === bounds.height
+  ) {
+    return;
+  }
+
+  const isBottom = isBottomPosition(notificationSettings.position);
+  const positionUnchanged =
+    current.x === bounds.x &&
+    current.y === bounds.y &&
+    current.width === bounds.width &&
+    current.height === bounds.height;
+
+  if (positionUnchanged) {
+    lastAppliedBounds = { ...bounds };
+    return;
+  }
+
+  if (
+    !isBottom &&
+    current.x === bounds.x &&
+    current.y === bounds.y &&
+    (current.width !== bounds.width || current.height !== bounds.height)
+  ) {
+    hostWindow.setSize(bounds.width, bounds.height);
+  } else {
+    hostWindow.setBounds(bounds);
+  }
+
+  lastAppliedBounds = { ...bounds };
 
   try {
     require('./activeCallOverlay.cjs').repositionActiveCallOverlayIfActive?.();
@@ -158,19 +195,17 @@ function syncHostWindow() {
 
     hostWindow.on('closed', () => {
       hostWindow = null;
+      lastAppliedBounds = null;
     });
 
     hostWindow.webContents.on('did-finish-load', () => {
       pushDataToHost();
-      if (!hostWindow || hostWindow.isDestroyed()) return;
-      hostWindow.showInactive();
     });
 
     hostWindow.loadFile(path.join(__dirname, 'notification-host.html'));
     return;
   }
 
-  applyHostBounds(notificationQueue.length);
   pushDataToHost();
 }
 
@@ -228,7 +263,9 @@ function updateDesktopNotificationSettings(settings) {
   if (settings.position && VALID_POSITIONS.has(settings.position)) {
     notificationSettings.position = settings.position;
     if (notificationQueue.length) {
-      syncHostWindow();
+      lastAppliedBounds = null;
+      pushDataToHost();
+      applyHostBounds(notificationQueue.length);
     }
   }
 }
@@ -294,6 +331,9 @@ function registerDesktopNotificationIpc(getMainWindow, showMainWindow) {
     if (!hostWindow || hostWindow.isDestroyed() || !notificationQueue.length) return;
     if (!Number.isFinite(height) || height <= 0) return;
     applyHostBounds(notificationQueue.length, height);
+    if (!hostWindow.isVisible()) {
+      hostWindow.showInactive();
+    }
   });
 }
 

@@ -225,7 +225,7 @@ const ChannelItem = ({
               {getChannelName()}
               {isPrivate && <FaLock className="private-channel-icon" title="Приватный канал" />}
             </span>
-            {unreadCount > 0 && !isActive && (
+            {unreadCount > 0 && !isActive && !isVoiceChannel && (
               <span className="channel-unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
             )}
             {onSettings && (

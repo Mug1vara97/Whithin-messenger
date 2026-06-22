@@ -1,6 +1,13 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { resolveElectronWindowBackgroundColor } from '../../../lib/theme/appBackgroundSettings';
+import { useAuthContext } from '../../../lib/contexts/AuthContext';
+import { useNotificationContext } from '../../../lib/contexts/NotificationContext';
+import { NotificationBellButton } from '../../atoms/NotificationBellButton';
+import {
+  NOTIFICATIONS_PANEL_STATE_EVENT,
+  toggleNotificationsPanel,
+} from '../../../lib/utils/notificationPanelEvents';
 import './ElectronTitlebar.css';
 
 const APP_DISPLAY_NAME = 'Whithin';
@@ -37,7 +44,41 @@ function hasElectronWindowControls() {
   );
 }
 
-export function ElectronTitlebar() {
+export function hasElectronTitlebarChrome() {
+  return hasElectronWindowControls();
+}
+
+function ElectronTitlebarNotifications() {
+  const { user } = useAuthContext();
+  const { unreadCount } = useNotificationContext();
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onPanelState = (event) => {
+      setIsPanelOpen(Boolean(event.detail?.isOpen));
+    };
+    window.addEventListener(NOTIFICATIONS_PANEL_STATE_EVENT, onPanelState);
+    return () => window.removeEventListener(NOTIFICATIONS_PANEL_STATE_EVENT, onPanelState);
+  }, []);
+
+  const handleNotificationsClick = useCallback(() => {
+    toggleNotificationsPanel();
+  }, []);
+
+  if (!user) return null;
+
+  return (
+    <NotificationBellButton
+      unreadCount={unreadCount}
+      isOpen={isPanelOpen}
+      onClick={handleNotificationsClick}
+      variant="titlebar"
+      iconSize={18}
+    />
+  );
+}
+
+export function ElectronTitlebar({ showNotifications = true }) {
   const showChrome = hasElectronWindowControls();
 
   useEffect(() => {
@@ -90,6 +131,7 @@ export function ElectronTitlebar() {
         <span className="electron-titlebar-app-name">{APP_DISPLAY_NAME}</span>
       </div>
       <div id="electron-window-controls">
+        {showNotifications && <ElectronTitlebarNotifications />}
         <button
           type="button"
           className="electron-tl electron-nav electron-reload-pill"

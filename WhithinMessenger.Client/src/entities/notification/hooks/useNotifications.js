@@ -7,6 +7,7 @@ import { dispatchNotificationReceived } from '../../../shared/lib/utils/notifica
 import {
   dismissDesktopNotificationById,
   dismissDesktopNotificationsByChatId,
+  dismissAllDesktopNotifications,
 } from '../../../shared/lib/utils/desktopNotificationBridge';
 import {
   getInAppNotificationsEnabled,
@@ -121,6 +122,20 @@ export const useNotifications = () => {
     },
     [refreshUnreadCount]
   );
+
+  const markAllAsRead = useCallback(async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications([]);
+      dismissAllDesktopNotifications();
+      window.dispatchEvent(
+        new CustomEvent('notificationRead', { detail: { all: true } }),
+      );
+      setUnreadCount(0);
+    } catch (err) {
+      setError(err?.message || 'Не удалось отметить все уведомления как прочитанные');
+    }
+  }, []);
 
   const playNotificationSound = useCallback(() => {
     if (!getInAppNotificationsEnabled()) return;
@@ -255,8 +270,7 @@ export const useNotifications = () => {
           prev.filter((item) => (item.id || item.Id) !== notificationId),
         );
         dismissDesktopNotificationById(notificationId);
-      }
-      if (chatId) {
+      } else if (chatId) {
         setNotifications((prev) =>
           prev.filter((item) => (item.chatId || item.ChatId) !== chatId),
         );
@@ -281,6 +295,15 @@ export const useNotifications = () => {
       );
     };
 
+    const onAllNotificationsRead = () => {
+      setNotifications([]);
+      dismissAllDesktopNotifications();
+      setUnreadCount(0);
+      window.dispatchEvent(
+        new CustomEvent('notificationRead', { detail: { all: true } }),
+      );
+    };
+
     const setupRealtime = async () => {
       try {
         connection = await connectionContext.getConnection('notificationhub', user.id);
@@ -294,6 +317,8 @@ export const useNotifications = () => {
         connection.on('NotificationDismissed', onNotificationDismissed);
         connection.off('ChatNotificationsDismissed', onChatNotificationsDismissed);
         connection.on('ChatNotificationsDismissed', onChatNotificationsDismissed);
+        connection.off('AllNotificationsRead', onAllNotificationsRead);
+        connection.on('AllNotificationsRead', onAllNotificationsRead);
       } catch (err) {
         console.error('Failed to setup notification realtime', err);
       }
@@ -308,6 +333,7 @@ export const useNotifications = () => {
         connection.off('UnreadCountChanged', onUnreadCountChanged);
         connection.off('NotificationDismissed', onNotificationDismissed);
         connection.off('ChatNotificationsDismissed', onChatNotificationsDismissed);
+        connection.off('AllNotificationsRead', onAllNotificationsRead);
       }
     };
   }, [user?.id, connectionContext, sortByDate, playNotificationSound]);
@@ -322,10 +348,21 @@ export const useNotifications = () => {
     }, {});
   }, [notifications]);
 
+  const unreadCountByServer = useMemo(() => {
+    return notifications.reduce((acc, item) => {
+      const serverId = item.serverId || item.ServerId;
+      if (!serverId) return acc;
+      const key = String(serverId);
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }, [notifications]);
+
   return {
     notifications,
     unreadCount,
     unreadCountByChat,
+    unreadCountByServer,
     hasUnread,
     loading,
     error,
@@ -333,6 +370,7 @@ export const useNotifications = () => {
     refreshUnreadCount,
     markAsRead,
     markChatAsRead,
+    markAllAsRead,
     deleteNotification,
   };
 };

@@ -17,15 +17,15 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
-import { NotificationsModal, SoundpadSoundsModal, CreateServerModal } from '../../../shared/ui/organisms';
+import { NotificationsModal, CreateServerModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
-import { SOUNDPAD_OPEN_MANAGER_EVENT } from '../../../shared/lib/soundpad/soundpadPanelEvents';
 import { UserAvatar } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { findChannelInCategories } from '../../../shared/lib/voice/callOnlyVoiceChannels';
 import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
+import { NOTIFICATIONS_TOGGLE_PANEL_EVENT, notifyNotificationsPanelState } from '../../../shared/lib/utils/notificationPanelEvents';
 import { CALL_RING_TIMEOUT_MS } from '../../../shared/lib/utils/callLogHelpers';
 import { isElectronDesktop } from '../../../shared/lib/utils/desktopCallOverlayBridge';
 import {
@@ -54,8 +54,7 @@ const HomePage = () => {
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
-  const [showSoundpadModal, setShowSoundpadModal] = useState(false);
-  const isElectronApp = soundpadBridge.isElectronAvailable();
+  const [markingAllNotificationsAsRead, setMarkingAllNotificationsAsRead] = useState(false);
   
   const showFriends = location.pathname === '/channels/@me/friends';
 
@@ -80,10 +79,13 @@ const HomePage = () => {
   const {
     notifications,
     unreadCount,
+    unreadCountByChat: notificationUnreadCountByChat,
+    unreadCountByServer,
     loading: notificationsLoading,
     error: notificationsError,
     markAsRead,
     markChatAsRead,
+    markAllAsRead,
     deleteNotification,
     refreshNotifications,
     refreshUnreadCount
@@ -246,10 +248,14 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    const onOpenSoundpadManager = () => setShowSoundpadModal(true);
-    window.addEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadManager);
-    return () => window.removeEventListener(SOUNDPAD_OPEN_MANAGER_EVENT, onOpenSoundpadManager);
+    const onToggleNotificationsPanel = () => setShowNotificationsModal((prev) => !prev);
+    window.addEventListener(NOTIFICATIONS_TOGGLE_PANEL_EVENT, onToggleNotificationsPanel);
+    return () => window.removeEventListener(NOTIFICATIONS_TOGGLE_PANEL_EVENT, onToggleNotificationsPanel);
   }, []);
+
+  useEffect(() => {
+    notifyNotificationsPanelState(showNotificationsModal);
+  }, [showNotificationsModal]);
 
   useEffect(() => {
     if (!user?.id || !getConnection) return undefined;
@@ -1005,19 +1011,11 @@ const HomePage = () => {
   }, [openSettings]);
 
   const handleNotificationsClick = useCallback(() => {
-    setShowNotificationsModal(true);
+    setShowNotificationsModal((prev) => !prev);
   }, []);
 
   const handleCloseNotificationsModal = useCallback(() => {
     setShowNotificationsModal(false);
-  }, []);
-
-  const handleSoundpadClick = useCallback(() => {
-    setShowSoundpadModal(true);
-  }, []);
-
-  const handleCloseSoundpadModal = useCallback(() => {
-    setShowSoundpadModal(false);
   }, []);
 
   const handleOpenNotification = useCallback(async (notification) => {
@@ -1044,6 +1042,16 @@ const HomePage = () => {
     if (!notificationId) return;
     await deleteNotification(notificationId);
   }, [deleteNotification]);
+
+  const handleMarkAllNotificationsAsRead = useCallback(async () => {
+    if (markingAllNotificationsAsRead) return;
+    try {
+      setMarkingAllNotificationsAsRead(true);
+      await markAllAsRead();
+    } finally {
+      setMarkingAllNotificationsAsRead(false);
+    }
+  }, [markAllAsRead, markingAllNotificationsAsRead]);
 
   /**
    * Server channel unread counters do not appear in DM-only `messageUnreadCountByChat` from ChatList hub,
@@ -1118,11 +1126,6 @@ const HomePage = () => {
         setShowNotificationsModal(false);
         return;
       }
-      if (showSoundpadModal) {
-        e.preventDefault();
-        setShowSoundpadModal(false);
-        return;
-      }
 
       if (selectedChat && !showFriends && !showDiscovery) {
         e.preventDefault();
@@ -1137,7 +1140,6 @@ const HomePage = () => {
     isSettingsOpen,
     closeSettings,
     showNotificationsModal,
-    showSoundpadModal,
     selectedChat,
     showFriends,
     showDiscovery,
@@ -1159,9 +1161,10 @@ const HomePage = () => {
             onDiscoverClick={handleDiscoverClick}
             onCreateServerClick={handleCreateServerClick}
             onSettingsClick={handleSettingsClick}
-            onSoundpadClick={isElectronApp ? handleSoundpadClick : undefined}
             onNotificationsClick={handleNotificationsClick}
             unreadNotificationsCount={unreadCount}
+            unreadCountByServer={unreadCountByServer}
+            notificationsPanelOpen={showNotificationsModal}
             userId={user?.id}
           />
           <div className="content-area">
@@ -1172,7 +1175,7 @@ const HomePage = () => {
                   onChatSelected={handleChatSelected}
                   selectedChat={selectedChat}
                   onServerDataUpdated={handleServerDataUpdated}
-                  unreadCountByChat={messageUnreadCountByChat}
+                  unreadCountByChat={notificationUnreadCountByChat}
                 />
               ) : (
                 <ChatList
@@ -1277,13 +1280,6 @@ const HomePage = () => {
         onCreate={handleCreateServer}
       />
 
-      {isElectronApp && (
-        <SoundpadSoundsModal
-          isOpen={showSoundpadModal}
-          onClose={handleCloseSoundpadModal}
-        />
-      )}
-
       <NotificationsModal
         isOpen={showNotificationsModal}
         onClose={handleCloseNotificationsModal}
@@ -1293,6 +1289,8 @@ const HomePage = () => {
         unreadCount={unreadCount}
         onOpenNotification={handleOpenNotification}
         onDeleteNotification={handleDeleteNotification}
+        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+        markingAllAsRead={markingAllNotificationsAsRead}
       />
 
       {incomingCall && !isElectronDesktop() && (

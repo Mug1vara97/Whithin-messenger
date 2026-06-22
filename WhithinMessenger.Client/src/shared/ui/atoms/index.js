@@ -4,6 +4,7 @@ export { default as UserAvatar } from './UserAvatar';
 export { UserAvatarPresenceDot } from './UserAvatar';
 export { ServerIcon } from './ServerIcon';
 export { NotificationButton } from './NotificationButton';
+export { NotificationBellButton } from './NotificationBellButton';
 export * from './MessageInput';
 export * from './VideoCallGrid';
 export * from './MessageStatusIndicator';

@@ -52,8 +52,22 @@ function MainApp() {
 
 function ThemeColorsApp() {
   useEffect(() => setupThemeWindowSync(), []);
+  useEffect(() => {
+    const refreshGlass = () => applyAppBackgroundSettings();
+    window.addEventListener('themePresetChanged', refreshGlass);
+    window.addEventListener('themeColorsChanged', refreshGlass);
+    return () => {
+      window.removeEventListener('themePresetChanged', refreshGlass);
+      window.removeEventListener('themeColorsChanged', refreshGlass);
+    };
+  }, []);
 
-  return <ThemeAppRouter />;
+  return (
+    <>
+      <ElectronTitlebar showNotifications={false} />
+      <ThemeAppRouter />
+    </>
+  );
 }
 
 function App() {

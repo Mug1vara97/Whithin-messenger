@@ -12,7 +12,7 @@ import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { userApi } from '../../../../entities/user/api/userApi';
-import { SoundpadConfigSection } from '../SoundpadConfigSection';
+import SoundpadSoundsContent from '../SoundpadSoundsModal/SoundpadSoundsContent';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import { ParticipantVolumeSettings } from '../../molecules/ParticipantVolumeSettings';
 import { ProfileCustomizeSection } from '../../molecules/ProfileCustomizeSection';
@@ -26,6 +26,7 @@ import {
   persistInterfaceDesign,
   INTERFACE_DESIGNS,
 } from '../../../lib/theme/interfaceDesignSettings';
+import { openThemeColorsWindow } from '../../../lib/theme/openThemeColorsWindow';
 import {
   getInAppNotificationsEnabled,
   setInAppNotificationsEnabled,
@@ -641,7 +642,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
         );
 
       case 'soundpad':
-        return <SoundpadConfigSection active={isOpen && activeTab === 'soundpad'} />;
+        return <SoundpadSoundsContent active={isOpen && activeTab === 'soundpad'} />;
 
       case 'interface':
         return (
@@ -709,6 +710,24 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                   </p>
                 </div>
               )}
+            </SettingsPanel>
+
+            <SettingsPanel
+              title="Цвета интерфейса"
+              description="Тонкая настройка отдельных цветов элементов. Откроется отдельное окно."
+            >
+              <SettingsRow
+                title="Редактор цветов"
+                description="Палитра, градиенты и сброс к значениям по умолчанию."
+              >
+                <button
+                  type="button"
+                  className="settings-btn settings-btn--primary"
+                  onClick={openThemeColorsWindow}
+                >
+                  Открыть
+                </button>
+              </SettingsRow>
             </SettingsPanel>
 
             <SettingsPanel

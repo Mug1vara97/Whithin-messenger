@@ -379,16 +379,10 @@ const ChatList = ({
               )}
             </div>
             {lastMessageTimeLabel && (
-              <div className="chat-last-time">
-                {lastMessageTimeLabel}
-              </div>
+              <div className="chat-last-time">{lastMessageTimeLabel}</div>
             )}
           </div>
-          {subtitle && (
-            <div className="chat-last-message">
-              {subtitle}
-            </div>
-          )}
+          {subtitle && <div className="chat-last-message">{subtitle}</div>}
         </div>
         {unreadForChat > 0 && (
           <div className="chat-unread-badge">

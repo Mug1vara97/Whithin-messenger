@@ -27,6 +27,7 @@ import {
   meshStopLabel,
   parseGradientUi
 } from '../../../lib/theme/themeGradientEditor';
+import { hasElectronTitlebarChrome } from '../ElectronTitlebar';
 import styles from './ThemeColorMenu.module.css';
 
 const colorPickerValue = (raw, key) => extractFirstHexFromThemeValue(raw) || DEFAULT_THEME[key] || '#5865f2';
@@ -380,6 +381,7 @@ export function ThemeColorEditor({ standalone = false }) {
   const navigate = useNavigate();
   const [draft, setDraft] = useState(() => ({ ...DEFAULT_THEME }));
   const isPopup = typeof window !== 'undefined' && !!window.opener && !window.opener.closed;
+  const useNativeTitlebar = standalone && hasElectronTitlebarChrome();
 
   useEffect(() => {
     setDraft(getMergedTheme());
@@ -438,9 +440,11 @@ export function ThemeColorEditor({ standalone = false }) {
           <h1 id="theme-color-menu-title" className={styles.title}>
             Цвета интерфейса
           </h1>
-          <button type="button" className={styles.closeBtn} onClick={handleCancel} aria-label="Закрыть">
-            ×
-          </button>
+          {!useNativeTitlebar && (
+            <button type="button" className={styles.closeBtn} onClick={handleCancel} aria-label="Закрыть">
+              ×
+            </button>
+          )}
         </div>
         <div className={styles.body}>
           {THEME_COLOR_FIELDS.map(({ key, label, acceptsGradient }) => {

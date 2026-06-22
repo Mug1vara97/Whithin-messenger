@@ -662,8 +662,10 @@
   border-radius: 10px;
 }
 
-.settings-modal__content .soundpad-config-section {
-  gap: 20px;
+.settings-modal__content .soundpad-sounds-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .settings-modal__content .soundpad-section {
