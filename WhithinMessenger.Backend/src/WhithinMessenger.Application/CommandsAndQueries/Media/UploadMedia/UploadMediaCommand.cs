@@ -9,7 +9,8 @@ public record UploadMediaCommand(
     IFormFile File,
     string? Caption = null,
     string? Username = null,
-    bool IsVideoNote = false
+    bool IsVideoNote = false,
+    double? DurationSeconds = null
 ) : IRequest<UploadMediaResult>;
 
 public record UploadMediaResult
@@ -20,5 +21,7 @@ public record UploadMediaResult
     public string? FilePath { get; init; }
     public string? ThumbnailPath { get; init; }
     public bool IsVideoNote { get; init; }
+    public double? DurationSeconds { get; init; }
+    public string? StreamingManifestPath { get; init; }
     public string? ErrorMessage { get; init; }
 }

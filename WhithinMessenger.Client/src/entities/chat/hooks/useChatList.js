@@ -48,6 +48,28 @@ const sortChats = (items) => {
   return [...saved, ...pinned, ...unpinned];
 };
 
+const applyPinnedChatOrder = (items, orderedChatIds) => {
+  const orderMap = new Map(
+    orderedChatIds.map((id, index) => [String(id), index]),
+  );
+
+  const updated = items.map((chat) => {
+    const chatId = String(chat.chatId ?? chat.chat_id ?? '');
+    if (!orderMap.has(chatId)) {
+      return chat;
+    }
+
+    const order = orderMap.get(chatId);
+    return {
+      ...chat,
+      pinOrder: order,
+      PinOrder: order,
+    };
+  });
+
+  return sortChats(updated);
+};
+
 const normalizeChatListItem = (chat) => {
   if (!chat || typeof chat !== 'object') {
     return chat;
@@ -390,11 +412,18 @@ export const useChatList = (userId, onChatCreated = null) => {
       return true;
     }
 
+    setChats((prevChats) => applyPinnedChatOrder(prevChats, orderedChatIds));
+
     try {
       await connectionRef.current.invoke('ReorderPinnedChats', orderedChatIds);
       return true;
     } catch (error) {
       console.error('Error reordering pinned chats:', error);
+      try {
+        await connectionRef.current.invoke('GetUserChats');
+      } catch (refreshError) {
+        console.error('Error refreshing chats after reorder failure:', refreshError);
+      }
       return false;
     }
   }, []);

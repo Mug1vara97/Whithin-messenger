@@ -102,4 +102,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pickBackgroundImage: () => ipcRenderer.invoke('electron:pick-background-image'),
   loadBackgroundImage: (filePath) => ipcRenderer.invoke('electron:load-background-image', filePath),
   clearBackgroundImage: () => ipcRenderer.invoke('electron:clear-background-image'),
+
+  /*
+  setVideoOverlayFullscreen: (active) =>
+    ipcRenderer.send('electron:video-overlay-fullscreen', Boolean(active)),
+  getWindowContentSize: () => ipcRenderer.invoke('electron:get-window-content-size'),
+  onVideoOverlayFullscreenSync: (callback) => {
+    if (typeof callback !== 'function') return undefined;
+    const listener = (_event, payload) => {
+      if (typeof payload === 'boolean') {
+        callback({ active: payload, bottomInset: 0 });
+        return;
+      }
+      callback({
+        active: Boolean(payload?.active),
+        bottomInset: Number(payload?.bottomInset) || 0,
+      });
+    };
+    ipcRenderer.on('electron:video-overlay-fullscreen-sync', listener);
+    return () => ipcRenderer.removeListener('electron:video-overlay-fullscreen-sync', listener);
+  },
+  */
 });

@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
+import {
+  readMediaFileDuration,
+  readCachedAudioDuration,
+} from '../../../lib/utils/probeAudioDuration';
 import ImagePreview from '../ImagePreview/ImagePreview';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import VideoPlayer from './VideoPlayer';
@@ -233,12 +237,33 @@ const MediaFile = ({ mediaFile }) => {
   const [videoLoading, setVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
 
+  const handleVideoLoad = useCallback(() => {
+    setVideoLoading(false);
+  }, []);
+
+  const handleVideoError = useCallback(() => {
+    setVideoLoading(false);
+    setVideoError(true);
+  }, []);
+
   useEffect(() => {
     if (mediaFile?.contentType?.startsWith('video/')) {
       setVideoError(false);
       setVideoLoading(true);
     }
   }, [mediaFile?.filePath, mediaFile?.isVideoNote]);
+
+  useEffect(() => {
+    if (!mediaFile?.contentType?.startsWith('video/') || !videoLoading) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVideoLoading(false);
+    }, 8000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [mediaFile?.filePath, mediaFile?.contentType, videoLoading]);
 
   const handleDownload = async (e, url, fileName) => {
     e.preventDefault();
@@ -363,11 +388,17 @@ const MediaFile = ({ mediaFile }) => {
           )}
           <VideoPlayer
             src={videoUrl}
-            onLoad={() => setVideoLoading(false)}
-            onError={() => {
-              setVideoLoading(false);
-              setVideoError(true);
-            }}
+            hlsSrc={
+              mediaFile.streamingManifestPath
+                ? buildMediaUrl(mediaFile.streamingManifestPath)
+                : null
+            }
+            knownDuration={
+              readMediaFileDuration(mediaFile) ||
+              readCachedAudioDuration(mediaFile.filePath)
+            }
+            onLoad={handleVideoLoad}
+            onError={handleVideoError}
             className={videoLoading ? 'media-loading' : ''}
           />
         </div>

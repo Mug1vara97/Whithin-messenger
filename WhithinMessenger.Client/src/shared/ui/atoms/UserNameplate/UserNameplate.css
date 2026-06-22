@@ -13,6 +13,8 @@
 
 .user-nameplate--decorated {
   min-height: 42px;
+  overflow: hidden;
+  isolation: isolate;
   border-radius: 12px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),

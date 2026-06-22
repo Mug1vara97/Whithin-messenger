@@ -8,16 +8,16 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Media.DeleteMedia;
 public class DeleteMediaCommandHandler : IRequestHandler<DeleteMediaCommand, DeleteMediaResult>
 {
     private readonly IMediaFileRepository _mediaFileRepository;
-    private readonly IFileService _fileService;
+    private readonly IMediaFileStorageCleanup _mediaFileStorageCleanup;
     private readonly ILogger<DeleteMediaCommandHandler> _logger;
 
     public DeleteMediaCommandHandler(
         IMediaFileRepository mediaFileRepository,
-        IFileService fileService,
+        IMediaFileStorageCleanup mediaFileStorageCleanup,
         ILogger<DeleteMediaCommandHandler> logger)
     {
         _mediaFileRepository = mediaFileRepository;
-        _fileService = fileService;
+        _mediaFileStorageCleanup = mediaFileStorageCleanup;
         _logger = logger;
     }
 
@@ -44,12 +44,7 @@ public class DeleteMediaCommandHandler : IRequestHandler<DeleteMediaCommand, Del
                 };
             }
 
-            await _fileService.DeleteFileAsync(mediaFile.FilePath);
-            
-            if (!string.IsNullOrEmpty(mediaFile.ThumbnailPath))
-            {
-                await _fileService.DeleteFileAsync(mediaFile.ThumbnailPath);
-            }
+            await _mediaFileStorageCleanup.DeleteMediaAssetsAsync(mediaFile, cancellationToken);
 
             await _mediaFileRepository.DeleteAsync(request.MediaFileId, cancellationToken);
 

@@ -3882,30 +3882,38 @@ export const useCallStore = create(
         }
 
         set({ isScreenShareTransitioning: true });
+        let preCapturedStream = null;
         try {
           const state = get();
           const screenShareSessionId = Date.now();
           let includeAudio = true;
           set({ screenShareSessionId });
-          
-          // Останавливаем существующую демонстрацию экрана, если есть
-          if (state.isScreenSharing) {
-            await get().stopScreenShare();
-          }
 
-          // В Electron показываем нативное меню выбора экрана/окна перед стартом шаринга.
           if (window.electronAPI?.chooseScreenSource) {
             const selectedSource = await window.electronAPI.chooseScreenSource();
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
             includeAudio = Boolean(selectedSource.captureAudio);
+
+            // Capture immediately while Electron still has the picker selection.
+            preCapturedStream = await voiceCallApi.acquireScreenShareStream(includeAudio);
           }
 
-          console.log('Starting screen share via LiveKit...', { includeAudio });
+          // Stop previous share only after we already own a fresh capture stream.
+          if (state.isScreenSharing) {
+            await get().stopScreenShare();
+          }
 
-          // Use LiveKit API to start screen share
-          await voiceCallApi.setScreenShareEnabled(true, { includeAudio });
+          console.log('Starting screen share via LiveKit...', {
+            includeAudio,
+            preCaptured: Boolean(preCapturedStream),
+          });
+
+          await voiceCallApi.setScreenShareEnabled(true, {
+            includeAudio,
+            screenStream: preCapturedStream,
+          });
           
           // Get the screen share stream from LiveKit room
           const room = voiceCallApi.getRoom();
@@ -3969,6 +3977,16 @@ export const useCallStore = create(
           set({ isScreenSharing: true });
 
         } catch (error) {
+          if (preCapturedStream) {
+            preCapturedStream.getTracks().forEach((track) => {
+              try {
+                track.stop();
+              } catch {
+                /* ignore */
+              }
+            });
+          }
+
           console.error('Error starting screen share:', error);
           
           // Проверяем, является ли это отменой пользователем

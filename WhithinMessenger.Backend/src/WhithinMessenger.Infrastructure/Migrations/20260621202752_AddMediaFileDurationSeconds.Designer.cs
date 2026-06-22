@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WhithinMessenger.Infrastructure.Database;
@@ -11,9 +12,11 @@ using WhithinMessenger.Infrastructure.Database;
 namespace WhithinMessenger.Infrastructure.Migrations
 {
     [DbContext(typeof(WithinDbContext))]
-    partial class WithinDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260621202752_AddMediaFileDurationSeconds")]
+    partial class AddMediaFileDurationSeconds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -539,9 +542,6 @@ namespace WhithinMessenger.Infrastructure.Migrations
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StreamingManifestPath")
                         .HasColumnType("text");
 
                     b.Property<string>("ThumbnailPath")

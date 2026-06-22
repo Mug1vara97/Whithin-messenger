@@ -152,7 +152,8 @@ body {
 }
 
 [data-theme-preset='cyberpunk'] .message-username,
-[data-theme-preset='cyberpunk'] .member-list-name {
+[data-theme-preset='cyberpunk'] .member-list-name,
+[data-theme-preset='cyberpunk'] .chat-info-participant-name {
   color: var(--cp-cyan);
   text-shadow: var(--cp-glow-cyan);
 }

@@ -15,6 +15,7 @@ public static class Application
         services.AddMediatR(x => x.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         services.AddScoped<ServerPermissionChecker>();
         services.AddScoped<IServerAuditLogService, ServerAuditLogService>();
+        services.AddScoped<IMediaFileStorageCleanup, MediaFileStorageCleanup>();
         services.AddScoped<IdeaBoardAccessHelper>();
         
         // FileService регистрируется в Program.cs с использованием IWebHostEnvironment

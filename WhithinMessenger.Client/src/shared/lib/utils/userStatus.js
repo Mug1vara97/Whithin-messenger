@@ -79,6 +79,15 @@ export const getUserStatusLabel = (status) => STATUS_LABELS[normalizeUserStatus(
 
 export const getUserStatusColor = (status) => STATUS_COLORS[normalizeUserStatus(status)];
 
+export const getPresenceSnapshot = (status) => {
+  const normalized = normalizeUserStatus(status);
+  return {
+    normalized,
+    label: STATUS_LABELS[normalized],
+    color: STATUS_COLORS[normalized],
+  };
+};
+
 export const getUserStatusOptions = () => USER_STATUS_OPTIONS.map((value) => ({
   value,
   label: STATUS_LABELS[value],

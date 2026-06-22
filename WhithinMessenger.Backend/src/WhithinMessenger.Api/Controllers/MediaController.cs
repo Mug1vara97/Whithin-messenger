@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using MediatR;
+using System.Globalization;
 using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMedia;
 using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMediaBatch;
 using WhithinMessenger.Application.CommandsAndQueries.Media.DeleteMedia;
@@ -44,40 +45,62 @@ public class MediaController : ControllerBase
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 10737418240)] // 10 GB для загрузки файлов
     public async Task<IActionResult> UploadMedia(
-        [FromForm] Guid chatId,
-        [FromForm] IFormFile file,
+        [FromForm] string? chatId,
+        [FromForm] IFormFile? file,
         [FromForm] string? caption = null,
-        [FromForm] Guid? userId = null,
         [FromForm] string? username = null,
-        [FromForm] bool isVideoNote = false)
+        [FromForm] string? isVideoNote = null,
+        [FromForm] string? durationSeconds = null)
     {
         try
         {
+            if (!TryParseChatId(chatId, out var parsedChatId, out var chatIdError))
+            {
+                return BadRequest(new { success = false, error = chatIdError });
+            }
+
             if (file == null || file.Length == 0)
             {
-                return BadRequest("Файл не выбран");
+                return BadRequest(new { success = false, error = "Файл не выбран" });
             }
 
-            if (userId == null || userId == Guid.Empty)
+            var userId = GetCurrentUserId();
+            if (userId == Guid.Empty)
             {
-                userId = GetCurrentUserId();
-                if (userId == Guid.Empty)
-                {
-                    return Unauthorized("Пользователь не авторизован");
-                }
+                return Unauthorized(new { success = false, error = "Пользователь не авторизован" });
             }
 
-        if (string.IsNullOrEmpty(username))
-        {
-            username = GetCurrentUsername();
-            _logger.LogInformation($"MediaController: Retrieved username from context: {username}");
-        }
-        else
-        {
-            _logger.LogInformation($"MediaController: Username provided in form: {username}");
-        }
+            if (string.IsNullOrEmpty(username))
+            {
+                username = GetCurrentUsername();
+                _logger.LogInformation("MediaController: Retrieved username from context: {Username}", username);
+            }
+            else
+            {
+                _logger.LogInformation("MediaController: Username provided in form: {Username}", username);
+            }
 
-            var command = new UploadMediaCommand(userId.Value, chatId, file, caption, username, isVideoNote);
+            var videoNote = string.Equals(isVideoNote, "true", StringComparison.OrdinalIgnoreCase);
+            double? parsedDuration = null;
+            if (!string.IsNullOrWhiteSpace(durationSeconds)
+                && double.TryParse(
+                    durationSeconds,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var durationValue)
+                && durationValue > 0)
+            {
+                parsedDuration = durationValue;
+            }
+
+            var command = new UploadMediaCommand(
+                userId,
+                parsedChatId,
+                file,
+                caption,
+                username,
+                videoNote,
+                parsedDuration);
             var result = await _mediator.Send(command);
 
             if (result.Success)
@@ -96,21 +119,23 @@ public class MediaController : ControllerBase
                             fileSize = file.Length,
                             thumbnailPath = result.ThumbnailPath,
                             createdAt = DateTimeOffset.UtcNow,
-                            isVideoNote = result.IsVideoNote
+                            isVideoNote = result.IsVideoNote,
+                            durationSeconds = result.DurationSeconds,
+                            streamingManifestPath = result.StreamingManifestPath
                         }
                     };
 
-                    var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
-                    string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
+                    var userProfile = await _mediator.Send(new GetUserProfileQuery(userId));
+                    string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId);
                     string? avatarUrl = userProfile?.Avatar;
 
-                    await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent", 
+                    await _hubContext.Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId,  // Используем MessageId для корректного удаления
-                            senderId = userId.Value,
+                            senderId = userId,
                             content = caption ?? string.Empty, 
                             username = username ?? "Unknown",
-                            chatId = chatId,
+                            chatId = parsedChatId,
                             avatarUrl = avatarUrl,
                             avatarColor = avatarColor,
                             repliedMessage = (object?)null,
@@ -122,14 +147,14 @@ public class MediaController : ControllerBase
                     if (result.MessageId.HasValue)
                     {
                         await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
-                            chatId,
+                            parsedChatId,
                             result.MessageId.Value,
-                            userId.Value);
+                            userId);
                     }
 
                     await _chatMessageNotificationService.NotifyMediaMessageAsync(
-                        chatId,
-                        userId.Value,
+                        parsedChatId,
+                        userId,
                         username ?? "Unknown",
                         result.MessageId,
                         caption,
@@ -166,26 +191,27 @@ public class MediaController : ControllerBase
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 10737418240)]
     public async Task<IActionResult> UploadMediaBatch(
-        [FromForm] Guid chatId,
-        [FromForm] List<IFormFile> files,
+        [FromForm] string? chatId,
+        [FromForm] List<IFormFile>? files,
         [FromForm] string? caption = null,
-        [FromForm] Guid? userId = null,
         [FromForm] string? username = null)
     {
         try
         {
-            if (files == null || files.Count == 0)
+            if (!TryParseChatId(chatId, out var parsedChatId, out var chatIdError))
             {
-                return BadRequest("Файлы не выбраны");
+                return BadRequest(new { success = false, error = chatIdError });
             }
 
-            if (userId == null || userId == Guid.Empty)
+            if (files == null || files.Count == 0)
             {
-                userId = GetCurrentUserId();
-                if (userId == Guid.Empty)
-                {
-                    return Unauthorized("Пользователь не авторизован");
-                }
+                return BadRequest(new { success = false, error = "Файлы не выбраны" });
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId == Guid.Empty)
+            {
+                return Unauthorized(new { success = false, error = "Пользователь не авторизован" });
             }
 
             if (string.IsNullOrEmpty(username))
@@ -193,7 +219,7 @@ public class MediaController : ControllerBase
                 username = GetCurrentUsername();
             }
 
-            var command = new UploadMediaBatchCommand(userId.Value, chatId, files, caption, username);
+            var command = new UploadMediaBatchCommand(userId, parsedChatId, files, caption, username);
             var result = await _mediator.Send(command);
 
             if (!result.Success)
@@ -216,18 +242,18 @@ public class MediaController : ControllerBase
                     isVideoNote = item.IsVideoNote
                 }).ToArray();
 
-                var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
-                string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
+                var userProfile = await _mediator.Send(new GetUserProfileQuery(userId));
+                string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId);
                 string? avatarUrl = userProfile?.Avatar;
 
-                await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent",
+                await _hubContext.Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent",
                     new
                     {
                         messageId = result.MessageId,
-                        senderId = userId.Value,
+                        senderId = userId,
                         content = caption ?? string.Empty,
                         username = username ?? "Unknown",
-                        chatId = chatId,
+                        chatId = parsedChatId,
                         avatarUrl = avatarUrl,
                         avatarColor = avatarColor,
                         repliedMessage = (object?)null,
@@ -239,17 +265,17 @@ public class MediaController : ControllerBase
                 if (result.MessageId.HasValue)
                 {
                     await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
-                        chatId,
+                        parsedChatId,
                         result.MessageId.Value,
-                        userId.Value);
+                        userId);
                 }
 
                 var firstMedia = result.MediaItems.FirstOrDefault();
                 if (firstMedia != null)
                 {
                     await _chatMessageNotificationService.NotifyMediaMessageAsync(
-                        chatId,
-                        userId.Value,
+                        parsedChatId,
+                        userId,
                         username ?? "Unknown",
                         result.MessageId,
                         caption,
@@ -359,6 +385,25 @@ public class MediaController : ControllerBase
             _logger.LogError(ex, "Error downloading file {FilePath}", filePath);
             return StatusCode(500, "Ошибка при загрузке файла");
         }
+    }
+
+    private static bool TryParseChatId(string? chatId, out Guid parsedChatId, out string errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(chatId))
+        {
+            parsedChatId = Guid.Empty;
+            errorMessage = "Не указан идентификатор чата";
+            return false;
+        }
+
+        if (Guid.TryParse(chatId.Trim(), out parsedChatId))
+        {
+            errorMessage = string.Empty;
+            return true;
+        }
+
+        errorMessage = "Некорректный идентификатор чата";
+        return false;
     }
 
     private Guid GetCurrentUserId()

@@ -14,6 +14,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     private readonly IMessageRepository _messageRepository;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly IVideoHlsBackgroundService _videoHlsBackgroundService;
     private readonly ILogger<UploadMediaCommandHandler> _logger;
 
     public UploadMediaCommandHandler(
@@ -23,6 +24,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
         IMessageRepository messageRepository,
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
+        IVideoHlsBackgroundService videoHlsBackgroundService,
         ILogger<UploadMediaCommandHandler> logger)
     {
         _fileService = fileService;
@@ -31,6 +33,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _videoHlsBackgroundService = videoHlsBackgroundService;
         _logger = logger;
     }
 
@@ -138,9 +141,11 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 ? new FileInfo(finalFilePath).Length 
                 : request.File.Length;
 
+            var mediaFileId = Guid.NewGuid();
+
             var mediaFile = new MediaFile
             {
-                Id = Guid.NewGuid(),
+                Id = mediaFileId,
                 MessageId = savedMessage.Id,
                 FileName = convertedFileName,
                 OriginalFileName = request.File.FileName,
@@ -148,7 +153,12 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 ContentType = contentType,
                 FileSize = finalFileSize,
                 CreatedAt = DateTimeOffset.UtcNow,
-                IsVideoNote = request.IsVideoNote && _videoConverterService.IsVideoFile(contentType)
+                IsVideoNote = request.IsVideoNote && _videoConverterService.IsVideoFile(contentType),
+                DurationSeconds = request.DurationSeconds is > 0
+                    && (contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
+                        || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+                        ? request.DurationSeconds
+                        : null
             };
 
             if (_fileService.IsImageFile(contentType))
@@ -174,6 +184,11 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
 
             var savedMediaFile = await _mediaFileRepository.AddAsync(mediaFile, cancellationToken);
 
+            if (_videoConverterService.IsVideoFile(contentType) && !request.IsVideoNote)
+            {
+                _videoHlsBackgroundService.QueueGeneration(savedMediaFile.Id, finalFilePath);
+            }
+
             return new UploadMediaResult
             {
                 Success = true,
@@ -181,7 +196,9 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 MediaFileId = savedMediaFile.Id,  // ID медиафайла
                 FilePath = savedMediaFile.FilePath,
                 ThumbnailPath = savedMediaFile.ThumbnailPath,
-                IsVideoNote = savedMediaFile.IsVideoNote
+                IsVideoNote = savedMediaFile.IsVideoNote,
+                DurationSeconds = savedMediaFile.DurationSeconds,
+                StreamingManifestPath = savedMediaFile.StreamingManifestPath
             };
         }
         catch (Exception ex)

@@ -3,6 +3,7 @@ import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
 import { getUserStatusLabel } from '../../../lib/utils/userStatus';
 import { mapChatParticipantToListItem } from '../../../lib/utils/memberListUtils';
+import { usePresence, useResolvedPresence } from '../../../lib/contexts/PresenceContext';
 import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import UserNameplate from '../../atoms/UserNameplate/UserNameplate';
@@ -79,6 +80,41 @@ const getBannerStyle = (banner, fallbackColor = '#5865F2') => {
   };
 };
 
+const ChatInfoParticipantItem = ({ participant, resolvePresence }) => {
+  const member = mapChatParticipantToListItem(participant, { resolveStatus: resolvePresence });
+  const presence = useResolvedPresence(member.userId, member.status);
+  const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
+
+  return (
+    <div
+      className="chat-info-participant-item"
+      title={`${member.username || 'Пользователь'} — ${getUserStatusLabel(presence.normalized)}`}
+    >
+      <div className="chat-info-participant-item__layout">
+        <div className="user-avatar-slot chat-info-participant-avatar-wrap">
+          <UserAvatar
+            displayName={member.displayName}
+            login={member.login}
+            username={member.login}
+            avatarUrl={avatarUrl}
+            avatarColor={member.avatarColor}
+            avatarDecoration={member.avatarDecoration}
+            size={40}
+            statusIndicator={<UserAvatarPresenceDot status={presence.normalized} />}
+          />
+        </div>
+        <UserNameplate nameplate={member.nameplate} className="chat-info-participant-nameplate">
+          <div className="chat-info-participant-nameplate__body">
+            <span className="chat-info-participant-name">
+              {member.username || 'Пользователь'}
+            </span>
+          </div>
+        </UserNameplate>
+      </div>
+    </div>
+  );
+};
+
 const ChatInfoModal = ({
   open,
   onClose,
@@ -92,6 +128,7 @@ const ChatInfoModal = ({
   connection,
 }) => {
   const [activeTab, setActiveTab] = useState(0);
+  const { resolvePresence } = usePresence();
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [chatAvatar, setChatAvatar] = useState(chatInfo?.chatAvatar);
   const [chatAvatarColor, setChatAvatarColor] = useState(chatInfo?.chatAvatarColor);
@@ -361,42 +398,13 @@ const ChatInfoModal = ({
                           <p>Загрузка участников…</p>
                         </div>
                       ) : participants && participants.length > 0 ? (
-                        participants.map((participant) => {
-                          const member = mapChatParticipantToListItem(participant);
-                          const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-
-                          return (
-                          <div
-                            key={participant.userId || member.userId}
-                            className="chat-info-participant-item"
-                            title={`${member.username || 'Пользователь'} — ${getUserStatusLabel(member.status)}`}
-                          >
-                            <div className="chat-info-participant-item__layout">
-                              <div className="user-avatar-slot chat-info-participant-avatar-wrap">
-                                <UserAvatar
-                                  displayName={member.displayName}
-                                  login={member.login}
-                                  username={member.login}
-                                  avatarUrl={avatarUrl}
-                                  avatarColor={member.avatarColor}
-                                  avatarDecoration={member.avatarDecoration}
-                                  size={40}
-                                  statusIndicator={
-                                    <UserAvatarPresenceDot status={member.status} />
-                                  }
-                                />
-                              </div>
-                              <UserNameplate nameplate={member.nameplate} className="chat-info-participant-nameplate">
-                                <div className="chat-info-participant-nameplate__body">
-                                  <span className="chat-info-participant-name">
-                                    {member.username || 'Пользователь'}
-                                  </span>
-                                </div>
-                              </UserNameplate>
-                            </div>
-                          </div>
-                          );
-                        })
+                        participants.map((participant) => (
+                          <ChatInfoParticipantItem
+                            key={participant.userId ?? participant.UserId}
+                            participant={participant}
+                            resolvePresence={resolvePresence}
+                          />
+                        ))
                       ) : (
                         <div className="chat-info-no-participants">
                           <p>Участники не загружены</p>

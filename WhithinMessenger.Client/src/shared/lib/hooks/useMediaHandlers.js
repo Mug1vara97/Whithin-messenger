@@ -1,9 +1,32 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
+import {
+  analyzeAudioBuffer,
+  cacheAudioDuration,
+  probeAudioDurationFromBlobUrl,
+  probeVideoDurationFromFile,
+} from '../utils/probeAudioDuration';
 
 const VIDEO_NOTE_MAX_SEC = 60;
 const MAX_BATCH_MEDIA_COUNT = 10;
+
+const parseUploadError = (xhr) => {
+  try {
+    const payload = JSON.parse(xhr.responseText);
+    if (payload?.error) return payload.error;
+
+    const validationErrors = payload?.errors ? Object.values(payload.errors).flat() : [];
+    if (validationErrors.length > 0) return String(validationErrors[0]);
+
+    if (payload?.title && payload.title !== 'One or more validation errors occurred.') {
+      return payload.title;
+    }
+  } catch {
+    if (xhr.responseText) return xhr.responseText;
+  }
+  return `HTTP ${xhr.status}`;
+};
 
 const filterSendableFiles = (files) =>
   Array.from(files)
@@ -20,6 +43,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const fileInputRef = useRef(null);
   const uploadProgressSetterRef = useRef(setUploadProgress);
   const recordingTimeRef = useRef(0);
+  const recordingStartedAtRef = useRef(null);
 
   uploadProgressSetterRef.current = setUploadProgress;
 
@@ -30,16 +54,18 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const videoNoteSkipUploadRef = useRef(false);
 
   useEffect(() => {
-    let interval;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingTime((prev) => {
-          const next = prev + 1;
-          recordingTimeRef.current = next;
-          return next;
-        });
-      }, 1000);
-    }
+    if (!isRecording || !recordingStartedAtRef.current) return undefined;
+
+    const tick = () => {
+      const elapsedSeconds = Math.floor(
+        (performance.now() - recordingStartedAtRef.current) / 1000
+      );
+      recordingTimeRef.current = elapsedSeconds;
+      setRecordingTime(elapsedSeconds);
+    };
+
+    tick();
+    const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
   }, [isRecording]);
 
@@ -61,12 +87,31 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     }
   }, [videoNoteRecordingTime, isRecordingVideoNote]);
 
+  const attachMediaDuration = useCallback(async (file) => {
+    if (!file || file.durationSeconds > 0) return file;
+
+    const type = file.type || '';
+    if (type.startsWith('video/')) {
+      const duration = await probeVideoDurationFromFile(file);
+      if (duration > 0) {
+        file.durationSeconds = duration;
+      }
+    }
+
+    return file;
+  }, []);
+
   const uploadFiles = useCallback(
     async (files, caption = '', options = {}) => {
       if (!files?.length || !connection) return false;
 
+      if (!chatId) {
+        alert('Ошибка загрузки файла: чат не выбран');
+        return false;
+      }
+
       const { isVideoNote = false } = options;
-      const fileList = Array.from(files);
+      const fileList = await Promise.all(Array.from(files).map(attachMediaDuration));
 
       try {
         setUploadingFile({
@@ -80,10 +125,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         setUploadProgress(0);
 
         const formData = new FormData();
-        formData.append('chatId', chatId);
-        formData.append('caption', caption || '');
-        formData.append('userId', userId);
-        formData.append('username', username);
+        formData.append('chatId', String(chatId));
+        if (caption) {
+          formData.append('caption', caption);
+        }
 
         let uploadUrl = `${BASE_URL}/api/media/upload`;
 
@@ -94,7 +139,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
           formData.append('file', fileList[0]);
           formData.append('isVideoNote', isVideoNote ? 'true' : 'false');
           if (fileList[0].durationSeconds > 0) {
-            formData.append('durationSeconds', String(fileList[0].durationSeconds));
+            formData.append(
+              'durationSeconds',
+              String(Math.round(fileList[0].durationSeconds * 1000) / 1000)
+            );
           }
         }
 
@@ -109,11 +157,19 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
           });
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(JSON.parse(xhr.responseText));
+              const response = JSON.parse(xhr.responseText);
+              if (
+                fileList.length === 1 &&
+                fileList[0].durationSeconds > 0 &&
+                response.filePath
+              ) {
+                cacheAudioDuration(response.filePath, fileList[0].durationSeconds);
+              }
+              resolve(response);
               return;
             }
             try {
-              reject(new Error(JSON.parse(xhr.responseText).error || `HTTP ${xhr.status}`));
+              reject(new Error(parseUploadError(xhr)));
             } catch {
               reject(new Error(`Upload failed with status ${xhr.status}`));
             }
@@ -140,7 +196,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         return false;
       }
     },
-    [connection, chatId, userId, username]
+    [connection, chatId, userId, username, attachMediaDuration]
   );
 
   const handleSendMedia = useCallback(
@@ -200,14 +256,37 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         const audioFile = new File([audioBlob], `audio-message-${Date.now()}.webm`, {
           type: 'audio/webm',
         });
-        const recordedSeconds = Math.max(1, recordingTimeRef.current || recordingTime);
-        audioFile.durationSeconds = recordedSeconds;
+
+        let durationSeconds = 0;
+        const blobUrl = URL.createObjectURL(audioBlob);
+        try {
+          const { duration } = await analyzeAudioBuffer(await audioBlob.arrayBuffer(), 'recording');
+          if (duration > 0) {
+            durationSeconds = duration;
+          } else {
+            durationSeconds = await probeAudioDurationFromBlobUrl(blobUrl);
+          }
+        } catch (probeError) {
+          console.warn('Voice duration probe failed:', probeError);
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+        }
+
+        if (!durationSeconds && recordingStartedAtRef.current) {
+          durationSeconds = Math.max(
+            0.1,
+            (performance.now() - recordingStartedAtRef.current) / 1000
+          );
+        }
+
+        audioFile.durationSeconds = durationSeconds;
 
         await handleSendMedia(audioFile);
 
         stream.getTracks().forEach((track) => track.stop());
       };
 
+      recordingStartedAtRef.current = performance.now();
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);

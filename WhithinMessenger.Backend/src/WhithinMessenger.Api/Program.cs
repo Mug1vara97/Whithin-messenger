@@ -39,6 +39,21 @@ builder.Services.AddScoped<WhithinMessenger.Application.Services.IVideoConverter
     return new WhithinMessenger.Application.Services.VideoConverterService(logger);
 });
 
+builder.Services.AddSingleton<WhithinMessenger.Application.Services.IVideoHlsBackgroundService,
+    WhithinMessenger.Application.Services.VideoHlsBackgroundService>();
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = null;
+});
+
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = true;
@@ -198,6 +213,14 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads")),
     RequestPath = "/uploads",
+    ContentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider
+    {
+        Mappings =
+        {
+            [".m3u8"] = "application/vnd.apple.mpegurl",
+            [".ts"] = "video/mp2t",
+        }
+    },
     OnPrepareResponse = ctx =>
     {
         // Добавляем CORS заголовки для статических файлов

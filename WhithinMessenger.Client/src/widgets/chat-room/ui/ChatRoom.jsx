@@ -336,6 +336,79 @@ const ChatRoom = ({
   const showSendAction = hasComposerText || Boolean(editingMessageId);
   const showMicAction = canVoice && !editingMessageId && !hasComposerText;
   const [replyingToMessage, setReplyingToMessage] = useState(null);
+
+  const fileDragDepthRef = useRef(0);
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+
+  const canAcceptFileDrop = Boolean(
+    chatId && canAttach && canSend && !editingMessageId && !isSavedMessages && !uploadingFile,
+  );
+
+  const isExternalFileDrag = useCallback((dataTransfer) => {
+    if (!dataTransfer) return false;
+    return Array.from(dataTransfer.types || []).includes('Files');
+  }, []);
+
+  const resetFileDragState = useCallback(() => {
+    fileDragDepthRef.current = 0;
+    setIsFileDragOver(false);
+  }, []);
+
+  const handleChatFileDragEnter = useCallback(
+    (event) => {
+      if (!canAcceptFileDrop || !isExternalFileDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      fileDragDepthRef.current += 1;
+      setIsFileDragOver(true);
+    },
+    [canAcceptFileDrop, isExternalFileDrag],
+  );
+
+  const handleChatFileDragLeave = useCallback((event) => {
+    if (fileDragDepthRef.current === 0) return;
+    event.preventDefault();
+    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+    if (fileDragDepthRef.current === 0) {
+      setIsFileDragOver(false);
+    }
+  }, []);
+
+  const handleChatFileDragOver = useCallback(
+    (event) => {
+      if (!canAcceptFileDrop || !isExternalFileDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    [canAcceptFileDrop, isExternalFileDrag],
+  );
+
+  const handleChatFileDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetFileDragState();
+
+      if (!canAcceptFileDrop) return;
+
+      const files = Array.from(event.dataTransfer?.files || []);
+      if (files.length > 0) {
+        queueMediaSend(files);
+      }
+    },
+    [canAcceptFileDrop, queueMediaSend, resetFileDragState],
+  );
+
+  useEffect(() => {
+    window.addEventListener('dragend', resetFileDragState);
+    return () => window.removeEventListener('dragend', resetFileDragState);
+  }, [resetFileDragState]);
+
+  useEffect(() => {
+    if (!canAcceptFileDrop) {
+      resetFileDragState();
+    }
+  }, [canAcceptFileDrop, resetFileDragState]);
+
   const [isPrivateChat, setIsPrivateChat] = useState(false);
   const [otherUserInCall] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(false);
@@ -386,7 +459,7 @@ const ChatRoom = ({
   } = useRoles(serverConnection, isServerChat ? serverId : null, userId);
   const { friends, fetchFriends, removeFriend } = useFriends();
   const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
-  const { resolveStatus } = usePresenceOverrides(userId);
+  const { resolveStatus } = usePresenceOverrides();
 
   useEffect(() => {
     if (isServerChat && serverConnection && serverId) {
@@ -1751,9 +1824,13 @@ const ChatRoom = ({
 
   return (
     <div
-      className={`group-chat-container ${isStickerPanelOpen ? 'has-sticker-panel' : ''}`}
+      className={`group-chat-container ${isStickerPanelOpen ? 'has-sticker-panel' : ''}${isFileDragOver ? ' group-chat-container--file-drag-over' : ''}`}
       tabIndex={0}
       style={{ outline: 'none' }}
+      onDragEnter={handleChatFileDragEnter}
+      onDragLeave={handleChatFileDragLeave}
+      onDragOver={handleChatFileDragOver}
+      onDrop={handleChatFileDrop}
     >
       <div className="chat-header">
         <div className="header-left">
@@ -2748,6 +2825,14 @@ const ChatRoom = ({
         onClose={closeAuthorContextMenu}
         items={authorContextMenuItems}
       />
+
+      {isFileDragOver && (
+        <div className="chat-file-drop-overlay" aria-hidden="true">
+          <div className="chat-file-drop-overlay__content">
+            <span className="chat-file-drop-overlay__title">Отпустите, чтобы прикрепить файлы</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

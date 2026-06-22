@@ -58,7 +58,9 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                                 FileSize = mf.FileSize,
                                 ThumbnailPath = mf.ThumbnailPath,
                                 CreatedAt = mf.CreatedAt,
-                                IsVideoNote = mf.IsVideoNote
+                                IsVideoNote = mf.IsVideoNote,
+                                DurationSeconds = mf.DurationSeconds,
+                                StreamingManifestPath = mf.StreamingManifestPath
                             }).ToList() ?? new List<MediaFileDto>()
                         }
                         : null,
@@ -79,7 +81,9 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                         FileSize = mf.FileSize,
                         ThumbnailPath = mf.ThumbnailPath,
                         CreatedAt = mf.CreatedAt,
-                        IsVideoNote = mf.IsVideoNote
+                        IsVideoNote = mf.IsVideoNote,
+                        DurationSeconds = mf.DurationSeconds,
+                        StreamingManifestPath = mf.StreamingManifestPath
                     }).ToList() ?? new List<MediaFileDto>()
                 };
 

@@ -29,6 +29,14 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public async Task<List<MediaFile>> GetAllByMessageIdAsync(Guid messageId, CancellationToken cancellationToken = default)
+        {
+            return await _context.MediaFiles
+                .Where(mf => mf.MessageId == messageId)
+                .OrderBy(mf => mf.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<MediaFile> AddAsync(MediaFile mediaFile, CancellationToken cancellationToken = default)
         {
             _context.MediaFiles.Add(mediaFile);

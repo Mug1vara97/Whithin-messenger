@@ -26,6 +26,12 @@ public class MediaFile
 
     /// <summary>Видеосообщение «кружок» (как в Telegram): круглый превью в чате.</summary>
     public bool IsVideoNote { get; set; }
+
+    /// <summary>Длительность аудио/видео в секундах (для голосовых сообщений и t.п.).</summary>
+    public double? DurationSeconds { get; set; }
+
+    /// <summary>HLS master.m3u8 для адаптивного стриминга (несколько качеств).</summary>
+    public string? StreamingManifestPath { get; set; }
     
     public Message Message { get; set; } = null!;
 }

@@ -193,6 +193,27 @@ async function decodeDurationFromBuffer(arrayBuffer) {
   }
 }
 
+export function probeVideoDurationFromBlobUrl(url) {
+  const video = document.createElement('video');
+  video.preload = 'auto';
+  video.src = url;
+  return probeDurationOnElement(video, { resetPosition: false }).finally(() => {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  });
+}
+
+export async function probeVideoDurationFromFile(file) {
+  if (!file) return 0;
+  const blobUrl = URL.createObjectURL(file);
+  try {
+    return await probeVideoDurationFromBlobUrl(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 export function probeAudioDurationFromBlobUrl(url) {
   const audio = document.createElement('audio');
   audio.preload = 'auto';

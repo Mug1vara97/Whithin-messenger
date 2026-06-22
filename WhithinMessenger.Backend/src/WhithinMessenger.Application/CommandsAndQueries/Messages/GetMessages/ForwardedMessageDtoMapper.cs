@@ -51,6 +51,8 @@ internal static class MessageDtoMappers
             FileSize = mediaFile.FileSize,
             ThumbnailPath = mediaFile.ThumbnailPath,
             CreatedAt = mediaFile.CreatedAt,
-            IsVideoNote = mediaFile.IsVideoNote
+            IsVideoNote = mediaFile.IsVideoNote,
+            DurationSeconds = mediaFile.DurationSeconds,
+            StreamingManifestPath = mediaFile.StreamingManifestPath
         };
 }

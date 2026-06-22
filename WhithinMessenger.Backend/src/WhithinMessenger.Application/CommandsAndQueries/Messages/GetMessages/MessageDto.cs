@@ -42,6 +42,8 @@ public class MediaFileDto
     public string? ThumbnailPath { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsVideoNote { get; set; }
+    public double? DurationSeconds { get; set; }
+    public string? StreamingManifestPath { get; set; }
 }
 
 public class ReplyMessageDto

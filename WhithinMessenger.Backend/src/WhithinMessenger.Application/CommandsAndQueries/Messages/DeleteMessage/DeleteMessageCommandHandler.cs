@@ -7,6 +7,8 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage
 public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand, DeleteMessageResult>
 {
     private readonly IMessageRepository _messageRepository;
+    private readonly IMediaFileRepository _mediaFileRepository;
+    private readonly IMediaFileStorageCleanup _mediaFileStorageCleanup;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IServerAuditLogService _auditLog;
@@ -14,12 +16,16 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
 
     public DeleteMessageCommandHandler(
         IMessageRepository messageRepository,
+        IMediaFileRepository mediaFileRepository,
+        IMediaFileStorageCleanup mediaFileStorageCleanup,
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
         IServerAuditLogService auditLog,
         IUserListCacheService userListCache)
     {
         _messageRepository = messageRepository;
+        _mediaFileRepository = mediaFileRepository;
+        _mediaFileStorageCleanup = mediaFileStorageCleanup;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
         _auditLog = auditLog;
@@ -56,6 +62,9 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
                     ErrorMessage = moderationCheck.ErrorMessage
                 };
             }
+
+            var mediaFiles = await _mediaFileRepository.GetAllByMessageIdAsync(request.MessageId, cancellationToken);
+            await _mediaFileStorageCleanup.DeleteMediaAssetsAsync(mediaFiles, cancellationToken);
 
             await _messageRepository.DeleteAsync(request.MessageId, cancellationToken);
 

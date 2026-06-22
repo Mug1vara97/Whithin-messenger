@@ -247,6 +247,10 @@ export const useChat = (chatId, username, userId, displayName) => {
         raw.durationSeconds ??
         raw.DurationSeconds ??
         null,
+      streamingManifestPath:
+        raw.streamingManifestPath ??
+        raw.StreamingManifestPath ??
+        null,
     };
   }, []);
 

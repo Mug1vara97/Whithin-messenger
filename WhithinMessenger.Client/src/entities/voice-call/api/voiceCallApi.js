@@ -115,6 +115,94 @@ class VoiceCallApi {
     this.suppressReconnectEvent = false;
     this.suppressRoomDisconnectEvents = 0;
     this.recentPeerJoinedAt = new Map();
+    this.screenShareStream = null;
+  }
+
+  async acquireScreenShareStream(includeAudio = true) {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error('Screen sharing is not supported in this environment');
+    }
+
+    const constraints = {
+      video: {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        frameRate: { ideal: 60, max: 60 },
+      },
+      audio: includeAudio
+        ? {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 2,
+          }
+        : false,
+      preferCurrentTab: false,
+      selfBrowserSurface: 'exclude',
+      systemAudio: includeAudio ? 'include' : 'exclude',
+    };
+
+    console.log('Acquiring screen share via getDisplayMedia...', { includeAudio });
+    const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error('No video track in screen share capture');
+    }
+
+    console.log('getDisplayMedia acquired tracks:', {
+      video: videoTrack.label,
+      audio: stream.getAudioTracks().map((track) => track.label),
+    });
+
+    return stream;
+  }
+
+  stopLocalScreenShareStream() {
+    if (!this.screenShareStream) return;
+    this.screenShareStream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        /* ignore */
+      }
+    });
+    this.screenShareStream = null;
+  }
+
+  async publishScreenShareStream(stream, options = {}) {
+    if (!this.room) {
+      throw new Error('Not connected to room');
+    }
+
+    const { includeAudio = true } = options;
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      throw new Error('No video track to publish');
+    }
+
+    await this.room.localParticipant.publishTrack(videoTrack, {
+      source: Track.Source.ScreenShare,
+      simulcast: false,
+      videoCodec: 'vp8',
+      videoEncoding: {
+        ...VideoPresets.h720.encoding,
+        maxBitrate: 2_500_000,
+        maxFramerate: 60,
+      },
+    });
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (includeAudio && audioTrack) {
+      await this.room.localParticipant.publishTrack(audioTrack, {
+        source: Track.Source.ScreenShareAudio,
+      });
+      this.tuneLocalScreenShareAudioTrack();
+    } else if (includeAudio) {
+      console.warn('Screen share audio track missing after getDisplayMedia');
+    }
+
+    this.screenShareStream = stream;
   }
 
   resetPeerJoinedDedupe() {
@@ -390,6 +478,7 @@ class VoiceCallApi {
     this.suppressRoomDisconnectEvents += 1;
     try {
       await releaseLiveKitLocalCapture(room);
+      this.stopLocalScreenShareStream();
       await room.disconnect();
     } finally {
       this.suppressRoomDisconnectEvents = Math.max(0, this.suppressRoomDisconnectEvents - 1);
@@ -866,10 +955,15 @@ class VoiceCallApi {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
-    const { includeAudio = true } = options;
+    const { includeAudio = true, screenStream: providedStream = null } = options;
 
     if (enabled) {
-      // Defensive cleanup for stale publications before enabling a new share.
+      let captureStream = providedStream;
+
+      if (!captureStream) {
+        captureStream = await this.acquireScreenShareStream(includeAudio);
+      }
+
       const hasActiveOrStaleScreenVideoPublication = Array.from(
         this.room.localParticipant.videoTrackPublications.values()
       ).some((publication) => publication.source === Track.Source.ScreenShare);
@@ -878,140 +972,42 @@ class VoiceCallApi {
         this.room.localParticipant.audioTrackPublications.values()
       ).some((publication) => publication.source === Track.Source.ScreenShareAudio);
 
-      if (hasActiveOrStaleScreenVideoPublication || hasActiveOrStaleScreenAudioPublication) {
+      if (
+        hasActiveOrStaleScreenVideoPublication
+        || hasActiveOrStaleScreenAudioPublication
+        || this.screenShareStream
+      ) {
         try {
           await this.room.localParticipant.setScreenShareEnabled(false);
           await this.waitForScreenShareCleared();
         } catch (error) {
           console.warn('Failed to disable previous screen share before re-enable:', error);
         }
+        this.stopLocalScreenShareStream();
       }
 
-      // Give LiveKit a short settle window between unpublish/publish cycles.
-      // Without this, rapid restart may yield an already-ended incoming track
-      // on remote subscribers in some browser/runtime combinations.
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const startProfiles = includeAudio
-        ? [
-            {
-              name: 'balanced-audio',
-              capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false,
-                  channelCount: 2
-                },
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 60
-              },
-              publish: {
-                videoCodec: 'vp8',
-                videoEncoding: {
-                  ...VideoPresets.h720.encoding,
-                  maxBitrate: 2_500_000,
-                  maxFramerate: 60
-                },
-                simulcast: false
-              }
-            },
-            {
-              name: 'compatibility-audio',
-              capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false
-                },
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 30
-              },
-              publish: {
-                videoCodec: 'vp8',
-                simulcast: false
-              }
-            },
-            {
-              name: 'minimal-audio',
-              capture: {
-                audio: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false
-                }
-              },
-              publish: null
-            }
-          ]
-        : [
-            {
-              name: 'video-only',
-              capture: {
-                audio: false,
-                resolution: VideoPresets.h720.resolution,
-                frameRate: 60
-              },
-              publish: {
-                videoCodec: 'vp8',
-                videoEncoding: {
-                  ...VideoPresets.h720.encoding,
-                  maxBitrate: 2_500_000,
-                  maxFramerate: 60
-                },
-                simulcast: false
-              }
-            }
-          ];
+      try {
+        await this.publishScreenShareStream(captureStream, { includeAudio });
 
-      let lastError = null;
-      for (let i = 0; i < startProfiles.length; i += 1) {
-        const profile = startProfiles[i];
-        try {
-          if (profile.publish) {
-            await this.room.localParticipant.setScreenShareEnabled(true, profile.capture, profile.publish);
-          } else {
-            await this.room.localParticipant.setScreenShareEnabled(true, profile.capture);
-          }
-
-          if (!includeAudio) {
-            return;
-          }
-
-          const audioPublished = await this.waitForScreenShareAudioPublished();
-          if (audioPublished) {
-            this.tuneLocalScreenShareAudioTrack();
-            return;
-          }
-
-          lastError = new Error(
-            `Screen-share audio track was not published (profile: ${profile.name})`
-          );
-          console.warn(lastError.message);
-        } catch (error) {
-          lastError = error;
-          console.warn(`Screen share start failed for profile "${profile.name}":`, error);
+        if (includeAudio && !this.hasLocalScreenShareAudioPublication()) {
+          console.warn('Screen-share audio track was not published after getDisplayMedia');
         }
-
-        // Cleanup before next profile attempt.
-        try {
-          await this.room.localParticipant.setScreenShareEnabled(false);
-        } catch (disableError) {
-          console.warn('Failed to disable screen share after failed attempt:', disableError);
-        }
-        await this.waitForScreenShareCleared();
-
-        // Short settle window before next retry.
-        await new Promise((resolve) => setTimeout(resolve, 120));
+      } catch (error) {
+        captureStream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {
+            /* ignore */
+          }
+        });
+        throw error;
       }
-
-      if (lastError) {
-        throw lastError;
-      }
-      throw new Error('Failed to start screen sharing');
     } else {
       await this.room.localParticipant.setScreenShareEnabled(false);
       await this.waitForScreenShareCleared();
+      this.stopLocalScreenShareStream();
     }
   }
 
@@ -1091,7 +1087,7 @@ class VoiceCallApi {
     }
     
     try {
-      await this.room.localParticipant.setScreenShareEnabled(false);
+      await this.setScreenShareEnabled(false);
       return { success: true };
     } catch (error) {
       console.error('Error stopping screen share:', error);

@@ -265,6 +265,12 @@
 .media-video-container--player {
   position: relative;
   max-width: 640px;
+  width: 100%;
+}
+
+.media-video-container--player {
+  position: relative;
+  min-height: 180px;
 }
 
 .media-video-container--player .media-skeleton {
@@ -274,10 +280,11 @@
   right: 0;
   bottom: 0;
   z-index: 1;
+  pointer-events: none;
 }
 
-.media-video-container--player .whithin-video-player.media-loading {
-  opacity: 0;
+.media-video-container--player .video-player.media-loading {
+  visibility: hidden;
   pointer-events: none;
 }
 

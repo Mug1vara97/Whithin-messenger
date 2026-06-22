@@ -8,6 +8,7 @@ namespace WhithinMessenger.Application.Services
         Task<string> SaveThumbnailAsync(byte[] imageData, string originalFileName, string folderPath);
         Task<string> SaveChatAvatarAsync(IFormFile file, CancellationToken cancellationToken = default);
         Task<bool> DeleteFileAsync(string filePath, CancellationToken cancellationToken = default);
+        Task DeleteDirectoryAsync(string relativeDirectoryPath, CancellationToken cancellationToken = default);
         Task<byte[]?> GetFileAsync(string filePath);
         Task<string> GetContentTypeAsync(string filePath);
         bool IsImageFile(string contentType);

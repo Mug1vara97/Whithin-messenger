@@ -122,6 +122,8 @@ function clearLegacyFrostedGlassWindowFlag() {
 }
 
 let mainWindow = null;
+// let videoOverlayFullscreenActive = false;
+// let videoOverlaySavedState = null;
 
 function createWindowsBadgeOverlay(count) {
   const label = count > 99 ? '99+' : String(count);
@@ -1231,6 +1233,118 @@ function createTray() {
   }
 }
 
+/*
+function saveVideoWindowState(win) {
+  return {
+    bounds: win.getBounds(),
+    isMaximized: win.isMaximized(),
+    alwaysOnTop: win.isAlwaysOnTop(),
+    roundedCorners: typeof win.isRoundedCorners === 'function'
+      ? win.isRoundedCorners()
+      : true,
+    backgroundColor: typeof win.getBackgroundColor === 'function'
+      ? win.getBackgroundColor()
+      : null,
+  };
+}
+
+function setVideoWindowRoundedCorners(win, rounded) {
+  if (!win || win.isDestroyed() || typeof win.setRoundedCorners !== 'function') {
+    return;
+  }
+
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    win.setRoundedCorners(Boolean(rounded));
+  }
+}
+
+function getVideoFullscreenDisplay(win) {
+  const bounds = win.getBounds();
+  return screen.getDisplayNearestPoint({
+    x: Math.round(bounds.x + bounds.width / 2),
+    y: Math.round(bounds.y + bounds.height / 2),
+  });
+}
+
+function enterVideoBorderlessFullscreen(win) {
+  if (!win || win.isDestroyed()) {
+    return false;
+  }
+
+  if (win.isFullScreen()) {
+    win.setFullScreen(false);
+  }
+
+  if (!videoOverlaySavedState) {
+    videoOverlaySavedState = saveVideoWindowState(win);
+  }
+
+  const display = getVideoFullscreenDisplay(win);
+  const { x, y, width, height } = display.bounds;
+  win.setBounds({ x, y, width, height });
+  win.setBackgroundColor('#000000');
+  setVideoWindowRoundedCorners(win, false);
+
+  const reinforceNoRoundedCorners = () => {
+    if (win.isDestroyed()) {
+      return;
+    }
+    setVideoWindowRoundedCorners(win, false);
+  };
+  win.once('resize', reinforceNoRoundedCorners);
+  setTimeout(reinforceNoRoundedCorners, 0);
+  setTimeout(reinforceNoRoundedCorners, 150);
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.focus();
+  return true;
+}
+
+function exitVideoBorderlessFullscreen(win) {
+  if (!win || win.isDestroyed() || !videoOverlaySavedState) {
+    videoOverlaySavedState = null;
+    return;
+  }
+
+  const { bounds, isMaximized, alwaysOnTop, roundedCorners, backgroundColor } = videoOverlaySavedState;
+  videoOverlaySavedState = null;
+
+  win.setAlwaysOnTop(alwaysOnTop);
+
+  if (win.isFullScreen()) {
+    win.setFullScreen(false);
+  }
+
+  win.setBounds(bounds);
+  if (isMaximized) {
+    win.maximize();
+  }
+
+  setVideoWindowRoundedCorners(win, roundedCorners !== false);
+  if (backgroundColor) {
+    win.setBackgroundColor(backgroundColor);
+  }
+}
+
+function sendVideoOverlaySync(isActive) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  let bottomInset = 0;
+  if (isActive) {
+    const display = getVideoFullscreenDisplay(mainWindow);
+    const boundsBottom = display.bounds.y + display.bounds.height;
+    const workAreaBottom = display.workArea.y + display.workArea.height;
+    bottomInset = Math.max(0, Math.ceil(boundsBottom - workAreaBottom));
+  }
+
+  mainWindow.webContents.send('electron:video-overlay-fullscreen-sync', {
+    active: isActive,
+    bottomInset,
+  });
+}
+*/
+
 function createWindow() {
   const iconPath = getWindowIconPath();
   const windowOptions = {
@@ -1270,6 +1384,29 @@ function createWindow() {
   mainWindow = new BrowserWindow(windowOptions);
   applyWindowIcon(mainWindow);
   mainWindow.webContents.setBackgroundThrottling(false);
+
+  /*
+  mainWindow.webContents.on('enter-html-full-screen', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    videoOverlayFullscreenActive = true;
+    enterVideoBorderlessFullscreen(mainWindow);
+
+    setTimeout(() => sendVideoOverlaySync(true), 50);
+  });
+
+  mainWindow.webContents.on('leave-html-full-screen', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    videoOverlayFullscreenActive = false;
+    exitVideoBorderlessFullscreen(mainWindow);
+    sendVideoOverlaySync(false);
+  });
+  */
 
   mainWindow.webContents.on('before-input-event', (_event, input) => {
     const key = String(input.key || '').toLowerCase();
@@ -1507,6 +1644,43 @@ ipcMain.on('electron:window-toggle-maximize', (event) => {
     win.maximize();
   }
 });
+
+/*
+ipcMain.handle('electron:get-window-content-size', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    return null;
+  }
+
+  const [width, height] = win.getContentSize();
+  return { width, height };
+});
+
+ipcMain.on('electron:video-overlay-fullscreen', (event, active) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== mainWindow) {
+    return;
+  }
+
+  const nextActive = Boolean(active);
+  videoOverlayFullscreenActive = nextActive;
+
+  if (nextActive) {
+    const entered = enterVideoBorderlessFullscreen(win);
+    if (!entered) {
+      videoOverlayFullscreenActive = false;
+      sendVideoOverlaySync(false);
+      return;
+    }
+
+    sendVideoOverlaySync(true);
+    return;
+  }
+
+  exitVideoBorderlessFullscreen(win);
+  setTimeout(() => sendVideoOverlaySync(false), 100);
+});
+*/
 
 ipcMain.on('electron:window-close', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);

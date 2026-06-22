@@ -98,19 +98,19 @@
     max-width: 100%;
     padding: 6px;
   }
-  
+
   .audio-message .waveform-container {
     flex: 1 1 auto;
     width: auto;
     min-width: 56px;
     height: 32px !important;
   }
-  
+
   .audio-message .play-pause-button {
     width: 28px;
     height: 28px;
   }
-  
+
   .audio-message .duration {
     font-size: 12px;
   }

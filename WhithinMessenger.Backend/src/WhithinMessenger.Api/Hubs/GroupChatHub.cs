@@ -448,7 +448,9 @@ public class GroupChatHub : Hub
                                     fileSize = mf.FileSize,
                                     thumbnailPath = mf.ThumbnailPath,
                                     createdAt = mf.CreatedAt,
-                                    isVideoNote = mf.IsVideoNote
+                                    isVideoNote = mf.IsVideoNote,
+                                    durationSeconds = mf.DurationSeconds,
+                                    streamingManifestPath = mf.StreamingManifestPath
                                 }).ToList()
                             };
                         }
@@ -936,7 +938,9 @@ public class GroupChatHub : Hub
                             fileSize = mf.FileSize,
                             thumbnailPath = mf.ThumbnailPath,
                             createdAt = mf.CreatedAt,
-                            isVideoNote = mf.IsVideoNote
+                            isVideoNote = mf.IsVideoNote,
+                            durationSeconds = mf.DurationSeconds,
+                            streamingManifestPath = mf.StreamingManifestPath
                         }).ToList();
                     }
 
@@ -1754,7 +1758,9 @@ public class GroupChatHub : Hub
                     fileSize = mf.FileSize,
                     thumbnailPath = mf.ThumbnailPath,
                     createdAt = mf.CreatedAt,
-                    isVideoNote = mf.IsVideoNote
+                    isVideoNote = mf.IsVideoNote,
+                    durationSeconds = mf.DurationSeconds,
+                    streamingManifestPath = mf.StreamingManifestPath
                 }).ToList()
             };
         }

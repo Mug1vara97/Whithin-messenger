@@ -104,7 +104,7 @@ namespace WhithinMessenger.Application.Services
         {
             try
             {
-                var fullPath = Path.Combine(_webRootPath, filePath);
+                var fullPath = ResolveStoredPath(filePath);
                 if (File.Exists(fullPath))
                 {
                     File.Delete(fullPath);
@@ -117,6 +117,35 @@ namespace WhithinMessenger.Application.Services
                 _logger.LogError(ex, "Error deleting file: {FilePath}", filePath);
                 return false;
             }
+        }
+
+        public Task DeleteDirectoryAsync(string relativeDirectoryPath, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var fullPath = ResolveStoredPath(relativeDirectoryPath);
+                if (Directory.Exists(fullPath))
+                {
+                    Directory.Delete(fullPath, recursive: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error deleting directory: {DirectoryPath}", relativeDirectoryPath);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private string ResolveStoredPath(string storedPath)
+        {
+            var normalized = storedPath.Replace('\\', '/').TrimStart('/');
+            if (normalized.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.Combine(_webRootPath, normalized);
+            }
+
+            return Path.Combine(_webRootPath, normalized);
         }
 
         public async Task<byte[]?> GetFileAsync(string filePath)

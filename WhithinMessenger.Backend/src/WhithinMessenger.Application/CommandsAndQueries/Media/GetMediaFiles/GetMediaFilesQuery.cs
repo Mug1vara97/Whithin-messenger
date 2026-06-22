@@ -31,4 +31,6 @@ public record MediaFileDto
     public string SenderUsername { get; init; } = string.Empty;
     public string? Caption { get; init; }
     public bool IsVideoNote { get; init; }
+    public double? DurationSeconds { get; init; }
+    public string? StreamingManifestPath { get; init; }
 }

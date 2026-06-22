@@ -45,7 +45,9 @@ public class GetMediaFilesQueryHandler : IRequestHandler<GetMediaFilesQuery, Get
                 CreatedAt = mf.CreatedAt,
                 SenderUsername = mf.Message?.User?.UserName ?? "Unknown",
                 Caption = mf.Message?.Content,
-                IsVideoNote = mf.IsVideoNote
+                IsVideoNote = mf.IsVideoNote,
+                DurationSeconds = mf.DurationSeconds,
+                StreamingManifestPath = mf.StreamingManifestPath
             })
             .ToList();
 

@@ -409,7 +409,7 @@ const ChatList = ({
     skipNextChatClickRef.current = false;
   }, []);
 
-  const handlePinnedDragEnd = useCallback(async (result) => {
+  const handlePinnedDragEnd = useCallback((result) => {
     if (!result.destination || result.source.droppableId !== 'pinned-chats') {
       return;
     }
@@ -433,11 +433,7 @@ const ChatList = ({
       .map((chat) => chat.chatId ?? chat.chat_id)
       .filter(Boolean);
 
-    try {
-      await reorderPinnedChats(orderedIds);
-    } catch (error) {
-      console.error('Error reordering pinned chats:', error);
-    }
+    void reorderPinnedChats(orderedIds);
   }, [chatSections.pinnedChats, reorderPinnedChats]);
 
 

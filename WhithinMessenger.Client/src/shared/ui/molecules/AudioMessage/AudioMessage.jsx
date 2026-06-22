@@ -18,9 +18,10 @@ import './AudioMessage.css';
 
 const formatTime = (time) => {
   if (!Number.isFinite(time) || time < 0) return '0:00';
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  const rounded = Math.max(0, Math.round(time));
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
 const readWaveformColors = (rootElement) => {
@@ -80,23 +81,30 @@ const AudioMessage = ({ mediaFile }) => {
 
   const tryResolveDurationFromAudio = useCallback(
     async (audio, { probe = false } = {}) => {
-      if (!audio || durationRef.current > 0) return durationRef.current;
+      if (!audio) return durationRef.current;
+
+      const applyIfChanged = (value) => {
+        if (!isValidAudioDuration(value)) return durationRef.current;
+        if (Math.abs(durationRef.current - value) < 0.05) return value;
+        applyDuration(value);
+        syncWaveformDuration(value);
+        return value;
+      };
 
       if (isValidAudioDuration(audio.duration)) {
-        applyDuration(audio.duration);
-        return audio.duration;
+        return applyIfChanged(audio.duration);
       }
+
+      if (durationRef.current > 0) return durationRef.current;
 
       if (probe) {
         const probed = await probeDurationOnElement(audio, { resetPosition: true });
         if (probed > 0) {
-          applyDuration(probed);
-          syncWaveformDuration(probed);
-          return probed;
+          return applyIfChanged(probed);
         }
       }
 
-      return 0;
+      return durationRef.current;
     },
     [applyDuration, syncWaveformDuration]
   );
@@ -151,7 +159,7 @@ const AudioMessage = ({ mediaFile }) => {
         if (isStale()) return;
 
         peaksRef.current = peaks;
-        if (!durationRef.current && decodedDuration > 0) {
+        if (decodedDuration > 0) {
           applyDuration(decodedDuration);
         }
 
@@ -162,9 +170,24 @@ const AudioMessage = ({ mediaFile }) => {
 
         if (!durationRef.current) {
           await tryResolveDurationFromAudio(audio, { probe: true });
+        } else {
+          await tryResolveDurationFromAudio(audio);
         }
 
         if (isStale()) return;
+
+        if (!durationRef.current) {
+          console.debug('[AudioMessage] duration unresolved after init', {
+            filePath,
+            contentType,
+            audioUrl,
+            fromMeta: readMediaFileDuration(mediaFile),
+            fromCache: readCachedAudioDuration(filePath),
+            decodedDuration,
+            elementDuration: audio?.duration,
+            mediaFile,
+          });
+        }
 
         const waveDuration = durationRef.current > 0 ? durationRef.current : 0;
         const waveformColors = readWaveformColors(rootRef.current);
@@ -193,9 +216,8 @@ const AudioMessage = ({ mediaFile }) => {
           const time = audio.currentTime;
           setCurrentTime(time);
 
-          if (!durationRef.current && isValidAudioDuration(audio.duration)) {
-            applyDuration(audio.duration);
-            syncWaveformDuration(audio.duration);
+          if (isValidAudioDuration(audio.duration)) {
+            void tryResolveDurationFromAudio(audio);
           }
 
           const total = durationRef.current;
