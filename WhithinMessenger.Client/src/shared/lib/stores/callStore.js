@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { voiceCallApi, isIntentionalLiveKitDisconnect } from '../../../entities/voice-call/api/voiceCallApi';
 import { NoiseSuppressionManager } from '../utils/noiseSuppression';
 import { audioNotificationManager } from '../utils/audioNotifications';
-import { VoiceActivityDetector } from '../utils/voiceActivityDetector';
+import { VoiceActivityDetector, VOICE_ACTIVATION_VAD_OPTIONS } from '../utils/voiceActivityDetector';
 import { RoomEvent, Track } from 'livekit-client';
 import { userApi } from '../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
@@ -21,6 +21,18 @@ import {
   disconnectCallMasterOutputBus,
   ensureCallMasterOutputBus,
 } from '../utils/callAudioMasterBus';
+import {
+  applyLiveVoiceCallSettings,
+  applyOutputAudioDevice,
+  getAudioInputMediaConstraints,
+  getEffectiveMicThreshold,
+  micThresholdToNoiseGateOpenDb,
+} from '../utils/voiceCallAudioSettings';
+import {
+  applyVoiceActivationTransmission,
+  applyVoiceActivationTransmissionFromDetector,
+} from '../utils/voiceActivationTransmission';
+import { volumeStorage } from '../utils/volumeStorage';
 import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModerationState';
 import { buildCallOnlyChannelEntry } from '../voice/callOnlyVoiceChannels';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
@@ -257,7 +269,7 @@ const refreshInAppMixedPublishTrack = async (state, noiseSuppressed) => {
     return getMixedPublishTrack();
   }
   await soundpadInAppMixer.attachMicStream(micStream);
-  soundpadInAppMixer.setMicMuted(state.isMuted);
+  applyVoiceActivationTransmissionFromDetector(state);
   return getMixedPublishTrack();
 };
 
@@ -800,8 +812,8 @@ export const useCallStore = create(
         
         const detector = new VoiceActivityDetector({
           audioContext,
-          threshold: 14,
-          holdTime: 300,
+          threshold: getEffectiveMicThreshold(volumeStorage.getMicThreshold()),
+          ...VOICE_ACTIVATION_VAD_OPTIONS,
           onSpeakingChange: (isSpeaking) => {
             const currentState = get();
             const localUserId = String(currentState.currentUserId || userId);
@@ -813,6 +825,7 @@ export const useCallStore = create(
             }
 
             get().updateSpeakingState(localUserId, isSpeaking);
+            applyVoiceActivationTransmission(get(), isSpeaking);
           }
         });
         
@@ -2482,15 +2495,7 @@ export const useCallStore = create(
             ? JSON.parse(savedNoiseSuppression)
             : false;
 
-          const buildMicConstraints = () => ({
-            echoCancellation: true,
-            noiseSuppression: wantsNoiseSuppression,
-            autoGainControl: true,
-            sampleRate: 48000,
-            channelCount: 1,
-            latency: 0,
-            suppressLocalAudioPlayback: true,
-          });
+          const buildMicConstraints = () => getAudioInputMediaConstraints().audio;
 
           if (!stream || wantsNoiseSuppression || usesInAppSoundpad()) {
             const capturedStream = await navigator.mediaDevices.getUserMedia({
@@ -2520,6 +2525,9 @@ export const useCallStore = create(
 
           const noiseSuppressionManager = new NoiseSuppressionManager();
           await noiseSuppressionManager.initialize(stream, audioContext);
+          noiseSuppressionManager.setNoiseGateThreshold(
+            micThresholdToNoiseGateOpenDb(volumeStorage.getMicThreshold()),
+          );
           set({ noiseSuppressionManager });
 
           if (wantsNoiseSuppression) {
@@ -2530,7 +2538,7 @@ export const useCallStore = create(
 
           if (usesInAppSoundpad()) {
             await soundpadInAppMixer.attachMicStream(streamForPublish);
-            soundpadInAppMixer.setMicMuted(state.isMuted);
+            soundpadInAppMixer.setVoiceActivationOpen(false);
             streamForPublish = soundpadInAppMixer.getMixedStream();
             set({ audioStream: streamForPublish });
           }
@@ -2554,8 +2562,7 @@ export const useCallStore = create(
           }
 
           const publishMicEnabled = usesInAppSoundpad() ? true : !state.isMuted;
-          audioTrack.enabled = publishMicEnabled;
-          
+
           const publishTrack = streamForPublish.getAudioTracks()[0];
           const needsCustomPublish = wantsNoiseSuppression || usesInAppSoundpad();
 
@@ -2588,6 +2595,8 @@ export const useCallStore = create(
             }
           }
           
+          applyVoiceActivationTransmission(get(), false);
+
           console.log('Audio stream created with noise suppression support');
         } catch (error) {
           console.error('Failed to create audio stream:', error);
@@ -2654,19 +2663,20 @@ export const useCallStore = create(
           if (serverMuted || muted) {
             try {
               if (usesInAppSoundpad()) {
-                soundpadInAppMixer.setMicMuted(muted);
                 await voiceCallApi.setMicrophoneEnabled(true);
                 voiceCallApi.broadcastMuteState(muted);
               } else {
                 await voiceCallApi.setMicrophoneEnabled(!muted);
                 voiceCallApi.broadcastMuteState(muted);
               }
+              applyVoiceActivationTransmission(get(), false);
             } catch (error) {
               console.warn('Failed to apply server mic moderation:', error);
               voiceCallApi.broadcastMuteState(muted);
             }
           } else {
             set({ isMuted: muted });
+            applyVoiceActivationTransmissionFromDetector(get());
           }
 
           if (muted) {
@@ -2791,27 +2801,22 @@ export const useCallStore = create(
         }
 
         try {
+          const speaking = get().localVoiceActivityDetector?.getSpeakingState?.() ?? false;
+
           if (usesInAppSoundpad()) {
-            soundpadInAppMixer.setMicMuted(newMutedState);
-            const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
-            if (mixedTrack) {
-              mixedTrack.enabled = true;
+            if (newMutedState) {
+              applyVoiceActivationTransmission(get(), false);
+            } else {
+              await voiceCallApi.setMicrophoneEnabled(true);
+              const mixedTrack = soundpadInAppMixer.getMixedStream()?.getAudioTracks()[0];
+              if (mixedTrack) {
+                mixedTrack.enabled = true;
+              }
+              applyVoiceActivationTransmission(get(), speaking);
             }
-            await voiceCallApi.setMicrophoneEnabled(true);
           } else {
             await voiceCallApi.setMicrophoneEnabled(!newMutedState);
-            if (state.noiseSuppressionManager) {
-              const processedStream = state.noiseSuppressionManager.getProcessedStream();
-              const audioTrack = processedStream?.getAudioTracks()[0];
-              if (audioTrack) {
-                audioTrack.enabled = !newMutedState;
-              }
-            } else if (state.localStream) {
-              const audioTrack = state.localStream.getAudioTracks()[0];
-              if (audioTrack) {
-                audioTrack.enabled = !newMutedState;
-              }
-            }
+            applyVoiceActivationTransmission(get(), newMutedState ? false : speaking);
           }
         } catch (error) {
           console.warn('Failed to toggle microphone via LiveKit:', error);
@@ -3036,6 +3041,7 @@ export const useCallStore = create(
           audioElement.controls = false;
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
+          void applyOutputAudioDevice(volumeStorage.getOutputDeviceId(), [audioElement]);
         }
         audioElement.srcObject = mediaStream;
 
@@ -3350,13 +3356,7 @@ export const useCallStore = create(
             localStorage.setItem('noiseSuppression', JSON.stringify(newState));
             
             // Обновляем состояние микрофона для обработанного трека
-            if (state.noiseSuppressionManager) {
-              const processedStream = state.noiseSuppressionManager.getProcessedStream();
-              const audioTrack = processedStream?.getAudioTracks()[0];
-              if (audioTrack) {
-                audioTrack.enabled = !state.isMuted;
-              }
-            }
+            applyVoiceActivationTransmissionFromDetector(get());
             
             // Обновляем трек в LiveKit через unpublishTrack и publishTrack
             const room = voiceCallApi.getRoom();
@@ -3457,8 +3457,9 @@ export const useCallStore = create(
                     console.log('LiveKit track published with noise suppression:', newState, 'track readyState:', trackToPublish.readyState);
                   }
                   
-                  // Восстанавливаем состояние микрофона
+                  // Восстанавливаем публикацию и voice activation
                   await localParticipant.setMicrophoneEnabled(!wasMuted);
+                  applyVoiceActivationTransmissionFromDetector(get());
                 } catch (error) {
                   console.warn('Failed to replace LiveKit track:', error);
                   // В случае ошибки просто включаем микрофон обратно
@@ -3528,9 +3529,11 @@ export const useCallStore = create(
                     }
 
                     await localParticipant.setMicrophoneEnabled(!wasMuted);
+                    applyVoiceActivationTransmissionFromDetector(get());
                   } catch (error) {
                     console.warn('Failed to replace LiveKit track:', error);
                     await localParticipant.setMicrophoneEnabled(!state.isMuted);
+                    applyVoiceActivationTransmissionFromDetector(get());
                   }
                 }
               }
@@ -4516,3 +4519,9 @@ export const useCallStore = create(
     }
   )
 );
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('voiceCallSettingsChanged', () => {
+    applyLiveVoiceCallSettings(useCallStore.getState());
+  });
+}

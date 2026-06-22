@@ -13,6 +13,7 @@ class SoundpadInAppMixer {
     this.soundpadGain = null;
     this.destination = null;
     this.micMuted = false;
+    this.voiceActivationOpen = false;
     this.activeSources = new Set();
   }
 
@@ -73,10 +74,10 @@ class SoundpadInAppMixer {
     this.soundpadGain = this.audioContext.createGain();
     this.destination = this.audioContext.createMediaStreamDestination();
 
-    this.micGain.gain.value = this.micMuted ? 0 : 1;
     this.micSource.connect(this.micGain);
     this.micGain.connect(this.destination);
     this.soundpadGain.connect(this.destination);
+    this._applyMicGain();
 
     soundpadLog('soundpadInAppMixer: graph ready (single publish stream)');
     return this.getMixedStream();
@@ -105,10 +106,19 @@ class SoundpadInAppMixer {
 
   setMicMuted(muted) {
     this.micMuted = Boolean(muted);
-    if (this.micGain) {
-      this.micGain.gain.value = this.micMuted ? 0 : 1;
-    }
+    this._applyMicGain();
     soundpadLog('soundpadInAppMixer: mic muted =', this.micMuted);
+  }
+
+  setVoiceActivationOpen(open) {
+    this.voiceActivationOpen = Boolean(open);
+    this._applyMicGain();
+  }
+
+  _applyMicGain() {
+    if (!this.micGain) return;
+    const transmit = !this.micMuted && this.voiceActivationOpen;
+    this.micGain.gain.value = transmit ? 1 : 0;
   }
 
   async playBlob(blob, volume = 1) {

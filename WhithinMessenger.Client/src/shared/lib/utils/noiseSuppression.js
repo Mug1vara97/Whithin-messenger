@@ -11,6 +11,11 @@ import rnnoiseWorkletPath from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.
 import speexWasmPath from '@sapphi-red/web-noise-suppressor/speex.wasm?url';
 import rnnoiseWasmPath from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import rnnoiseWasmSimdPath from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
+import {
+  getInputGainMultiplierFromStorage,
+  micThresholdToNoiseGateOpenDb,
+} from './voiceCallAudioSettings';
+import { volumeStorage } from './volumeStorage';
 
 export class NoiseSuppressionManager {
   constructor() {
@@ -113,15 +118,16 @@ export class NoiseSuppressionManager {
         gainOffset: 5  // Изменено с -15 на +5 (усиление вместо подавления)
       });
 
+      const gateOpenDb = micThresholdToNoiseGateOpenDb(volumeStorage.getMicThreshold());
       this.noiseGateNode = new NoiseGateWorkletNode(this.audioContext, {
-        openThreshold: -65,
-        closeThreshold: -70,
+        openThreshold: gateOpenDb,
+        closeThreshold: gateOpenDb - 5,
         holdMs: 150,
         maxChannels: 1 // Изменено на 1 канал для совместимости с getUserMedia
       });
 
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 2.0;  // Увеличено с 1.0 до 2.0 (200% усиление)
+      this.gainNode.gain.value = getInputGainMultiplierFromStorage();
 
       // Создаем High-Pass фильтр для удаления низких частот (звуки клавиатуры, дыхание)
       this.highPassFilter = this.audioContext.createBiquadFilter();
@@ -284,6 +290,29 @@ export class NoiseSuppressionManager {
       return 1.0;
     }
     return this.gainNode.gain.value;
+  }
+
+  setNoiseGateThreshold(openThresholdDb) {
+    try {
+      if (!this._isInitialized || !this.noiseGateNode) {
+        return false;
+      }
+
+      const openDb = Math.max(-90, Math.min(-20, Number(openThresholdDb) || -65));
+      const closeDb = openDb - 5;
+      const openParam = this.noiseGateNode.parameters?.get?.('openThreshold');
+      const closeParam = this.noiseGateNode.parameters?.get?.('closeThreshold');
+      if (openParam) {
+        openParam.value = openDb;
+      }
+      if (closeParam) {
+        closeParam.value = closeDb;
+      }
+      return true;
+    } catch (error) {
+      console.warn('NoiseSuppressionManager: Failed to set noise gate threshold:', error);
+      return false;
+    }
   }
 
   // Метод для настройки частоты среза High-Pass фильтра

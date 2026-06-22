@@ -51,6 +51,7 @@ import {
   resolveUserDisplayName,
 } from '../../../lib/utils/userDisplayNameHelpers';
 import { AppSoundSettingsSection } from '../../molecules/AppSoundSettingsSection/AppSoundSettingsSection';
+import { AudioSettingsSection } from '../../molecules/AudioSettingsSection';
 import { FrostedGlassSettingsSection } from '../../molecules/FrostedGlassSettingsSection/FrostedGlassSettingsSection';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
@@ -612,6 +613,12 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
       case 'audio':
         return (
           <>
+            <SettingsPanel title="Устройства и громкость">
+              <div className="settings-embedded-block">
+                <AudioSettingsSection active={isOpen && activeTab === 'audio'} />
+              </div>
+            </SettingsPanel>
+
             <SettingsPanel title="Микрофон">
               <SettingsToggle
                 id="settings-noise-suppression"

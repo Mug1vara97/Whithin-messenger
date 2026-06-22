@@ -4,11 +4,27 @@
  * Использует Web Audio API для анализа аудио потока
  */
 
+import {
+  createSpeechBandAnalyserChain,
+  measureSpeechBandLevel,
+} from './voiceLevelAnalysis';
+
+/** Shared tuning for call transmission + mic test preview. */
+export const VOICE_ACTIVATION_VAD_OPTIONS = {
+  holdTime: 220,
+  activationDebounceTime: 35,
+  deactivationDebounceTime: 100,
+  minActivationFrames: 2,
+  smoothingFactor: 0.5,
+};
+
 export class VoiceActivityDetector {
   constructor(options = {}) {
     this.audioContext = options.audioContext || null;
     this.analyser = null;
     this.source = null;
+    this.speechHighPass = null;
+    this.speechLowPass = null;
     this.scriptProcessor = null;
     this.silentGain = null;
     this.dataArray = null;
@@ -16,15 +32,26 @@ export class VoiceActivityDetector {
 
     // Настройки детекции
     this.threshold = options.threshold || 30;
-    this.smoothingFactor = options.smoothingFactor || 0.5;
-    this.holdTime = options.holdTime || 400;
-    this.debounceTime = options.debounceTime || 200;
+    this.smoothingFactor = options.smoothingFactor ?? VOICE_ACTIVATION_VAD_OPTIONS.smoothingFactor;
+    this.holdTime = options.holdTime ?? VOICE_ACTIVATION_VAD_OPTIONS.holdTime;
+    this.activationDebounceTime =
+      options.activationDebounceTime ?? VOICE_ACTIVATION_VAD_OPTIONS.activationDebounceTime;
+    this.deactivationDebounceTime =
+      options.deactivationDebounceTime ?? VOICE_ACTIVATION_VAD_OPTIONS.deactivationDebounceTime;
+    // Legacy single debounce value — applies to both directions if new options omitted.
+    if (options.debounceTime != null) {
+      this.activationDebounceTime = options.debounceTime;
+      this.deactivationDebounceTime = options.debounceTime;
+    }
+    this.minActivationFrames =
+      options.minActivationFrames ?? VOICE_ACTIVATION_VAD_OPTIONS.minActivationFrames;
 
     // Состояние
     this.isSpeaking = false;
     this.lastSpeakingTime = 0;
     this.lastStateChangeTime = 0;
     this.smoothedVolume = 0;
+    this.framesAboveThreshold = 0;
 
     // Коллбэки
     this.onSpeakingChange = options.onSpeakingChange || (() => {});
@@ -55,23 +82,22 @@ export class VoiceActivityDetector {
         await this.audioContext.resume();
       }
 
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.8;
-
       this.source = this.audioContext.createMediaStreamSource(stream);
+      const chain = createSpeechBandAnalyserChain(this.audioContext, this.source);
+      this.speechHighPass = chain.highPass;
+      this.speechLowPass = chain.lowPass;
+      this.analyser = chain.analyser;
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
       // Анализ на аудио-потоке: не зависит от requestAnimationFrame (свёрнутое окно).
       this.silentGain = this.audioContext.createGain();
       this.silentGain.gain.value = 0;
-      this.scriptProcessor = this.audioContext.createScriptProcessor(2048, 1, 1);
+      this.scriptProcessor = this.audioContext.createScriptProcessor(1024, 1, 1);
       this.scriptProcessor.onaudioprocess = () => {
         if (!this.isRunning || !this.analyser) return;
         this.processFrame();
       };
 
-      this.source.connect(this.analyser);
       this.analyser.connect(this.scriptProcessor);
       this.scriptProcessor.connect(this.silentGain);
       this.silentGain.connect(this.audioContext.destination);
@@ -93,11 +119,11 @@ export class VoiceActivityDetector {
 
     this.analyser.getByteFrequencyData(this.dataArray);
 
-    let sum = 0;
-    for (let i = 0; i < this.dataArray.length; i++) {
-      sum += this.dataArray[i];
-    }
-    const averageVolume = sum / this.dataArray.length;
+    const averageVolume = measureSpeechBandLevel(
+      this.dataArray,
+      this.analyser.fftSize,
+      this.audioContext.sampleRate,
+    );
 
     this.smoothedVolume =
       this.smoothedVolume * (1 - this.smoothingFactor) + averageVolume * this.smoothingFactor;
@@ -107,15 +133,24 @@ export class VoiceActivityDetector {
     let newSpeakingState = this.isSpeaking;
 
     if (this.smoothedVolume > this.threshold) {
-      newSpeakingState = true;
-      this.lastSpeakingTime = now;
-    } else if (now - this.lastSpeakingTime > this.holdTime) {
-      newSpeakingState = false;
+      this.framesAboveThreshold += 1;
+      if (this.framesAboveThreshold >= this.minActivationFrames) {
+        newSpeakingState = true;
+        this.lastSpeakingTime = now;
+      }
+    } else {
+      this.framesAboveThreshold = 0;
+      if (now - this.lastSpeakingTime > this.holdTime) {
+        newSpeakingState = false;
+      }
     }
 
     const timeSinceLastChange = now - this.lastStateChangeTime;
+    const debounceTime = newSpeakingState
+      ? this.activationDebounceTime
+      : this.deactivationDebounceTime;
 
-    if (wasSpeaking !== newSpeakingState && timeSinceLastChange >= this.debounceTime) {
+    if (wasSpeaking !== newSpeakingState && timeSinceLastChange >= debounceTime) {
       this.isSpeaking = newSpeakingState;
       this.lastStateChangeTime = now;
       this.onSpeakingChange(this.isSpeaking);
@@ -154,6 +189,24 @@ export class VoiceActivityDetector {
       }
     }
 
+    if (this.speechLowPass) {
+      try {
+        this.speechLowPass.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this.speechLowPass = null;
+    }
+
+    if (this.speechHighPass) {
+      try {
+        this.speechHighPass.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this.speechHighPass = null;
+    }
+
     if (this.source) {
       try {
         this.source.disconnect();
@@ -171,6 +224,7 @@ export class VoiceActivityDetector {
     this.analyser = null;
     this.dataArray = null;
     this.smoothedVolume = 0;
+    this.framesAboveThreshold = 0;
     this.lastSpeakingTime = 0;
     this.lastStateChangeTime = 0;
 
@@ -182,6 +236,7 @@ export class VoiceActivityDetector {
       this.isSpeaking = false;
       this.lastSpeakingTime = 0;
       this.lastStateChangeTime = Date.now();
+      this.framesAboveThreshold = 0;
       this.onSpeakingChange(false);
       console.log('[VAD] Force reset speaking state');
     }
