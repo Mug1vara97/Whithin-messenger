@@ -128,6 +128,11 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
         const formData = new FormData();
         formData.append('chatId', String(chatId));
+        const senderUsername =
+          username?.trim() || tokenManager.getUserFromToken()?.username?.trim() || '';
+        if (senderUsername) {
+          formData.append('username', senderUsername);
+        }
         if (caption) {
           formData.append('caption', caption);
         }

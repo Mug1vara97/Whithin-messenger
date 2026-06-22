@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using System.Globalization;
+using System.Security.Claims;
 using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMedia;
 using WhithinMessenger.Application.CommandsAndQueries.Media.UploadMediaBatch;
 using WhithinMessenger.Application.CommandsAndQueries.Media.DeleteMedia;
@@ -11,6 +12,7 @@ using WhithinMessenger.Application.Services;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Api.Services;
 using WhithinMessenger.Domain.Interfaces;
+using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -135,6 +137,8 @@ public class MediaController : ControllerBase
                             senderId = userId,
                             content = caption ?? string.Empty, 
                             username = username ?? "Unknown",
+                            senderDisplayName = userProfile?.DisplayName,
+                            senderLogin = username,
                             chatId = parsedChatId,
                             avatarUrl = avatarUrl,
                             avatarColor = avatarColor,
@@ -253,6 +257,8 @@ public class MediaController : ControllerBase
                         senderId = userId,
                         content = caption ?? string.Empty,
                         username = username ?? "Unknown",
+                        senderDisplayName = userProfile?.DisplayName,
+                        senderLogin = username,
                         chatId = parsedChatId,
                         avatarUrl = avatarUrl,
                         avatarColor = avatarColor,
@@ -418,18 +424,17 @@ public class MediaController : ControllerBase
 
     private string? GetCurrentUsername()
     {
-        var httpContext = HttpContext;
-        _logger.LogInformation($"GetCurrentUsername: HttpContext is null: {httpContext == null}");
-        
-        if (httpContext?.Items.ContainsKey("User") == true)
+        if (HttpContext?.Items["User"] is ApplicationUser appUser
+            && !string.IsNullOrWhiteSpace(appUser.UserName))
         {
-            var user = httpContext.Items["User"] as Microsoft.AspNetCore.Identity.IdentityUser;
-            _logger.LogInformation($"GetCurrentUsername: User found in context: {user?.UserName}");
-            return user?.UserName;
+            return appUser.UserName;
         }
-        
-        _logger.LogWarning("GetCurrentUsername: No User found in HttpContext.Items");
-        return null;
+
+        var fromClaims = User.FindFirst("Username")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? User.Identity?.Name;
+
+        return string.IsNullOrWhiteSpace(fromClaims) ? null : fromClaims;
     }
 
     private static string GenerateAvatarColor(Guid userId) 
