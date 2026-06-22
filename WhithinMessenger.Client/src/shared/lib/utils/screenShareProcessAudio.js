@@ -1,3 +1,6 @@
+const TARGET_SAMPLE_RATE = 48000;
+const TARGET_CHANNELS = 2;
+
 function toFloat32Array(buffer) {
   if (buffer instanceof Float32Array) {
     return buffer;
@@ -14,6 +17,58 @@ function toFloat32Array(buffer) {
     return new Float32Array(buffer);
   }
   return new Float32Array(0);
+}
+
+function resamplePcm(floatBuffer, channels, sampleRate, targetRate = TARGET_SAMPLE_RATE) {
+  if (sampleRate === targetRate) {
+    return floatBuffer;
+  }
+
+  const inputFrames = Math.floor(floatBuffer.length / channels);
+  if (inputFrames <= 0) {
+    return floatBuffer;
+  }
+
+  const outputFrames = Math.max(1, Math.round(inputFrames * (targetRate / sampleRate)));
+  const output = new Float32Array(outputFrames * channels);
+  const step = sampleRate / targetRate;
+
+  for (let outFrame = 0; outFrame < outputFrames; outFrame += 1) {
+    const srcPos = outFrame * step;
+    const srcIndex = Math.floor(srcPos);
+    const frac = srcPos - srcIndex;
+    const nextIndex = Math.min(srcIndex + 1, inputFrames - 1);
+
+    for (let ch = 0; ch < channels; ch += 1) {
+      const s0 = floatBuffer[srcIndex * channels + ch] ?? 0;
+      const s1 = floatBuffer[nextIndex * channels + ch] ?? s0;
+      output[outFrame * channels + ch] = s0 + frac * (s1 - s0);
+    }
+  }
+
+  return output;
+}
+
+function upmixToStereo(floatBuffer, channels) {
+  if (channels >= TARGET_CHANNELS) {
+    return { buffer: floatBuffer, channels: TARGET_CHANNELS };
+  }
+
+  const frames = Math.floor(floatBuffer.length / channels);
+  const stereo = new Float32Array(frames * TARGET_CHANNELS);
+
+  for (let frame = 0; frame < frames; frame += 1) {
+    const sample = floatBuffer[frame * channels] ?? 0;
+    stereo[frame * 2] = sample;
+    stereo[frame * 2 + 1] = sample;
+  }
+
+  return { buffer: stereo, channels: TARGET_CHANNELS };
+}
+
+function normalizePcm(floatBuffer, channels, sampleRate) {
+  const resampled = resamplePcm(floatBuffer, channels, sampleRate, TARGET_SAMPLE_RATE);
+  return upmixToStereo(resampled, channels);
 }
 
 function canUseMediaStreamTrackGenerator() {
@@ -33,7 +88,8 @@ export class ScreenShareProcessAudioSession {
     this.fallbackTrack = null;
     this.timestampUs = 0;
     this.stopped = false;
-    this.writeQueue = Promise.resolve();
+    this.writeInFlight = false;
+    this.pendingAudioData = null;
     this.sampleRate = 48000;
     this.channels = 2;
   }
@@ -108,13 +164,13 @@ export class ScreenShareProcessAudioSession {
   }
 
   createFallbackTrack() {
-    this.audioContext = new AudioContext();
+    this.audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
     const destination = this.audioContext.createMediaStreamDestination();
     this.fallbackTrack = destination.stream.getAudioTracks()[0];
     this.fallbackWorkletNode = null;
     this.pendingFrames = [];
 
-    const scriptNode = this.audioContext.createScriptProcessor(4096, this.channels, this.channels);
+    const scriptNode = this.audioContext.createScriptProcessor(4096, TARGET_CHANNELS, TARGET_CHANNELS);
     scriptNode.onaudioprocess = (event) => {
       const output = event.outputBuffer;
       const frames = output.length;
@@ -145,22 +201,37 @@ export class ScreenShareProcessAudioSession {
   }
 
   enqueueAudioData(audioData) {
-    this.writeQueue = this.writeQueue
-      .then(() => this.feedAudioData(audioData))
+    if (this.writeInFlight) {
+      this.pendingAudioData = audioData;
+      return;
+    }
+
+    this.writeInFlight = true;
+    Promise.resolve(this.feedAudioData(audioData))
       .catch((error) => {
         console.warn('[screen-audio] failed to feed process audio frame:', error);
+      })
+      .finally(() => {
+        this.writeInFlight = false;
+        if (this.pendingAudioData) {
+          const next = this.pendingAudioData;
+          this.pendingAudioData = null;
+          this.enqueueAudioData(next);
+        }
       });
   }
 
   async feedAudioData(audioData) {
-    const channels = Math.max(1, Number(audioData?.channels) || 2);
-    const sampleRate = Math.max(8000, Number(audioData?.sampleRate) || 48000);
+    const sourceChannels = Math.max(1, Number(audioData?.channels) || TARGET_CHANNELS);
+    const sourceRate = Math.max(8000, Number(audioData?.sampleRate) || TARGET_SAMPLE_RATE);
     const floatBuffer = toFloat32Array(audioData?.buffer);
-    const frames = Math.floor(floatBuffer.length / channels);
+    const { buffer, channels } = normalizePcm(floatBuffer, sourceChannels, sourceRate);
+    const frames = Math.floor(buffer.length / channels);
     if (frames <= 0) {
       return;
     }
 
+    const sampleRate = TARGET_SAMPLE_RATE;
     this.sampleRate = sampleRate;
     this.channels = channels;
 
@@ -171,7 +242,7 @@ export class ScreenShareProcessAudioSession {
         numberOfFrames: frames,
         numberOfChannels: channels,
         timestamp: this.timestampUs,
-        data: floatBuffer,
+        data: buffer,
       });
       this.timestampUs += Math.round((frames / sampleRate) * 1_000_000);
       await this.writer.write(audioFrame);
@@ -183,7 +254,7 @@ export class ScreenShareProcessAudioSession {
       for (let frame = 0; frame < frames; frame += 1) {
         const sample = [];
         for (let ch = 0; ch < channels; ch += 1) {
-          sample.push(floatBuffer[frame * channels + ch] ?? 0);
+          sample.push(buffer[frame * channels + ch] ?? 0);
         }
         this.pendingFrames.push(sample);
       }
@@ -206,7 +277,18 @@ export class ScreenShareProcessAudioSession {
     }
 
     try {
-      await this.writeQueue;
+      if (this.writeInFlight) {
+        await new Promise((resolve) => {
+          const check = () => {
+            if (!this.writeInFlight) {
+              resolve();
+              return;
+            }
+            setTimeout(check, 10);
+          };
+          check();
+        });
+      }
     } catch {
       /* ignore */
     }

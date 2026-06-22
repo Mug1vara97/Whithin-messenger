@@ -1,7 +1,7 @@
 {
   "name": "whithin",
   "productName": "Whithin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Whithin desktop shell",
   "license": "ISC",
   "author": "",
@@ -12,7 +12,8 @@
     "dev": "node scripts/patch-electron-exe-icon.cjs && cross-env WEB_CLIENT_URL=http://localhost:5173 electron ./main.cjs",
     "start:web": "cross-env WEB_CLIENT_URL=https://whithin.ru electron ./main.cjs",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win nsis"
+    "prepare-dist": "node scripts/prepare-dist.cjs",
+    "dist:win": "npm run prepare-dist && electron-builder --win nsis"
   },
   "config": {
     "forge": "./forge.config.cjs"
@@ -63,7 +64,8 @@
       "node_modules/node-global-key-listener/**/*",
       "node_modules/process-audio-capture/**/*",
       "node_modules/bindings/**/*",
-      "node_modules/file-uri-to-path/**/*"
+      "node_modules/file-uri-to-path/**/*",
+      "node_modules/node-addon-api/package.json"
     ],
     "win": {
       "icon": "app-icon.ico",

@@ -328,11 +328,24 @@ class VoiceCallApi {
 
     const audioMediaTrack = stream.getAudioTracks()[0];
     if (includeAudio && audioMediaTrack) {
+      try {
+        await audioMediaTrack.applyConstraints({
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: { ideal: 2 },
+          sampleRate: { ideal: 48000 },
+        });
+      } catch {
+        /* ignore unsupported constraints */
+      }
+
       const localAudioTrack = new LocalAudioTrack(audioMediaTrack, undefined, true);
       await this.room.localParticipant.publishTrack(localAudioTrack, {
         source: Track.Source.ScreenShareAudio,
-        dtx: true,
+        dtx: false,
         red: true,
+        audioPreset: AudioPresets.musicHighQuality,
       });
       this.tuneLocalScreenShareAudioTrack();
     } else if (includeAudio) {
