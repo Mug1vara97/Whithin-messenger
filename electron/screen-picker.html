@@ -314,22 +314,103 @@
       .footer__left {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 10px;
         min-width: 0;
       }
 
-      .checkbox {
-        display: inline-flex;
+      .footer__toggles {
+        display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 8px;
-        color: var(--muted);
-        font-size: 13px;
+        gap: 14px 20px;
       }
 
-      .checkbox input {
-        accent-color: var(--success);
-        width: 16px;
-        height: 16px;
+      .toggle-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        user-select: none;
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+      }
+
+      .toggle-row__label {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+        border: none;
+        border-radius: 999px;
+        padding: 0;
+        background: #4f545c;
+        cursor: pointer;
+        transition: background 0.18s ease, opacity 0.18s ease;
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+      }
+
+      .toggle-switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+        transition: transform 0.18s ease;
+      }
+
+      .toggle-switch[aria-checked='true'] {
+        background: var(--success);
+      }
+
+      .toggle-switch[aria-checked='true']::after {
+        transform: translateX(20px);
+      }
+
+      .toggle-switch:disabled {
+        opacity: 0.42;
+        cursor: not-allowed;
+      }
+
+      .card-select {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 2;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        background: rgba(0, 0, 0, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        transition: background 0.12s ease, border-color 0.12s ease;
+      }
+
+      .card.active .card-select {
+        background: var(--primary);
+        border-color: var(--primary);
+      }
+
+      .card.active .card-select::after {
+        content: '';
+        width: 5px;
+        height: 9px;
+        border: solid #fff;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg) translateY(-1px);
       }
 
       .hint {
@@ -439,10 +520,31 @@
 
         <footer class="footer">
           <div class="footer__left">
-            <label class="checkbox">
-              <input id="captureAudio" type="checkbox" disabled />
-              Передавать звук
-            </label>
+            <div class="footer__toggles">
+              <div class="toggle-row">
+                <button
+                  type="button"
+                  class="toggle-switch"
+                  id="captureAudioToggle"
+                  role="switch"
+                  aria-checked="false"
+                  aria-label="Передавать звук"
+                  disabled
+                ></button>
+                <span class="toggle-row__label">Передавать звук</span>
+              </div>
+              <div class="toggle-row">
+                <button
+                  type="button"
+                  class="toggle-switch"
+                  id="includeCameraToggle"
+                  role="switch"
+                  aria-checked="false"
+                  aria-label="Показать веб-камеру"
+                ></button>
+                <span class="toggle-row__label">С веб-камерой</span>
+              </div>
+            </div>
             <div id="audioHint" class="hint" style="display:none;">
               Для выбранного источника звук недоступен на этой системе.
             </div>
@@ -457,7 +559,8 @@
 
     <script>
       const sourcesNode = document.getElementById('sources');
-      const captureAudioNode = document.getElementById('captureAudio');
+      const captureAudioToggle = document.getElementById('captureAudioToggle');
+      const includeCameraToggle = document.getElementById('includeCameraToggle');
       const shareBtn = document.getElementById('shareBtn');
       const cancelBtn = document.getElementById('cancelBtn');
       const titlebarCloseBtn = document.getElementById('titlebarCloseBtn');
@@ -469,6 +572,38 @@
       let selected = null;
       let allSources = [];
       let activeTab = 'applications';
+      let captureAudioEnabled = false;
+      let includeCameraEnabled = false;
+
+      function setToggleState(toggle, enabled) {
+        toggle.setAttribute('aria-checked', enabled ? 'true' : 'false');
+      }
+
+      function setCaptureAudioEnabled(enabled) {
+        if (captureAudioToggle.disabled) {
+          captureAudioEnabled = false;
+          setToggleState(captureAudioToggle, false);
+          return;
+        }
+        captureAudioEnabled = Boolean(enabled);
+        setToggleState(captureAudioToggle, captureAudioEnabled);
+      }
+
+      function setIncludeCameraEnabled(enabled) {
+        includeCameraEnabled = Boolean(enabled);
+        setToggleState(includeCameraToggle, includeCameraEnabled);
+      }
+
+      captureAudioToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (captureAudioToggle.disabled) return;
+        setCaptureAudioEnabled(!captureAudioEnabled);
+      });
+
+      includeCameraToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setIncludeCameraEnabled(!includeCameraEnabled);
+      });
 
       const TAB_EMPTY = {
         applications: 'Нет открытых окон для демонстрации',
@@ -544,9 +679,9 @@
         selected = source;
         shareBtn.disabled = false;
         const canShareAudio = Boolean(source.canShareAudio);
-        captureAudioNode.disabled = !canShareAudio;
+        captureAudioToggle.disabled = !canShareAudio;
         if (!canShareAudio) {
-          captureAudioNode.checked = false;
+          setCaptureAudioEnabled(false);
           audioHint.style.display = 'block';
         } else {
           audioHint.style.display = 'none';
@@ -563,8 +698,8 @@
           if (selected && !visible.some((item) => item.id === selected.id)) {
             selected = null;
             shareBtn.disabled = true;
-            captureAudioNode.checked = false;
-            captureAudioNode.disabled = true;
+            setCaptureAudioEnabled(false);
+            captureAudioToggle.disabled = true;
             audioHint.style.display = 'none';
           }
           return;
@@ -580,14 +715,19 @@
             : '<div class="thumb thumb--empty">Нет превью</div>';
 
           const label = parseLabel(source);
+          const isActive = selected?.id === source.id;
 
           card.innerHTML = `
-            <div class="thumb-wrap">${thumb}</div>
+            <div class="thumb-wrap">
+              <span class="card-select" aria-hidden="true"></span>
+              ${thumb}
+            </div>
             <div class="label-row">
               ${renderIcon(source)}
               <span class="label-text">${label.short || label.text}</span>
             </div>
           `;
+          card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 
           card.addEventListener('click', () => selectSource(source));
           card.addEventListener('dblclick', () => {
@@ -611,8 +751,8 @@
         if (selected && !visible.some((item) => item.id === selected.id)) {
           selected = null;
           shareBtn.disabled = true;
-          captureAudioNode.checked = false;
-          captureAudioNode.disabled = true;
+          setCaptureAudioEnabled(false);
+          captureAudioToggle.disabled = true;
           audioHint.style.display = 'none';
         }
         render();
@@ -637,8 +777,9 @@
         allSources = data?.sources || [];
         selected = null;
         shareBtn.disabled = true;
-        captureAudioNode.checked = false;
-        captureAudioNode.disabled = true;
+        setCaptureAudioEnabled(false);
+        captureAudioToggle.disabled = true;
+        setIncludeCameraEnabled(false);
         audioHint.style.display = 'none';
 
         const defaultTab = allSources.some((item) => item.type === 'window')
@@ -655,7 +796,8 @@
           id: selected.id,
           name: selected.name,
           type: selected.type,
-          captureAudio: Boolean(captureAudioNode.checked && !captureAudioNode.disabled),
+          captureAudio: Boolean(captureAudioEnabled && !captureAudioToggle.disabled),
+          includeCamera: Boolean(includeCameraEnabled),
         });
       });
 

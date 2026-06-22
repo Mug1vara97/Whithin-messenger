@@ -46,6 +46,11 @@ public class ChatTypeConfiguration : IEntityTypeConfiguration<ChatType>
             {
                 Id = Guid.Parse("55555555-5555-5555-5555-555555555555"),
                 TypeName = "IdeasBoard"
+            },
+            new ChatType
+            {
+                Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                TypeName = "Saved"
             }
         );
     }

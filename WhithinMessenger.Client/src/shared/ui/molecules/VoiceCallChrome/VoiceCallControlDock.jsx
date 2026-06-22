@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Menu, MenuItem } from '@mui/material';
+import { Checkbox, Menu, MenuItem } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
+import CancelPresentationIcon from '@mui/icons-material/CancelPresentation';
+import ScreenshotMonitorIcon from '@mui/icons-material/ScreenshotMonitor';
 import CallEndIcon from '@mui/icons-material/CallEnd';
 import HeadsetIcon from '@mui/icons-material/Headset';
 import HeadsetOffIcon from '@mui/icons-material/HeadsetOff';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import NoiseControlOffIcon from '@mui/icons-material/NoiseControlOff';
 import SurroundSoundIcon from '@mui/icons-material/SurroundSound';
@@ -38,6 +41,29 @@ const noiseMenuPaperSx = {
   }
 };
 
+const screenShareMenuPaperSx = {
+  backgroundColor: '#111214',
+  color: '#f2f3f5',
+  borderRadius: '8px',
+  border: '1px solid #1e1f22',
+  minWidth: '280px',
+  marginBottom: '8px',
+  '& .MuiMenuItem-root': {
+    fontSize: '14px',
+    padding: '10px 14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    '&:hover': {
+      backgroundColor: '#2e3035',
+    },
+  },
+  '& .screen-share-menu-item--danger': {
+    color: '#f26b6b',
+  },
+};
+
 export function VoiceCallControlDock({
   isMuted,
   onToggleMute,
@@ -53,6 +79,10 @@ export function VoiceCallControlDock({
   onToggleVideo,
   isScreenSharing,
   onToggleScreenShare,
+  onStopScreenShare,
+  onChangeScreenShareSource,
+  screenShareAudioEnabled = false,
+  onToggleScreenShareAudio,
   spatialAudioEnabled,
   showSpatialAudioStage,
   onToggleSpatialAudioStage,
@@ -62,8 +92,34 @@ export function VoiceCallControlDock({
   onDisconnect
 }) {
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
+  const [screenShareMenuAnchor, setScreenShareMenuAnchor] = useState(null);
 
   const closeNoiseMenu = () => setNoiseSuppressMenuAnchor(null);
+  const closeScreenShareMenu = () => setScreenShareMenuAnchor(null);
+
+  const handleStopScreenShare = async () => {
+    closeScreenShareMenu();
+    if (onStopScreenShare) {
+      await onStopScreenShare();
+      return;
+    }
+    if (onToggleScreenShare) {
+      await onToggleScreenShare();
+    }
+  };
+
+  const handleChangeScreenShareSource = async () => {
+    closeScreenShareMenu();
+    if (onChangeScreenShareSource) {
+      await onChangeScreenShareSource();
+    }
+  };
+
+  const handleToggleScreenShareAudio = async () => {
+    if (onToggleScreenShareAudio) {
+      await onToggleScreenShareAudio();
+    }
+  };
 
   const handleNoiseModeSelect = async (mode) => {
     if (onNoiseSuppressionModeSelect) {
@@ -176,16 +232,46 @@ export function VoiceCallControlDock({
               </button>
             </div>
 
-            <div className="attached-button-container control-button">
-              <button
-                className={`center-button ${isScreenSharing ? 'active' : ''}`}
-                type="button"
-                aria-label="Продемонстрируйте свой экран"
-                onClick={onToggleScreenShare}
-              >
-                <ScreenShareIcon sx={{ fontSize: 24 }} />
-              </button>
-            </div>
+            {isScreenSharing ? (
+              <div className="attached-caret-button-container screen-share-active">
+                <button
+                  className="center-button attached-button active screen-share-main-button"
+                  type="button"
+                  aria-label="Остановить демонстрацию экрана"
+                  title="Остановить демонстрацию"
+                  onClick={handleStopScreenShare}
+                >
+                  <ScreenShareIcon sx={{ fontSize: 24 }} />
+                </button>
+                <div
+                  className="context-menu-caret screen-share-caret"
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Настройки демонстрации экрана"
+                  title="Настройки демонстрации"
+                  onClick={(event) => setScreenShareMenuAnchor(event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setScreenShareMenuAnchor(event.currentTarget);
+                    }
+                  }}
+                >
+                  <KeyboardArrowUpIcon sx={{ fontSize: 18 }} />
+                </div>
+              </div>
+            ) : (
+              <div className="attached-button-container control-button">
+                <button
+                  className="center-button"
+                  type="button"
+                  aria-label="Продемонстрируйте свой экран"
+                  onClick={onToggleScreenShare}
+                >
+                  <ScreenShareIcon sx={{ fontSize: 24 }} />
+                </button>
+              </div>
+            )}
 
             {onToggleSpatialAudioStage && (
               <div className="attached-button-container control-button spatial-audio-anchor">
@@ -267,6 +353,49 @@ export function VoiceCallControlDock({
               Простое подавление тишины
             </div>
           </MenuItem>
+        </Menu>
+      )}
+
+      {isScreenSharing && (
+        <Menu
+          anchorEl={screenShareMenuAnchor}
+          open={Boolean(screenShareMenuAnchor)}
+          onClose={closeScreenShareMenu}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          PaperProps={{ sx: screenShareMenuPaperSx }}
+        >
+          <MenuItem className="screen-share-menu-item--danger" onClick={handleStopScreenShare}>
+            <span>Прекратить стрим</span>
+            <CancelPresentationIcon sx={{ fontSize: 20 }} />
+          </MenuItem>
+          <MenuItem onClick={handleChangeScreenShareSource}>
+            <span>Изменить источник</span>
+            <ScreenshotMonitorIcon sx={{ fontSize: 20 }} />
+          </MenuItem>
+          {onToggleScreenShareAudio && (
+            <MenuItem
+              onClick={(event) => {
+                event.preventDefault();
+                void handleToggleScreenShareAudio();
+              }}
+            >
+              <span>Поделиться звуком стрима</span>
+              <Checkbox
+                checked={Boolean(screenShareAudioEnabled)}
+                size="small"
+                tabIndex={-1}
+                disableRipple
+                sx={{
+                  padding: 0,
+                  color: '#4f545c',
+                  '&.Mui-checked': {
+                    color: '#5865f2',
+                  },
+                }}
+              />
+            </MenuItem>
+          )}
         </Menu>
       )}
     </>

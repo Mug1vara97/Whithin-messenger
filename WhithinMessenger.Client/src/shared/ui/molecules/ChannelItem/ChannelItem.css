@@ -306,6 +306,21 @@
   z-index: 2;
 }
 
+.voice-participant-avatar-wrap--video {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: #1e1f22;
+}
+
+.voice-participant-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1);
+}
+
 .voice-participant-avatar-wrap .user-avatar-frame {
   box-shadow: none;
 }

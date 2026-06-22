@@ -355,6 +355,34 @@ class VoiceCallApi {
     this.screenShareStream = stream;
   }
 
+  async unpublishScreenShareAudio() {
+    if (!this.room) {
+      return;
+    }
+
+    const audioPublications = Array.from(this.room.localParticipant.audioTrackPublications.values())
+      .filter((publication) => publication.source === Track.Source.ScreenShareAudio);
+
+    for (const publication of audioPublications) {
+      if (publication.track) {
+        await this.room.localParticipant.unpublishTrack(publication.track);
+      }
+    }
+
+    if (this.screenShareStream) {
+      this.screenShareStream.getAudioTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          /* ignore */
+        }
+        this.screenShareStream.removeTrack(track);
+      });
+    }
+
+    this.stopProcessAudioSession();
+  }
+
   resetPeerJoinedDedupe() {
     this.recentPeerJoinedAt.clear();
   }

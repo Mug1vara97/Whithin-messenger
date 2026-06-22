@@ -64,12 +64,49 @@ const areParticipantsEqual = (a, b) => {
       pA.isAudioDisabled !== pB.isAudioDisabled ||
       pA.isGlobalAudioMuted !== pB.isGlobalAudioMuted ||
       pA.isServerMuted !== pB.isServerMuted ||
-      pA.isServerDeafened !== pB.isServerDeafened
+      pA.isServerDeafened !== pB.isServerDeafened ||
+      pA.isVideoEnabled !== pB.isVideoEnabled
     ) {
       return false;
     }
   }
   return true;
+};
+
+const VoiceParticipantVideo = ({ stream }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return undefined;
+
+    if (stream?.active) {
+      videoElement.srcObject = stream;
+      videoElement.play().catch(() => {});
+    } else {
+      videoElement.srcObject = null;
+    }
+
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
+    };
+  }, [stream]);
+
+  if (!stream?.active) {
+    return null;
+  }
+
+  return (
+    <video
+      ref={videoRef}
+      className="voice-participant-video"
+      autoPlay
+      muted
+      playsInline
+    />
+  );
 };
 
 const ChannelItem = ({
@@ -252,15 +289,19 @@ const ChannelItem = ({
                             style={participantProvided.draggableProps.style}
                           >
                             <div className="voice-participant__layout">
-                              <div className="voice-participant-avatar-wrap">
-                                <UserAvatar
-                                  displayName={participant.displayName}
-                                  login={participant.login}
-                                  username={participant.userName || participant.name}
-                                  avatarUrl={participant.avatar ? getAvatarUrl(participant.avatar) : null}
-                                  avatarColor={participant.avatarColor}
-                                  size={30}
-                                />
+                              <div className={`voice-participant-avatar-wrap${participant.isVideoEnabled && participant.videoStream?.active ? ' voice-participant-avatar-wrap--video' : ''}`}>
+                                {participant.isVideoEnabled && participant.videoStream?.active ? (
+                                  <VoiceParticipantVideo stream={participant.videoStream} />
+                                ) : (
+                                  <UserAvatar
+                                    displayName={participant.displayName}
+                                    login={participant.login}
+                                    username={participant.userName || participant.name}
+                                    avatarUrl={participant.avatar ? getAvatarUrl(participant.avatar) : null}
+                                    avatarColor={participant.avatarColor}
+                                    size={30}
+                                  />
+                                )}
                               </div>
                               <UserNameplate
                                 nameplate={participant.nameplate}

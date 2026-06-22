@@ -977,6 +977,25 @@
   background: #000000;
 }
 
+.screen-share-camera-pip {
+  position: absolute;
+  right: 12px;
+  bottom: 52px;
+  width: min(28%, 180px);
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 4;
+  background: #1e1f22;
+  pointer-events: none;
+}
+
+.screen-share-camera-pip .tile-video {
+  object-fit: cover;
+}
+
 /* Стили для видео элементов */
 .tile-video {
   width: 100%;

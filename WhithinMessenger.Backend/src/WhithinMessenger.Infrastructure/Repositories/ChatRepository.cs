@@ -126,9 +126,10 @@ namespace WhithinMessenger.Infrastructure.Repositories
             }
 
             var savedChat = await _context.Members
-                .Where(m => m.UserId == userId)
+                .AsNoTracking()
+                .Where(m => m.UserId == userId && m.Chat.TypeId == savedChatType.Id && m.Chat.ServerId == null)
                 .Select(m => m.Chat)
-                .FirstOrDefaultAsync(c => c.TypeId == savedChatType.Id, cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (savedChat == null)
             {

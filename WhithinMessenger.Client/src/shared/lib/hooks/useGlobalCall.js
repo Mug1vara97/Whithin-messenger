@@ -103,6 +103,8 @@ export const useGlobalCall = (userId = null, userName = null) => {
     startScreenShare: callContext.startScreenShare,
     stopScreenShare: callContext.stopScreenShare,
     toggleScreenShare: callContext.toggleScreenShare,
+    changeScreenShareSource: callContext.changeScreenShareSource,
+    toggleScreenShareAudio: callContext.toggleScreenShareAudio,
     startVideo: callContext.startVideo,
     stopVideo: callContext.stopVideo,
     toggleVideo: callContext.toggleVideo

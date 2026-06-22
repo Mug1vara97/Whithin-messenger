@@ -228,6 +228,7 @@ const VideoCallGrid = ({
         name: screenShareParticipant.name,
         isScreenShare: true,
         isLocal: true,
+        ownerUserId: screenShareParticipant.id,
         stream: screenShareStream
       });
     }
@@ -239,6 +240,7 @@ const VideoCallGrid = ({
         name: screenShare.userName,
         isScreenShare: true,
         isLocal: false,
+        ownerUserId: screenShare.userId,
         stream: screenShare.stream,
         producerId: screenShare.producerId
       });
@@ -475,6 +477,27 @@ const VideoCallGrid = ({
     return <div className="tile-avatar-stage">{avatarNode}</div>;
   };
 
+  const resolveOwnerCameraStream = useCallback((screenShareTile) => {
+    if (!screenShareTile?.isScreenShare || !screenShareTile.ownerUserId) {
+      return null;
+    }
+
+    const ownerKey = String(screenShareTile.ownerUserId);
+    const owner = extendedParticipants.find((participant) =>
+      !participant.isScreenShare
+      && (String(participant.id) === ownerKey || String(participant.userId) === ownerKey)
+    );
+
+    if (!owner?.isVideoEnabled || !owner?.videoStream?.active) {
+      return null;
+    }
+
+    return {
+      stream: owner.videoStream,
+      isLocal: Boolean(owner.isCurrentUser),
+    };
+  }, [extendedParticipants]);
+
   const renderParticipantTile = (participant, isSmall = false) => {
     const isFocused = participant.id === focusedParticipantId;
     const channelParticipant = findChannelParticipant(activeVoiceChannelParticipants, participant.id);
@@ -513,6 +536,7 @@ const VideoCallGrid = ({
     const isAudioMuted = userMutedStates.get(participant.id) || false;
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
+    const ownerCamera = isScreenShare ? resolveOwnerCameraStream(participant) : null;
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
@@ -551,10 +575,21 @@ const VideoCallGrid = ({
           {/* Background with avatar, video, or screen share */}
           <div className="tile-background">
             {isScreenShare && participant.stream && participant.stream.active ? (
-              <ScreenShareElement 
-                stream={participant.stream} 
-                participantId={participant.id}
-              />
+              <>
+                <ScreenShareElement 
+                  stream={participant.stream} 
+                  participantId={participant.id}
+                />
+                {ownerCamera?.stream ? (
+                  <div className="screen-share-camera-pip">
+                    <VideoElement
+                      stream={ownerCamera.stream}
+                      participantId={`${participant.id}-camera-pip`}
+                      isLocal={ownerCamera.isLocal}
+                    />
+                  </div>
+                ) : null}
+              </>
             ) : participant.isVideoEnabled && participant.videoStream && participant.videoStream.active ? (
               <VideoElement 
                 stream={participant.videoStream}

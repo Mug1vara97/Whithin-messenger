@@ -36,6 +36,7 @@ export const CallProvider = ({ children }) => {
   const connecting = useCallStore(state => state.connecting);
   const isScreenSharing = useCallStore(state => state.isScreenSharing);
   const screenShareStream = useCallStore(state => state.screenShareStream);
+  const screenShareAudioEnabled = useCallStore(state => state.screenShareAudioEnabled);
   const remoteScreenShares = useCallStore(state => state.remoteScreenShares);
   const isVideoEnabled = useCallStore(state => state.isVideoEnabled);
   const cameraStream = useCallStore(state => state.cameraStream);
@@ -134,6 +135,7 @@ export const CallProvider = ({ children }) => {
     connecting,
     isScreenSharing,
     screenShareStream,
+    screenShareAudioEnabled,
     remoteScreenShares,
     isVideoEnabled,
     cameraStream,
@@ -168,6 +170,8 @@ export const CallProvider = ({ children }) => {
     startScreenShare: useCallStore.getState().startScreenShare,
     stopScreenShare: useCallStore.getState().stopScreenShare,
     toggleScreenShare: useCallStore.getState().toggleScreenShare,
+    changeScreenShareSource: useCallStore.getState().changeScreenShareSource,
+    toggleScreenShareAudio: useCallStore.getState().toggleScreenShareAudio,
     startVideo: useCallStore.getState().startVideo,
     stopVideo: useCallStore.getState().stopVideo,
     toggleVideo: useCallStore.getState().toggleVideo,
@@ -199,6 +203,7 @@ export const CallProvider = ({ children }) => {
     connecting,
     isScreenSharing,
     screenShareStream,
+    screenShareAudioEnabled,
     remoteScreenShares,
     isVideoEnabled,
     cameraStream,

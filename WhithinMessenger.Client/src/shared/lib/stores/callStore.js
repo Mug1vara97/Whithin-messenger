@@ -383,10 +383,13 @@ export const useCallStore = create(
       localScreenTrackId: null,
       localScreenTrackPublishedHandler: null,
       remoteScreenShares: new Map(),
+      screenShareCaptureOptions: null,
+      screenShareAudioEnabled: false,
       
   // Состояние вебкамеры
   isVideoEnabled: false,
   cameraStream: null, // Отдельный поток для вебкамеры
+  cameraStartedWithScreenShare: false,
   localCameraTrackPublishedHandler: null,
   videoProducer: null, // Демонстрации экрана от других пользователей (producerId -> data)
       
@@ -1525,6 +1528,13 @@ export const useCallStore = create(
                       : p
                   )
                 }));
+                const roomId = get().currentRoomId;
+                if (roomId) {
+                  get().updateVoiceChannelParticipant(roomId, targetUserId, {
+                    isVideoEnabled: true,
+                    videoStream,
+                  });
+                }
                 console.log('📹 callStore: Participant video enabled for:', targetUserId);
               } else {
                 // Video disabled - clear stream
@@ -1535,6 +1545,13 @@ export const useCallStore = create(
                       : p
                   )
                 }));
+                const roomId = get().currentRoomId;
+                if (roomId) {
+                  get().updateVoiceChannelParticipant(roomId, targetUserId, {
+                    isVideoEnabled: false,
+                    videoStream: null,
+                  });
+                }
                 console.log('📹 callStore: Participant video disabled for:', targetUserId);
               }
             } else if (mediaType === 'screen') {
@@ -3906,13 +3923,21 @@ export const useCallStore = create(
             });
           }
 
+          const includeCamera = Boolean(selectedSource?.includeCamera);
+          const hadVideoBeforeShare = state.isVideoEnabled;
+
           // Stop previous share only after we already own a fresh capture stream.
           if (state.isScreenSharing) {
             await get().stopScreenShare();
           }
 
+          set({
+            cameraStartedWithScreenShare: includeCamera && !hadVideoBeforeShare,
+          });
+
           console.log('Starting screen share via LiveKit...', {
             includeAudio,
+            includeCamera,
             preCaptured: Boolean(preCapturedStream),
           });
 
@@ -3988,6 +4013,22 @@ export const useCallStore = create(
           
           set({ isScreenSharing: true });
 
+          set({
+            screenShareCaptureOptions: selectedSource
+              ? {
+                  sourceId: selectedSource.id,
+                  sourceType: selectedSource.type,
+                  processPid: selectedSource.processPid,
+                  excludeSelfPid: selectedSource.excludeSelfPid,
+                }
+              : null,
+            screenShareAudioEnabled: includeAudio,
+          });
+
+          if (includeCamera && !get().isVideoEnabled) {
+            await get().startVideo();
+          }
+
         } catch (error) {
           if (preCapturedStream) {
             preCapturedStream.getTracks().forEach((track) => {
@@ -4055,6 +4096,16 @@ export const useCallStore = create(
             localScreenTrackPublishedHandler: null
           });
 
+          const { cameraStartedWithScreenShare, isVideoEnabled } = get();
+          if (cameraStartedWithScreenShare && isVideoEnabled) {
+            await get().stopVideo();
+          }
+          set({ cameraStartedWithScreenShare: false });
+          set({
+            screenShareCaptureOptions: null,
+            screenShareAudioEnabled: false,
+          });
+
           console.log('Screen sharing stopped successfully');
         } catch (error) {
           console.error('Error stopping screen share:', error);
@@ -4082,6 +4133,50 @@ export const useCallStore = create(
         } else {
           console.log('Starting screen share...');
           await get().startScreenShare();
+        }
+      },
+
+      changeScreenShareSource: async () => {
+        if (!get().isScreenSharing) {
+          await get().startScreenShare();
+          return;
+        }
+        await get().startScreenShare();
+      },
+
+      toggleScreenShareAudio: async () => {
+        const state = get();
+        if (!state.isScreenSharing || state.isScreenShareTransitioning) {
+          return;
+        }
+
+        const nextAudioEnabled = !state.screenShareAudioEnabled;
+        set({ isScreenShareTransitioning: true });
+
+        try {
+          if (!nextAudioEnabled) {
+            await voiceCallApi.unpublishScreenShareAudio();
+            set({ screenShareAudioEnabled: false });
+            return;
+          }
+
+          const captureOptions = state.screenShareCaptureOptions || {};
+          if (window.electronAPI?.armScreenCapture) {
+            await window.electronAPI.armScreenCapture({ captureAudio: true });
+          }
+
+          const stream = await voiceCallApi.acquireScreenShareStream(true, captureOptions);
+          await voiceCallApi.setScreenShareEnabled(true, {
+            includeAudio: true,
+            screenStream: stream,
+            captureOptions,
+          });
+          set({ screenShareAudioEnabled: true });
+        } catch (error) {
+          console.error('Error toggling screen share audio:', error);
+          set({ error: 'Не удалось переключить звук демонстрации: ' + error.message });
+        } finally {
+          set({ isScreenShareTransitioning: false });
         }
       },
 
@@ -4134,8 +4229,24 @@ export const useCallStore = create(
                 set((state) => {
                   const newVideoStates = new Map(state.participantVideoStates);
                   newVideoStates.set(state.currentUserId, true);
-                  return { participantVideoStates: newVideoStates };
+                  const currentUserId = String(state.currentUserId);
+                  return {
+                    participantVideoStates: newVideoStates,
+                    participants: state.participants.map((participant) =>
+                      String(participant.userId) === currentUserId
+                        ? { ...participant, isVideoEnabled: true, videoStream: stream }
+                        : participant
+                    ),
+                  };
                 });
+
+                const { currentRoomId, currentUserId } = get();
+                if (currentRoomId && currentUserId) {
+                  get().updateVoiceChannelParticipant(currentRoomId, currentUserId, {
+                    isVideoEnabled: true,
+                    videoStream: stream,
+                  });
+                }
                 
                 // Handle track ended
                 publication.track.on('ended', () => {
@@ -4255,8 +4366,24 @@ export const useCallStore = create(
           set((state) => {
             const newVideoStates = new Map(state.participantVideoStates);
             newVideoStates.set(state.currentUserId, false);
-            return { participantVideoStates: newVideoStates };
+            const currentUserId = String(state.currentUserId);
+            return {
+              participantVideoStates: newVideoStates,
+              participants: state.participants.map((participant) =>
+                String(participant.userId) === currentUserId
+                  ? { ...participant, isVideoEnabled: false, videoStream: null }
+                  : participant
+              ),
+            };
           });
+
+          const { currentRoomId, currentUserId } = get();
+          if (currentRoomId && currentUserId) {
+            get().updateVoiceChannelParticipant(currentRoomId, currentUserId, {
+              isVideoEnabled: false,
+              videoStream: null,
+            });
+          }
           
           console.log('🎥 Video state cleared');
           

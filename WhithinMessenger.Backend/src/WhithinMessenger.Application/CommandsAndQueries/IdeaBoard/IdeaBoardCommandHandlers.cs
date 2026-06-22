@@ -7,7 +7,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
 
 public static class IdeaBoardType
 {
-    public static readonly Guid TypeId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    public static readonly Guid TypeId = ChatTypeIds.IdeasBoard;
 }
 
 public static class IdeaBoardCardMapper

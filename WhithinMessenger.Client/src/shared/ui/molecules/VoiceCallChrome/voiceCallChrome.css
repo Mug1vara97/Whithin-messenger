@@ -352,6 +352,32 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vc-icon) 35%, transparent);
 }
 
+.attached-caret-button-container.screen-share-active {
+  background: color-mix(in srgb, var(--success, #23a559) 88%, #000);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success, #23a559) 70%, #000);
+}
+
+.attached-caret-button-container.screen-share-active:hover {
+  background: color-mix(in srgb, var(--success, #23a559) 78%, #000);
+}
+
+.attached-caret-button-container.screen-share-active .center-button.active,
+.attached-caret-button-container.screen-share-active .screen-share-main-button {
+  color: #fff;
+}
+
+.attached-caret-button-container.screen-share-active .context-menu-caret,
+.attached-caret-button-container.screen-share-active .screen-share-caret {
+  color: #fff;
+  border-left-color: color-mix(in srgb, #fff 18%, transparent);
+}
+
+.attached-caret-button-container.screen-share-active .context-menu-caret:hover,
+.attached-caret-button-container.screen-share-active .screen-share-caret:hover {
+  background: color-mix(in srgb, #000 12%, transparent);
+  color: #fff;
+}
+
 .attached-button {
   border-radius: 0 !important;
   box-shadow: none !important;

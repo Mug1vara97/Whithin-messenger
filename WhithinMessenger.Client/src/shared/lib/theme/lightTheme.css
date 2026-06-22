@@ -39,6 +39,10 @@
   background-color: var(--surface-hover) !important;
 }
 
+[data-theme-mode='light'] .server-panel-header.with-banner .server-info:hover {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
 [data-theme-mode='light'] [class*='username'] {
   color: var(--text) !important;
 }

@@ -31,6 +31,17 @@
 
 html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-panel-header.with-banner {
   border-bottom: none;
+  background: transparent;
+}
+
+html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-info {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-panel-header.with-banner .server-info {
+  border-bottom: none;
+  background: transparent;
 }
 
 .server-panel-banner {
@@ -69,16 +80,6 @@ html:not([data-interface-design='system24']):not([data-interface-design='midnigh
   width: 100%;
   box-sizing: border-box;
   color: var(--text);
-}
-
-html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-info {
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.server-panel-header.with-banner .server-info {
-  border-bottom: none;
-  background: transparent;
 }
 
 .server-info:hover {

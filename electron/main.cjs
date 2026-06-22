@@ -1887,6 +1887,7 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     name: selection.name,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
+    includeCamera: Boolean(selection.includeCamera),
     processPid,
     excludeSelfPid,
   };

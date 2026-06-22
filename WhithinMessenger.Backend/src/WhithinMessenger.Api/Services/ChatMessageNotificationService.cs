@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
+using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Api.Services;
 
@@ -123,6 +125,14 @@ public class ChatMessageNotificationService
         {
             var chat = await _chatRepository.GetByIdAsync(chatId);
             if (chat == null)
+            {
+                return;
+            }
+
+            var chatTypeName = chat.Type?.TypeName;
+            if (chatTypeName == ChatTypeNames.Saved
+                || chat.TypeId == IdeaBoardType.TypeId
+                || chatTypeName == ChatTypeNames.IdeasBoard)
             {
                 return;
             }

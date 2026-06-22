@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Domain.Interfaces;
@@ -48,6 +49,16 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 {
                     Success = false,
                     ErrorMessage = "Chat not found"
+                };
+            }
+
+            if (chat.TypeId == IdeaBoardType.TypeId
+                || chat.Type?.TypeName == ChatTypeNames.IdeasBoard)
+            {
+                return new SendMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = "В канал доски нельзя отправлять текстовые сообщения",
                 };
             }
 

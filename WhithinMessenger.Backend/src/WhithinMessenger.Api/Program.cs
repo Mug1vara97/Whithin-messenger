@@ -162,6 +162,7 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<WithinDbContext>();
         
         await context.Database.MigrateAsync();
+        await SavedMessagesChatTypeDataFix.ApplyAsync(context);
         
         Console.WriteLine("Database migrations applied successfully");
     }
