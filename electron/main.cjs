@@ -1561,7 +1561,8 @@ if (!gotSingleInstanceLock) {
           : sources.find((source) => source.name.toLowerCase().includes('screen')) || sources[0];
 
         const shouldCaptureAudio = Boolean(pendingSelection?.captureAudio);
-        const selectedSourceType = pendingSelection?.type;
+        const inferredType = preferredSource.id.startsWith('screen:') ? 'screen' : 'window';
+        const selectedSourceType = pendingSelection?.type || inferredType;
         const sourceNameLower = (preferredSource?.name || '').toLowerCase();
         const isWhithinWindow =
           sourceNameLower.includes('whithin') ||
@@ -1576,21 +1577,26 @@ if (!gotSingleInstanceLock) {
         }
 
         let audioSource = null;
-        if (shouldCaptureAudio) {
-          if (selectedSourceType === 'window' && !isWhithinWindow) {
-            // Для window-поделивания оставляем audio выбранного окна,
-            // иначе loopback подмешивает весь системный вывод и эхо звонка.
+        if (shouldCaptureAudio && !isWhithinWindow) {
+          if (selectedSourceType === 'window') {
+            // Window audio: capture audio from the selected window source.
             audioSource = preferredSource;
-          } else if (selectedSourceType === 'screen') {
-            // Для полного экрана нужен loopback, иначе аудио-трек не создаётся.
+          } else {
+            // Full screen: system loopback audio.
             audioSource = 'loopback';
           }
         }
 
+        console.log('[display-media] capture resolved:', {
+          sourceId: preferredSource.id,
+          sourceType: selectedSourceType,
+          captureAudio: shouldCaptureAudio,
+          audioSource: audioSource ? (typeof audioSource === 'string' ? audioSource : 'window-source') : null,
+        });
+
         safeCallback({
           video: preferredSource,
-          // Защита от петли в звонке: не захватываем звук, если шарим окно самого Whithin.
-          audio: audioSource
+          audio: audioSource,
         });
       } catch (error) {
         console.error('Display media request failed:', error);
@@ -1598,7 +1604,7 @@ if (!gotSingleInstanceLock) {
         safeCallback({});
       }
     },
-    { useSystemPicker: true }
+    { useSystemPicker: false }
   );
 
   clearLegacyFrostedGlassWindowFlag();
@@ -1807,6 +1813,19 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio)
   };
+});
+
+ipcMain.handle('electron:arm-screen-capture', () => {
+  if (!lastSelectedScreenSource?.id) {
+    return false;
+  }
+
+  selectedScreenSource = {
+    id: lastSelectedScreenSource.id,
+    type: lastSelectedScreenSource.type,
+    captureAudio: Boolean(lastSelectedScreenSource.captureAudio),
+  };
+  return true;
 });
 
 ipcMain.on('electron:register-shortcut-listener', (event) => {

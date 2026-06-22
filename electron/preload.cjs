@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
+  armScreenCapture: () => ipcRenderer.invoke('electron:arm-screen-capture'),
 
   updateGlobalShortcuts: (shortcuts) => ipcRenderer.invoke('electron:update-global-shortcuts', shortcuts),
 

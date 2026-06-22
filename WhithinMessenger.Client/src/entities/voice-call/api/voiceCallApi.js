@@ -1,5 +1,15 @@
 import { io } from 'socket.io-client';
-import { Room, RoomEvent, Track, TrackPublication, VideoPresets, DisconnectReason } from 'livekit-client';
+import {
+  AudioPresets,
+  LocalAudioTrack,
+  LocalVideoTrack,
+  Room,
+  RoomEvent,
+  Track,
+  TrackPublication,
+  VideoPresets,
+  DisconnectReason,
+} from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { serverApi } from '../../server/api/serverApi';
 
@@ -123,37 +133,80 @@ class VoiceCallApi {
       throw new Error('Screen sharing is not supported in this environment');
     }
 
-    const constraints = {
-      video: {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        frameRate: { ideal: 60, max: 60 },
-      },
-      audio: includeAudio
-        ? {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            channelCount: 2,
-          }
-        : false,
-      preferCurrentTab: false,
-      selfBrowserSurface: 'exclude',
-      systemAudio: includeAudio ? 'include' : 'exclude',
+    const isElectron = Boolean(window.electronAPI?.isElectron);
+    if (isElectron && window.electronAPI?.armScreenCapture) {
+      await window.electronAPI.armScreenCapture();
+    }
+
+    const buildConstraints = (withAudio) => {
+      const constraints = {
+        video: {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 60, max: 60 },
+        },
+        audio: withAudio ? true : false,
+        preferCurrentTab: false,
+        selfBrowserSurface: 'exclude',
+      };
+
+      if (!isElectron && withAudio) {
+        constraints.audio = {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+        };
+        constraints.systemAudio = 'include';
+      }
+
+      return constraints;
     };
 
-    console.log('Acquiring screen share via getDisplayMedia...', { includeAudio });
-    const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+    console.log('Acquiring screen share via getDisplayMedia...', { includeAudio, isElectron });
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia(buildConstraints(includeAudio));
+      return this.validateScreenShareStream(stream, includeAudio);
+    } catch (error) {
+      const audioCaptureFailed = includeAudio && this.isAudioCaptureError(error);
+      if (!audioCaptureFailed) {
+        throw error;
+      }
+
+      console.warn('Screen share audio capture failed, retrying video-only:', error);
+      const videoOnlyStream = await navigator.mediaDevices.getDisplayMedia(buildConstraints(false));
+      return this.validateScreenShareStream(videoOnlyStream, false);
+    }
+  }
+
+  isAudioCaptureError(error) {
+    if (!error) return false;
+    const name = String(error.name || '');
+    const message = String(error.message || '').toLowerCase();
+    return name === 'NotReadableError'
+      || name === 'NotAllowedError'
+      || message.includes('audio source')
+      || message.includes('could not start');
+  }
+
+  validateScreenShareStream(stream, includeAudio) {
     const videoTrack = stream.getVideoTracks()[0];
     if (!videoTrack) {
       stream.getTracks().forEach((track) => track.stop());
       throw new Error('No video track in screen share capture');
     }
 
+    const audioTracks = stream.getAudioTracks();
     console.log('getDisplayMedia acquired tracks:', {
       video: videoTrack.label,
-      audio: stream.getAudioTracks().map((track) => track.label),
+      audio: audioTracks.map((track) => track.label),
+      includeAudio,
     });
+
+    if (includeAudio && audioTracks.length === 0) {
+      console.warn('Screen share started without audio track');
+    }
 
     return stream;
   }
@@ -176,12 +229,13 @@ class VoiceCallApi {
     }
 
     const { includeAudio = true } = options;
-    const videoTrack = stream.getVideoTracks()[0];
-    if (!videoTrack) {
+    const videoMediaTrack = stream.getVideoTracks()[0];
+    if (!videoMediaTrack) {
       throw new Error('No video track to publish');
     }
 
-    await this.room.localParticipant.publishTrack(videoTrack, {
+    const localVideoTrack = new LocalVideoTrack(videoMediaTrack, undefined, true);
+    await this.room.localParticipant.publishTrack(localVideoTrack, {
       source: Track.Source.ScreenShare,
       simulcast: false,
       videoCodec: 'vp8',
@@ -192,10 +246,15 @@ class VoiceCallApi {
       },
     });
 
-    const audioTrack = stream.getAudioTracks()[0];
-    if (includeAudio && audioTrack) {
-      await this.room.localParticipant.publishTrack(audioTrack, {
+    const audioMediaTrack = stream.getAudioTracks()[0];
+    if (includeAudio && audioMediaTrack) {
+      const localAudioTrack = new LocalAudioTrack(audioMediaTrack, undefined, true);
+      await this.room.localParticipant.publishTrack(localAudioTrack, {
         source: Track.Source.ScreenShareAudio,
+        dtx: true,
+        red: true,
+        forceStereo: true,
+        audioPreset: AudioPresets.musicHighQualityStereo,
       });
       this.tuneLocalScreenShareAudioTrack();
     } else if (includeAudio) {
@@ -989,7 +1048,9 @@ class VoiceCallApi {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       try {
-        await this.publishScreenShareStream(captureStream, { includeAudio });
+        await this.publishScreenShareStream(captureStream, {
+          includeAudio: includeAudio && captureStream.getAudioTracks().length > 0,
+        });
 
         if (includeAudio && !this.hasLocalScreenShareAudioPublication()) {
           console.warn('Screen-share audio track was not published after getDisplayMedia');
