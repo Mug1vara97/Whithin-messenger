@@ -66,6 +66,7 @@ const MediaSendOverlay = ({
   files = [],
   isUploading = false,
   uploadProgress = 0,
+  isUploadProcessing = false,
   onCancel,
   onSend,
 }) => {
@@ -181,7 +182,9 @@ const MediaSendOverlay = ({
 
         {isUploading && (
           <div className="media-send-modal__progress">
-            Загрузка… {uploadProgress}%
+            {isUploadProcessing
+              ? `Обработка на сервере… ${uploadProgress}%`
+              : `Загрузка… ${uploadProgress}%`}
             <div className="media-send-modal__progress-bar">
               <div
                 className="media-send-modal__progress-fill"

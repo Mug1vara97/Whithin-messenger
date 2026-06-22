@@ -134,41 +134,6 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
         var filePath = await _fileService.SaveFileAsync(file, folderPath);
         var convertedFileName = Path.GetFileName(filePath);
 
-        if (_videoConverterService.IsVideoFile(contentType))
-        {
-            try
-            {
-                var fullFilePath = _fileService.GetFullPath(filePath);
-                if (_videoConverterService.NeedsConversion(fullFilePath))
-                {
-                    var outputFolder = _fileService.GetFullPathForFolder(folderPath);
-                    var convertedFileNameResult = await _videoConverterService.ConvertVideoToH264Async(
-                        fullFilePath,
-                        outputFolder,
-                        cancellationToken);
-
-                    if (!string.IsNullOrEmpty(convertedFileNameResult))
-                    {
-                        try
-                        {
-                            File.Delete(fullFilePath);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to delete original video file: {FilePath}", fullFilePath);
-                        }
-
-                        filePath = Path.Combine("uploads", folderPath, convertedFileNameResult).Replace("\\", "/");
-                        convertedFileName = convertedFileNameResult;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during video conversion, using original file: {FilePath}", filePath);
-            }
-        }
-
         var finalFilePath = _fileService.GetFullPath(filePath);
         var finalFileSize = File.Exists(finalFilePath)
             ? new FileInfo(finalFilePath).Length

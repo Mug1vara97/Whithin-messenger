@@ -293,6 +293,7 @@ const ChatRoom = ({
     cancelRecording,
     uploadingFile,
     uploadProgress,
+    isUploadProcessing,
     isRecordingVideoNote,
     videoNoteRecordingTime,
     handleVideoNoteRecording,
@@ -2463,7 +2464,9 @@ const ChatRoom = ({
                   <div className="uploading-file-details">
                     <div className="uploading-file-name">{uploadingFile.name}</div>
                     <div className="uploading-file-progress">
-                      Загрузка... {uploadProgress}%
+                      {isUploadProcessing
+                        ? `Обработка на сервере… ${uploadProgress}%`
+                        : `Загрузка… ${uploadProgress}%`}
                     </div>
                   </div>
                 </div>
@@ -2687,6 +2690,7 @@ const ChatRoom = ({
           files={pendingMediaSend.files}
           isUploading={Boolean(uploadingFile)}
           uploadProgress={uploadProgress}
+          isUploadProcessing={isUploadProcessing}
           onCancel={cancelMediaSend}
           onSend={confirmMediaSend}
         />

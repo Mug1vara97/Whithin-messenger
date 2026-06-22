@@ -39,6 +39,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   const [pendingMediaSend, setPendingMediaSend] = useState(null);
   const fileInputRef = useRef(null);
   const uploadProgressSetterRef = useRef(setUploadProgress);
@@ -123,6 +124,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
           size: fileList.reduce((sum, file) => sum + file.size, 0),
         });
         setUploadProgress(0);
+        setIsUploadProcessing(false);
 
         const formData = new FormData();
         formData.append('chatId', String(chatId));
@@ -148,15 +150,23 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
+          const UPLOAD_PROGRESS_CAP = 96;
+
           xhr.upload.addEventListener('progress', (event) => {
-            if (event.lengthComputable) {
-              uploadProgressSetterRef.current(
-                Math.round((event.loaded / event.total) * 100)
-              );
+            if (!event.lengthComputable || event.total <= 0) return;
+            const pct = Math.min(
+              UPLOAD_PROGRESS_CAP,
+              Math.round((event.loaded / event.total) * UPLOAD_PROGRESS_CAP)
+            );
+            uploadProgressSetterRef.current(pct);
+            if (event.loaded >= event.total) {
+              setIsUploadProcessing(true);
+              uploadProgressSetterRef.current(97);
             }
           });
           xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
+              uploadProgressSetterRef.current(100);
               const response = JSON.parse(xhr.responseText);
               if (
                 fileList.length === 1 &&
@@ -187,11 +197,13 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         await new Promise((resolve) => setTimeout(resolve, 200));
         setUploadingFile(null);
         setUploadProgress(0);
+        setIsUploadProcessing(false);
         return true;
       } catch (error) {
         console.error('❌ Ошибка загрузки файла:', error);
         setUploadingFile(null);
         setUploadProgress(0);
+        setIsUploadProcessing(false);
         alert(`Ошибка загрузки файла: ${error.message}`);
         return false;
       }
@@ -421,6 +433,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     cancelRecording,
     uploadingFile,
     uploadProgress,
+    isUploadProcessing,
     isRecordingVideoNote,
     videoNoteRecordingTime,
     handleVideoNoteRecording,

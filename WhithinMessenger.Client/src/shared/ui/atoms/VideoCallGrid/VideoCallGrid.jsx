@@ -126,7 +126,87 @@ const ScreenShareElement = React.memo(({ stream, participantId }) => {
   );
 });
 
-const VideoCallGrid = ({ 
+const PIP_DEFAULT_POSITION = { right: 24, bottom: 80 };
+
+const ScreenShareCameraPip = React.memo(({
+  stream,
+  participantId,
+  isLocal,
+  position,
+  onPositionChange,
+}) => {
+  const pipRef = useRef(null);
+  const dragStateRef = useRef(null);
+  const pos = position ?? PIP_DEFAULT_POSITION;
+
+  const handlePointerDown = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const pip = pipRef.current;
+    if (!pip) return;
+
+    const rect = pip.getBoundingClientRect();
+    const parentRect = pip.offsetParent?.getBoundingClientRect();
+    if (!parentRect) return;
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originRight: pos.right,
+      originBottom: pos.bottom,
+      parentWidth: parentRect.width,
+      parentHeight: parentRect.height,
+      pipWidth: rect.width,
+      pipHeight: rect.height,
+    };
+    pip.setPointerCapture(event.pointerId);
+  }, [pos.bottom, pos.right]);
+
+  const handlePointerMove = useCallback((event) => {
+    const drag = dragStateRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const right = Math.max(
+      8,
+      Math.min(drag.parentWidth - drag.pipWidth - 8, drag.originRight - dx)
+    );
+    const bottom = Math.max(
+      56,
+      Math.min(drag.parentHeight - drag.pipHeight - 8, drag.originBottom - dy)
+    );
+    onPositionChange?.({ right, bottom });
+  }, [onPositionChange]);
+
+  const endDrag = useCallback((event) => {
+    if (dragStateRef.current?.pointerId !== event.pointerId) return;
+    dragStateRef.current = null;
+    pipRef.current?.releasePointerCapture(event.pointerId);
+  }, []);
+
+  return (
+    <div
+      ref={pipRef}
+      className="screen-share-camera-pip"
+      style={{ right: `${pos.right}px`, bottom: `${pos.bottom}px` }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <VideoElement
+        stream={stream}
+        participantId={participantId}
+        isLocal={isLocal}
+      />
+    </div>
+  );
+});
+
+const VideoCallGrid = ({
   participants = [], 
   onParticipantClick,
   className = '',
@@ -263,6 +343,7 @@ const VideoCallGrid = ({
   const [visibleBottomUsers] = useState(6);
   const [lastVideoParticipants, setLastVideoParticipants] = useState(new Set());
   const [fullscreenScreenShareId, setFullscreenScreenShareId] = useState(null);
+  const [screenSharePipPositions, setScreenSharePipPositions] = useState(() => new Map());
 
   // Сброс состояния полноэкранного режима при выходе
   useEffect(() => {
@@ -371,6 +452,10 @@ const VideoCallGrid = ({
       console.log('VideoCallGrid: Auto-focus disabled');
       return;
     }
+
+    if (fullscreenScreenShareId !== null) {
+      return;
+    }
     
     if (!isFocusedMode) {
       // Получаем текущих участников с вебкамерой
@@ -409,9 +494,12 @@ const VideoCallGrid = ({
       // Обновляем состояние для следующей проверки
       setLastVideoParticipants(currentVideoParticipants);
     }
-  }, [extendedParticipants, isFocusedMode, focusParticipant, lastVideoParticipants, enableAutoFocus]);
+  }, [extendedParticipants, isFocusedMode, focusParticipant, lastVideoParticipants, enableAutoFocus, fullscreenScreenShareId]);
 
   const handleParticipantClick = (participant) => {
+    if (fullscreenScreenShareId !== null) {
+      return;
+    }
     focusParticipant(participant.id);
     onParticipantClick?.(participant);
   };
@@ -440,10 +528,18 @@ const VideoCallGrid = ({
       document.exitFullscreen?.();
       setFullscreenScreenShareId(null);
     } else {
-      tile.requestFullscreen?.();
+      if (focusedParticipantId !== null) {
+        setFocusedParticipantId(null);
+        setBottomPage(0);
+      }
       setFullscreenScreenShareId(participantId);
+      requestAnimationFrame(() => {
+        tile.requestFullscreen?.().catch(() => {
+          setFullscreenScreenShareId(null);
+        });
+      });
     }
-  }, [fullscreenScreenShareId]);
+  }, [fullscreenScreenShareId, focusedParticipantId]);
 
   const renderTileAvatar = (participant, isSmall, { overlay = false, tileBackgroundColor = null } = {}) => {
     const avatarSize = isSmall ? 60 : 100;
@@ -537,6 +633,7 @@ const VideoCallGrid = ({
     const volume = userVolumes.get(participant.id) || 100;
     const showSlider = showVolumeSliders.get(participant.id) || false;
     const ownerCamera = isScreenShare ? resolveOwnerCameraStream(participant) : null;
+    const showCameraPip = Boolean(isScreenShare && ownerCamera?.stream);
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
@@ -580,14 +677,20 @@ const VideoCallGrid = ({
                   stream={participant.stream} 
                   participantId={participant.id}
                 />
-                {ownerCamera?.stream ? (
-                  <div className="screen-share-camera-pip">
-                    <VideoElement
-                      stream={ownerCamera.stream}
-                      participantId={`${participant.id}-camera-pip`}
-                      isLocal={ownerCamera.isLocal}
-                    />
-                  </div>
+                {showCameraPip ? (
+                  <ScreenShareCameraPip
+                    stream={ownerCamera.stream}
+                    participantId={`${participant.id}-camera-pip`}
+                    isLocal={ownerCamera.isLocal}
+                    position={screenSharePipPositions.get(participant.id)}
+                    onPositionChange={(nextPosition) => {
+                      setScreenSharePipPositions((prev) => {
+                        const next = new Map(prev);
+                        next.set(participant.id, nextPosition);
+                        return next;
+                      });
+                    }}
+                  />
                 ) : null}
               </>
             ) : participant.isVideoEnabled && participant.videoStream && participant.videoStream.active ? (

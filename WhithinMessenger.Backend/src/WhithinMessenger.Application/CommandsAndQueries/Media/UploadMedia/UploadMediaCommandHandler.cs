@@ -69,59 +69,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
             var folderPath = _fileService.GetMediaFolderPath(contentType);
 
             var filePath = await _fileService.SaveFileAsync(request.File, folderPath);
-            var originalFilePath = filePath;
             var convertedFileName = Path.GetFileName(filePath);
-
-            // Конвертируем видео в H.264 если нужно
-            if (_videoConverterService.IsVideoFile(contentType))
-            {
-                try
-                {
-                    var fullFilePath = _fileService.GetFullPath(filePath);
-                    if (_videoConverterService.NeedsConversion(fullFilePath))
-                    {
-                        _logger.LogInformation("Video needs conversion, starting conversion: {FilePath}", fullFilePath);
-                        
-                        var outputFolder = _fileService.GetFullPathForFolder(folderPath);
-                        var convertedFileNameResult = await _videoConverterService.ConvertVideoToH264Async(
-                            fullFilePath, 
-                            outputFolder, 
-                            cancellationToken);
-
-                        if (!string.IsNullOrEmpty(convertedFileNameResult))
-                        {
-                            // Удаляем оригинальный файл
-                            try
-                            {
-                                File.Delete(fullFilePath);
-                                _logger.LogInformation("Original video file deleted: {FilePath}", fullFilePath);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to delete original video file: {FilePath}", fullFilePath);
-                            }
-
-                            // Используем конвертированный файл
-                            filePath = Path.Combine("uploads", folderPath, convertedFileNameResult).Replace("\\", "/");
-                            convertedFileName = convertedFileNameResult;
-                            _logger.LogInformation("Video converted successfully: {OriginalPath} -> {ConvertedPath}", originalFilePath, filePath);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Video conversion failed, using original file: {FilePath}", fullFilePath);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Video does not need conversion: {FilePath}", fullFilePath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error during video conversion, using original file: {FilePath}", filePath);
-                    // Продолжаем с оригинальным файлом в случае ошибки
-                }
-            }
 
             var message = new Message
             {
