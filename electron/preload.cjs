@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { exposeAudioCaptureApi } = require('process-audio-capture/dist/preload');
 
 let globalShortcutListener = null;
 
@@ -70,7 +71,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
-  armScreenCapture: () => ipcRenderer.invoke('electron:arm-screen-capture'),
+  armScreenCapture: (options) => ipcRenderer.invoke('electron:arm-screen-capture', options),
 
   updateGlobalShortcuts: (shortcuts) => ipcRenderer.invoke('electron:update-global-shortcuts', shortcuts),
 
@@ -125,3 +126,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   */
 });
+
+exposeAudioCaptureApi();

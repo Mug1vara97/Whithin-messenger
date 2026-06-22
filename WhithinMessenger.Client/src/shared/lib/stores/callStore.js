@@ -3883,6 +3883,7 @@ export const useCallStore = create(
 
         set({ isScreenShareTransitioning: true });
         let preCapturedStream = null;
+        let selectedSource = null;
         try {
           const state = get();
           const screenShareSessionId = Date.now();
@@ -3890,14 +3891,18 @@ export const useCallStore = create(
           set({ screenShareSessionId });
 
           if (window.electronAPI?.chooseScreenSource) {
-            const selectedSource = await window.electronAPI.chooseScreenSource();
+            selectedSource = await window.electronAPI.chooseScreenSource();
             if (!selectedSource) {
               throw new Error('Screen sharing cancelled by user');
             }
             includeAudio = Boolean(selectedSource.captureAudio);
 
             // Capture immediately while Electron still has the picker selection.
-            preCapturedStream = await voiceCallApi.acquireScreenShareStream(includeAudio);
+            preCapturedStream = await voiceCallApi.acquireScreenShareStream(includeAudio, {
+              sourceId: selectedSource.id,
+              sourceType: selectedSource.type,
+              processPid: selectedSource.processPid,
+            });
           }
 
           // Stop previous share only after we already own a fresh capture stream.
@@ -3913,6 +3918,11 @@ export const useCallStore = create(
           await voiceCallApi.setScreenShareEnabled(true, {
             includeAudio,
             screenStream: preCapturedStream,
+            captureOptions: selectedSource ? {
+              sourceId: selectedSource.id,
+              sourceType: selectedSource.type,
+              processPid: selectedSource.processPid,
+            } : {},
           });
           
           // Get the screen share stream from LiveKit room

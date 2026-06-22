@@ -34,7 +34,8 @@
     "asar": true,
     "asarUnpack": [
       "node_modules/global-mouse-events/**/*.node",
-      "node_modules/node-global-key-listener/**/*.exe"
+      "node_modules/node-global-key-listener/**/*.exe",
+      "node_modules/process-audio-capture/**/*.node"
     ],
     "directories": {
       "output": "release"
@@ -60,6 +61,7 @@
       "package.json",
       "node_modules/global-mouse-events/**/*",
       "node_modules/node-global-key-listener/**/*",
+      "node_modules/process-audio-capture/**/*",
       "node_modules/bindings/**/*",
       "node_modules/file-uri-to-path/**/*"
     ],
@@ -80,6 +82,7 @@
   },
   "dependencies": {
     "global-mouse-events": "^1.2.0",
-    "node-global-key-listener": "^0.3.0"
+    "node-global-key-listener": "^0.3.0",
+    "process-audio-capture": "^1.0.14"
   }
 }

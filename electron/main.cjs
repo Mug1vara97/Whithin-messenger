@@ -1,5 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const {
   app,
   BrowserWindow,
@@ -26,6 +27,7 @@ const {
   shutdownActiveCallOverlay,
   dismissActiveCallOverlay,
 } = require('./activeCallOverlay.cjs');
+const { setupAudioCaptureIpc } = require('process-audio-capture/dist/main');
 
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
@@ -737,6 +739,52 @@ function getScreenPickerThumbnailSize() {
     width: Math.round(960 * scaleFactor),
     height: Math.round(540 * scaleFactor),
   };
+}
+
+function getProcessIdFromWindowSourceId(sourceId) {
+  const match = /^window:(\d+):/.exec(String(sourceId || ''));
+  if (!match) {
+    return null;
+  }
+
+  const hwnd = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(hwnd) || hwnd <= 0) {
+    return null;
+  }
+
+  return getProcessIdFromHwnd(hwnd);
+}
+
+function getProcessIdFromHwnd(hwnd) {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+
+  try {
+    const script = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WhithinWin32 {
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+}
+"@
+$processId = 0
+[void][WhithinWin32]::GetWindowThreadProcessId([IntPtr]${hwnd}, [ref]$processId)
+Write-Output $processId
+`;
+    const output = execFileSync('powershell', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+    }).trim();
+    const pid = Number.parseInt(output, 10);
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
+  } catch (error) {
+    console.warn('[screen-audio] failed to resolve HWND to PID:', error.message);
+    return null;
+  }
 }
 
 function mapScreenPickerSources(sources) {
@@ -1535,6 +1583,7 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+  setupAudioCaptureIpc();
   session.defaultSession.setDisplayMediaRequestHandler(
     async (request, callback) => {
       let isCallbackSent = false;
@@ -1578,11 +1627,10 @@ if (!gotSingleInstanceLock) {
 
         let audioSource = null;
         if (shouldCaptureAudio && !isWhithinWindow) {
-          if (selectedSourceType === 'window') {
-            // Window audio: capture audio from the selected window source.
-            audioSource = preferredSource;
-          } else {
-            // Full screen: system loopback audio.
+          if (selectedSourceType === 'screen') {
+            audioSource = 'loopback';
+          } else if (selectedSourceType === 'window' && !pendingSelection?.processPid) {
+            // HWND -> PID failed; fall back to system loopback instead of broken window-source.
             audioSource = 'loopback';
           }
         }
@@ -1592,6 +1640,7 @@ if (!gotSingleInstanceLock) {
           sourceType: selectedSourceType,
           captureAudio: shouldCaptureAudio,
           audioSource: audioSource ? (typeof audioSource === 'string' ? audioSource : 'window-source') : null,
+          processPid: pendingSelection?.processPid ?? null,
         });
 
         safeCallback({
@@ -1795,35 +1844,54 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     return null;
   }
 
+  const processPid = selection.type === 'window'
+    ? getProcessIdFromWindowSourceId(selection.id)
+    : null;
+
   selectedScreenSource = {
     id: selection.id,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio)
+    captureAudio: Boolean(selection.captureAudio),
+    processPid,
   };
   lastSelectedScreenSource = {
     id: selection.id,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
+    processPid,
     selectedAt: Date.now()
   };
+
+  if (selection.captureAudio && selection.type === 'window') {
+    console.log('[screen-audio] window source resolved:', {
+      sourceId: selection.id,
+      processPid,
+    });
+  }
 
   return {
     id: selection.id,
     name: selection.name,
     type: selection.type,
-    captureAudio: Boolean(selection.captureAudio)
+    captureAudio: Boolean(selection.captureAudio),
+    processPid,
   };
 });
 
-ipcMain.handle('electron:arm-screen-capture', () => {
+ipcMain.handle('electron:arm-screen-capture', (_event, options = {}) => {
   if (!lastSelectedScreenSource?.id) {
     return false;
   }
 
+  const captureAudio = options.captureAudio !== undefined
+    ? Boolean(options.captureAudio)
+    : Boolean(lastSelectedScreenSource.captureAudio);
+
   selectedScreenSource = {
     id: lastSelectedScreenSource.id,
     type: lastSelectedScreenSource.type,
-    captureAudio: Boolean(lastSelectedScreenSource.captureAudio),
+    captureAudio,
+    processPid: lastSelectedScreenSource.processPid ?? null,
   };
   return true;
 });

@@ -11,6 +11,7 @@ import {
   DisconnectReason,
 } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
+import { ScreenShareProcessAudioSession } from '../../../shared/lib/utils/screenShareProcessAudio';
 import { serverApi } from '../../server/api/serverApi';
 
 // Конфигурация для голосового сервера
@@ -126,16 +127,39 @@ class VoiceCallApi {
     this.suppressRoomDisconnectEvents = 0;
     this.recentPeerJoinedAt = new Map();
     this.screenShareStream = null;
+    this.processAudioSession = null;
   }
 
-  async acquireScreenShareStream(includeAudio = true) {
+  async stopProcessAudioSession() {
+    if (!this.processAudioSession) return;
+    try {
+      await this.processAudioSession.stop();
+    } catch (error) {
+      console.warn('Failed to stop process audio session:', error);
+    }
+    this.processAudioSession = null;
+  }
+
+  shouldUseProcessAudioCapture(includeAudio, captureOptions = {}) {
+    if (!includeAudio) return false;
+    if (captureOptions.sourceType !== 'window') return false;
+    if (!captureOptions.processPid) return false;
+    return ScreenShareProcessAudioSession.isAvailable();
+  }
+
+  async acquireScreenShareStream(includeAudio = true, captureOptions = {}) {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       throw new Error('Screen sharing is not supported in this environment');
     }
 
     const isElectron = Boolean(window.electronAPI?.isElectron);
+    const useProcessAudio = isElectron && this.shouldUseProcessAudioCapture(includeAudio, captureOptions);
+    const useDisplayMediaAudio = includeAudio && !useProcessAudio;
+
     if (isElectron && window.electronAPI?.armScreenCapture) {
-      await window.electronAPI.armScreenCapture();
+      await window.electronAPI.armScreenCapture({
+        captureAudio: useDisplayMediaAudio,
+      });
     }
 
     const buildConstraints = (withAudio) => {
@@ -163,13 +187,38 @@ class VoiceCallApi {
       return constraints;
     };
 
-    console.log('Acquiring screen share via getDisplayMedia...', { includeAudio, isElectron });
+    console.log('Acquiring screen share via getDisplayMedia...', {
+      includeAudio,
+      isElectron,
+      useProcessAudio,
+      processPid: captureOptions.processPid ?? null,
+      sourceType: captureOptions.sourceType ?? null,
+    });
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia(buildConstraints(includeAudio));
+      const stream = await navigator.mediaDevices.getDisplayMedia(buildConstraints(useDisplayMediaAudio));
+
+      if (useProcessAudio) {
+        await this.stopProcessAudioSession();
+        const processAudioSession = new ScreenShareProcessAudioSession();
+        try {
+          const audioStream = await processAudioSession.start(captureOptions.processPid);
+          const audioTrack = audioStream.getAudioTracks()[0];
+          if (!audioTrack) {
+            throw new Error('Process audio capture returned no audio track');
+          }
+          stream.addTrack(audioTrack);
+          this.processAudioSession = processAudioSession;
+          console.log('[screen-audio] merged process audio track for pid', captureOptions.processPid);
+        } catch (processAudioError) {
+          await processAudioSession.stop();
+          console.warn('[screen-audio] process audio capture failed, continuing video-only:', processAudioError);
+        }
+      }
+
       return this.validateScreenShareStream(stream, includeAudio);
     } catch (error) {
-      const audioCaptureFailed = includeAudio && this.isAudioCaptureError(error);
+      const audioCaptureFailed = useDisplayMediaAudio && this.isAudioCaptureError(error);
       if (!audioCaptureFailed) {
         throw error;
       }
@@ -212,15 +261,17 @@ class VoiceCallApi {
   }
 
   stopLocalScreenShareStream() {
-    if (!this.screenShareStream) return;
-    this.screenShareStream.getTracks().forEach((track) => {
-      try {
-        track.stop();
-      } catch {
-        /* ignore */
-      }
-    });
-    this.screenShareStream = null;
+    if (this.screenShareStream) {
+      this.screenShareStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          /* ignore */
+        }
+      });
+      this.screenShareStream = null;
+    }
+    this.stopProcessAudioSession();
   }
 
   async publishScreenShareStream(stream, options = {}) {
@@ -253,8 +304,6 @@ class VoiceCallApi {
         source: Track.Source.ScreenShareAudio,
         dtx: true,
         red: true,
-        forceStereo: true,
-        audioPreset: AudioPresets.musicHighQualityStereo,
       });
       this.tuneLocalScreenShareAudioTrack();
     } else if (includeAudio) {
@@ -1014,13 +1063,17 @@ class VoiceCallApi {
     if (!this.room) {
       throw new Error('Not connected to room');
     }
-    const { includeAudio = true, screenStream: providedStream = null } = options;
+    const {
+      includeAudio = true,
+      screenStream: providedStream = null,
+      captureOptions = {},
+    } = options;
 
     if (enabled) {
       let captureStream = providedStream;
 
       if (!captureStream) {
-        captureStream = await this.acquireScreenShareStream(includeAudio);
+        captureStream = await this.acquireScreenShareStream(includeAudio, captureOptions);
       }
 
       const hasActiveOrStaleScreenVideoPublication = Array.from(
