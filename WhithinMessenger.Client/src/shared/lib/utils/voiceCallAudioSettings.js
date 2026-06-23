@@ -40,11 +40,13 @@ export function getAudioInputMediaConstraints(extra = {}) {
   const settings = volumeStorage.getSettings();
   const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
   const wantsNoiseSuppression = savedNoiseSuppression ? JSON.parse(savedNoiseSuppression) : false;
+  const echoOn = settings.echoCancellation !== false;
+  const agcOn = settings.autoGainControl !== false;
 
   const audio = {
-    echoCancellation: settings.echoCancellation !== false,
+    echoCancellation: echoOn,
     noiseSuppression: wantsNoiseSuppression,
-    autoGainControl: settings.autoGainControl !== false,
+    autoGainControl: agcOn,
     sampleRate: 48000,
     channelCount: 1,
     latency: 0,
@@ -52,12 +54,48 @@ export function getAudioInputMediaConstraints(extra = {}) {
     ...extra,
   };
 
+  if (echoOn) {
+    Object.assign(audio, {
+      googEchoCancellation: true,
+      googEchoCancellation2: true,
+      googDAEchoCancellation: true,
+      googHighpassFilter: true,
+    });
+
+    if (typeof navigator !== 'undefined' && /chrome|chromium|electron/i.test(navigator.userAgent)) {
+      audio.voiceIsolation = true;
+    }
+  }
+
+  if (agcOn) {
+    audio.googAutoGainControl = true;
+  }
+
+  if (wantsNoiseSuppression) {
+    audio.googNoiseSuppression = true;
+  }
+
   const deviceId = settings.inputDeviceId;
   if (deviceId && deviceId !== 'default') {
     audio.deviceId = { exact: deviceId };
   }
 
   return { audio };
+}
+
+export async function applyLiveMicCaptureConstraints(callState) {
+  const track = callState?.localStream?.getAudioTracks?.()?.[0]
+    || callState?.audioStream?.getAudioTracks?.()?.[0];
+  if (!track || track.readyState === 'ended') {
+    return;
+  }
+
+  const { audio } = getAudioInputMediaConstraints();
+  try {
+    await track.applyConstraints(audio);
+  } catch (error) {
+    console.warn('[voice] Failed to apply mic capture constraints:', error);
+  }
 }
 
 export async function applyAudioContextSinkId(audioContext, deviceId) {
@@ -96,7 +134,15 @@ export async function applyOutputAudioDevice(deviceId, audioElements = []) {
   }
 }
 
-export function applyLiveVoiceCallSettings(callState) {
+export async function applyCallPlaybackRouting(callState) {
+  if (!callState) return;
+
+  const outputDeviceId = volumeStorage.getOutputDeviceId();
+  await applyAudioContextSinkId(callState.audioContext, outputDeviceId);
+  await applyOutputAudioDevice(outputDeviceId, callState.audioElements);
+}
+
+export async function applyLiveVoiceCallSettings(callState) {
   if (!callState) return;
 
   const inputGain = getInputGainMultiplierFromStorage();
@@ -109,13 +155,13 @@ export function applyLiveVoiceCallSettings(callState) {
     micThresholdToNoiseGateOpenDb(baseThreshold),
   );
 
-  applyCallMasterOutputGain(callState.audioContext, callState.masterGain);
+  applyCallMasterOutputGain(
+    callState.audioContext,
+    callState.masterOutputGain || callState.masterGain,
+  );
 
   applyVoiceActivationTransmissionFromDetector(callState);
 
-  void applyAudioContextSinkId(callState.audioContext, volumeStorage.getOutputDeviceId());
-  void applyOutputAudioDevice(
-    volumeStorage.getOutputDeviceId(),
-    callState.audioElements,
-  );
+  await applyLiveMicCaptureConstraints(callState);
+  await applyCallPlaybackRouting(callState);
 }

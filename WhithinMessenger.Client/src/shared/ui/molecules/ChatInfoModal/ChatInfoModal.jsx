@@ -376,7 +376,7 @@ const ChatInfoModal = ({
                       avatarDecoration={
                         chatInfo?.type === 'group' ? null : chatInfo?.avatarDecoration
                       }
-                      size={100}
+                      size={chatInfo?.type === 'group' ? 72 : 100}
                       statusIndicator={
                         chatInfo?.type === 'private' && chatInfo?.status ? (
                           <UserAvatarPresenceDot status={chatInfo.status} />

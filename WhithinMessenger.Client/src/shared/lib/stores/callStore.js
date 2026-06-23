@@ -1492,7 +1492,9 @@ export const useCallStore = create(
               audioElement.playsInline = true;
               audioElement.style.display = 'none';
               document.body.appendChild(audioElement);
-              
+              const outputDeviceId = volumeStorage.getOutputDeviceId();
+              await applyOutputAudioDevice(outputDeviceId, [audioElement]);
+
               try {
                 await audioElement.play();
                 console.log('🔊 callStore: Screen share audio playback started');
@@ -2597,6 +2599,8 @@ export const useCallStore = create(
           
           applyVoiceActivationTransmission(get(), false);
 
+          await applyLiveVoiceCallSettings(get());
+
           console.log('Audio stream created with noise suppression support');
         } catch (error) {
           console.error('Failed to create audio stream:', error);
@@ -3039,9 +3043,9 @@ export const useCallStore = create(
           audioElement.autoplay = true;
           audioElement.playsInline = true;
           audioElement.controls = false;
+          audioElement.muted = true;
           audioElement.style.display = 'none';
           document.body.appendChild(audioElement);
-          void applyOutputAudioDevice(volumeStorage.getOutputDeviceId(), [audioElement]);
         }
         audioElement.srcObject = mediaStream;
 
@@ -3105,6 +3109,8 @@ export const useCallStore = create(
 
         get().ensureParticipantSpatialPosition(targetUserId);
         get().applyParticipantAudioRouting(targetUserId);
+
+        await applyLiveVoiceCallSettings(get());
 
         try {
           await audioElement.play();
@@ -4522,6 +4528,6 @@ export const useCallStore = create(
 
 if (typeof window !== 'undefined') {
   window.addEventListener('voiceCallSettingsChanged', () => {
-    applyLiveVoiceCallSettings(useCallStore.getState());
+    void applyLiveVoiceCallSettings(useCallStore.getState());
   });
 }

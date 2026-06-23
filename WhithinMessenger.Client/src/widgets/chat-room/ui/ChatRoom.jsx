@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
@@ -311,7 +312,8 @@ const ChatRoom = ({
   const contextMenuPosition = useClampedMenuPosition(
     contextMenu.visible && contextMenu.type === 'message',
     { x: contextMenu.x, y: contextMenu.y },
-    contextMenuRef
+    contextMenuRef,
+    { avoidSelector: '.input-container' },
   );
 
   const {
@@ -2242,175 +2244,6 @@ const ChatRoom = ({
           );
         })}
 
-        {contextMenu.visible && contextMenu.type === 'message' && (
-          <div 
-            ref={contextMenuRef}
-            className="context-menu"
-            style={{
-              left: `${contextMenuPosition.x}px`,
-              top: `${contextMenuPosition.y}px`
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              onClick={() => handleReplyToMessage(messages.find(m => m.messageId === contextMenu.messageId))}
-              className="context-menu-button"
-            >
-              <span className="context-menu-button-icon" aria-hidden="true">
-                <ReplyOutlined fontSize="inherit" />
-              </span>
-              Ответить
-            </button>
-            <button
-              onClick={() => handleStartMessageSelection(
-                messages.find((m) => m.messageId === contextMenu.messageId),
-              )}
-              className="context-menu-button"
-            >
-              <span className="context-menu-button-icon" aria-hidden="true">
-                <CheckCircleOutlineTwoTone fontSize="inherit" />
-              </span>
-              Выбрать
-            </button>
-            <button 
-              onClick={() => handleForwardMessage(messages.find(m => m.messageId === contextMenu.messageId))}
-              className="context-menu-button"
-            >
-              <span className="context-menu-button-icon" aria-hidden="true">
-                <ForwardOutlined fontSize="inherit" />
-              </span>
-              Переслать
-            </button>
-            {(() => {
-              const message = messages.find((m) => m.messageId === contextMenu.messageId);
-              const {
-                canCopyText,
-                canCopyImage,
-                canCopyVideo,
-                canSaveAs,
-              } = getMessageContextMenuActions(message);
-
-              return (
-                <>
-                  {canCopyText && (
-                    <button
-                      onClick={() => void handleCopyMessageText(message)}
-                      className="context-menu-button"
-                    >
-                      <span className="context-menu-button-icon" aria-hidden="true">
-                        <ContentCopy fontSize="inherit" />
-                      </span>
-                      Скопировать
-                    </button>
-                  )}
-                  {canCopyImage && (
-                    <button
-                      onClick={() => void handleCopyMessageImage(message)}
-                      className="context-menu-button"
-                    >
-                      <span className="context-menu-button-icon" aria-hidden="true">
-                        <ContentCopy fontSize="inherit" />
-                      </span>
-                      Скопировать изображение
-                    </button>
-                  )}
-                  {canCopyVideo && (
-                    <button
-                      onClick={() => void handleCopyMessageVideo(message)}
-                      className="context-menu-button"
-                    >
-                      <span className="context-menu-button-icon" aria-hidden="true">
-                        <ContentCopy fontSize="inherit" />
-                      </span>
-                      Скопировать видео
-                    </button>
-                  )}
-                  {canSaveAs && (
-                    <button
-                      onClick={() => void handleSaveMessageMedia(message)}
-                      className="context-menu-button"
-                    >
-                      <span className="context-menu-button-icon" aria-hidden="true">
-                        <SaveAlt fontSize="inherit" />
-                      </span>
-                      Сохранить как
-                    </button>
-                  )}
-                </>
-              );
-            })()}
-            {savedMessagesChatId && String(savedMessagesChatId) !== String(chatId) && (
-              <button
-                onClick={() => {
-                  void handleSaveToSaved(messages.find((m) => m.messageId === contextMenu.messageId));
-                }}
-                className="context-menu-button"
-              >
-                <span className="context-menu-button-icon" aria-hidden="true">
-                  <BookmarkBorder fontSize="inherit" />
-                </span>
-                Сохранить в избранное
-              </button>
-            )}
-            {canPinMessages && (() => {
-              const message = messages.find((m) => m.messageId === contextMenu.messageId);
-              const isPinned = Boolean(message?.isPinned);
-              return (
-                <button
-                  onClick={async () => {
-                    if (isPinned) {
-                      await unpinMessage(contextMenu.messageId);
-                    } else {
-                      await pinMessage(contextMenu.messageId);
-                    }
-                    closeContextMenu();
-                  }}
-                  className="context-menu-button"
-                >
-                  <span className="context-menu-button-icon" aria-hidden="true">
-                    <PushPin fontSize="inherit" />
-                  </span>
-                  {isPinned ? 'Открепить' : 'Закрепить'}
-                </button>
-              );
-            })()}
-            {contextMenu.canEdit && (() => {
-              const message = messages.find(m => m.messageId === contextMenu.messageId);
-              const isSticker = message?.contentType === 'sticker' && message?.sticker;
-              const hasMediaOnly = message?.contentType === 'media' && !message?.content?.trim();
-              if (isSticker || hasMediaOnly) return null;
-              return (
-                <button
-                  onClick={() => {
-                    handleEditMessage(contextMenu.messageId, message?.content);
-                    closeContextMenu();
-                  }}
-                  className="context-menu-button"
-                >
-                  <span className="context-menu-button-icon" aria-hidden="true">
-                    <EditOutlined fontSize="inherit" />
-                  </span>
-                  Редактировать
-                </button>
-              );
-            })()}
-            {contextMenu.canDelete && (
-              <button 
-                onClick={() => {
-                  handleDeleteMessage(contextMenu.messageId);
-                  closeContextMenu();
-                }}
-                className="context-menu-button danger"
-              >
-                <span className="context-menu-button-icon" aria-hidden="true">
-                  <DeleteOutline fontSize="inherit" />
-                </span>
-                Удалить
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Индикатор загрузки файла */}
         {uploadingFile && (
           <div className="message my-message uploading-message">
@@ -2459,6 +2292,178 @@ const ChatRoom = ({
         <div ref={messagesEndRef} />
       </div>
       </div>
+
+      {contextMenu.visible && contextMenu.type === 'message' && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            left: `${contextMenuPosition.x}px`,
+            top: `${contextMenuPosition.y}px`,
+            zIndex: 10000,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => handleReplyToMessage(messages.find(m => m.messageId === contextMenu.messageId))}
+            className="context-menu-button"
+          >
+            <span className="context-menu-button-icon" aria-hidden="true">
+              <ReplyOutlined fontSize="inherit" />
+            </span>
+            Ответить
+          </button>
+          <button
+            onClick={() => handleStartMessageSelection(
+              messages.find((m) => m.messageId === contextMenu.messageId),
+            )}
+            className="context-menu-button"
+          >
+            <span className="context-menu-button-icon" aria-hidden="true">
+              <CheckCircleOutlineTwoTone fontSize="inherit" />
+            </span>
+            Выбрать
+          </button>
+          <button
+            onClick={() => handleForwardMessage(messages.find(m => m.messageId === contextMenu.messageId))}
+            className="context-menu-button"
+          >
+            <span className="context-menu-button-icon" aria-hidden="true">
+              <ForwardOutlined fontSize="inherit" />
+            </span>
+            Переслать
+          </button>
+          {(() => {
+            const message = messages.find((m) => m.messageId === contextMenu.messageId);
+            const {
+              canCopyText,
+              canCopyImage,
+              canCopyVideo,
+              canSaveAs,
+            } = getMessageContextMenuActions(message);
+
+            return (
+              <>
+                {canCopyText && (
+                  <button
+                    onClick={() => void handleCopyMessageText(message)}
+                    className="context-menu-button"
+                  >
+                    <span className="context-menu-button-icon" aria-hidden="true">
+                      <ContentCopy fontSize="inherit" />
+                    </span>
+                    Скопировать
+                  </button>
+                )}
+                {canCopyImage && (
+                  <button
+                    onClick={() => void handleCopyMessageImage(message)}
+                    className="context-menu-button"
+                  >
+                    <span className="context-menu-button-icon" aria-hidden="true">
+                      <ContentCopy fontSize="inherit" />
+                    </span>
+                    Скопировать изображение
+                  </button>
+                )}
+                {canCopyVideo && (
+                  <button
+                    onClick={() => void handleCopyMessageVideo(message)}
+                    className="context-menu-button"
+                  >
+                    <span className="context-menu-button-icon" aria-hidden="true">
+                      <ContentCopy fontSize="inherit" />
+                    </span>
+                    Скопировать видео
+                  </button>
+                )}
+                {canSaveAs && (
+                  <button
+                    onClick={() => void handleSaveMessageMedia(message)}
+                    className="context-menu-button"
+                  >
+                    <span className="context-menu-button-icon" aria-hidden="true">
+                      <SaveAlt fontSize="inherit" />
+                    </span>
+                    Сохранить как
+                  </button>
+                )}
+              </>
+            );
+          })()}
+          {savedMessagesChatId && String(savedMessagesChatId) !== String(chatId) && (
+            <button
+              onClick={() => {
+                void handleSaveToSaved(messages.find((m) => m.messageId === contextMenu.messageId));
+              }}
+              className="context-menu-button"
+            >
+              <span className="context-menu-button-icon" aria-hidden="true">
+                <BookmarkBorder fontSize="inherit" />
+              </span>
+              Сохранить в избранное
+            </button>
+          )}
+          {canPinMessages && (() => {
+            const message = messages.find((m) => m.messageId === contextMenu.messageId);
+            const isPinned = Boolean(message?.isPinned);
+            return (
+              <button
+                onClick={async () => {
+                  if (isPinned) {
+                    await unpinMessage(contextMenu.messageId);
+                  } else {
+                    await pinMessage(contextMenu.messageId);
+                  }
+                  closeContextMenu();
+                }}
+                className="context-menu-button"
+              >
+                <span className="context-menu-button-icon" aria-hidden="true">
+                  <PushPin fontSize="inherit" />
+                </span>
+                {isPinned ? 'Открепить' : 'Закрепить'}
+              </button>
+            );
+          })()}
+          {contextMenu.canEdit && (() => {
+            const message = messages.find(m => m.messageId === contextMenu.messageId);
+            const isSticker = message?.contentType === 'sticker' && message?.sticker;
+            const hasMediaOnly = message?.contentType === 'media' && !message?.content?.trim();
+            if (isSticker || hasMediaOnly) return null;
+            return (
+              <button
+                onClick={() => {
+                  handleEditMessage(contextMenu.messageId, message?.content);
+                  closeContextMenu();
+                }}
+                className="context-menu-button"
+              >
+                <span className="context-menu-button-icon" aria-hidden="true">
+                  <EditOutlined fontSize="inherit" />
+                </span>
+                Редактировать
+              </button>
+            );
+          })()}
+          {contextMenu.canDelete && (
+            <button
+              onClick={() => {
+                handleDeleteMessage(contextMenu.messageId);
+                closeContextMenu();
+              }}
+              className="context-menu-button danger"
+            >
+              <span className="context-menu-button-icon" aria-hidden="true">
+                <DeleteOutline fontSize="inherit" />
+              </span>
+              Удалить
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
 
       {isSelectionMode ? (
         <MessageSelectionBar

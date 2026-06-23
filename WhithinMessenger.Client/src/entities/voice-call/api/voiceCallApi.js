@@ -12,6 +12,7 @@ import {
 } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { ScreenShareProcessAudioSession } from '../../../shared/lib/utils/screenShareProcessAudio';
+import { getAudioInputMediaConstraints } from '../../../shared/lib/utils/voiceCallAudioSettings';
 import { serverApi } from '../../server/api/serverApi';
 
 // Конфигурация для голосового сервера
@@ -45,6 +46,8 @@ const ICE_SERVERS = [
 
 // Конфигурация LiveKit Room
 const getRoomOptions = () => {
+  const { audio: micDefaults } = getAudioInputMediaConstraints();
+
   return {
     rtcConfig: {
       iceServers: ICE_SERVERS,
@@ -59,9 +62,10 @@ const getRoomOptions = () => {
     // a different Opus fmtp profile than microphone. Forcing mono here
     // can lead to SDP bundle codec collisions for multiple audio tracks.
     audioCaptureDefaults: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
+      echoCancellation: micDefaults.echoCancellation !== false,
+      noiseSuppression: Boolean(micDefaults.noiseSuppression),
+      autoGainControl: micDefaults.autoGainControl !== false,
+      suppressLocalAudioPlayback: true,
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,

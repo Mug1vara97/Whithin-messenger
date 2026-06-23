@@ -540,7 +540,7 @@ export function AudioSettingsSection({ active = true }) {
         <span className="audio-settings__toggle-info">
           <span className="audio-settings__toggle-title">Эхоподавление</span>
           <span className="audio-settings__toggle-desc">
-            Убирает звук из наушников/динамиков с микрофона. Рекомендуется держать включённым.
+            Убирает звук собеседников с микрофона. Для гарнитуры выберите её же в поле «Динамик».
           </span>
         </span>
         <span className="settings-switch">
