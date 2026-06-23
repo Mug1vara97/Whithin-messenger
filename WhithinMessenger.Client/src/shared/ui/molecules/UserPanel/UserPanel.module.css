@@ -10,7 +10,7 @@
     flex-shrink: 0;
 }
 
-html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .user-panel {
+html:not([data-interface-design='system24']):not([data-interface-design='rounded']) .user-panel {
     border-top: 1px solid var(--border, #4f545c);
 }
 

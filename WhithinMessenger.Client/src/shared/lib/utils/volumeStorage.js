@@ -4,7 +4,7 @@ export class VolumeStorage {
     this.storageKey = 'voiceCallSettings';
     this.defaultSettings = {
       inputVolume: 1.0,
-      outputVolume: 1.4,
+      outputVolume: 1.0,
       inputDeviceId: 'default',
       outputDeviceId: 'default',
       micThreshold: 14,
@@ -50,11 +50,13 @@ export class VolumeStorage {
   }
 
   getOutputVolume() {
-    return this.getSettings().outputVolume;
+    const value = Number(this.getSettings().outputVolume);
+    if (!Number.isFinite(value)) return 1;
+    return Math.max(0, Math.min(1, value));
   }
 
   setOutputVolume(volume) {
-    this.saveSettings({ outputVolume: Math.max(0, Math.min(2, volume)) });
+    this.saveSettings({ outputVolume: Math.max(0, Math.min(1, volume)) });
   }
 
   getNoiseSuppression() {

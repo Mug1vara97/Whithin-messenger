@@ -8,7 +8,8 @@ import MediaFile from '../MediaFile/MediaFile';
 import { categorizeMessageMedia } from '../../../lib/utils/messageMediaHelpers';
 import RepliedMedia from '../RepliedMedia/RepliedMedia';
 import StickerMessage from '../StickerMessage/StickerMessage';
-import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
+import MessageMarkdown from '../MessageMarkdown/MessageMarkdown';
 import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../lib/utils/messageTime';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { ReplyOutlined, ForwardOutlined, EditOutlined, DeleteOutline } from '@mui/icons-material';
@@ -87,40 +88,8 @@ const MessageItem = ({
   }, []);
 
   const renderMessageContent = () => {
-    const messageParts = splitTextWithLinks(message.content);
     const hasTextContent = Boolean(message.content?.trim());
-    const renderCaption = () => (
-      <>
-        {messageParts.length > 0 ? (
-          messageParts.map((part, index) => {
-            if (part.type === 'link') {
-              return (
-                <a
-                  key={`${message.messageId}-link-${index}`}
-                  href={part.href}
-                  className="message-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalUrl(part.href);
-                  }}
-                >
-                  {part.value}
-                </a>
-              );
-            }
-
-            return (
-              <React.Fragment key={`${message.messageId}-text-${index}`}>
-                {part.value}
-              </React.Fragment>
-            );
-          })
-        ) : (
-          message.content
-        )}
-      </>
-    );
+    const renderCaption = () => <MessageMarkdown content={message.content} />;
 
     return (
       <div className="message-content">

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
-import { getUserStatusLabel } from '../../../lib/utils/userStatus';
+import { getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
 import { mapChatParticipantToListItem } from '../../../lib/utils/memberListUtils';
 import { usePresence, useResolvedPresence } from '../../../lib/contexts/PresenceContext';
 import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
@@ -80,6 +80,16 @@ const getBannerStyle = (banner, fallbackColor = '#5865F2') => {
   };
 };
 
+const isParticipantOnline = (participant, resolvePresence) => {
+  const userId = participant?.userId ?? participant?.UserId ?? null;
+  const rawStatus = participant?.userStatus ?? participant?.UserStatus ?? null;
+  const status = resolvePresence
+    ? resolvePresence(userId, rawStatus)?.normalized
+    : normalizeUserStatus(rawStatus);
+
+  return status !== PRESENCE_STATUS.OFFLINE;
+};
+
 const ChatInfoParticipantItem = ({ participant, resolvePresence }) => {
   const member = mapChatParticipantToListItem(participant, { resolveStatus: resolvePresence });
   const presence = useResolvedPresence(member.userId, member.status);
@@ -98,7 +108,7 @@ const ChatInfoParticipantItem = ({ participant, resolvePresence }) => {
             username={member.login}
             avatarUrl={avatarUrl}
             avatarColor={member.avatarColor}
-            avatarDecoration={member.avatarDecoration}
+            avatarDecoration={null}
             size={40}
             statusIndicator={<UserAvatarPresenceDot status={presence.normalized} />}
           />
@@ -129,6 +139,23 @@ const ChatInfoModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const { resolvePresence } = usePresence();
+  const sortedParticipants = useMemo(() => {
+    if (!participants?.length) {
+      return [];
+    }
+
+    return [...participants].sort((a, b) => {
+      const onlineA = isParticipantOnline(a, resolvePresence);
+      const onlineB = isParticipantOnline(b, resolvePresence);
+      if (onlineA !== onlineB) {
+        return onlineA ? -1 : 1;
+      }
+
+      const nameA = a.username ?? a.Username ?? '';
+      const nameB = b.username ?? b.Username ?? '';
+      return String(nameA).localeCompare(String(nameB), 'ru', { sensitivity: 'base' });
+    });
+  }, [participants, resolvePresence]);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [chatAvatar, setChatAvatar] = useState(chatInfo?.chatAvatar);
   const [chatAvatarColor, setChatAvatarColor] = useState(chatInfo?.chatAvatarColor);
@@ -381,7 +408,10 @@ const ChatInfoModal = ({
                 {chatInfo?.type === 'group' && (
                   <div className="chat-info-participants-panel">
                     <div className="chat-info-participants-header">
-                      <h5 className="chat-info-participants-title">Участники</h5>
+                      <h5 className="chat-info-participants-title">
+                        Участники
+                        {sortedParticipants.length > 0 ? ` · ${sortedParticipants.length}` : ''}
+                      </h5>
                       {canAddParticipants && (
                         <button 
                           className="chat-info-add-participant-btn"
@@ -397,8 +427,8 @@ const ChatInfoModal = ({
                         <div className="chat-info-no-participants">
                           <p>Загрузка участников…</p>
                         </div>
-                      ) : participants && participants.length > 0 ? (
-                        participants.map((participant) => (
+                      ) : sortedParticipants.length > 0 ? (
+                        sortedParticipants.map((participant) => (
                           <ChatInfoParticipantItem
                             key={participant.userId ?? participant.UserId}
                             participant={participant}

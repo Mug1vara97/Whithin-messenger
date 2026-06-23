@@ -281,49 +281,49 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 }
 
 /* === Midnight — per-panel brightness like FrostedGlass regions === */
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .home-page,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-panel,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-page,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-main,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-messages-panel .messages,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .member-list-sidebar .member-list-scroll,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .chat-list-container,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .chat-list,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main .search-results-container {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .home-page,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-panel,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-settings-page,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-settings-main,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-messages-panel .messages,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .member-list-sidebar .member-list-scroll,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar-main .chat-list-container,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar-main .chat-list,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar-main .search-results-container {
   background: transparent !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-layout > div[class*='server-list'] {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .main-layout > div[class*='server-list'] {
   background: var(--fg-fill-serverlist) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-panel-header,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-channels,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-sidebar-main,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .user-panel,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-sidebar {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-panel-header,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-channels,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar-main,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .user-panel,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-settings-sidebar {
   background: var(--fg-fill-left) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-messages-panel,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .friends-panel,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-page-header,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .server-settings-scroll {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-messages-panel,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .friends-panel,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-settings-page-header,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .server-settings-scroll {
   background: var(--fg-fill-middle) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-header,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .input-container {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-header,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .input-container {
   background: var(--fg-fill-left) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .member-list-sidebar {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .member-list-sidebar {
   background: var(--fg-fill-right) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area:has(> .no-selection),
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area:has(> .no-chat-selected) {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .main-area:has(> .no-selection),
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .main-area:has(> .no-chat-selected) {
   background: var(--fg-fill-middle) !important;
   border: var(--midnight-panel-border);
   border-radius: var(--midnight-radius-lg);
@@ -533,9 +533,9 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   background: var(--fg-fill-middle) !important;
 }
 
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .main-area .voice-call-container,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .group-chat-container .chat-voice-call,
-[data-frosted-glass='enabled'][data-interface-design='midnight'] .chat-voice-call-join-preview {
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .main-area .voice-call-container,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .group-chat-container .chat-voice-call,
+[data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-voice-call-join-preview {
   background: var(--fg-fill-middle) !important;
 }
 

@@ -1,10 +1,9 @@
 import { volumeStorage } from './volumeStorage';
 
 const OUTPUT_GAIN_MIN = 0;
-const OUTPUT_GAIN_MAX = 2;
-/** Default call output boost (~40% louder) with limiter to avoid harsh clipping. */
-export const DEFAULT_CALL_OUTPUT_GAIN = 1.4;
-export const OUTPUT_VOLUME_PERCENT_MAX = 200;
+const OUTPUT_GAIN_MAX = 1;
+export const DEFAULT_CALL_OUTPUT_GAIN = 1;
+export const OUTPUT_VOLUME_PERCENT_MAX = 100;
 
 export function outputGainToPercent(gain) {
   const clamped = Math.max(OUTPUT_GAIN_MIN, Math.min(OUTPUT_GAIN_MAX, Number(gain) || 0));
@@ -18,12 +17,7 @@ export function percentToOutputGain(percent) {
 
 export function getCallOutputGain() {
   const stored = volumeStorage.getOutputVolume();
-  let gain = stored > 0 ? stored : DEFAULT_CALL_OUTPUT_GAIN;
-  // Migrate older installs that saved 1.0 as "max" before the output boost existed.
-  if (gain === 1) {
-    gain = DEFAULT_CALL_OUTPUT_GAIN;
-  }
-  // Values from the previous 0.5–2.5 scale are still valid gains; cap at 200%.
+  const gain = stored > 0 ? stored : DEFAULT_CALL_OUTPUT_GAIN;
   return Math.max(OUTPUT_GAIN_MIN, Math.min(OUTPUT_GAIN_MAX, gain));
 }
 

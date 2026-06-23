@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
-import { buildMediaUrl, openExternalUrl, splitTextWithLinks } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
+import MessageMarkdown from '../MessageMarkdown/MessageMarkdown';
 import AudioMessage from '../AudioMessage/AudioMessage';
 import './RepliedMedia.css';
 
@@ -134,33 +135,13 @@ const RepliedMedia = ({ content, mediaFiles }) => {
     }
   }
 
-  // Если это обычный текст
-  console.log('🎵 RepliedMedia - отображаем как текст:', content);
-  const textParts = splitTextWithLinks(content);
-
   return (
-    <span className="replied-text">
-      {textParts.length > 0 ? textParts.map((part, index) => {
-        if (part.type === 'link') {
-          return (
-            <a
-              key={`reply-link-${index}`}
-              href={part.href}
-              className="replied-link"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openExternalUrl(part.href);
-              }}
-            >
-              {part.value}
-            </a>
-          );
-        }
-
-        return <React.Fragment key={`reply-text-${index}`}>{part.value}</React.Fragment>;
-      }) : content}
-    </span>
+    <MessageMarkdown
+      content={content}
+      className="replied-text"
+      linkClassName="replied-link"
+      compact
+    />
   );
 };
 

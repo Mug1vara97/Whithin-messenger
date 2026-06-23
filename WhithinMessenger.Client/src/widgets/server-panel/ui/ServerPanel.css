@@ -29,17 +29,17 @@
   overflow: visible;
 }
 
-html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-panel-header.with-banner {
+html:not([data-interface-design='system24']):not([data-interface-design='rounded']) .server-panel-header.with-banner {
   border-bottom: none;
   background: transparent;
 }
 
-html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-info {
+html:not([data-interface-design='system24']):not([data-interface-design='rounded']) .server-info {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 
-html:not([data-interface-design='system24']):not([data-interface-design='midnight']) .server-panel-header.with-banner .server-info {
+html:not([data-interface-design='system24']):not([data-interface-design='rounded']) .server-panel-header.with-banner .server-info {
   border-bottom: none;
   background: transparent;
 }

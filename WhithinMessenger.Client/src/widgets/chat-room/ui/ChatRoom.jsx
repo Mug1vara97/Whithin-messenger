@@ -8,7 +8,8 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
-import { openExternalUrl, splitTextWithLinks, buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
+import { buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
+import MessageMarkdown from '../../../shared/ui/molecules/MessageMarkdown/MessageMarkdown';
 import { fetchAllChatMediaFiles, collectMediaFromMessages } from '../../../shared/lib/utils/fetchChatMedia';
 import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../shared/lib/utils/messageTime';
 import { isCallLogMessage } from '../../../shared/lib/utils/callLogHelpers';
@@ -1049,39 +1050,6 @@ const ChatRoom = ({
     exitSelectionMode,
   ]);
 
-  const renderTextWithLinks = useCallback((text, keyPrefix) => {
-    const parts = splitTextWithLinks(text);
-
-    if (!parts.length) {
-      return text;
-    }
-
-    return parts.map((part, index) => {
-      if (part.type === 'link') {
-        return (
-          <a
-            key={`${keyPrefix}-link-${index}`}
-            href={part.href}
-            className="message-link"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openExternalUrl(part.href);
-            }}
-          >
-            {part.value}
-          </a>
-        );
-      }
-
-      return (
-        <React.Fragment key={`${keyPrefix}-text-${index}`}>
-          {part.value}
-        </React.Fragment>
-      );
-    });
-  }, []);
-
   const loadChatInfo = useCallback(() => {
     if (!chatId || !connection) return;
     
@@ -2108,7 +2076,7 @@ const ChatRoom = ({
                           <>
                             {msg.forwardedMessage.content && (
                               <div className="forwarded-message-text">
-                                {renderTextWithLinks(msg.forwardedMessage.content, `${msg.messageId}-forwarded-source`)}
+                                <MessageMarkdown content={msg.forwardedMessage.content} />
                               </div>
                             )}
                             {msg.forwardedMessage.mediaFiles?.length > 0 && (() => {
@@ -2153,7 +2121,7 @@ const ChatRoom = ({
                     </div>
                     {hasTextContent && (
                       <div className="message-text">
-                        {renderTextWithLinks(msg.content, `${msg.messageId}-forwarded-content`)}
+                        <MessageMarkdown content={msg.content} />
                       </div>
                     )}
                   </>
@@ -2173,7 +2141,7 @@ const ChatRoom = ({
 
                 {!msg.forwardedMessage && !isStickerMessage && !isPollMessage && !msg.mediaFiles?.length && hasTextContent && (
                   <div className="message-text">
-                    {renderTextWithLinks(msg.content, `${msg.messageId}-content`)}
+                    <MessageMarkdown content={msg.content} />
                   </div>
                 )}
                 
@@ -2184,7 +2152,7 @@ const ChatRoom = ({
                     onVideoClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
                     renderCaption={
                       hasTextContent
-                        ? () => renderTextWithLinks(msg.content, `${msg.messageId}-content`)
+                        ? () => <MessageMarkdown content={msg.content} />
                         : null
                     }
                   />

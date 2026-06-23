@@ -1,9 +1,11 @@
 const STORAGE_KEY = 'whithin-interface-design';
 const CHANGE_EVENT = 'interfaceDesignChanged';
 
+const LEGACY_ROUNDED_DESIGN_ID = 'midnight';
+
 export const INTERFACE_DESIGN_IDS = {
   DEFAULT: 'default',
-  MIDNIGHT: 'midnight',
+  ROUNDED: 'rounded',
   SYSTEM24: 'system24',
 };
 
@@ -14,9 +16,9 @@ export const INTERFACE_DESIGNS = [
     description: 'Стандартный интерфейс Whithin в духе Discord.',
   },
   {
-    id: INTERFACE_DESIGN_IDS.MIDNIGHT,
-    name: 'Midnight',
-    description: 'Отделённые скруглённые панели с зазорами, как в теме midnight-discord.',
+    id: INTERFACE_DESIGN_IDS.ROUNDED,
+    name: 'Закруглённая',
+    description: 'Отделённые панели со скруглёнными углами и зазорами между блоками.',
   },
   {
     id: INTERFACE_DESIGN_IDS.SYSTEM24,
@@ -33,6 +35,10 @@ export function getInterfaceDesignId() {
 
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === LEGACY_ROUNDED_DESIGN_ID) {
+      localStorage.setItem(STORAGE_KEY, INTERFACE_DESIGN_IDS.ROUNDED);
+      return INTERFACE_DESIGN_IDS.ROUNDED;
+    }
     if (saved && INTERFACE_DESIGNS.some((item) => item.id === saved)) {
       return saved;
     }
@@ -44,8 +50,11 @@ export function getInterfaceDesignId() {
 }
 
 export function persistInterfaceDesign(designId) {
-  const nextId = INTERFACE_DESIGNS.some((item) => item.id === designId)
-    ? designId
+  const normalizedDesignId = designId === LEGACY_ROUNDED_DESIGN_ID
+    ? INTERFACE_DESIGN_IDS.ROUNDED
+    : designId;
+  const nextId = INTERFACE_DESIGNS.some((item) => item.id === normalizedDesignId)
+    ? normalizedDesignId
     : INTERFACE_DESIGN_IDS.DEFAULT;
 
   if (typeof window !== 'undefined') {
@@ -62,14 +71,17 @@ export function applyInterfaceDesign(designId = getInterfaceDesignId()) {
     return designId;
   }
 
+  const normalizedDesignId = designId === LEGACY_ROUNDED_DESIGN_ID
+    ? INTERFACE_DESIGN_IDS.ROUNDED
+    : designId;
   const root = document.documentElement;
-  if (!designId || designId === INTERFACE_DESIGN_IDS.DEFAULT) {
+  if (!normalizedDesignId || normalizedDesignId === INTERFACE_DESIGN_IDS.DEFAULT) {
     root.removeAttribute('data-interface-design');
   } else {
-    root.setAttribute('data-interface-design', designId);
+    root.setAttribute('data-interface-design', normalizedDesignId);
   }
 
-  return designId;
+  return normalizedDesignId;
 }
 
 export function applySavedInterfaceDesign() {
