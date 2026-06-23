@@ -7,7 +7,7 @@ const WALLPAPER_ROOT_ID = 'app-wallpaper-root';
 const MAX_WEB_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ELECTRON_IMAGE_BYTES = 12 * 1024 * 1024;
 
-/** FrostedGlass defaults — https://github.com/DiscordStyles/FrostedGlass */
+/** Wallpaper blur radius when transparent interface mode is active. */
 export const FROSTED_GLASS_WALLPAPER_BLUR_PX = 5;
 
 export const FROSTED_GLASS_OVERLAY_TINT = {
@@ -23,8 +23,8 @@ export const FROSTED_GLASS_OVERLAY_TINT_OPTIONS = [
   },
   {
     id: FROSTED_GLASS_OVERLAY_TINT.DEFAULT,
-    label: 'Классическая (FrostedGlass)',
-    description: 'Нейтральное чёрное затемнение, как в оригинальной теме DiscordStyles.',
+    label: 'Нейтральная',
+    description: 'Ровное тёмное затемнение панелей без оттенка текущей темы.',
   },
 ];
 

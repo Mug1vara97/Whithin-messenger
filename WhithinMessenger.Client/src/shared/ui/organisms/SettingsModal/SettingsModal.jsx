@@ -738,8 +738,8 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
             </SettingsPanel>
 
             <SettingsPanel
-              title="Стеклянный фон"
-              description="Пользовательское изображение с эффектом матового стекла (Frosted Glass)."
+              title="Фон и прозрачность"
+              description="Своё фоновое изображение и полупрозрачные панели интерфейса поверх него."
             >
               <FrostedGlassSettingsSection />
             </SettingsPanel>

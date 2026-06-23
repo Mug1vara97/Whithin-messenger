@@ -1133,8 +1133,8 @@ export const THEME_PRESETS = {
   },
   [THEME_PRESET_IDS.FROSTED_GLASS]: {
     id: THEME_PRESET_IDS.FROSTED_GLASS,
-    name: 'Frosted Glass',
-    description: 'Тёмная полупрозрачная палитра для пользовательского фона с эффектом матового стекла',
+    name: 'Прозрачная',
+    description: 'Полупрозрачная палитра для режима с фоновым изображением',
     colors: {
       '--background': '#1a1b1f',
       '--background-primary': '#141519',

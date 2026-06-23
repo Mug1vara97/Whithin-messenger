@@ -19,6 +19,7 @@ export function ChatAttachMenu({
   onMediaSelect,
   onDocumentSelect,
   onPollClick,
+  canCreatePoll = false,
   onDefaultClick,
   usePlusIcon = false,
   triggerClassName = '',
@@ -175,15 +176,17 @@ export function ChatAttachMenu({
             <InsertDriveFile fontSize="small" />
             <span>Документ</span>
           </button>
-          <button
-            type="button"
-            className="chat-attach-menu__item"
-            role="menuitem"
-            onClick={handlePollClick}
-          >
-            <PollOutlined fontSize="small" />
-            <span>Опрос</span>
-          </button>
+          {canCreatePoll && (
+            <button
+              type="button"
+              className="chat-attach-menu__item"
+              role="menuitem"
+              onClick={handlePollClick}
+            >
+              <PollOutlined fontSize="small" />
+              <span>Опрос</span>
+            </button>
+          )}
         </div>,
         document.body,
       )

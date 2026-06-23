@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
@@ -108,6 +108,34 @@ import { inviteUserToServer } from '../../../shared/lib/utils/inviteUserToServer
 import SendIcon from '../../../shared/ui/atoms/SendIcon';
 import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
+
+const MESSAGE_COMPOSER_LINE_HEIGHT_PX = 22;
+const MESSAGE_COMPOSER_MAX_LINES = 7;
+const MESSAGE_COMPOSER_MAX_HEIGHT_PX = MESSAGE_COMPOSER_LINE_HEIGHT_PX * MESSAGE_COMPOSER_MAX_LINES;
+
+function syncComposerInset(container) {
+  const main = container?.closest('.chat-room-main');
+  if (!main || !container) return;
+
+  const height = `${container.offsetHeight}px`;
+  main.style.setProperty('--chat-composer-inset', height);
+  if (main.classList.contains('is-replying') || main.classList.contains('is-editing')) {
+    main.style.setProperty('--chat-composer-inset-expanded', height);
+  }
+}
+
+function resizeMessageComposerTextarea(textarea) {
+  if (!textarea) return;
+
+  const isExpanded = textarea.value.includes('\n');
+  textarea.classList.toggle('message-input--expanded', isExpanded);
+
+  textarea.style.height = 'auto';
+  const scrollHeight = textarea.scrollHeight;
+  const nextHeight = Math.min(scrollHeight, MESSAGE_COMPOSER_MAX_HEIGHT_PX);
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = scrollHeight > MESSAGE_COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden';
+}
 
 const ChatRoom = ({ 
   chatId, 
@@ -246,8 +274,16 @@ const ChatRoom = ({
   const canVoice = !isServerChat || canSendVoiceMessages(userPermissions, isServerOwner);
   const canModerateMessages = isServerChat && canManageMessages(userPermissions, isServerOwner);
   const canPinMessages = canModerateMessages || !isServerChat;
+  const isDirectChat = chatTypeId === 1 || (!isGroupChat && !isServerChat);
+  const canCreatePoll = !isSavedMessages && !isDirectChat && (isGroupChat || isServerChat);
   const [isPollModalOpen, setPollModalOpen] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+
+  useEffect(() => {
+    if (!canCreatePoll) {
+      setPollModalOpen(false);
+    }
+  }, [canCreatePoll, chatId]);
 
   const messagesTailKey = useMemo(() => {
     if (!messages?.length) return '0:';
@@ -958,6 +994,27 @@ const ChatRoom = ({
   }, [chatId, exitSelectionMode]);
 
   const inputRef = useRef(null);
+  const inputContainerRef = useRef(null);
+
+  const resizeMessageComposer = useCallback(() => {
+    resizeMessageComposerTextarea(inputRef.current);
+    syncComposerInset(inputContainerRef.current);
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeMessageComposer();
+  }, [newMessage, replyingToMessage, editingMessageId, resizeMessageComposer]);
+
+  useEffect(() => {
+    const container = inputContainerRef.current;
+    if (!container) return undefined;
+
+    const observer = new ResizeObserver(() => {
+      syncComposerInset(container);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [chatId]);
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -1394,6 +1451,15 @@ const ChatRoom = ({
     }
   }, [newMessage, replyingToMessage, editingMessageId, editMessage, sendMessage]);
 
+  const handleComposerKeyDown = useCallback((event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+
+    event.preventDefault();
+    if (newMessage.trim()) {
+      void handleSendMessage(event);
+    }
+  }, [newMessage, handleSendMessage]);
+
   const handleSendSticker = useCallback(async (sticker) => {
     if (!chatId || !sticker?.id || isSendingSticker) return;
     setIsSendingSticker(true);
@@ -1581,6 +1647,8 @@ const ChatRoom = ({
   }, [closeContextMenu]);
 
   const handleCreatePoll = async ({ question, options, allowMultiple, isAnonymous }) => {
+    if (!canCreatePoll) return false;
+
     setIsCreatingPoll(true);
     try {
       return await createPoll({ question, options, allowMultiple, isAnonymous });
@@ -2476,6 +2544,7 @@ const ChatRoom = ({
         />
       ) : (canSend || editingMessageId || !isServerChat) && (
       <form
+        ref={inputContainerRef}
         className={`input-container${replyingToMessage ? ' replying' : ''}${editingMessageId ? ' editing' : ''}`}
         onSubmit={handleSendMessage}
       >
@@ -2548,19 +2617,21 @@ const ChatRoom = ({
                 triggerClassName="chat-composer__action-btn chat-composer__action-btn--attach"
                 onMediaSelect={queueMediaSend}
                 onDocumentSelect={queueMediaSend}
+                canCreatePoll={canCreatePoll}
                 onPollClick={() => setPollModalOpen(true)}
               />
             )}
 
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={newMessage}
               onChange={(e) => {
                 const value = e.target.value;
                 setNewMessage(value);
                 handleComposerTextChange(value);
               }}
+              onKeyDown={handleComposerKeyDown}
               placeholder={
                 editingMessageId
                   ? 'Редактируйте сообщение...'
@@ -2735,12 +2806,14 @@ const ChatRoom = ({
         connection={connection}
       />
 
-      <CreatePollModal
-        isOpen={isPollModalOpen}
-        onClose={() => setPollModalOpen(false)}
-        onSubmit={handleCreatePoll}
-        isSubmitting={isCreatingPoll}
-      />
+      {canCreatePoll && (
+        <CreatePollModal
+          isOpen={isPollModalOpen}
+          onClose={() => setPollModalOpen(false)}
+          onSubmit={handleCreatePoll}
+          isSubmitting={isCreatingPoll}
+        />
+      )}
 
       <ServerMemberNicknameModal
         open={Boolean(nicknameEditorMember)}

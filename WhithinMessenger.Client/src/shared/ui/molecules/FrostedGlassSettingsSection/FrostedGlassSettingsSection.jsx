@@ -79,14 +79,11 @@ export function FrostedGlassSettingsSection() {
       <div className="settings-row">
         <div className="settings-row__info">
           <label htmlFor="frosted-glass-enabled" className="settings-row__title">
-            Frosted Glass
+            Прозрачность интерфейса
           </label>
           <p className="settings-row__desc">
-            Фон как в теме{' '}
-            <a href="https://github.com/DiscordStyles/FrostedGlass" target="_blank" rel="noreferrer">
-              DiscordStyles/FrostedGlass
-            </a>
-            : размытие 5px, серверы 80%, каналы 80%, чат 60%, участники без затемнения.
+            Панели серверов, каналов и чата становятся полупрозрачными — сквозь них видно
+            фоновое изображение. Текст, иконки и кнопки остаются контрастными и читаемыми.
           </p>
         </div>
         <label

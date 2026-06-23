@@ -50,6 +50,22 @@ public class CreatePollCommandHandler : IRequestHandler<CreatePollCommand, Creat
             return new CreatePollResult { Success = false, ErrorMessage = "Chat not found" };
         }
 
+        var chatTypeName = chat.Type?.TypeName ?? string.Empty;
+        if (string.Equals(chatTypeName, ChatTypeNames.Private, StringComparison.OrdinalIgnoreCase))
+        {
+            return new CreatePollResult { Success = false, ErrorMessage = "Опросы недоступны в личных чатах" };
+        }
+
+        if (!string.Equals(chatTypeName, ChatTypeNames.Group, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(chatTypeName, ChatTypeNames.TextChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            return new CreatePollResult
+            {
+                Success = false,
+                ErrorMessage = "Опросы доступны только в групповых чатах и текстовых каналах сервера",
+            };
+        }
+
         if (chat.ServerId.HasValue &&
             !await _permissionChecker.HasPermissionAsync(chat.ServerId.Value, request.UserId, "sendMessages", cancellationToken))
         {

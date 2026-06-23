@@ -1,6 +1,5 @@
 /*
- * Frosted Glass — defaults from DiscordStyles/FrostedGlass
- * https://github.com/DiscordStyles/FrostedGlass
+ * Transparent interface mode — semi-transparent panels over a blurred wallpaper.
  *
  * serverlist-brightness: 0.8 | left-brightness: 0.8 | middle-brightness: 0.6 | right-brightness: 0.8
  * background-image-blur: 5px
@@ -155,7 +154,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   min-height: 100vh;
 }
 
-/* === Default layout (Discord columns) === */
+/* === Default three-column layout === */
 [data-frosted-glass='enabled'] .main-layout > div[class*='server-list'] {
   background: var(--fg-fill-serverlist) !important;
 }
@@ -227,7 +226,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   background: transparent !important;
 }
 
-/* === System24 — per-panel brightness like FrostedGlass regions === */
+/* === System24 — per-panel transparency === */
 [data-frosted-glass='enabled'][data-interface-design='system24'] .home-page,
 [data-frosted-glass='enabled'][data-interface-design='system24'] .server-panel,
 [data-frosted-glass='enabled'][data-interface-design='system24'] .chat-sidebar,
@@ -280,7 +279,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   --system24-label-bg: rgba(var(--fg-tint-middle-rgb), 0.72);
 }
 
-/* === Midnight — per-panel brightness like FrostedGlass regions === */
+/* === Rounded layout — per-panel transparency === */
 [data-frosted-glass='enabled'][data-interface-design='rounded'] .home-page,
 [data-frosted-glass='enabled'][data-interface-design='rounded'] .server-panel,
 [data-frosted-glass='enabled'][data-interface-design='rounded'] .chat-sidebar,
@@ -379,7 +378,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   background: var(--fg-hover) !important;
 }
 
-/* === FrostedGlass chat chrome — tinted from theme palette === */
+/* === Chat chrome — tinted from theme palette === */
 [data-frosted-glass='enabled'] .chat-header {
   background: var(--fg-fill-header) !important;
   border-bottom-color: var(--border) !important;
