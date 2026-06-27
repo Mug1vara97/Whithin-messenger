@@ -4,12 +4,15 @@ import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 import StickerMessage from '../StickerMessage/StickerMessage';
 import EmojiPicker from '../EmojiPicker/EmojiPicker';
-import { Add, Close, History, InsertEmoticon, UploadFile } from '@mui/icons-material';
+import { Add, Close, History, UploadFile } from '@mui/icons-material';
 import './StickerPicker.css';
 
 const LONG_PRESS_MS = 450;
 const STICKER_FILE_ACCEPT = '.webp,.png,.gif,.jpg,.jpeg,.webm,image/webp,image/png,image/gif,image/jpeg,video/webm';
-const EMOJI_PANEL_ID = '__emoji__';
+const MAIN_TAB = {
+  EMOJI: 'emoji',
+  STICKERS: 'stickers',
+};
 
 const normalizePack = (pack) => ({
   id: pack.id ?? pack.Id,
@@ -40,7 +43,7 @@ const StickerPicker = ({
   const [packs, setPacks] = useState([]);
   const [availablePacks, setAvailablePacks] = useState([]);
   const [selectedPackId, setSelectedPackId] = useState(null);
-  const [activePanel, setActivePanel] = useState(EMOJI_PANEL_ID);
+  const [mainTab, setMainTab] = useState(MAIN_TAB.STICKERS);
   const [isLoading, setIsLoading] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
@@ -133,11 +136,6 @@ const StickerPicker = ({
         }
         return normalized[0]?.id ?? null;
       });
-      setActivePanel((current) => {
-        if (current === EMOJI_PANEL_ID) return current;
-        if (current && normalized.some((pack) => pack.id === current)) return current;
-        return EMOJI_PANEL_ID;
-      });
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить стикеры');
       setPacks([]);
@@ -174,7 +172,7 @@ const StickerPicker = ({
       await stickerApi.installPack(packId);
       await loadPacks();
       setSelectedPackId(packId);
-      setActivePanel(packId);
+      setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       onInstallPack?.(packId);
     } catch (err) {
@@ -198,7 +196,7 @@ const StickerPicker = ({
       const normalized = normalizePack(pack);
       await loadPacks();
       setSelectedPackId(normalized.id);
-      setActivePanel(normalized.id);
+      setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       setNewPackTitle('');
     } catch (err) {
@@ -226,7 +224,7 @@ const StickerPicker = ({
       const normalized = normalizePack(pack);
       await loadPacks();
       setSelectedPackId(normalized.id);
-      setActivePanel(normalized.id);
+      setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       setNewPackTitle('');
     } catch (err) {
@@ -241,8 +239,8 @@ const StickerPicker = ({
     [packs, selectedPackId],
   );
 
-  const isEmojiPanel = activePanel === EMOJI_PANEL_ID;
-  const activePackId = isEmojiPanel ? selectedPackId : activePanel;
+  const isEmojiTab = mainTab === MAIN_TAB.EMOJI;
+  const activePackId = selectedPackId;
 
   const isSelectedPackOwned = useMemo(() => {
     const pack = packs.find((item) => item.id === activePackId) ?? selectedPack;
@@ -258,7 +256,7 @@ const StickerPicker = ({
   const handleAddStickerToPack = useCallback(async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    const targetPackId = activePanel === EMOJI_PANEL_ID ? selectedPackId : activePanel;
+    const targetPackId = selectedPackId;
     if (!file || !targetPackId) return;
 
     setIsAddingSticker(true);
@@ -274,7 +272,7 @@ const StickerPicker = ({
     } finally {
       setIsAddingSticker(false);
     }
-  }, [activePanel, selectedPackId]);
+  }, [selectedPackId]);
 
   if (!open) {
     return null;
@@ -297,11 +295,28 @@ const StickerPicker = ({
           title="Потяните, чтобы изменить ширину"
         />
         <div className="sticker-picker__header">
-          <span className="sticker-picker__title">
-            {isEmojiPanel ? 'Эмодзи' : (activeStickerPack?.title ?? 'Стикеры')}
-          </span>
+          <nav className="sticker-picker__main-tabs" role="tablist" aria-label="Эмодзи и стикеры">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isEmojiTab}
+              className={`sticker-picker__main-tab${isEmojiTab ? ' is-active' : ''}`}
+              onClick={() => setMainTab(MAIN_TAB.EMOJI)}
+            >
+              Эмодзи
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!isEmojiTab}
+              className={`sticker-picker__main-tab${!isEmojiTab ? ' is-active' : ''}`}
+              onClick={() => setMainTab(MAIN_TAB.STICKERS)}
+            >
+              Стикеры
+            </button>
+          </nav>
           <div className="sticker-picker__header-actions">
-            {!isEmojiPanel && isSelectedPackOwned && (
+            {!isEmojiTab && isSelectedPackOwned && (
               <>
                 <input
                   ref={addStickerInputRef}
@@ -330,7 +345,7 @@ const StickerPicker = ({
         {error && <div className="sticker-picker__error">{error}</div>}
 
         <div className="sticker-picker__grid-wrap">
-          {isEmojiPanel ? (
+          {isEmojiTab ? (
             <EmojiPicker embedded onEmojiSelect={onEmojiSelect} />
           ) : isLoading ? (
             <div className="sticker-picker__empty">Загрузка...</div>
@@ -358,22 +373,15 @@ const StickerPicker = ({
                   onClick={handleStickerClick(sticker)}
                   title="Клик — отправить. Удерживайте для предпросмотра."
                 >
-                  <StickerMessage sticker={sticker} size={64} />
+                  <StickerMessage sticker={sticker} size={64} className="sticker-picker__cell-sticker" />
                 </button>
               ))}
             </div>
           )}
         </div>
 
+        {!isEmojiTab && (
         <div className="sticker-picker__packs">
-          <button
-            type="button"
-            className={`sticker-picker__pack-btn ${isEmojiPanel ? 'is-selected' : ''}`}
-            onClick={() => setActivePanel(EMOJI_PANEL_ID)}
-            title="Эмодзи"
-          >
-            <InsertEmoticon fontSize="small" />
-          </button>
           <button
             type="button"
             className="sticker-picker__pack-btn"
@@ -384,16 +392,13 @@ const StickerPicker = ({
           </button>
           {packs.map((pack) => {
             const coverUrl = pack.coverImagePath ? buildMediaUrl(pack.coverImagePath) : null;
-            const isSelected = !isEmojiPanel && pack.id === activePackId;
+            const isSelected = pack.id === activePackId;
             return (
               <button
                 key={pack.id}
                 type="button"
                 className={`sticker-picker__pack-btn ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => {
-                  setSelectedPackId(pack.id);
-                  setActivePanel(pack.id);
-                }}
+                onClick={() => setSelectedPackId(pack.id)}
                 title={pack.title}
               >
                 {coverUrl ? (
@@ -405,6 +410,7 @@ const StickerPicker = ({
             );
           })}
         </div>
+        )}
       </aside>
 
       {previewSticker && (

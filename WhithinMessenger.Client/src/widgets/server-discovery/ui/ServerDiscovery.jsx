@@ -99,8 +99,14 @@ const ServerDiscoveryCard = ({
   );
 };
 
-const ServerDiscovery = ({ onServerSelected, onClose }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+const ServerDiscovery = ({
+  embedded = false,
+  searchQuery: externalSearchQuery,
+  onServerSelected,
+  onClose,
+}) => {
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const [joiningServer, setJoiningServer] = useState(null);
 
   const {
@@ -196,6 +202,10 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
     );
   };
 
+  if (embedded) {
+    return renderContent();
+  }
+
   return (
     <div className="server-discovery">
       <header className="server-discovery__header">
@@ -224,8 +234,8 @@ const ServerDiscovery = ({ onServerSelected, onClose }) => {
           <input
             type="search"
             placeholder="Поиск по названию или описанию…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={internalSearchQuery}
+            onChange={(e) => setInternalSearchQuery(e.target.value)}
           />
         </label>
         {!isLoading && !error && (

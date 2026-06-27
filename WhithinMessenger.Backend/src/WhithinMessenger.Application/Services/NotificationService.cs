@@ -39,6 +39,9 @@ public class NotificationService : INotificationService
         string? pushMessageType = null,
         string? pushPreviewText = null,
         string? pushThumbnailUrl = null,
+        Guid? senderId = null,
+        int encryptionVersion = 0,
+        string? encryptedMessageContent = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -70,6 +73,9 @@ public class NotificationService : INotificationService
                 messageId = notification.MessageId,
                 type = notification.Type,
                 content = notification.Content,
+                messageContent = encryptionVersion > 0 ? encryptedMessageContent : null,
+                encryptionVersion = encryptionVersion,
+                senderId = senderId,
                 isRead = notification.IsRead,
                 createdAt = notification.CreatedAt
             }, cancellationToken);
@@ -91,6 +97,9 @@ public class NotificationService : INotificationService
                 pushMessageType: pushMessageType,
                 pushPreviewText: pushPreviewText,
                 pushThumbnailUrl: pushThumbnailUrl,
+                senderId: senderId,
+                encryptionVersion: encryptionVersion,
+                encryptedMessageContent: encryptedMessageContent,
                 cancellationToken: cancellationToken
             );
 
@@ -218,6 +227,9 @@ public class NotificationService : INotificationService
         string? pushMessageType,
         string? pushPreviewText,
         string? pushThumbnailUrl,
+        Guid? senderId,
+        int encryptionVersion,
+        string? encryptedMessageContent,
         CancellationToken cancellationToken
     )
     {
@@ -255,6 +267,9 @@ public class NotificationService : INotificationService
                     serverName: serverDisplayName,
                     serverId: serverId,
                     notificationType: type,
+                    senderId: senderId,
+                    encryptionVersion: encryptionVersion,
+                    encryptedMessageContent: encryptedMessageContent,
                     cancellationToken: cancellationToken
                 );
             }

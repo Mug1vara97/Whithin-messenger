@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
@@ -21,6 +22,13 @@ import {
   persistThemePreset,
   THEME_PRESET_LIST,
 } from '../../../lib/theme/appTheme';
+import {
+  addThemeToLibrary,
+  getInstalledThemeIds,
+  getInstalledThemePresets,
+  subscribeUserThemeLibrary,
+} from '../../../lib/theme/userThemeLibrary';
+import { openDiscovery } from '../../../lib/utils/discoveryEvents';
 import {
   getInterfaceDesignId,
   persistInterfaceDesign,
@@ -105,7 +113,8 @@ const SettingsToggle = ({ id, checked, onChange, label, description, disabled = 
 );
 
 const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdated }) => {
-  const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthContext();
   const userId = user?.id || user?.Id;
   const username = user?.username || user?.Username || user?.userName || 'Пользователь';
   const userEmail = user?.email || user?.Email;
@@ -141,10 +150,28 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   const [displayNameMessage, setDisplayNameMessage] = useState('');
   const [displayNameError, setDisplayNameError] = useState('');
   const [isChangingDisplayName, setIsChangingDisplayName] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [accountProfile, setAccountProfile] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [themePresetId, setThemePresetId] = useState(() => getThemePresetId());
+  const [installedThemeIds, setInstalledThemeIds] = useState(() => getInstalledThemeIds());
   const [interfaceDesignId, setInterfaceDesignId] = useState(() => getInterfaceDesignId());
+
+  const installedThemePresets = useMemo(() => getInstalledThemePresets(), [installedThemeIds]);
+
+  const selectableThemePresets = useMemo(() => {
+    const presets = [...installedThemePresets];
+    if (themePresetId && !presets.some((preset) => preset.id === themePresetId)) {
+      const activePreset = THEME_PRESET_LIST.find((preset) => preset.id === themePresetId);
+      if (activePreset) {
+        presets.unshift(activePreset);
+      }
+    }
+    return presets;
+  }, [installedThemePresets, themePresetId]);
 
   const isElectron = soundpadBridge.isElectronAvailable();
   const tabs = useMemo(
@@ -157,6 +184,21 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
     displayName: accountProfile?.displayName,
     username,
   });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    return subscribeUserThemeLibrary(setInstalledThemeIds);
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleThemePresetChanged = () => {
+      setThemePresetId(getThemePresetId());
+      setInstalledThemeIds(getInstalledThemeIds());
+    };
+
+    window.addEventListener('themePresetChanged', handleThemePresetChanged);
+    return () => window.removeEventListener('themePresetChanged', handleThemePresetChanged);
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !userId) {
@@ -395,6 +437,38 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
     }
   };
 
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    setDeleteAccountError('');
+
+    if (!deleteAccountPassword) {
+      setDeleteAccountError('Введите пароль');
+      return;
+    }
+
+    if (deleteAccountConfirm.trim().toLowerCase() !== String(username).trim().toLowerCase()) {
+      setDeleteAccountError('Введите ваш логин для подтверждения');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Удалить аккаунт без возможности восстановления? Будут удалены личные чаты, серверы, профиль и сообщения.',
+    );
+    if (!confirmed) return;
+
+    setIsDeletingAccount(true);
+    try {
+      await userApi.deleteAccount({ password: deleteAccountPassword });
+      onClose();
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      setDeleteAccountError(error.message || 'Не удалось удалить аккаунт');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   const getActionName = (action) => {
     const actionNames = {
       toggleMic: 'Переключить микрофон',
@@ -597,6 +671,49 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                 </div>
               </form>
             </SettingsPanel>
+
+            <SettingsPanel
+              title="Удаление аккаунта"
+              description="Безвозвратно удалит аккаунт, личные чаты, серверы, профиль и ваши сообщения."
+            >
+              <form onSubmit={handleDeleteAccount}>
+                {deleteAccountError && (
+                  <div className="settings-alert settings-alert--error">{deleteAccountError}</div>
+                )}
+                <div className="settings-field">
+                  <label htmlFor="settings-delete-password">Пароль</label>
+                  <input
+                    id="settings-delete-password"
+                    type="password"
+                    value={deleteAccountPassword}
+                    onChange={(event) => setDeleteAccountPassword(event.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="settings-delete-confirm">
+                    Введите логин <strong>@{username}</strong> для подтверждения
+                  </label>
+                  <input
+                    id="settings-delete-confirm"
+                    type="text"
+                    value={deleteAccountConfirm}
+                    onChange={(event) => setDeleteAccountConfirm(event.target.value)}
+                    placeholder={username}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="settings-form-actions">
+                  <button
+                    type="submit"
+                    className="settings-btn settings-btn--danger"
+                    disabled={isDeletingAccount}
+                  >
+                    {isDeletingAccount ? 'Удаление…' : 'Удалить аккаунт'}
+                  </button>
+                </div>
+              </form>
+            </SettingsPanel>
           </>
         );
 
@@ -668,8 +785,10 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                     persistInterfaceDesign(nextId);
                     const design = INTERFACE_DESIGNS.find((item) => item.id === nextId);
                     if (design?.suggestedThemeId) {
+                      addThemeToLibrary(design.suggestedThemeId);
                       setThemePresetId(design.suggestedThemeId);
                       persistThemePreset(design.suggestedThemeId);
+                      setInstalledThemeIds(getInstalledThemeIds());
                     }
                   }}
                 >
@@ -691,7 +810,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
 
             <SettingsPanel
               title="Тема"
-              description="Цветовая палитра интерфейса. Совместима со стилем System24 и стеклянным фоном."
+              description="Здесь только темы из вашей коллекции. Новые можно добавить в разделе «Обзор»."
             >
               <SettingsRow title="Тема оформления">
                 <select
@@ -699,24 +818,41 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                   value={themePresetId}
                   onChange={(e) => {
                     const nextId = e.target.value;
+                    addThemeToLibrary(nextId);
                     setThemePresetId(nextId);
                     persistThemePreset(nextId);
+                    setInstalledThemeIds(getInstalledThemeIds());
                   }}
                 >
-                  {THEME_PRESET_LIST.map((preset) => (
+                  {selectableThemePresets.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.name}
                     </option>
                   ))}
                 </select>
               </SettingsRow>
-              {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId)?.description && (
+              {selectableThemePresets.find((preset) => preset.id === themePresetId)?.description && (
                 <div className="settings-row">
                   <p className="settings-row__desc" style={{ margin: 0 }}>
-                    {THEME_PRESET_LIST.find((preset) => preset.id === themePresetId).description}
+                    {selectableThemePresets.find((preset) => preset.id === themePresetId).description}
                   </p>
                 </div>
               )}
+              <SettingsRow
+                title="Каталог тем"
+                description="Откройте обзор, чтобы найти и добавить новые темы в коллекцию."
+              >
+                <button
+                  type="button"
+                  className="settings-btn settings-btn--primary"
+                  onClick={() => {
+                    openDiscovery({ tab: 'themes' });
+                    onClose();
+                  }}
+                >
+                  Открыть обзор
+                </button>
+              </SettingsRow>
             </SettingsPanel>
 
             <SettingsPanel

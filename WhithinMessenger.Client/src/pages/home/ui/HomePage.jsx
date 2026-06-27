@@ -2,7 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from '
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChatList } from '../../../widgets/chat-list';
 import { ServerList } from '../../../widgets/server-list';
-import { ServerDiscovery } from '../../../widgets/server-discovery';
+import {
+  DiscoverySidebar,
+  DiscoveryMainPanel,
+  DISCOVERY_TAB,
+} from '../../../widgets/discovery-hub';
+import { OPEN_DISCOVERY_EVENT } from '../../../shared/lib/utils/discoveryEvents';
 import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
@@ -52,6 +57,8 @@ const HomePage = () => {
   const [selectedServer, setSelectedServer] = useState(null);
   const [serverDataFromPanel, setServerDataFromPanel] = useState(null);
   const [showDiscovery, setShowDiscovery] = useState(false);
+  const [discoveryTab, setDiscoveryTab] = useState(DISCOVERY_TAB.SERVERS);
+  const [discoverySearch, setDiscoverySearch] = useState('');
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [markingAllNotificationsAsRead, setMarkingAllNotificationsAsRead] = useState(false);
@@ -961,9 +968,44 @@ const HomePage = () => {
     }
   }, [navigate]);
 
-  const handleDiscoverClick = useCallback((show) => {
-    setShowDiscovery(show);
+  const handleCloseDiscovery = useCallback(() => {
+    setShowDiscovery(false);
+    setDiscoverySearch('');
   }, []);
+
+  const handleDiscoverClick = useCallback((show, tab = DISCOVERY_TAB.SERVERS) => {
+    setShowDiscovery(show);
+    if (show) {
+      setDiscoveryTab(tab);
+      setDiscoverySearch('');
+      setSelectedServer(null);
+      setSelectedChat(null);
+      navigate('/channels/@me');
+    } else {
+      setDiscoverySearch('');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    setDiscoverySearch('');
+  }, [discoveryTab]);
+
+  useEffect(() => {
+    const handleOpenDiscovery = (event) => {
+      const tab = event.detail?.tab === DISCOVERY_TAB.THEMES
+        ? DISCOVERY_TAB.THEMES
+        : DISCOVERY_TAB.SERVERS;
+      setShowDiscovery(true);
+      setDiscoveryTab(tab);
+      setDiscoverySearch('');
+      setSelectedServer(null);
+      setSelectedChat(null);
+      navigate('/channels/@me');
+    };
+
+    window.addEventListener(OPEN_DISCOVERY_EVENT, handleOpenDiscovery);
+    return () => window.removeEventListener(OPEN_DISCOVERY_EVENT, handleOpenDiscovery);
+  }, [navigate]);
 
   const handleFriendsSelected = useCallback(() => {
     setShowDiscovery(false);
@@ -1178,7 +1220,13 @@ const HomePage = () => {
             <ResizableSidebarShell>
               <div className="sidebar-panel-layout">
                 <div className="sidebar-panel-layout__main">
-                  {selectedServer ? (
+                  {showDiscovery ? (
+                    <DiscoverySidebar
+                      activeSection={discoveryTab}
+                      onSectionChange={setDiscoveryTab}
+                      onClose={handleCloseDiscovery}
+                    />
+                  ) : selectedServer ? (
                     <ServerPanel
                       selectedServer={selectedServer}
                       onChatSelected={handleChatSelected}
@@ -1223,9 +1271,12 @@ const HomePage = () => {
                   }}
                 />
               ) : showDiscovery ? (
-                <ServerDiscovery 
+                <DiscoveryMainPanel
+                  activeSection={discoveryTab}
+                  searchQuery={discoverySearch}
+                  onSearchChange={setDiscoverySearch}
                   onServerSelected={handleServerSelected}
-                  onClose={() => setShowDiscovery(false)}
+                  onClose={handleCloseDiscovery}
                 />
                   ) : selectedChat ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>

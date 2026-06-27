@@ -17,6 +17,9 @@ public interface INotificationService
         string? pushMessageType = null,
         string? pushPreviewText = null,
         string? pushThumbnailUrl = null,
+        Guid? senderId = null,
+        int encryptionVersion = 0,
+        string? encryptedMessageContent = null,
         CancellationToken cancellationToken = default);
     Task<int> GetUnreadCountForUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task SendIncomingCallPushAsync(

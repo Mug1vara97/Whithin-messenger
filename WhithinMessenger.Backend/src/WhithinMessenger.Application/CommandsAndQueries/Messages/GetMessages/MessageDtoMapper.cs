@@ -15,6 +15,7 @@ public static class MessageDtoMapper
             MessageId = message.Id,
             SenderId = message.UserId,
             Content = message.Content,
+            EncryptionVersion = message.EncryptionVersion,
             ContentType = message.ContentType,
             CreatedAt = message.CreatedAt,
             SenderUsername = ResolveSenderUsername(message, serverNicknamesByUserId),

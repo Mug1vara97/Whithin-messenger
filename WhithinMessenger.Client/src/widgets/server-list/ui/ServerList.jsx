@@ -329,7 +329,7 @@ const ServerList = ({
               <div
                 className={styles['server-button']}
                 onClick={handleDiscoverClick}
-                title="Обзор серверов"
+                title="Обзор"
               >
                 <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
               </div>

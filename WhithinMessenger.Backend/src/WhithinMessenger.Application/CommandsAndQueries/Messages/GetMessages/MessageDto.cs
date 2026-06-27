@@ -5,6 +5,7 @@ public class MessageDto
     public Guid MessageId { get; set; }
     public Guid SenderId { get; set; }
     public string Content { get; set; } = string.Empty;
+    public int EncryptionVersion { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public string SenderUsername { get; set; } = string.Empty;
     public string? SenderDisplayName { get; set; }

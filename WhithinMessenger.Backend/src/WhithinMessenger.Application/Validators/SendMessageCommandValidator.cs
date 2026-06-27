@@ -18,8 +18,10 @@ public class SendMessageCommandValidator : AbstractValidator<SendMessageCommand>
         RuleFor(x => x.Content)
             .NotEmpty()
             .WithMessage("Message content is required")
-            .MaximumLength(4000)
-            .WithMessage("Message content cannot exceed 4000 characters");
+            .Must((command, content) => command.EncryptionVersion > 0
+                ? content.Length <= 16000
+                : content.Length <= 4000)
+            .WithMessage("Message content is too long");
     }
 }
 

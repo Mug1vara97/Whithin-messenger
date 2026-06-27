@@ -8,7 +8,8 @@ public record SendMessageCommand(
     Guid ChatId,
     string Content,
     Guid? RepliedToMessageId = null,
-    Guid? ForwardedFromMessageId = null
+    Guid? ForwardedFromMessageId = null,
+    int EncryptionVersion = 0
 ) : IRequest<SendMessageResult>;
 
 public record SendMessageResult

@@ -17,6 +17,7 @@ import SeoRouteSync from '../../shared/lib/seo/SeoRouteSync';
 import { DesktopNotificationSync } from '../../shared/lib/hooks/DesktopNotificationSync';
 import { DesktopCallOverlaySync } from '../../shared/lib/hooks/DesktopCallOverlaySync';
 import { DesktopActiveCallOverlaySync } from '../../shared/lib/hooks/DesktopActiveCallOverlaySync';
+import { ProfileModalProvider } from '../../shared/lib/contexts/ProfileModalContext';
 
 const MIN_BOOT_DISPLAY_MS = 380;
 
@@ -67,11 +68,12 @@ const AppRouter = () => {
   return (
     <>
       <Router>
-        <SeoRouteSync />
-        <DesktopNotificationSync />
-        <DesktopCallOverlaySync />
-        <DesktopActiveCallOverlaySync />
-        <Routes>
+        <ProfileModalProvider>
+          <SeoRouteSync />
+          <DesktopNotificationSync />
+          <DesktopCallOverlaySync />
+          <DesktopActiveCallOverlaySync />
+          <Routes>
           <Route 
             path="/login" 
             element={
@@ -163,6 +165,7 @@ const AppRouter = () => {
             } 
           />
         </Routes>
+        </ProfileModalProvider>
       </Router>
 
       {shouldShowBootPreloader && (

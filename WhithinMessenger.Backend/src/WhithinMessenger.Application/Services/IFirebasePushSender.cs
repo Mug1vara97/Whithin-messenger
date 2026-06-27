@@ -16,6 +16,9 @@ public interface IFirebasePushSender
         string? serverName = null,
         Guid? serverId = null,
         string? notificationType = null,
+        Guid? senderId = null,
+        int encryptionVersion = 0,
+        string? encryptedMessageContent = null,
         CancellationToken cancellationToken = default
     );
 

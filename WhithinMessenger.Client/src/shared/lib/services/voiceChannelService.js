@@ -64,8 +64,11 @@ class VoiceChannelService {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.requestedChannels.clear();
-      this.subscribedChannels.forEach((channelId) => {
-        this.requestChannelParticipants(channelId, true);
+      queueMicrotask(() => {
+        if (!this.socket?.connected) return;
+        this.subscribedChannels.forEach((channelId) => {
+          this.requestChannelParticipants(channelId, true);
+        });
       });
     });
 
@@ -290,8 +293,7 @@ class VoiceChannelService {
   requestChannelParticipants(channelId, force = false) {
     const key = normalizeChannelId(channelId);
     const socket = this.socket;
-    if (!socket?.connected || !this.isConnected || !key) {
-      console.warn('[VoiceChannelService] Cannot request participants - not connected');
+    if (!socket?.connected || !key) {
       return;
     }
 

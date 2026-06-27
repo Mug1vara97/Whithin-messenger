@@ -70,7 +70,10 @@ export const buildServerUserContextMenuItems = ({
   if (typeof onProfile === 'function') {
     primarySection.push({ text: 'Профиль', onClick: onProfile });
   }
-  if (typeof onMessage === 'function') {
+  const canMessage =
+    typeof onMessage === 'function' &&
+    (!isServerContext || friendAction?.kind === 'friend');
+  if (canMessage) {
     primarySection.push({ text: 'Написать сообщение', onClick: onMessage });
   }
   pushSection(items, primarySection);

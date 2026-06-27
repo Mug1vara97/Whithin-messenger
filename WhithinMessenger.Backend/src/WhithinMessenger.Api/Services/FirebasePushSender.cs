@@ -49,6 +49,9 @@ public class FirebasePushSender : IFirebasePushSender
         string? serverName = null,
         Guid? serverId = null,
         string? notificationType = null,
+        Guid? senderId = null,
+        int encryptionVersion = 0,
+        string? encryptedMessageContent = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -100,6 +103,17 @@ public class FirebasePushSender : IFirebasePushSender
         if (serverId.HasValue && serverId.Value != Guid.Empty)
         {
             data["server_id"] = serverId.Value.ToString();
+        }
+
+        if (encryptionVersion > 0 && !string.IsNullOrWhiteSpace(encryptedMessageContent))
+        {
+            data["encryption_version"] = encryptionVersion.ToString();
+            data["encrypted_payload"] = TruncateDataValue(encryptedMessageContent.Trim());
+        }
+
+        if (senderId.HasValue && senderId.Value != Guid.Empty)
+        {
+            data["sender_id"] = senderId.Value.ToString();
         }
 
         // Data-only: Android always calls onMessageReceived → our MessagingStyle (Discord-like).

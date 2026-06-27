@@ -10,6 +10,9 @@ public class Message
 
     public string Content { get; set; } = null!;
 
+    /// <summary>0 = legacy plaintext, 1 = client-side E2E ciphertext in Content.</summary>
+    public int EncryptionVersion { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public string? ContentType { get; set; }

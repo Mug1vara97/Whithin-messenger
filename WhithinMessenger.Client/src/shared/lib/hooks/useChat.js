@@ -9,6 +9,11 @@ import {
 } from '../utils/messageStatus';
 import { PROFILE_UPDATED_EVENT } from '../contexts/ProfileModalContext';
 import { patchMessageWithProfile } from '../utils/profilePatchHelpers';
+import {
+  decryptChatMessage,
+  encryptChatMessage,
+  E2eEncryptionError,
+} from '../e2e';
 
 const TYPING_IDLE_MS = 3000;
 /** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
@@ -22,7 +27,14 @@ export const formatTypingLabel = (users) => {
   return `${users.length} человек печатают…`;
 };
 
-export const useChat = (chatId, username, userId, displayName) => {
+export const useChat = (chatId, username, userId, displayName, options = {}) => {
+  const {
+    e2eEnabled = true,
+    getMemberUserIds = () => [],
+    peerUserId = null,
+    e2eMembersVersion = 0,
+    strictAllMembers = false,
+  } = options;
   const [messages, setMessages] = useState([]);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -154,6 +166,7 @@ export const useChat = (chatId, username, userId, displayName) => {
   const acknowledgedDeliveriesRef = useRef(new Set());
   const pendingOptimisticIdRef = useRef(null);
   const pendingConfirmedMessageRef = useRef(null);
+  const messagesRef = useRef([]);
 
   const replaceOwnOptimisticMessage = useCallback((prev, confirmedMessage) => {
     const pendingId = pendingOptimisticIdRef.current;
@@ -286,6 +299,7 @@ export const useChat = (chatId, username, userId, displayName) => {
       senderDisplayName: msg.senderDisplayName ?? msg.SenderDisplayName ?? null,
       senderLogin: msg.senderLogin ?? msg.SenderLogin ?? '',
       content: msg.content ?? msg.Content ?? '',
+      encryptionVersion: msg.encryptionVersion ?? msg.EncryptionVersion ?? 0,
       contentType: msg.contentType ?? msg.ContentType ?? null,
       sticker: normalizeSticker(msg.sticker ?? msg.Sticker),
       avatarUrl: msg.avatarUrl ?? msg.AvatarUrl ?? null,
@@ -304,6 +318,85 @@ export const useChat = (chatId, username, userId, displayName) => {
         : null,
     };
   }, [normalizeForwardedMessage, normalizeMediaFile, normalizePoll, normalizeSticker, userId, username]);
+
+  const decryptMessageContent = useCallback(async (message) => {
+    if (!message || !e2eEnabled || !userId || !chatId) {
+      return message;
+    }
+
+    const encryptionVersion = message.encryptionVersion ?? 0;
+    if (encryptionVersion <= 0) {
+      return message;
+    }
+
+    const memberUserIds = getMemberUserIds();
+    const decryptedContent = await decryptChatMessage(
+      userId,
+      chatId,
+      memberUserIds,
+      message.content,
+      encryptionVersion,
+      peerUserId,
+    );
+
+    return {
+      ...message,
+      content: decryptedContent,
+      isE2e: true,
+    };
+  }, [chatId, e2eEnabled, getMemberUserIds, peerUserId, userId]);
+
+  const decryptMessages = useCallback(async (items) => {
+    const normalized = (Array.isArray(items) ? items : [])
+      .map((msg) => normalizeMessage(msg))
+      .filter(Boolean);
+
+    if (!e2eEnabled || !userId || !chatId) {
+      return normalized;
+    }
+
+    return Promise.all(normalized.map((message) => decryptMessageContent(message)));
+  }, [chatId, decryptMessageContent, e2eEnabled, normalizeMessage, userId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!e2eEnabled || !userId || !chatId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const redecrypt = async () => {
+      const snapshot = messagesRef.current;
+      if (!snapshot.length) return;
+
+      const needsDecrypt = snapshot.some((message) => (
+        (message.encryptionVersion ?? 0) > 0 && !message.isE2e
+      ));
+      if (!needsDecrypt) return;
+
+      const decrypted = await Promise.all(
+        snapshot.map((message) => (
+          (message.encryptionVersion ?? 0) > 0 && !message.isE2e
+            ? decryptMessageContent(message)
+            : message
+        )),
+      );
+
+      if (!cancelled) {
+        setMessages(decrypted);
+      }
+    };
+
+    void redecrypt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, decryptMessageContent, e2eEnabled, e2eMembersVersion, userId]);
 
   const currentUserDisplayName = displayName ?? null;
   const currentUserLogin = username ?? '';
@@ -449,8 +542,9 @@ export const useChat = (chatId, username, userId, displayName) => {
 
         const receiveMessageHandler = async (messageData) => {
           if (loadGenerationRef.current !== loadGen) return;
-          const newMessage = normalizeMessage(messageData);
-          if (!newMessage) return;
+          const normalized = normalizeMessage(messageData);
+          if (!normalized) return;
+          const newMessage = await decryptMessageContent(normalized);
           const own = isOwnMessage(newMessage, userId, username);
 
           setMessages((prev) => {
@@ -591,12 +685,9 @@ export const useChat = (chatId, username, userId, displayName) => {
           loadingOlderRef.current = false;
         });
 
-        newConnection.on('ReceiveMessages', (messages) => {
+        newConnection.on('ReceiveMessages', async (messages) => {
           if (loadGenerationRef.current !== loadGen) return;
-          const source = Array.isArray(messages) ? messages : [];
-          const processedMessages = source
-            .map((msg) => normalizeMessage(msg))
-            .filter(Boolean);
+          const processedMessages = await decryptMessages(messages);
 
           if (loadingOlderRef.current) {
             skipAutoScrollRef.current = true;
@@ -831,12 +922,33 @@ export const useChat = (chatId, username, userId, displayName) => {
           typingIdleTimerRef.current = null;
         }
         await notifyStopTyping();
+
+        let payloadContent = content;
+        let encryptionVersion = 0;
+
+        if (e2eEnabled && userId && chatId) {
+          const memberUserIds = [...getMemberUserIds()];
+          if (peerUserId && !memberUserIds.some((id) => String(id) === String(peerUserId))) {
+            memberUserIds.push(peerUserId);
+          }
+          const encrypted = await encryptChatMessage(
+            userId,
+            chatId,
+            memberUserIds,
+            content,
+            { strictAllMembers },
+          );
+          payloadContent = encrypted.content;
+          encryptionVersion = encrypted.encryptionVersion;
+        }
+
         await connection.invoke('SendMessage',
-          content,
+          payloadContent,
           username,
           chatId,
           repliedMessageId,
-          forwardedMessage
+          forwardedMessage,
+          encryptionVersion,
         );
       } catch (error) {
         console.error('Error sending message:', error);
@@ -847,12 +959,19 @@ export const useChat = (chatId, username, userId, displayName) => {
             ? { ...msg, status: MessageStatus.FAILED }
             : msg
         )));
-        setError('Ошибка отправки сообщения');
+        const e2eMessage = error instanceof E2eEncryptionError
+          || error?.name === 'E2eEncryptionError'
+          || error?.message?.includes('шифрован')
+          || error?.message?.includes('E2E')
+          || error?.message?.includes('Не удалось отправить')
+          ? error.message
+          : 'Ошибка отправки сообщения';
+        setError(e2eMessage);
       }
     })();
 
     return true;
-  }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId, currentUserDisplayName, currentUserLogin]);
+  }, [connection, username, chatId, notifyStopTyping, normalizeMessage, userId, currentUserDisplayName, currentUserLogin, e2eEnabled, getMemberUserIds, peerUserId, strictAllMembers]);
 
   const editMessage = useCallback(async (messageId, newContent) => {
     if (!connection) return;

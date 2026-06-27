@@ -1,0 +1,18 @@
+export {
+  E2E_DECRYPT_FAILED_TEXT,
+  E2E_ENCRYPTION_VERSION,
+  E2E_PEER_KEY_MISSING_TEXT,
+  E2eEncryptionError,
+  resolveEncryptAudience,
+  assertAllMembersHaveDeviceKeys,
+  clearE2ePeerKeyCache,
+  decryptChatMessage,
+  decryptDmMessage,
+  decryptNotificationPreview,
+  decryptNotificationsList,
+  encryptChatMessage,
+  encryptDmMessage,
+  ensureChatKey,
+  ensureE2eIdentity,
+  getPeerPublicKey,
+} from './e2eCrypto';

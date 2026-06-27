@@ -181,6 +181,16 @@ const ChatRoom = ({
   const { openProfile, openOwnProfile } = useProfileModal();
   const { markChatAsRead } = useNotificationContext();
   const { servers } = useServerContext();
+  const isDirectChat = chatTypeId === 1 || (!isGroupChat && !isServerChat);
+  const [chatUserProfile, setChatUserProfile] = useState(null);
+  const directPeerUserId = useMemo(() => (
+    isDirectChat
+      ? (chatUserProfile?.otherUserId ?? chatUserProfile?.userId ?? chatUserProfile?.UserId ?? null)
+      : null
+  ), [isDirectChat, chatUserProfile]);
+  const e2eMemberIdsRef = useRef(userId ? [String(userId)] : []);
+  const [e2eMembersVersion, setE2eMembersVersion] = useState(0);
+  const getE2eMemberUserIds = useCallback(() => e2eMemberIdsRef.current, []);
 
   const isMessageOwn = useCallback(
     (message) => {
@@ -232,7 +242,13 @@ const ChatRoom = ({
     handleComposerTextChange,
     handleMessagesScroll,
     loadOlderMessages,
-  } = useChat(chatId, username, userId, userDisplayName);
+  } = useChat(chatId, username, userId, userDisplayName, {
+    e2eEnabled: true,
+    getMemberUserIds: getE2eMemberUserIds,
+    peerUserId: directPeerUserId,
+    e2eMembersVersion,
+    strictAllMembers: isDirectChat && !isSavedMessages,
+  });
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
 
@@ -286,7 +302,6 @@ const ChatRoom = ({
   const canVoice = !isServerChat || canSendVoiceMessages(userPermissions, isServerOwner);
   const canModerateMessages = isServerChat && canManageMessages(userPermissions, isServerOwner);
   const canPinMessages = canModerateMessages || !isServerChat;
-  const isDirectChat = chatTypeId === 1 || (!isGroupChat && !isServerChat);
   const canCreatePoll = !isSavedMessages && !isDirectChat && (isGroupChat || isServerChat);
   const [isPollModalOpen, setPollModalOpen] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
@@ -469,7 +484,6 @@ const ChatRoom = ({
   const [chatParticipants, setChatParticipants] = useState([]);
   const [existingCallParticipants, setExistingCallParticipants] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [chatUserProfile, setChatUserProfile] = useState(null);
   const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [stickerPanelWidth, setStickerPanelWidth] = useState(380);
@@ -1185,6 +1199,28 @@ const ChatRoom = ({
 
     return chatParticipants || [];
   }, [isPrivateChat, isServerChat, chatParticipants, serverMembers, resolveStatus]);
+
+  useEffect(() => {
+    const ids = new Set();
+    const add = (id) => {
+      if (id != null && String(id).trim()) {
+        ids.add(String(id));
+      }
+    };
+
+    add(userId);
+
+    if (isServerChat) {
+      (sidebarMembers || []).forEach((member) => add(member.userId ?? member.id ?? member.UserId));
+    } else if (isGroupChat) {
+      (chatParticipants || []).forEach((participant) => add(participant.userId ?? participant.UserId));
+    } else {
+      add(directPeerUserId);
+    }
+
+    e2eMemberIdsRef.current = Array.from(ids);
+    setE2eMembersVersion((value) => value + 1);
+  }, [userId, directPeerUserId, chatParticipants, sidebarMembers, isServerChat, isGroupChat]);
 
   useEffect(() => {
     exitSelectionMode();

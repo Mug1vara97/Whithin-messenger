@@ -157,7 +157,8 @@ namespace WhithinMessenger.Api.Controllers
                     chatId,
                     request.Content,
                     request.RepliedToMessageId,
-                    request.ForwardedFromMessageId
+                    request.ForwardedFromMessageId,
+                    request.EncryptionVersion
                 );
                 var result = await _mediator.Send(command);
 
@@ -318,6 +319,7 @@ public class SendMessageRequest
     public string Content { get; set; } = string.Empty;
     public Guid? RepliedToMessageId { get; set; }
     public Guid? ForwardedFromMessageId { get; set; }
+    public int EncryptionVersion { get; set; }
 }
 
 public class EditMessageRequest

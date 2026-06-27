@@ -4,6 +4,7 @@ import { normalizeNotification } from '../lib/notificationDisplay';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { dispatchNotificationReceived } from '../../../shared/lib/utils/notificationRealtimeBridge';
+import { decryptNotificationPreview, decryptNotificationsList } from '../../../shared/lib/e2e';
 import { isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
 import {
   dismissDesktopNotificationById,
@@ -50,13 +51,14 @@ export const useNotifications = () => {
         pageSize: 50,
         unreadOnly: true,
       });
-      setNotifications(sortByDate(data));
+      const decrypted = await decryptNotificationsList(data, user?.id);
+      setNotifications(sortByDate(decrypted));
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить уведомления');
     } finally {
       setLoading(false);
     }
-  }, [sortByDate]);
+  }, [sortByDate, user?.id]);
 
   const refreshUnreadCount = useCallback(async () => {
     try {
@@ -232,37 +234,41 @@ export const useNotifications = () => {
     let connection = null;
 
     const onReceiveNotification = (payload) => {
-      const normalized = normalizeNotification(payload);
-      const notificationId = normalized.id;
-      if (!notificationId) return;
+      void (async () => {
+        const normalized = normalizeNotification(payload);
+        const notificationId = normalized.id;
+        if (!notificationId) return;
 
-      let isNewNotification = false;
-      setNotifications((prev) => {
-        if (prev.some((item) => (item.id || item.Id) === notificationId)) {
-          return prev;
+        const enriched = await decryptNotificationPreview(normalized, user?.id);
+
+        let isNewNotification = false;
+        setNotifications((prev) => {
+          if (prev.some((item) => (item.id || item.Id) === notificationId)) {
+            return prev;
+          }
+          isNewNotification = true;
+          return sortByDate([enriched, ...prev]);
+        });
+
+        if (!isNewNotification) return;
+
+        const notificationChatId = enriched.chatId ?? enriched.ChatId;
+        const isMutedChat = isChatMuted(notificationChatId);
+
+        if (
+          !isMutedChat
+          && getInAppNotificationsEnabled()
+          && soundNotificationsEnabledRef.current
+          && notificationSoundVolumeRef.current > 0
+          && !(enriched.isRead ?? false)
+        ) {
+          playNotificationSound();
         }
-        isNewNotification = true;
-        return sortByDate([normalized, ...prev]);
-      });
 
-      if (!isNewNotification) return;
-
-      const notificationChatId = normalized.chatId ?? normalized.ChatId;
-      const isMutedChat = isChatMuted(notificationChatId);
-
-      if (
-        !isMutedChat
-        && getInAppNotificationsEnabled()
-        && soundNotificationsEnabledRef.current
-        && notificationSoundVolumeRef.current > 0
-        && !(normalized.isRead ?? false)
-      ) {
-        playNotificationSound();
-      }
-
-      if (!isMutedChat) {
-        dispatchNotificationReceived(normalized);
-      }
+        if (!isMutedChat) {
+          dispatchNotificationReceived(enriched);
+        }
+      })();
     };
 
     const onUnreadCountChanged = (count) => {

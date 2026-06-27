@@ -19,6 +19,9 @@ export const normalizeNotification = (notification) => ({
   type: pick(notification, 'type', 'Type'),
   content: pick(notification, 'content', 'Content') || '',
   messageContent: pick(notification, 'messageContent', 'MessageContent'),
+  encryptionVersion: Number(pick(notification, 'encryptionVersion', 'EncryptionVersion') ?? 0) || 0,
+  senderId: pick(notification, 'senderId', 'SenderId'),
+  encryptedPayload: pick(notification, 'encryptedPayload', 'EncryptedPayload'),
   isRead: notification?.isRead ?? notification?.IsRead ?? false,
   createdAt: pick(notification, 'createdAt', 'CreatedAt'),
 });
@@ -28,6 +31,18 @@ const isServerNotification = (item) =>
 
 const isGroupNotification = (item) =>
   item.type === 'group_message' || item.type === 'GroupMessage';
+
+const isE2eEnvelope = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{')) return false;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Boolean((parsed.n || parsed.N) && (parsed.c || parsed.C));
+  } catch {
+    return false;
+  }
+};
 
 const formatChannelLabel = (chatName) => {
   if (!chatName) return null;
@@ -98,7 +113,12 @@ export const getNotificationMessageText = (notification) => {
   const item = normalizeNotification(notification);
   const { content, senderName, chatName } = item;
   const storedPreview = item.messageContent || pick(notification, 'messageContent', 'MessageContent');
-  if (storedPreview) return storedPreview;
+  if (storedPreview) {
+    if (isE2eEnvelope(storedPreview)) {
+      return 'Зашифрованное сообщение';
+    }
+    return storedPreview;
+  }
 
   if (!content) return '';
 

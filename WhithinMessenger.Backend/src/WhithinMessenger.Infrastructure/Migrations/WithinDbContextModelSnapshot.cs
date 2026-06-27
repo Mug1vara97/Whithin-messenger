@@ -362,6 +362,35 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("ChatCategories");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ChatE2eWrappedKey", b =>
+                {
+                    b.Property<Guid>("ChatId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("WrappedKeyBase64")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("ChatId", "UserId", "DeviceId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ChatE2eWrappedKeys");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.ChatType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -621,6 +650,11 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("EncryptionVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<Guid?>("ForwardedByUserId")
                         .HasColumnType("uuid");
@@ -1152,6 +1186,30 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("StickerPacks");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserE2eDeviceKey", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PublicKeyBase64")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("UserId", "DeviceId");
+
+                    b.ToTable("UserE2eDeviceKeys");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1379,6 +1437,25 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Server");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ChatE2eWrappedKey", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.Chat", "Chat")
+                        .WithMany()
+                        .HasForeignKey("ChatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chat");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.Friendship", b =>
@@ -1706,6 +1783,17 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserE2eDeviceKey", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserProfile", b =>

@@ -391,7 +391,7 @@ public class GroupChatHub : Hub
             }
         }
 
-        public async Task SendMessage(string message, string username, string chatId, Guid? repliedToMessageId = null, Guid? forwardedFromMessageId = null)
+        public async Task SendMessage(string message, string username, string chatId, Guid? repliedToMessageId = null, Guid? forwardedFromMessageId = null, int encryptionVersion = 0)
         {
             try
             {
@@ -416,7 +416,8 @@ public class GroupChatHub : Hub
                     parsedChatId,
                     message,
                     repliedToMessageId,
-                    forwardedFromMessageId
+                    forwardedFromMessageId,
+                    encryptionVersion
                 );
 
                 var result = await _mediator.Send(command);
@@ -473,6 +474,7 @@ public class GroupChatHub : Hub
                             messageId = result.MessageId,
                             senderId = userId.Value,
                             content = message, 
+                            encryptionVersion = encryptionVersion,
                             username = resolvedUsername,
                             senderDisplayName = senderIdentity.DisplayName,
                             senderLogin = senderIdentity.Login,
@@ -491,7 +493,8 @@ public class GroupChatHub : Hub
                         userId.Value,
                         resolvedUsername,
                         result.MessageId,
-                        message
+                        message,
+                        encryptionVersion: encryptionVersion
                     );
 
                     await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(

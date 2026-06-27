@@ -206,4 +206,13 @@ export const userApi = {
       throw new Error(extractError(error, 'Не удалось сменить email'));
     }
   },
+
+  async deleteAccount({ password }) {
+    try {
+      const response = await apiClient.post('/user/delete-account', { password });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Не удалось удалить аккаунт'));
+    }
+  },
 };

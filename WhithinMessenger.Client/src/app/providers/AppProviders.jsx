@@ -4,7 +4,6 @@ import { ConnectionProvider } from '../../shared/lib/contexts/ConnectionContext'
 import { NotificationProvider } from '../../shared/lib/contexts/NotificationContext';
 import { ServerProvider } from '../../shared/lib/contexts/ServerContext.jsx';
 import { CallProvider } from '../../shared/lib/contexts/CallContext';
-import { ProfileModalProvider } from '../../shared/lib/contexts/ProfileModalContext';
 import { PresenceProvider } from '../../shared/lib/contexts/PresenceContext';
 import { UserBlockProvider } from '../../shared/lib/contexts/UserBlockContext';
 import { ProfileRealtimeProvider } from '../../shared/lib/contexts/ProfileRealtimeContext';
@@ -22,7 +21,6 @@ const AppProviders = ({ children }) => {
         <PresenceProvider>
           <ProfileRealtimeProvider>
           <NotificationProvider>
-            <ProfileModalProvider>
               <ServerProvider>
                 <StartupBootProvider>
                   <CallProvider>
@@ -30,7 +28,6 @@ const AppProviders = ({ children }) => {
                   </CallProvider>
                 </StartupBootProvider>
               </ServerProvider>
-            </ProfileModalProvider>
           </NotificationProvider>
           </ProfileRealtimeProvider>
         </PresenceProvider>

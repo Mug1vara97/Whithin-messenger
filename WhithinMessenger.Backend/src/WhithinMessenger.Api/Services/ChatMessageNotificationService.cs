@@ -38,12 +38,23 @@ public class ChatMessageNotificationService
         string senderUsername,
         Guid? messageId,
         string text,
+        int encryptionVersion = 0,
         CancellationToken cancellationToken = default)
     {
-        var (messageType, previewText) = ChatMessagePreviewBuilder.Build(
-            contentType: null,
-            textContent: text,
-            mediaContentType: null);
+        string messageType;
+        string previewText;
+        if (encryptionVersion > 0)
+        {
+            messageType = "text";
+            previewText = "Зашифрованное сообщение";
+        }
+        else
+        {
+            (messageType, previewText) = ChatMessagePreviewBuilder.Build(
+                contentType: null,
+                textContent: text,
+                mediaContentType: null);
+        }
 
         return NotifyAsync(
             chatId,
@@ -53,6 +64,8 @@ public class ChatMessageNotificationService
             messageType,
             previewText,
             thumbnailPath: null,
+            encryptionVersion: encryptionVersion,
+            encryptedMessageContent: encryptionVersion > 0 ? text : null,
             cancellationToken);
     }
 
@@ -83,8 +96,8 @@ public class ChatMessageNotificationService
             messageId,
             messageType,
             previewText,
-            thumbnail,
-            cancellationToken);
+            thumbnailPath: thumbnail,
+            cancellationToken: cancellationToken);
     }
 
     public Task NotifyStickerMessageAsync(
@@ -107,8 +120,8 @@ public class ChatMessageNotificationService
             messageId,
             messageType,
             previewText,
-            stickerFilePath,
-            cancellationToken);
+            thumbnailPath: stickerFilePath,
+            cancellationToken: cancellationToken);
     }
 
     private async Task NotifyAsync(
@@ -119,6 +132,8 @@ public class ChatMessageNotificationService
         string messageType,
         string previewText,
         string? thumbnailPath,
+        int encryptionVersion = 0,
+        string? encryptedMessageContent = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -194,6 +209,9 @@ public class ChatMessageNotificationService
                     pushMessageType: messageType,
                     pushPreviewText: truncatedPreview,
                     pushThumbnailUrl: string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl,
+                    senderId: senderId,
+                    encryptionVersion: encryptionVersion,
+                    encryptedMessageContent: encryptedMessageContent,
                     cancellationToken: cancellationToken);
 
                 var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, memberId);

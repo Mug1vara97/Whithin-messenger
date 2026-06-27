@@ -9,6 +9,7 @@ using WhithinMessenger.Infrastructure.Database;
 using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangeEmail;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangePassword;
+using WhithinMessenger.Application.CommandsAndQueries.Users.DeleteAccount;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using WhithinMessenger.Application.Interfaces;
 using WhithinMessenger.Application.Services;
@@ -77,6 +78,24 @@ public class UserController : ControllerBase
                 Message = "Письмо с подтверждением отправлено на ваш email",
                 ConfirmationEmail = result.ConfirmationEmail,
             });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage });
+    }
+
+    [HttpPost("delete-account")]
+    public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest request)
+    {
+        var userId = HttpContext.Items["UserId"] as Guid?;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new { Error = "Пользователь не авторизован" });
+        }
+
+        var result = await _mediator.Send(new DeleteAccountCommand(userId.Value, request.Password));
+        if (result.Success)
+        {
+            return Ok(new { Message = "Аккаунт удалён" });
         }
 
         return BadRequest(new { Error = result.ErrorMessage });
@@ -259,4 +278,9 @@ public class ChangeEmailRequest
 {
     public string NewEmail { get; set; } = string.Empty;
     public string CurrentPassword { get; set; } = string.Empty;
+}
+
+public class DeleteAccountRequest
+{
+    public string Password { get; set; } = string.Empty;
 }

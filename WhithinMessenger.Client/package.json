@@ -23,6 +23,7 @@
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "hls.js": "^1.6.16",
+    "libsodium-wrappers": "^0.8.4",
     "livekit-client": "^2.5.0",
     "lucide-react": "^0.544.0",
     "qrcode": "^1.5.4",

@@ -16,6 +16,9 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         builder.Property(e => e.ContentType)
             .HasMaxLength(50);
+
+        builder.Property(e => e.EncryptionVersion)
+            .HasDefaultValue(0);
         
         builder.Property(e => e.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

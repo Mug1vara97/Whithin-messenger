@@ -92,12 +92,22 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 }
             }
 
+            if (request.EncryptionVersion > 0 && request.EncryptionVersion != 1)
+            {
+                return new SendMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = "Unsupported encryption version"
+                };
+            }
+
             var newMessage = new Message
             {
                 Id = Guid.NewGuid(),
                 ChatId = request.ChatId,
                 UserId = request.UserId,
                 Content = request.Content,
+                EncryptionVersion = request.EncryptionVersion,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RepliedToMessageId = request.RepliedToMessageId,
                 ForwardedFromMessageId = request.ForwardedFromMessageId,

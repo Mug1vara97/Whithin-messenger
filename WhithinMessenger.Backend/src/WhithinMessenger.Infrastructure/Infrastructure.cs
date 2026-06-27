@@ -58,6 +58,9 @@ public static class Infrastructure
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserPushTokenStore, UserPushTokenStore>();
+        services.AddScoped<IAccountDeletionService, AccountDeletionService>();
+        services.AddScoped<IUserE2eKeyRepository, UserE2eKeyRepository>();
+        services.AddScoped<IChatE2eKeyRepository, ChatE2eKeyRepository>();
         
         // JWT Services
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));

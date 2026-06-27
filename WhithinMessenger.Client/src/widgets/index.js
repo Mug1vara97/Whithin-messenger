@@ -7,6 +7,7 @@ export * from './server-list';
 export * from './server-panel';
 export * from './server-settings';
 export * from './server-discovery';
+export * from './discovery-hub';
 export * from './categories-list';
 export * from './member-management';
 export * from './role-management';
