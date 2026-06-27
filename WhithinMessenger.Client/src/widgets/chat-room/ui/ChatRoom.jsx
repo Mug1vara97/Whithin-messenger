@@ -247,7 +247,7 @@ const ChatRoom = ({
     getMemberUserIds: getE2eMemberUserIds,
     peerUserId: directPeerUserId,
     e2eMembersVersion,
-    strictAllMembers: isDirectChat && !isSavedMessages,
+    strictAllMembers: false,
   });
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
