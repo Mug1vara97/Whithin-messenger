@@ -204,12 +204,17 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
 
   await ensureE2eIdentity(userId, { strictUpload: true });
 
+  // Legacy strict mode: verify every member has a device key before sending.
+  if (!strictAllMembers) {
+    return { audience: members, eligible: [String(userId)], ineligible: [] };
+  }
+
   const eligible = [];
   const ineligible = [];
 
   const resolved = await Promise.all(
     members.map(async (memberId) => {
-      const publicKey = await getPeerPublicKey(memberId, userId, { fresh: strictAllMembers });
+      const publicKey = await getPeerPublicKey(memberId, userId, { fresh: true });
       return { memberId: String(memberId), publicKey };
     }),
   );
@@ -228,7 +233,7 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
     );
   }
 
-  if (strictAllMembers && ineligible.length > 0) {
+  if (ineligible.length > 0) {
     throw new E2eEncryptionError(
       formatMissingKeysError(ineligible, userId),
       ineligible,
@@ -434,29 +439,43 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     throw new Error('Chat E2E requires userId and chatId');
   }
 
+  const members = normalizeMemberIds(memberUserIds, userId);
+  const scheduleWrapSync = (chatKeyBase64, targetMemberIds) => {
+    if (!targetMemberIds.length) return;
+    void syncChatKeyWraps(userId, chatId, chatKeyBase64, targetMemberIds, { strictAllMembers: false })
+      .catch((error) => {
+        console.warn('Best-effort chat key wrap sync failed:', error);
+      });
+  };
+
   const localKeyBase64 = loadLocalChatKey(chatId);
 
+  // Send path: only the sender must have keys; peer wraps are best-effort in the background.
   if (forEncrypt && localKeyBase64 && !strictAllMembers) {
     await ensureE2eIdentity(userId, { strictUpload: true });
-    const members = normalizeMemberIds(memberUserIds, userId);
-    await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers });
+    scheduleWrapSync(localKeyBase64, members);
     return localKeyBase64;
   }
 
-  let audience = normalizeMemberIds(memberUserIds, userId);
-  let eligible = audience;
+  let audience = members;
+  let eligible = members;
 
-  if (forEncrypt) {
-    const resolved = await resolveEncryptAudience(userId, memberUserIds, { strictAllMembers });
+  if (forEncrypt && strictAllMembers) {
+    const resolved = await resolveEncryptAudience(userId, memberUserIds, { strictAllMembers: true });
     audience = resolved.audience;
     eligible = resolved.eligible;
+  } else if (forEncrypt) {
+    await ensureE2eIdentity(userId, { strictUpload: true });
+    eligible = [String(userId)];
   } else {
     await ensureE2eIdentity(userId);
   }
 
   if (localKeyBase64) {
-    if (forEncrypt) {
-      await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible, { strictAllMembers });
+    if (forEncrypt && strictAllMembers) {
+      await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible, { strictAllMembers: true });
+    } else if (forEncrypt) {
+      scheduleWrapSync(localKeyBase64, members);
     }
     return localKeyBase64;
   }
@@ -469,8 +488,10 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   );
   if (keyBase64FromServer) {
     saveLocalChatKey(chatId, keyBase64FromServer);
-    if (forEncrypt) {
-      await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers });
+    if (forEncrypt && strictAllMembers) {
+      await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers: true });
+    } else if (forEncrypt) {
+      scheduleWrapSync(keyBase64FromServer, members);
     }
     return keyBase64FromServer;
   }
@@ -483,8 +504,12 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     throw new E2eEncryptionError(message);
   }
 
-  if (!eligible.length) {
-    throw new E2eEncryptionError('Не удалось определить участников с ключами шифрования.');
+  const wrapTargets = forEncrypt && !strictAllMembers ? [String(userId)] : eligible;
+
+  if (!wrapTargets.length) {
+    throw new E2eEncryptionError(
+      'Не удалось настроить шифрование на этом устройстве. Проверьте соединение и попробуйте снова.',
+    );
   }
 
   const sodium = await ensureSodium();
@@ -492,7 +517,7 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
   const { wraps } = await buildWrapsForMembers(
     chatKeyBytes,
-    eligible,
+    wrapTargets,
     userId,
     { strict: strictAllMembers },
   );
@@ -501,12 +526,17 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     throw new E2eEncryptionError(
       strictAllMembers
         ? formatMissingKeysError(audience.filter((id) => !eligible.includes(String(id))), userId)
-        : 'Не удалось создать ключ шифрования для чата.',
+        : 'Не удалось настроить шифрование на этом устройстве. Проверьте соединение и попробуйте снова.',
     );
   }
 
   await e2eApi.uploadChatWrappedKeys(chatId, wraps);
   saveLocalChatKey(chatId, keyBase64);
+
+  if (forEncrypt && !strictAllMembers) {
+    scheduleWrapSync(keyBase64, members);
+  }
+
   return keyBase64;
 };
 
