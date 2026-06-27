@@ -329,7 +329,11 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       return message;
     }
 
-    const memberUserIds = getMemberUserIds();
+    const memberUserIds = [...getMemberUserIds()];
+    const senderId = message.senderId ?? message.SenderId;
+    if (senderId && !memberUserIds.some((id) => String(id) === String(senderId))) {
+      memberUserIds.push(senderId);
+    }
     const decryptedContent = await decryptChatMessage(
       userId,
       chatId,

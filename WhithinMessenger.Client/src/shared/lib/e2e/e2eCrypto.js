@@ -5,6 +5,8 @@ const DEVICE_ID = 'default';
 const IDENTITY_STORAGE_PREFIX = 'whithin:e2e:identity:';
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
 const PEER_KEY_CACHE = new Map();
+/** Users known to have no device key on the server (404). */
+const PEER_KEY_MISSING = new Set();
 
 let sodiumReadyPromise = null;
 
@@ -157,14 +159,21 @@ export const getPeerPublicKey = async (peerUserId, currentUserId = null, options
   const { fresh = false } = options;
   const cacheKey = String(peerUserId);
 
+  if (!cacheKey) return null;
+
+  if (!fresh && PEER_KEY_MISSING.has(cacheKey)) {
+    return null;
+  }
+
   if (!fresh && PEER_KEY_CACHE.has(cacheKey)) {
     return PEER_KEY_CACHE.get(cacheKey);
   }
 
-  if (currentUserId && String(peerUserId) === String(currentUserId)) {
+  if (currentUserId && cacheKey === String(currentUserId)) {
     const identity = loadIdentity(currentUserId) ?? await ensureE2eIdentity(currentUserId);
     if (identity?.publicKeyBase64) {
       PEER_KEY_CACHE.set(cacheKey, identity.publicKeyBase64);
+      PEER_KEY_MISSING.delete(cacheKey);
       return identity.publicKeyBase64;
     }
     return null;
@@ -173,10 +182,12 @@ export const getPeerPublicKey = async (peerUserId, currentUserId = null, options
   const remote = await e2eApi.getDeviceKey(peerUserId);
   if (!remote?.publicKeyBase64) {
     PEER_KEY_CACHE.delete(cacheKey);
+    PEER_KEY_MISSING.add(cacheKey);
     return null;
   }
 
   PEER_KEY_CACHE.set(cacheKey, remote.publicKeyBase64);
+  PEER_KEY_MISSING.delete(cacheKey);
   return remote.publicKeyBase64;
 };
 
@@ -192,12 +203,18 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
   const eligible = [];
   const ineligible = [];
 
-  for (const memberId of members) {
-    const publicKey = await getPeerPublicKey(memberId, userId, { fresh: true });
+  const resolved = await Promise.all(
+    members.map(async (memberId) => {
+      const publicKey = await getPeerPublicKey(memberId, userId, { fresh: strictAllMembers });
+      return { memberId: String(memberId), publicKey };
+    }),
+  );
+
+  for (const { memberId, publicKey } of resolved) {
     if (publicKey) {
-      eligible.push(String(memberId));
+      eligible.push(memberId);
     } else {
-      ineligible.push(String(memberId));
+      ineligible.push(memberId);
     }
   }
 
@@ -273,12 +290,23 @@ const syncChatKeyWraps = async (
   chatId,
   chatKeyBase64,
   eligibleMemberIds,
+  { strictAllMembers = false } = {},
 ) => {
   if (!eligibleMemberIds.length) return;
 
+  const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
+  const existingSet = new Set((existingRecipients || []).map((id) => String(id)));
+  const missingWraps = eligibleMemberIds.filter((id) => !existingSet.has(String(id)));
+  if (!missingWraps.length) return;
+
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
-  const { wraps } = await buildWrapsForMembers(chatKeyBytes, eligibleMemberIds, userId, { fresh: true });
+  const { wraps } = await buildWrapsForMembers(
+    chatKeyBytes,
+    missingWraps,
+    userId,
+    { strict: strictAllMembers },
+  );
 
   if (!wraps.length) return;
 
@@ -292,6 +320,15 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     throw new Error('Chat E2E requires userId and chatId');
   }
 
+  const localKeyBase64 = loadLocalChatKey(chatId);
+
+  if (forEncrypt && localKeyBase64 && !strictAllMembers) {
+    await ensureE2eIdentity(userId, { strictUpload: true });
+    const members = normalizeMemberIds(memberUserIds, userId);
+    await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers });
+    return localKeyBase64;
+  }
+
   let audience = normalizeMemberIds(memberUserIds, userId);
   let eligible = audience;
 
@@ -303,11 +340,9 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     await ensureE2eIdentity(userId);
   }
 
-  const localKeyBase64 = loadLocalChatKey(chatId);
-
   if (localKeyBase64) {
     if (forEncrypt) {
-      await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible);
+      await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible, { strictAllMembers });
     }
     return localKeyBase64;
   }
@@ -319,7 +354,7 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
     const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
     saveLocalChatKey(chatId, keyBase64);
     if (forEncrypt) {
-      await syncChatKeyWraps(userId, chatId, keyBase64, eligible);
+      await syncChatKeyWraps(userId, chatId, keyBase64, eligible, { strictAllMembers });
     }
     return keyBase64;
   }
@@ -339,7 +374,12 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.randombytes_buf(32);
   const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
-  const { wraps } = await buildWrapsForMembers(chatKeyBytes, eligible, userId, { fresh: true });
+  const { wraps } = await buildWrapsForMembers(
+    chatKeyBytes,
+    eligible,
+    userId,
+    { strict: strictAllMembers },
+  );
 
   if (!wraps.length) {
     throw new E2eEncryptionError(
@@ -463,4 +503,5 @@ export const decryptDmMessage = async (userId, peerUserId, content, encryptionVe
 
 export const clearE2ePeerKeyCache = () => {
   PEER_KEY_CACHE.clear();
+  PEER_KEY_MISSING.clear();
 };

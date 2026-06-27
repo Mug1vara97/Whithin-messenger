@@ -161,20 +161,19 @@ body.is-resizing-sticker-panel {
 .sticker-picker__grid-wrap {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .sticker-picker__grid {
+  --sticker-grid-gap: 8px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 8px;
+  gap: var(--sticker-grid-gap);
+  width: 100%;
+  padding: var(--sticker-grid-gap);
+  box-sizing: border-box;
   align-content: start;
 }
 
@@ -182,34 +181,41 @@ body.is-resizing-sticker-panel {
   border: none;
   background: transparent;
   border-radius: 8px;
-  padding: 6px;
+  padding: 0;
   margin: 0;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 1;
+  display: block;
   width: 100%;
   min-width: 0;
-  min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
   position: relative;
-  isolation: isolate;
+}
+
+.sticker-picker__cell::before {
+  content: '';
+  display: block;
+  padding-top: 100%;
 }
 
 .sticker-picker__cell-sticker {
-  width: 100%;
-  height: 100%;
-  max-width: 72px;
-  max-height: 72px;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  overflow: hidden;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.sticker-picker__cell-sticker.sticker-message {
+  line-height: 0;
 }
 
 .sticker-picker__cell-sticker .sticker-message__media {
+  display: block;
   max-width: 100% !important;
   max-height: 100% !important;
   width: auto !important;

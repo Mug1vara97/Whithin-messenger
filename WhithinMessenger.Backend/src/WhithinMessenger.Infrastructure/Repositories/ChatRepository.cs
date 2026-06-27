@@ -106,6 +106,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             chats = pinnedChats.Concat(unpinnedChats).ToList();
 
+            chats.RemoveAll(c => c.ChatId == savedChat.ChatId);
             chats.Insert(0, savedChat);
 
             await ApplyUnreadCountsAsync(chats, userId, cancellationToken);
@@ -129,6 +130,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(m => m.UserId == userId && m.Chat.TypeId == savedChatType.Id && m.Chat.ServerId == null)
                 .Select(m => m.Chat)
+                .OrderByDescending(c => c.CreatedAt)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (savedChat == null)

@@ -80,12 +80,10 @@ const RepliedMedia = ({ content, mediaFiles }) => {
 
   // Если нет медиафайлов, но есть контент с путем к файлу
   if (content && typeof content === 'string') {
-    console.log('🎵 RepliedMedia - проверяем content:', content);
-    const isMediaPath = content.toLowerCase().includes('/uploads/') || 
+    const isMediaPath = content.toLowerCase().includes('/uploads/') ||
                        content.toLowerCase().startsWith('uploads/');
-    
+
     if (isMediaPath) {
-      console.log('🎵 RepliedMedia - это медиафайл:', content);
       const src = buildMediaUrl(content);
       const extension = content.split('.').pop().toLowerCase();
       

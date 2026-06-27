@@ -1211,7 +1211,7 @@ const ChatRoom = ({
     add(userId);
 
     if (isServerChat) {
-      (sidebarMembers || []).forEach((member) => add(member.userId ?? member.id ?? member.UserId));
+      (chatParticipants || []).forEach((participant) => add(participant.userId ?? participant.UserId));
     } else if (isGroupChat) {
       (chatParticipants || []).forEach((participant) => add(participant.userId ?? participant.UserId));
     } else {
@@ -1220,7 +1220,7 @@ const ChatRoom = ({
 
     e2eMemberIdsRef.current = Array.from(ids);
     setE2eMembersVersion((value) => value + 1);
-  }, [userId, directPeerUserId, chatParticipants, sidebarMembers, isServerChat, isGroupChat]);
+  }, [userId, directPeerUserId, chatParticipants, isServerChat, isGroupChat]);
 
   useEffect(() => {
     exitSelectionMode();
