@@ -39,9 +39,9 @@ public class E2eController : ControllerBase
     }
 
     [HttpGet("keys/{userId:guid}")]
-    public async Task<IActionResult> GetDeviceKey(Guid userId)
+    public async Task<IActionResult> GetDeviceKey(Guid userId, [FromQuery] string? deviceId = null)
     {
-        var result = await _mediator.Send(new GetE2eDeviceKeyQuery(userId));
+        var result = await _mediator.Send(new GetE2eDeviceKeyQuery(userId, deviceId));
         if (!result.Success)
         {
             return NotFound(new { error = result.ErrorMessage });

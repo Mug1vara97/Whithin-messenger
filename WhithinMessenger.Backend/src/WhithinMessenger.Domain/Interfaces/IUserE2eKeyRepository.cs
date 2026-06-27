@@ -8,5 +8,10 @@ public interface IUserE2eKeyRepository
 
     Task<UserE2eDeviceKey?> GetPrimaryAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    Task<UserE2eDeviceKey?> GetByDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> HasKeyAsync(Guid userId, CancellationToken cancellationToken = default);
 }

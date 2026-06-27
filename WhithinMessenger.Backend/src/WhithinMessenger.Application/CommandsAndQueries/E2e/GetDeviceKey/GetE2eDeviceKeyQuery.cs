@@ -2,7 +2,7 @@ using MediatR;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.E2e.GetDeviceKey;
 
-public record GetE2eDeviceKeyQuery(Guid UserId) : IRequest<GetE2eDeviceKeyResult>;
+public record GetE2eDeviceKeyQuery(Guid UserId, string? DeviceId = null) : IRequest<GetE2eDeviceKeyResult>;
 
 public record GetE2eDeviceKeyResult
 {

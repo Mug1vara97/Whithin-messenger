@@ -10,9 +10,11 @@ export const e2eApi = {
     });
   },
 
-  async getDeviceKey(userId) {
+  async getDeviceKey(userId, deviceId = null) {
     try {
-      const { data } = await apiClient.get(`/e2e/keys/${userId}`);
+      const { data } = await apiClient.get(`/e2e/keys/${userId}`, {
+        params: deviceId ? { deviceId } : undefined,
+      });
       return {
         deviceId: data.deviceId ?? data.DeviceId ?? 'default',
         publicKeyBase64: data.publicKeyBase64 ?? data.PublicKeyBase64 ?? '',

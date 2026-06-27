@@ -14,7 +14,9 @@ public class GetE2eDeviceKeyQueryHandler : IRequestHandler<GetE2eDeviceKeyQuery,
 
     public async Task<GetE2eDeviceKeyResult> Handle(GetE2eDeviceKeyQuery request, CancellationToken cancellationToken)
     {
-        var key = await _repository.GetPrimaryAsync(request.UserId, cancellationToken);
+        var key = !string.IsNullOrWhiteSpace(request.DeviceId)
+            ? await _repository.GetByDeviceAsync(request.UserId, request.DeviceId, cancellationToken)
+            : await _repository.GetPrimaryAsync(request.UserId, cancellationToken);
         if (key == null)
         {
             return new GetE2eDeviceKeyResult

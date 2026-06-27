@@ -13,6 +13,7 @@ export {
   ensureChatKey,
   ensureE2eIdentity,
   getPeerPublicKey,
+  proactiveSyncChatDeviceWraps,
 } from './e2eCrypto';
 
 export {

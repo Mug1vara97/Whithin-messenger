@@ -44,6 +44,19 @@ public class UserE2eKeyRepository : IUserE2eKeyRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<UserE2eDeviceKey?> GetByDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedDeviceId = deviceId.Trim();
+        return _context.UserE2eDeviceKeys
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                k => k.UserId == userId && k.DeviceId == normalizedDeviceId,
+                cancellationToken);
+    }
+
     public Task<bool> HasKeyAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return _context.UserE2eDeviceKeys.AnyAsync(k => k.UserId == userId, cancellationToken);

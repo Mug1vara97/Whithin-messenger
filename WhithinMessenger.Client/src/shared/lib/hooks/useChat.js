@@ -13,6 +13,7 @@ import {
   decryptChatMessage,
   encryptChatMessage,
   E2eEncryptionError,
+  proactiveSyncChatDeviceWraps,
 } from '../e2e';
 
 const TYPING_IDLE_MS = 3000;
@@ -365,6 +366,41 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    if (!e2eEnabled || !userId || !chatId) {
+      return undefined;
+    }
+
+    const members = getMemberUserIds();
+    if (!members.length) return undefined;
+
+    let cancelled = false;
+
+    void proactiveSyncChatDeviceWraps(userId, chatId, members)
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return;
+        // After wraps sync, re-run decrypt pass for encrypted messages.
+        const snapshot = messagesRef.current;
+        if (!snapshot.some((message) => (message.encryptionVersion ?? 0) > 0 && !message.isE2e)) {
+          return;
+        }
+        void Promise.all(snapshot.map((message) => (
+          (message.encryptionVersion ?? 0) > 0 && !message.isE2e
+            ? decryptMessageContent(message)
+            : message
+        ))).then((decrypted) => {
+          if (!cancelled) {
+            setMessages(decrypted);
+          }
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, decryptMessageContent, e2eEnabled, e2eMembersVersion, getMemberUserIds, userId]);
 
   useEffect(() => {
     if (!e2eEnabled || !userId || !chatId) {
