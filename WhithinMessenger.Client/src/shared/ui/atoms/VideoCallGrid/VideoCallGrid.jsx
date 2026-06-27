@@ -128,12 +128,16 @@ const ScreenShareElement = React.memo(({ stream, participantId }) => {
 
 const PIP_DEFAULT_POSITION = { right: 24, bottom: 80 };
 
+const PIP_DRAG_THRESHOLD_PX = 6;
+
 const ScreenShareCameraPip = React.memo(({
   stream,
   participantId,
   isLocal,
   position,
   onPositionChange,
+  onDragStart,
+  onDragEnd,
 }) => {
   const pipRef = useRef(null);
   const dragStateRef = useRef(null);
@@ -159,6 +163,7 @@ const ScreenShareCameraPip = React.memo(({
       parentHeight: parentRect.height,
       pipWidth: rect.width,
       pipHeight: rect.height,
+      isDragging: false,
     };
     pip.setPointerCapture(event.pointerId);
   }, [pos.bottom, pos.right]);
@@ -169,6 +174,13 @@ const ScreenShareCameraPip = React.memo(({
 
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
+
+    if (!drag.isDragging) {
+      if (Math.hypot(dx, dy) < PIP_DRAG_THRESHOLD_PX) return;
+      drag.isDragging = true;
+      onDragStart?.();
+    }
+
     const right = Math.max(
       8,
       Math.min(drag.parentWidth - drag.pipWidth - 8, drag.originRight - dx)
@@ -178,13 +190,22 @@ const ScreenShareCameraPip = React.memo(({
       Math.min(drag.parentHeight - drag.pipHeight - 8, drag.originBottom - dy)
     );
     onPositionChange?.({ right, bottom });
-  }, [onPositionChange]);
+  }, [onDragStart, onPositionChange]);
 
   const endDrag = useCallback((event) => {
-    if (dragStateRef.current?.pointerId !== event.pointerId) return;
+    const drag = dragStateRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const wasDragging = drag.isDragging;
     dragStateRef.current = null;
     pipRef.current?.releasePointerCapture(event.pointerId);
-  }, []);
+
+    if (wasDragging) {
+      event.preventDefault();
+      event.stopPropagation();
+      onDragEnd?.();
+    }
+  }, [onDragEnd]);
 
   return (
     <div
@@ -195,7 +216,10 @@ const ScreenShareCameraPip = React.memo(({
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      onClick={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       <VideoElement
         stream={stream}
@@ -343,16 +367,72 @@ const VideoCallGrid = ({
   const [visibleBottomUsers] = useState(6);
   const [lastVideoParticipants, setLastVideoParticipants] = useState(new Set());
   const [fullscreenScreenShareId, setFullscreenScreenShareId] = useState(null);
+  const [fullscreenUiVisible, setFullscreenUiVisible] = useState(false);
+  const [isScreenSharePipDragging, setIsScreenSharePipDragging] = useState(false);
   const [screenSharePipPositions, setScreenSharePipPositions] = useState(() => new Map());
+  const fullscreenUiTimerRef = useRef(null);
+
+  const clearFullscreenUiTimer = useCallback(() => {
+    if (fullscreenUiTimerRef.current) {
+      clearTimeout(fullscreenUiTimerRef.current);
+      fullscreenUiTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleFullscreenUiHide = useCallback(() => {
+    clearFullscreenUiTimer();
+    fullscreenUiTimerRef.current = setTimeout(() => {
+      setFullscreenUiVisible(false);
+      fullscreenUiTimerRef.current = null;
+    }, 3000);
+  }, [clearFullscreenUiTimer]);
+
+  const handleScreenSharePipDragStart = useCallback(() => {
+    setIsScreenSharePipDragging(true);
+    setFullscreenUiVisible(false);
+    clearFullscreenUiTimer();
+  }, [clearFullscreenUiTimer]);
+
+  const handleScreenSharePipDragEnd = useCallback(() => {
+    setIsScreenSharePipDragging(false);
+  }, []);
+
+  const handleFullscreenTileTap = useCallback((participantId, event) => {
+    if (fullscreenScreenShareId !== participantId || isScreenSharePipDragging) return;
+    if (event.target.closest('.screen-share-camera-pip')) return;
+
+    event.stopPropagation();
+    setFullscreenUiVisible((visible) => {
+      const nextVisible = !visible;
+      if (nextVisible) {
+        scheduleFullscreenUiHide();
+      } else {
+        clearFullscreenUiTimer();
+      }
+      return nextVisible;
+    });
+  }, [
+    clearFullscreenUiTimer,
+    fullscreenScreenShareId,
+    isScreenSharePipDragging,
+    scheduleFullscreenUiHide,
+  ]);
 
   // Сброс состояния полноэкранного режима при выходе
   useEffect(() => {
     const handler = () => {
-      if (!document.fullscreenElement) setFullscreenScreenShareId(null);
+      if (!document.fullscreenElement) {
+        setFullscreenScreenShareId(null);
+        setFullscreenUiVisible(false);
+        setIsScreenSharePipDragging(false);
+        clearFullscreenUiTimer();
+      }
     };
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
+  }, [clearFullscreenUiTimer]);
+
+  useEffect(() => () => clearFullscreenUiTimer(), [clearFullscreenUiTimer]);
 
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
@@ -527,11 +607,15 @@ const VideoCallGrid = ({
     if (fullscreenScreenShareId === participantId) {
       document.exitFullscreen?.();
       setFullscreenScreenShareId(null);
+      setFullscreenUiVisible(false);
+      clearFullscreenUiTimer();
     } else {
       if (focusedParticipantId !== null) {
         setFocusedParticipantId(null);
         setBottomPage(0);
       }
+      setFullscreenUiVisible(false);
+      clearFullscreenUiTimer();
       setFullscreenScreenShareId(participantId);
       requestAnimationFrame(() => {
         tile.requestFullscreen?.().catch(() => {
@@ -539,7 +623,7 @@ const VideoCallGrid = ({
         });
       });
     }
-  }, [fullscreenScreenShareId, focusedParticipantId]);
+  }, [clearFullscreenUiTimer, fullscreenScreenShareId, focusedParticipantId]);
 
   const renderTileAvatar = (participant, isSmall, { overlay = false, tileBackgroundColor = null } = {}) => {
     const avatarSize = isSmall ? 60 : 100;
@@ -660,17 +744,22 @@ const VideoCallGrid = ({
     const onTileContextMenu = canMuteMembers && !participant.isCurrentUser
       ? (event) => handleParticipantContextMenu(event, participant, channelParticipant)
       : undefined;
+    const isFullscreenTile = fullscreenScreenShareId === participant.id;
+    const showFullscreenChrome = isFullscreenTile && fullscreenUiVisible && !isScreenSharePipDragging;
 
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${isServerMuted ? 'server-muted' : ''} ${isServerDeafened ? 'server-deafened' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${isServerMuted ? 'server-muted' : ''} ${isServerDeafened ? 'server-deafened' : ''}${showFullscreenChrome ? ' screen-share-fullscreen-ui-visible' : ''}${isScreenSharePipDragging && isFullscreenTile ? ' screen-share-pip-dragging' : ''}`}
         onClick={() => handleParticipantClick(participant)}
         onContextMenu={onTileContextMenu}
       >
         <div className={`tile-content ${isScreenShare ? 'screen-share-content' : ''}`}>
           {/* Background with avatar, video, or screen share */}
-          <div className="tile-background">
+          <div
+            className="tile-background"
+            onClick={isFullscreenTile ? (event) => handleFullscreenTileTap(participant.id, event) : undefined}
+          >
             {isScreenShare && participant.stream && participant.stream.active ? (
               <>
                 <ScreenShareElement 
@@ -683,6 +772,8 @@ const VideoCallGrid = ({
                     participantId={`${participant.id}-camera-pip`}
                     isLocal={ownerCamera.isLocal}
                     position={screenSharePipPositions.get(participant.id)}
+                    onDragStart={handleScreenSharePipDragStart}
+                    onDragEnd={handleScreenSharePipDragEnd}
                     onPositionChange={(nextPosition) => {
                       setScreenSharePipPositions((prev) => {
                         const next = new Map(prev);

@@ -320,8 +320,8 @@ const resolveMissingWrapMemberIds = async (
   for (const memberId of eligibleMemberIds) {
     const memberKey = String(memberId);
     if (memberKey === String(userId)) {
-      const ownWrap = await e2eApi.getChatWrappedKey(chatId, ourDeviceId);
-      if (!ownWrap?.wrappedKeyBase64) {
+      const readable = await ownWrapIsReadable(userId, chatId, ourDeviceId);
+      if (!readable) {
         missing.push(memberId);
       }
     } else if (!existingSet.has(memberKey)) {
@@ -336,6 +336,33 @@ const selfDeviceIds = (primaryDeviceId) => [
   primaryDeviceId,
   ...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId),
 ].filter((id, index, arr) => arr.indexOf(id) === index);
+
+/** Re-seal chat key for this deviceId when another browser registered the same deviceId. */
+const refreshOwnDeviceWrapForCurrentServerKey = async (userId, chatId, chatKeyBase64) => {
+  const identity = loadIdentity(userId);
+  if (!identity?.publicKeyBase64) return;
+
+  const deviceId = identity.deviceId ?? DEVICE_ID;
+  const remoteKey = await e2eApi.getDeviceKey(userId, deviceId);
+  if (!remoteKey?.publicKeyBase64) return;
+  if (remoteKey.publicKeyBase64 === identity.publicKeyBase64) return;
+
+  const sodium = await ensureSodium();
+  const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
+  const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, remoteKey.publicKeyBase64);
+  await e2eApi.uploadChatWrappedKeys(chatId, [{ userId, wrappedKeyBase64, deviceId }]);
+};
+
+const ownWrapIsReadable = async (userId, chatId, deviceId) => {
+  const ownWrap = await e2eApi.getChatWrappedKey(chatId, deviceId);
+  if (!ownWrap?.wrappedKeyBase64) return false;
+  try {
+    await openSealedChatKey(userId, ownWrap.wrappedKeyBase64);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /** Upload chat-key wraps for our other registered devices (e.g. android) when this device holds the key. */
 const syncAlternateSelfDeviceWraps = async (userId, chatId, chatKeyBase64) => {
@@ -360,6 +387,7 @@ const syncAlternateSelfDeviceWraps = async (userId, chatId, chatKeyBase64) => {
 
   if (!wraps.length) return;
   await e2eApi.uploadChatWrappedKeys(chatId, wraps);
+  await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
 };
 
 const syncChatKeyWraps = async (
@@ -378,7 +406,10 @@ const syncChatKeyWraps = async (
     eligibleMemberIds,
     existingRecipients,
   );
-  if (!missingWraps.length) return;
+  if (!missingWraps.length) {
+    await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
+    return;
+  }
 
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
@@ -396,6 +427,7 @@ const syncChatKeyWraps = async (
 
   await e2eApi.uploadChatWrappedKeys(chatId, wraps);
   await syncAlternateSelfDeviceWraps(userId, chatId, chatKeyBase64);
+  await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
 };
 
 const tryOpenChatKeyFromServer = async (userId, chatId, primaryDeviceId) => {
@@ -430,6 +462,7 @@ export const proactiveSyncChatDeviceWraps = async (userId, chatId, memberUserIds
   await ensureE2eIdentity(userId, { strictUpload: true });
   const members = normalizeMemberIds(memberUserIds, userId);
   await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
+  await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, localKeyBase64);
 };
 
 export const ensureChatKey = async (userId, chatId, memberUserIds = [], options = {}) => {
@@ -443,6 +476,7 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   const scheduleWrapSync = (chatKeyBase64, targetMemberIds) => {
     if (!targetMemberIds.length) return;
     void syncChatKeyWraps(userId, chatId, chatKeyBase64, targetMemberIds, { strictAllMembers: false })
+      .then(() => refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64))
       .catch((error) => {
         console.warn('Best-effort chat key wrap sync failed:', error);
       });
@@ -499,8 +533,8 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
   if ((existingRecipients || []).length > 0) {
     const message = forEncrypt
-      ? 'Не удалось отправить сообщение: у вас ещё нет ключа этого чата. Попросите любого участника, который уже писал здесь, отправить сообщение ещё раз.'
-      : 'E2E-ключ чата ещё не выдан этому устройству.';
+      ? 'Не удалось отправить сообщение: у вас ещё нет ключа этого чата. Откройте чат на устройстве, где переписка уже работает, и отправьте любое сообщение — затем обновите страницу здесь.'
+      : 'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
     throw new E2eEncryptionError(message);
   }
 

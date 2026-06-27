@@ -996,6 +996,15 @@
   display: block;
   pointer-events: auto;
   cursor: grab;
+  width: min(28%, 280px);
+}
+
+@media (orientation: landscape) {
+  .video-tile:fullscreen .screen-share-camera-pip {
+    width: min(18%, 168px);
+    border-radius: 10px;
+    border-width: 1.5px;
+  }
 }
 
 .video-tile:fullscreen .screen-share-camera-pip:active {
@@ -1004,6 +1013,44 @@
 
 .screen-share-camera-pip .tile-video {
   object-fit: cover;
+}
+
+/* Fullscreen screen share: hide chrome until tap; never show while dragging PiP */
+.video-tile.screen-share-tile:fullscreen .tile-bottom-overlay,
+.video-tile.screen-share-tile:-webkit-full-screen .tile-bottom-overlay,
+.video-tile.screen-share-tile:-moz-full-screen .tile-bottom-overlay {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:fullscreen .tile-bottom-overlay,
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:-webkit-full-screen .tile-bottom-overlay,
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:-moz-full-screen .tile-bottom-overlay {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.video-tile.screen-share-tile.screen-share-pip-dragging:fullscreen .tile-bottom-overlay,
+.video-tile.screen-share-tile.screen-share-pip-dragging:-webkit-full-screen .tile-bottom-overlay,
+.video-tile.screen-share-tile.screen-share-pip-dragging:-moz-full-screen .tile-bottom-overlay {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.video-tile.screen-share-tile:fullscreen:hover .tile-border,
+.video-tile.screen-share-tile:-webkit-full-screen:hover .tile-border,
+.video-tile.screen-share-tile:-moz-full-screen:hover .tile-border {
+  opacity: 0;
+}
+
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:fullscreen:hover .tile-border,
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:-webkit-full-screen:hover .tile-border,
+.video-tile.screen-share-tile.screen-share-fullscreen-ui-visible:-moz-full-screen:hover .tile-border {
+  opacity: 1;
 }
 
 /* Стили для видео элементов */
