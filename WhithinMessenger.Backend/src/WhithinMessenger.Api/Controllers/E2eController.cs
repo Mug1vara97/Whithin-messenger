@@ -56,10 +56,10 @@ public class E2eController : ControllerBase
     }
 
     [HttpGet("chat-keys/{chatId:guid}")]
-    public async Task<IActionResult> GetChatWrappedKey(Guid chatId)
+    public async Task<IActionResult> GetChatWrappedKey(Guid chatId, [FromQuery] string? deviceId = null)
     {
         var userId = (Guid)HttpContext.Items["UserId"]!;
-        var result = await _mediator.Send(new GetChatWrappedKeyQuery(chatId, userId));
+        var result = await _mediator.Send(new GetChatWrappedKeyQuery(chatId, userId, deviceId ?? "default"));
         if (!result.Success)
         {
             return NotFound(new { error = result.ErrorMessage });

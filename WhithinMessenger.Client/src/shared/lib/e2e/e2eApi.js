@@ -26,9 +26,11 @@ export const e2eApi = {
     }
   },
 
-  async getChatWrappedKey(chatId) {
+  async getChatWrappedKey(chatId, deviceId = 'default') {
     try {
-      const { data } = await apiClient.get(`/e2e/chat-keys/${chatId}`);
+      const { data } = await apiClient.get(`/e2e/chat-keys/${chatId}`, {
+        params: { deviceId },
+      });
       return {
         wrappedKeyBase64: data.wrappedKeyBase64 ?? data.WrappedKeyBase64 ?? '',
         updatedAt: data.updatedAt ?? data.UpdatedAt ?? null,
