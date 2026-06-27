@@ -108,7 +108,7 @@ public class FirebasePushSender : IFirebasePushSender
         if (encryptionVersion > 0 && !string.IsNullOrWhiteSpace(encryptedMessageContent))
         {
             data["encryption_version"] = encryptionVersion.ToString();
-            data["encrypted_payload"] = TruncateDataValue(encryptedMessageContent.Trim());
+            data["encrypted_payload"] = TruncateEncryptedPayload(encryptedMessageContent.Trim());
         }
 
         if (senderId.HasValue && senderId.Value != Guid.Empty)
@@ -296,6 +296,20 @@ public class FirebasePushSender : IFirebasePushSender
     }
 
     private static string TruncateDataValue(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    /// <summary>
+    /// E2E envelopes are JSON and can exceed generic preview limits; keep enough for client-side decrypt.
+    /// </summary>
+    private static string TruncateEncryptedPayload(string value, int maxLength = 2048)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
