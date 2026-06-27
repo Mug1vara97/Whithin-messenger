@@ -23,6 +23,14 @@ public interface IFriendshipRepository
     Task<bool> AreFriendsAsync(Guid userId1, Guid userId2, CancellationToken cancellationToken = default);
     
     Task<bool> HasPendingRequestAsync(Guid requesterId, Guid addresseeId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Guid>> GetBlockedUserIdsAsync(Guid blockerId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Guid>> GetBlockerUserIdsAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsBlockedByAsync(Guid blockerId, Guid blockedUserId, CancellationToken cancellationToken = default);
+
+    Task<IEnumerable<Friendship>> GetBlockedFriendshipsAsync(Guid blockerId, CancellationToken cancellationToken = default);
 }
 
 

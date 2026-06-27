@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
-import { useAuth } from '../../../lib/hooks/useAuth';
+import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { isSameVoiceChannel } from '../../../lib/stores/callStore';
 import PhoneIcon from '@mui/icons-material/Phone';
 import PhoneDisabledIcon from '@mui/icons-material/PhoneDisabled';
@@ -14,7 +14,7 @@ const CallButton = ({
   variant = 'primary' 
 }) => {
   const { isCallActive, startCall, endCall, getCallInfo } = useGlobalCall();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
 
   // Проверяем, активен ли звонок в этом канале

@@ -3,6 +3,7 @@
 }
 
 :root {
+  --emoji-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Android Emoji', emoji;
   /* Основные цвета */
   --background: #36393f;
   --background-primary: #2f3136;

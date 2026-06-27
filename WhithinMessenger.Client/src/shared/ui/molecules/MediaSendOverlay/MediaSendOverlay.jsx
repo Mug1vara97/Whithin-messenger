@@ -92,13 +92,26 @@ const MediaSendOverlay = ({
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Escape' && !isUploading) {
+      if (isUploading) return;
+
+      if (event.key === 'Escape') {
         onCancel?.();
+        return;
+      }
+
+      if (
+        event.key === 'Enter'
+        && !event.shiftKey
+        && !event.nativeEvent.isComposing
+        && event.target?.id !== 'media-send-caption'
+      ) {
+        event.preventDefault();
+        onSend?.(caption.trim());
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isUploading, onCancel]);
+  }, [isUploading, onCancel, onSend, caption]);
 
   if (!files.length) return null;
 
@@ -106,6 +119,13 @@ const MediaSendOverlay = ({
   const title = buildSelectionTitle(previewItems);
 
   const handleSubmit = (event) => {
+    event.preventDefault();
+    if (isUploading) return;
+    onSend?.(caption.trim());
+  };
+
+  const handleCaptionKeyDown = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     if (isUploading) return;
     onSend?.(caption.trim());
@@ -204,6 +224,7 @@ const MediaSendOverlay = ({
             placeholder=""
             value={caption}
             onChange={(event) => setCaption(event.target.value)}
+            onKeyDown={handleCaptionKeyDown}
             rows={2}
             disabled={isUploading}
             autoFocus

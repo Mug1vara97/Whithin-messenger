@@ -1,16 +1,9 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { applyAuthPageSeo, applySiteSeo } from '../../lib/seo/siteSeo';
+import { PUBLIC_AUTH_PATHS } from '../../lib/utils/authRoutes';
 
-const AUTH_PATHS = new Set([
-  '/login',
-  '/register',
-  '/forgot-password',
-  '/reset-password',
-  '/confirm-email',
-  '/confirm-email-change',
-  '/confirm-password-change',
-]);
+const AUTH_PATHS = PUBLIC_AUTH_PATHS;
 
 export default function SeoRouteSync() {
   const { pathname } = useLocation();

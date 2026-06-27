@@ -7,6 +7,9 @@ using WhithinMessenger.Application.CommandsAndQueries.Friends.DeclineFriendReque
 using WhithinMessenger.Application.CommandsAndQueries.Friends.RemoveFriend;
 using WhithinMessenger.Application.CommandsAndQueries.Friends.GetFriends;
 using WhithinMessenger.Application.CommandsAndQueries.Friends.GetFriendRequests;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.BlockUser;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.UnblockUser;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.GetBlockedUsers;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -147,11 +150,72 @@ public class FriendsController : ControllerBase
             return StatusCode(500, new { error = "Произошла ошибка при удалении из друзей: " + ex.Message });
         }
     }
+
+    [HttpGet("blocked")]
+    public async Task<IActionResult> GetBlockedUsers()
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new GetBlockedUsersQuery(userId));
+            return Ok(new
+            {
+                blockedUsers = result.BlockedUsers,
+                blockedByUserIds = result.BlockedByUserIds,
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка при получении заблокированных: " + ex.Message });
+        }
+    }
+
+    [HttpPost("block")]
+    public async Task<IActionResult> BlockUser([FromBody] BlockUserRequest request)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new BlockUserCommand(userId, request.TargetUserId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка при блокировке: " + ex.Message });
+        }
+    }
+
+    [HttpPost("unblock")]
+    public async Task<IActionResult> UnblockUser([FromBody] UnblockUserRequest request)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new UnblockUserCommand(userId, request.TargetUserId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Произошла ошибка при разблокировке: " + ex.Message });
+        }
+    }
 }
 
 public record SendFriendRequestRequest(Guid TargetUserId);
 public record AcceptFriendRequestRequest(Guid FriendshipId);
 public record DeclineFriendRequestRequest(Guid FriendshipId);
+public record BlockUserRequest(Guid TargetUserId);
+public record UnblockUserRequest(Guid TargetUserId);
 
 
 

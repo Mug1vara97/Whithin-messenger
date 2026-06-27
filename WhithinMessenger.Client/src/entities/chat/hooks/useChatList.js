@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
 import tokenManager from '../../../shared/lib/services/tokenManager';
 import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
+import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
+import { patchChatListItemWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
+import { useStartupBoot } from '../../../shared/lib/contexts/StartupBootContext';
 
 const getPinOrder = (chat) => {
   const order = chat?.pinOrder ?? chat?.PinOrder;
@@ -98,6 +101,7 @@ const normalizeChatListItem = (chat) => {
 
 export const useChatList = (userId, onChatCreated = null) => {
   const navigate = useNavigate();
+  const { markChatsReady } = useStartupBoot();
   const [chats, setChats] = useState([]);
   const [initialChatsLoaded, setInitialChatsLoaded] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -124,6 +128,12 @@ export const useChatList = (userId, onChatCreated = null) => {
   useEffect(() => {
     userIdRef.current = userId;
   }, [userId]);
+
+  useEffect(() => {
+    if (initialChatsLoaded) {
+      markChatsReady();
+    }
+  }, [initialChatsLoaded, markChatsReady]);
 
   const bindConnectionHandlers = useCallback((conn) => {
     const handleReceiveChats = (receivedChats) => {
@@ -306,6 +316,7 @@ export const useChatList = (userId, onChatCreated = null) => {
         if (!cancelled) {
           setIsConnected(false);
           setConnection(null);
+          setInitialChatsLoaded(true);
         }
       }
     };
@@ -322,6 +333,22 @@ export const useChatList = (userId, onChatCreated = null) => {
       setIsConnected(false);
     };
   }, [userId, bindConnectionHandlers]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (event) => {
+      const patch = event.detail;
+      if (!patch?.userId) {
+        return;
+      }
+
+      setChats((prevChats) =>
+        sortChats(prevChats.map((chat) => patchChatListItemWithProfile(chat, patch))),
+      );
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, []);
 
   const refreshChats = useCallback(async () => {
     if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
+import { patchFriendWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
 import { normalizeFriend } from '../lib/friendHelpers';
 
 export const useFriends = () => {
@@ -155,6 +157,20 @@ export const useFriends = () => {
       }
     };
   }, [user?.id, getConnection]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (event) => {
+      const patch = event.detail;
+      if (!patch?.userId) {
+        return;
+      }
+
+      setFriends((prev) => prev.map((friend) => patchFriendWithProfile(friend, patch)));
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;

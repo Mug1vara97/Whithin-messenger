@@ -11,17 +11,20 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
     private readonly IChatRepository _chatRepository;
     private readonly IUserRepository _userRepository;
     private readonly IChatMemberRepository _memberRepository;
+    private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserListCacheService _userListCache;
 
     public CreateGroupChatHandler(
         IChatRepository chatRepository,
         IUserRepository userRepository,
         IChatMemberRepository memberRepository,
+        IFriendshipRepository friendshipRepository,
         IUserListCacheService userListCache)
     {
         _chatRepository = chatRepository;
         _userRepository = userRepository;
         _memberRepository = memberRepository;
+        _friendshipRepository = friendshipRepository;
         _userListCache = userListCache;
     }
 
@@ -37,10 +40,24 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
 
             foreach (var memberId in request.MemberIds)
             {
+                if (memberId == request.CreatorId)
+                {
+                    continue;
+                }
+
                 var member = await _userRepository.GetByIdAsync(memberId);
                 if (member == null)
                 {
                     return CreateGroupChatResult.FailureResult($"Пользователь с ID {memberId} не найден");
+                }
+
+                var areFriends = await _friendshipRepository.AreFriendsAsync(
+                    request.CreatorId,
+                    memberId,
+                    cancellationToken);
+                if (!areFriends)
+                {
+                    return CreateGroupChatResult.FailureResult("В группу можно добавлять только друзей");
                 }
             }
 
@@ -85,6 +102,7 @@ public class CreateGroupChatHandler : IRequestHandler<CreateGroupChatCommand, Cr
             await _memberRepository.AddRangeAsync(members, cancellationToken);
 
             await _userListCache.InvalidateUserChatsAsync(request.MemberIds, cancellationToken);
+            await _userListCache.InvalidateUserChatsAsync(request.CreatorId, cancellationToken);
 
             return CreateGroupChatResult.SuccessResult(groupChat.Id);
         }

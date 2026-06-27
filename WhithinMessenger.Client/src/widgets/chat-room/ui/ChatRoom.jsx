@@ -6,6 +6,11 @@ import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContex
 import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
+import {
+  patchChatUserProfileWithProfile,
+  patchParticipantWithProfile,
+} from '../../../shared/lib/utils/profilePatchHelpers';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { voiceChannelService } from '../../../shared/lib/services/voiceChannelService';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
@@ -69,6 +74,8 @@ import {
   mapServerMemberToChatParticipant,
   mapServerMemberToListItem,
 } from '../../../shared/lib/utils/memberListUtils';
+import { filterMembersWithChannelAccess, buildChannelAccessContext } from '../../../shared/lib/utils/channelAccessUtils';
+import { serverApi } from '../../../entities/server/api/serverApi';
 import {
   Call,
   Mic,
@@ -105,6 +112,9 @@ import { getFriendActionForMember } from '../../../shared/lib/utils/friendAction
 import { buildServerUserContextMenuItems } from '../../../shared/lib/utils/buildServerUserContextMenuItems';
 import { buildDmContextMenuItems } from '../../../shared/lib/utils/buildDmContextMenuItems';
 import { inviteUserToServer } from '../../../shared/lib/utils/inviteUserToServer';
+import { insertTextAtCursor } from '../../../shared/lib/utils/insertTextAtCursor';
+import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
+import { muteChat, unmuteChat, isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
 import SendIcon from '../../../shared/ui/atoms/SendIcon';
 import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
@@ -151,6 +161,8 @@ const ChatRoom = ({
   isServerOwner = false,
   serverId = null,
   serverOwnerId = null,
+  serverChannelCategories = null,
+  serverChannelFallback = null,
   isSavedMessages = false,
   savedMessagesChatId = null,
   /** When messages load/update; parent debounces the server «mark chat read» call */
@@ -490,6 +502,7 @@ const ChatRoom = ({
     updateMemberNickname,
     openPrivateChat,
     kickMember,
+    fetchMembers,
   } = useMembers(serverConnection, isServerChat ? serverId : null, userId);
   const {
     roles: serverRoles,
@@ -499,13 +512,131 @@ const ChatRoom = ({
   } = useRoles(serverConnection, isServerChat ? serverId : null, userId);
   const { friends, fetchFriends, removeFriend } = useFriends();
   const { pendingRequests, sentRequests, sendRequest, acceptRequest } = useFriendRequests();
-  const { resolveStatus } = usePresenceOverrides();
+  const { blockUser, unblockUser, isUserBlocked } = useUserBlocks();
+  const [muteRevision, setMuteRevision] = useState(0);
+  const { resolveStatus, statusOverrides } = usePresenceOverrides();
+  const [fetchedServerCategories, setFetchedServerCategories] = useState(null);
+  const [liveChannelCategories, setLiveChannelCategories] = useState(null);
+
+  useEffect(() => {
+    setLiveChannelCategories(null);
+  }, [serverChannelCategories, serverId, chatId]);
+
+  const refreshServerChannelCategories = useCallback(() => {
+    if (!serverId) return;
+    serverApi
+      .getServerById(serverId)
+      .then((data) => {
+        setLiveChannelCategories(data?.categories ?? data?.Categories ?? []);
+      })
+      .catch(() => {});
+  }, [serverId]);
+
+  useEffect(() => {
+    if (!isServerChat || !serverId || !chatId) {
+      setFetchedServerCategories(null);
+      return undefined;
+    }
+
+    if (Array.isArray(serverChannelCategories) && serverChannelCategories.length > 0) {
+      setFetchedServerCategories(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    serverApi
+      .getServerById(serverId)
+      .then((data) => {
+        if (!cancelled) {
+          setFetchedServerCategories(data?.categories ?? data?.Categories ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFetchedServerCategories([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isServerChat, serverId, chatId, serverChannelCategories]);
+
+  const channelAccessContext = useMemo(() => {
+    if (!isServerChat || !chatId) return null;
+
+    const categories =
+      liveChannelCategories
+      ?? (Array.isArray(serverChannelCategories) && serverChannelCategories.length > 0
+        ? serverChannelCategories
+        : fetchedServerCategories);
+
+    return buildChannelAccessContext(
+      categories?.length ? { categories } : null,
+      chatId,
+      serverChannelFallback,
+    );
+  }, [
+    isServerChat,
+    chatId,
+    liveChannelCategories,
+    serverChannelCategories,
+    fetchedServerCategories,
+    serverChannelFallback,
+  ]);
+
+  const isChannelAccessPending = Boolean(
+    isServerChat
+      && serverId
+      && chatId
+      && !channelAccessContext
+      && (!Array.isArray(serverChannelCategories) || serverChannelCategories.length === 0)
+      && fetchedServerCategories === null,
+  );
 
   useEffect(() => {
     if (isServerChat && serverConnection && serverId) {
       fetchServerRoles();
     }
   }, [isServerChat, serverConnection, serverId, fetchServerRoles]);
+
+  useEffect(() => {
+    if (!isServerChat || !serverConnection || !serverId || !chatId) {
+      return undefined;
+    }
+
+    const matchesCurrentChannel = (eventServerId, eventChannelId) =>
+      String(eventServerId) === String(serverId) && String(eventChannelId) === String(chatId);
+
+    const handleChannelAccessChanged = (eventServerId, eventChannelId) => {
+      if (!matchesCurrentChannel(eventServerId, eventChannelId)) return;
+      refreshServerChannelCategories();
+      void fetchMembers();
+    };
+
+    const handleChatUpdated = (updatedChat) => {
+      const updatedChatId = updatedChat?.chatId ?? updatedChat?.ChatId;
+      if (String(updatedChatId) !== String(chatId)) return;
+      refreshServerChannelCategories();
+    };
+
+    serverConnection.on('ChannelMemberAdded', handleChannelAccessChanged);
+    serverConnection.on('ChannelMemberRemoved', handleChannelAccessChanged);
+    serverConnection.on('ChatUpdated', handleChatUpdated);
+
+    return () => {
+      serverConnection.off('ChannelMemberAdded', handleChannelAccessChanged);
+      serverConnection.off('ChannelMemberRemoved', handleChannelAccessChanged);
+      serverConnection.off('ChatUpdated', handleChatUpdated);
+    };
+  }, [
+    isServerChat,
+    serverConnection,
+    serverId,
+    chatId,
+    refreshServerChannelCategories,
+    fetchMembers,
+  ]);
 
   const isStickerPanelOpen = stickerPickerOpen && !editingMessageId && canSend;
   const showMembersSidebar =
@@ -523,6 +654,22 @@ const ChatRoom = ({
   const handleStickerPickerToggle = useCallback(() => {
     setStickerPickerOpen((open) => !open);
   }, []);
+
+  const handleEmojiSelect = useCallback((emoji) => {
+    const textarea = inputRef.current;
+    if (!textarea) {
+      setNewMessage((prev) => `${prev}${emoji}`);
+      return;
+    }
+
+    const nextValue = insertTextAtCursor(textarea, emoji);
+    if (nextValue != null) {
+      setNewMessage(nextValue);
+      handleComposerTextChange(nextValue);
+      resizeMessageComposerTextarea(textarea);
+    }
+    textarea.focus();
+  }, [handleComposerTextChange]);
 
   const canEditMemberNickname = useCallback(
     (memberUserId) =>
@@ -636,6 +783,36 @@ const ChatRoom = ({
     }
   }, []);
 
+  useEffect(() => {
+    const onMuteChanged = () => setMuteRevision((value) => value + 1);
+    window.addEventListener('chatMuteChanged', onMuteChanged);
+    return () => window.removeEventListener('chatMuteChanged', onMuteChanged);
+  }, []);
+
+  const handleBlockUser = useCallback(async (targetUserId, targetUsername) => {
+    if (!targetUserId) return;
+    const displayName = targetUsername || 'пользователя';
+    if (!window.confirm(`Заблокировать ${displayName}? Вы не сможете отправлять сообщения друг другу.`)) {
+      return;
+    }
+
+    try {
+      await blockUser(targetUserId);
+    } catch (error) {
+      alert(error?.message || 'Не удалось заблокировать пользователя');
+    }
+  }, [blockUser]);
+
+  const handleUnblockUser = useCallback(async (targetUserId) => {
+    if (!targetUserId) return;
+
+    try {
+      await unblockUser(targetUserId);
+    } catch (error) {
+      alert(error?.message || 'Не удалось разблокировать пользователя');
+    }
+  }, [unblockUser]);
+
   const openRoleModal = useCallback((member, x, y) => {
     setRoleModal({
       open: true,
@@ -717,6 +894,8 @@ const ChatRoom = ({
         targetUsername: targetUsername || groupName || 'пользователя',
         hasUnread: false,
         isPinned,
+        isBlocked: isUserBlocked(targetUserId),
+        isMuted: isChatMuted(chatId),
         friendAction,
         servers: servers || [],
         handlers: {
@@ -736,9 +915,10 @@ const ChatRoom = ({
                   void handleRemoveFriend(targetUserId);
                 }
               : undefined,
-          onIgnore: () => alert('Игнорирование пока не реализовано'),
-          onBlock: () => alert('Блокировка пока не реализована'),
-          onMute: () => alert('Заглушение пока не реализовано'),
+          onBlock: () => { void handleBlockUser(targetUserId, targetUsername); },
+          onUnblock: () => { void handleUnblockUser(targetUserId); },
+          onMute: (duration) => muteChat(chatId, duration),
+          onUnmute: () => unmuteChat(chatId),
           onCopyUserId: () => handleCopyUserId(targetUserId),
           onCopyChannelId: () => handleCopyUserId(chatId),
         },
@@ -759,6 +939,10 @@ const ChatRoom = ({
       openProfile,
       handleRemoveFriend,
       handleCopyUserId,
+      isUserBlocked,
+      handleBlockUser,
+      handleUnblockUser,
+      muteRevision,
     ],
   );
 
@@ -954,7 +1138,17 @@ const ChatRoom = ({
 
   const sidebarMembers = useMemo(() => {
     if (isServerChat) {
-      return (serverMembers || []).map((member) =>
+      if (isChannelAccessPending) {
+        return [];
+      }
+
+      const accessibleMembers = filterMembersWithChannelAccess(
+        serverMembers || [],
+        channelAccessContext?.channel ?? null,
+        serverOwnerId,
+        channelAccessContext?.category ?? null,
+      );
+      return accessibleMembers.map((member) =>
         mapServerMemberToListItem(member, { serverOwnerId, resolveStatus, serverRoles })
       );
     }
@@ -968,9 +1162,12 @@ const ChatRoom = ({
     isServerChat,
     isGroupChat,
     serverMembers,
+    channelAccessContext,
+    isChannelAccessPending,
     chatParticipants,
     serverOwnerId,
     resolveStatus,
+    statusOverrides,
     serverRoles,
   ]);
 
@@ -1200,11 +1397,10 @@ const ChatRoom = ({
       setChatParticipants([]);
     };
 
-    const handleGroupUpdated = (action, userId) => {
-      console.log('ChatRoom - Group updated:', action, userId);
-      if (action === 'user_added' && (showChatInfo || showMemberList) && connection && chatId) {
-        console.log('ChatRoom - Reloading participants after user added');
-        connection.invoke('GetChatParticipants', chatId).catch(error => {
+    const handleGroupUpdated = (action) => {
+      if (!showMemberList && !showChatInfo) return;
+      if ((action === 'user_added' || action === 'user_removed') && connection && chatId) {
+        connection.invoke('GetChatParticipants', chatId).catch((error) => {
           console.error('ChatRoom - Error reloading participants:', error);
         });
       }
@@ -1363,6 +1559,23 @@ const ChatRoom = ({
       }
     };
   }, [userId, getConnection]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (event) => {
+      const patch = event.detail;
+      if (!patch?.userId) {
+        return;
+      }
+
+      setChatUserProfile((prev) => patchChatUserProfileWithProfile(prev, patch));
+      setChatParticipants((prev) =>
+        prev.map((participant) => patchParticipantWithProfile(participant, patch)),
+      );
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, []);
 
   useEffect(() => {
     setIsPrivateChat(chatTypeId === 1 || (!isGroupChat && !isServerChat));
@@ -2609,6 +2822,7 @@ const ChatRoom = ({
             </button>
           </div>
         ) : (
+          <>
           <div className="chat-composer">
             {!editingMessageId && canAttach && (
               <ChatAttachMenu
@@ -2685,7 +2899,7 @@ const ChatRoom = ({
                   type="button"
                   onClick={handleStickerPickerToggle}
                   className={`chat-composer__action-btn chat-composer__action-btn--sticker ${isStickerPanelOpen ? 'chat-composer__action-btn--active' : ''}`}
-                  title="Стикеры"
+                  title="Эмодзи и стикеры"
                   disabled={isSendingSticker}
                 >
                   <StickerIcon className="chat-composer__sticker-icon" />
@@ -2693,6 +2907,7 @@ const ChatRoom = ({
               )}
             </div>
           </div>
+          </>
         )}
         </>
       </form>
@@ -2706,8 +2921,8 @@ const ChatRoom = ({
         >
           <MemberListSidebar
             members={sidebarMembers}
-            isLoading={isServerChat ? serverMembersLoading : false}
-            emptyLabel={isServerChat ? 'Участники сервера не найдены' : 'Участники группы не найдены'}
+            isLoading={isServerChat ? (serverMembersLoading || isChannelAccessPending) : false}
+            emptyLabel={isServerChat ? 'Нет участников с доступом к каналу' : 'Участники группы не найдены'}
             groupByRoles={isServerChat}
             serverRoles={isServerChat ? serverRoles : []}
             getUserContextMenuItems={getUserContextMenuItems}
@@ -2721,6 +2936,7 @@ const ChatRoom = ({
         onResizeStart={handleStickerPanelResizeStart}
         onClose={() => setStickerPickerOpen(false)}
         onStickerSelect={handleSendSticker}
+        onEmojiSelect={handleEmojiSelect}
       />
       </div>
 

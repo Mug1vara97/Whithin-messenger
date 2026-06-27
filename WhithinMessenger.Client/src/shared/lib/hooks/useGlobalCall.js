@@ -1,5 +1,5 @@
 import { useCall } from '../contexts/CallContext';
-import { useAuth } from './useAuth';
+import { useAuthContext } from '../contexts/AuthContext';
 import { isSameVoiceChannel } from '../stores/callStore';
 
 /**
@@ -8,7 +8,7 @@ import { isSameVoiceChannel } from '../stores/callStore';
  */
 export const useGlobalCall = (userId = null, userName = null) => {
   const callContext = useCall();
-  const { user: authUser } = useAuth();
+  const { user: authUser } = useAuthContext();
   
   // Используем переданного пользователя или пользователя из auth
   const user = userId && userName ? { id: userId, username: userName } : authUser;

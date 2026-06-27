@@ -19,7 +19,7 @@ public class GetAvailableStickerPacksQueryHandler : IRequestHandler<GetAvailable
         try
         {
             var packs = await _stickerPackRepository.GetAvailablePacksForUserAsync(request.UserId, cancellationToken);
-            var dtos = packs.Select(MapPack).ToList();
+            var dtos = packs.Select(StickerPackMapper.ToDto).ToList();
             return new GetStickerPacksResult
             {
                 Success = true,
@@ -35,24 +35,4 @@ public class GetAvailableStickerPacksQueryHandler : IRequestHandler<GetAvailable
             };
         }
     }
-
-    private static StickerPackDto MapPack(Domain.Models.StickerPack pack) =>
-        new()
-        {
-            Id = pack.Id,
-            Title = pack.Title,
-            CoverImagePath = pack.CoverImagePath,
-            CreatedAt = pack.CreatedAt,
-            Stickers = pack.Stickers
-                .OrderBy(s => s.SortOrder)
-                .Select(s => new StickerDto
-                {
-                    Id = s.Id,
-                    StickerPackId = s.StickerPackId,
-                    FilePath = s.FilePath,
-                    ContentType = s.ContentType,
-                    SortOrder = s.SortOrder
-                })
-                .ToList()
-        };
 }

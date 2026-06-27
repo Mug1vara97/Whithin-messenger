@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { notificationApi } from '../api';
 import { normalizeNotification } from '../lib/notificationDisplay';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
-import { useAuth } from '../../../shared/lib/hooks/useAuth';
+import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { dispatchNotificationReceived } from '../../../shared/lib/utils/notificationRealtimeBridge';
+import { isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
 import {
   dismissDesktopNotificationById,
   dismissDesktopNotificationsByChatId,
@@ -17,7 +18,7 @@ import {
 import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
 
 export const useNotifications = () => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const connectionContext = useConnectionContext();
   const notificationSoundRef = useRef(null);
   const lastSoundPlayedAtRef = useRef(0);
@@ -246,8 +247,12 @@ export const useNotifications = () => {
 
       if (!isNewNotification) return;
 
+      const notificationChatId = normalized.chatId ?? normalized.ChatId;
+      const isMutedChat = isChatMuted(notificationChatId);
+
       if (
-        getInAppNotificationsEnabled()
+        !isMutedChat
+        && getInAppNotificationsEnabled()
         && soundNotificationsEnabledRef.current
         && notificationSoundVolumeRef.current > 0
         && !(normalized.isRead ?? false)
@@ -255,7 +260,9 @@ export const useNotifications = () => {
         playNotificationSound();
       }
 
-      dispatchNotificationReceived(normalized);
+      if (!isMutedChat) {
+        dispatchNotificationReceived(normalized);
+      }
     };
 
     const onUnreadCountChanged = (count) => {

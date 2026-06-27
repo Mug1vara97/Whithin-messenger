@@ -5,6 +5,7 @@ public class StickerPackDto
     public Guid Id { get; init; }
     public string Title { get; init; } = string.Empty;
     public string? CoverImagePath { get; init; }
+    public Guid CreatedByUserId { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public List<StickerDto> Stickers { get; init; } = new();
 }

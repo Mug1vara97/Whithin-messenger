@@ -557,7 +557,10 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
-            await _serverHub.Clients.User(body.UserId.ToString()).SendAsync("ChannelMemberAdded", serverId, channelId);
+            await _serverHub.Clients.Group(serverId.ToString())
+                .SendAsync("ChannelMemberAdded", serverId, channelId, body.UserId);
+            await _serverHub.Clients.User(body.UserId.ToString())
+                .SendAsync("ChannelMemberAdded", serverId, channelId, body.UserId);
             return Ok(new { message = "Участник добавлен в канал" });
         }
         catch (Exception ex)
@@ -582,7 +585,10 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
-            await _serverHub.Clients.User(memberUserId.ToString()).SendAsync("ChannelMemberRemoved", serverId, channelId);
+            await _serverHub.Clients.Group(serverId.ToString())
+                .SendAsync("ChannelMemberRemoved", serverId, channelId, memberUserId);
+            await _serverHub.Clients.User(memberUserId.ToString())
+                .SendAsync("ChannelMemberRemoved", serverId, channelId, memberUserId);
             return Ok(new { message = "Участник удалён из канала" });
         }
         catch (Exception ex)

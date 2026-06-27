@@ -567,37 +567,54 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             try
             {
-                var usersWithPrivateChats = await _context.Members
-                    .Where(m => m.UserId == currentUserId)
-                    .Include(m => m.Chat)
-                    .ThenInclude(c => c.Members)
-                    .ThenInclude(m => m.User)
-                    .SelectMany(m => m.Chat.Members)
-                    .Where(m => m.UserId != currentUserId && m.User != null)
-                    .Select(m => m.User)
-                    .Distinct()
+                var isParticipant = await IsUserParticipantAsync(groupChatId, currentUserId, cancellationToken);
+                if (!isParticipant)
+                {
+                    return [];
+                }
+
+                var friendIds = await _context.Friendships
+                    .AsNoTracking()
+                    .Where(f =>
+                        f.Status == FriendshipStatus.Accepted &&
+                        (f.RequesterId == currentUserId || f.AddresseeId == currentUserId))
+                    .Select(f => f.RequesterId == currentUserId ? f.AddresseeId : f.RequesterId)
                     .ToListAsync(cancellationToken);
 
                 var groupMembers = await _context.Members
+                    .AsNoTracking()
                     .Where(m => m.ChatId == groupChatId)
                     .Select(m => m.UserId)
                     .ToListAsync(cancellationToken);
-                
-                var availableUsers = usersWithPrivateChats
-                    .Where(u => u != null && !groupMembers.Contains(u.Id))
+
+                var availableFriendIds = friendIds
+                    .Where(id => !groupMembers.Contains(id))
+                    .ToList();
+
+                if (availableFriendIds.Count == 0)
+                {
+                    return [];
+                }
+
+                var users = await _context.Users
+                    .AsNoTracking()
+                    .Include(u => u.UserProfile)
+                    .Where(u => availableFriendIds.Contains(u.Id))
+                    .ToListAsync(cancellationToken);
+
+                return users
                     .Select(u => new AvailableUserInfo
                     {
                         UserId = u.Id,
-                        Username = u.UserName ?? string.Empty,
+                        Username = UserDisplayNames.Resolve(u.UserProfile?.DisplayName, u.UserName) ?? string.Empty,
                         AvatarUrl = u.UserProfile?.Avatar,
                         AvatarColor = u.UserProfile?.AvatarColor,
-                        UserStatus = u.Status.ToString().ToLower(),
+                        UserStatus = u.Status.ToString().ToLowerInvariant(),
                         LastSeen = u.LastSeen,
-                        HasExistingChat = true
+                        HasExistingChat = false
                     })
+                    .OrderBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
                     .ToList();
-
-                return availableUsers;
             }
             catch (Exception ex)
             {

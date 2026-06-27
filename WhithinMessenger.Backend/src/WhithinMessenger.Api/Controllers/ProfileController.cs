@@ -20,6 +20,7 @@ public class ProfileController : ControllerBase
     private readonly IUserProfileRepository _userProfileRepository;
     private readonly WithinDbContext _context;
     private readonly IWebHostEnvironment _environment;
+    private readonly IProfileRealtimeNotifier _profileRealtimeNotifier;
 
     private static readonly HashSet<string> AvatarDecorationAllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -29,11 +30,13 @@ public class ProfileController : ControllerBase
     public ProfileController(
         IUserProfileRepository userProfileRepository,
         WithinDbContext context,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IProfileRealtimeNotifier profileRealtimeNotifier)
     {
         _userProfileRepository = userProfileRepository;
         _context = context;
         _environment = environment;
+        _profileRealtimeNotifier = profileRealtimeNotifier;
     }
 
     [HttpGet("{userId}/profile")]
@@ -99,6 +102,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Avatar = request.Avatar;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "avatar");
 
             return Ok(new { Avatar = userProfile.Avatar });
         }
@@ -123,6 +127,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Banner = request.Banner;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "banner");
 
             return Ok(new { Banner = userProfile.Banner });
         }
@@ -157,6 +162,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Description = string.IsNullOrWhiteSpace(description) ? null : description;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "description");
 
             return Ok(new { description = userProfile.Description });
         }
@@ -191,6 +197,7 @@ public class ProfileController : ControllerBase
 
             userProfile.DisplayName = displayName;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "displayName");
 
             var user = await _context.Users.AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == request.UserId);
@@ -231,6 +238,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Nameplate = string.IsNullOrWhiteSpace(request.Nameplate) ? null : request.Nameplate.Trim();
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "nameplate");
 
             return Ok(new { nameplate = userProfile.Nameplate });
         }
@@ -261,6 +269,7 @@ public class ProfileController : ControllerBase
                 ? null
                 : request.AvatarDecoration.Trim();
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "avatarDecoration");
 
             return Ok(new { avatarDecoration = userProfile.AvatarDecoration });
         }
@@ -289,6 +298,7 @@ public class ProfileController : ControllerBase
 
             userProfile.AvatarDecoration = null;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "avatarDecoration");
 
             return Ok(new { avatarDecoration = userProfile.AvatarDecoration });
         }
@@ -317,6 +327,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Nameplate = null;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "nameplate");
 
             return Ok(new { nameplate = userProfile.Nameplate });
         }
@@ -350,6 +361,7 @@ public class ProfileController : ControllerBase
 
             userProfile.AvatarColor = request.AvatarColor.Trim();
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "avatarColor");
 
             return Ok(new { avatarColor = userProfile.AvatarColor });
         }
@@ -378,6 +390,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Avatar = null;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "avatar");
 
             return Ok(new { avatar = userProfile.Avatar });
         }
@@ -406,6 +419,7 @@ public class ProfileController : ControllerBase
 
             userProfile.Banner = null;
             await _userProfileRepository.UpdateAsync(userProfile);
+            await NotifyProfileUpdatedAsync(request.UserId, "banner");
 
             return Ok(new { banner = userProfile.Banner });
         }
@@ -669,6 +683,24 @@ public class ProfileController : ControllerBase
         }
 
         return claimedExtension;
+    }
+
+    private async Task NotifyProfileUpdatedAsync(Guid userId, params string[] changedFields)
+    {
+        var userProfile = await _userProfileRepository.GetByUserIdAsync(userId);
+        if (userProfile == null)
+        {
+            return;
+        }
+
+        var user = await _context.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        await _profileRealtimeNotifier.NotifyUserProfileUpdatedAsync(
+            userId,
+            userProfile,
+            user,
+            changedFields);
     }
 
     private bool EnsureOwnProfile(Guid targetUserId, out IActionResult? forbidResult)

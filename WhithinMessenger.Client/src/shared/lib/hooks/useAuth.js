@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { authApi } from '../api/authApi';
 import { useUser } from './useUser';
 import tokenManager from '../services/tokenManager';
+import { isPublicAuthRoute } from '../utils/authRoutes';
 
 export const useAuth = () => {
   const { user, updateUser, clearUser, isLoading: userLoading, setIsLoading } = useUser();
@@ -47,7 +48,7 @@ export const useAuth = () => {
               /* noop */
             }
           }
-          if (!restoredUser) {
+          if (!restoredUser && !isPublicAuthRoute()) {
             console.log('useAuth: Cannot get user from token or cache, making API request...');
             try {
               const user = await authApi.getCurrentUser();
@@ -68,6 +69,7 @@ export const useAuth = () => {
           // Токен невалиден или истек
           tokenManager.clearTokens();
           localStorage.removeItem('user');
+          clearUser();
         }
       } catch (error) {
         console.warn('useAuth: auth initialization failed, keeping current session state', error);
@@ -77,7 +79,7 @@ export const useAuth = () => {
     };
 
     initializeAuth();
-  }, []); // Убираем updateUser из зависимостей
+  }, [clearUser, updateUser]);
 
   const login = useCallback(async (credentials) => {
     try {

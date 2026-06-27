@@ -11,6 +11,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangeEmail;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangePassword;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using WhithinMessenger.Application.Interfaces;
+using WhithinMessenger.Application.Services;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -22,15 +23,18 @@ public class UserController : ControllerBase
     private readonly WithinDbContext _context;
     private readonly IMediator _mediator;
     private readonly IHubContext<NotificationHub> _notificationHub;
+    private readonly IUserBlockService _userBlockService;
 
     public UserController(
         WithinDbContext context,
         IMediator mediator,
-        IHubContext<NotificationHub> notificationHub)
+        IHubContext<NotificationHub> notificationHub,
+        IUserBlockService userBlockService)
     {
         _context = context;
         _mediator = mediator;
         _notificationHub = notificationHub;
+        _userBlockService = userBlockService;
     }
     [HttpGet("profile")]
     public IActionResult GetProfile()
@@ -191,6 +195,11 @@ public class UserController : ControllerBase
 
         foreach (var friendId in friendIds)
         {
+            if (await _userBlockService.ShouldHidePresenceAsync(friendId, userId))
+            {
+                continue;
+            }
+
             await _notificationHub.Clients.Group($"user-{friendId}").SendAsync(
                 "UserStatusChanged",
                 new

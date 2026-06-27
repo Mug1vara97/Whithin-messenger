@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
+import { hasStartupBootCompleted } from '../startup/startupBoot';
 import { ServerContext } from './ServerContext';
 
 export const ServerProvider = ({ children }) => {
   const [servers, setServers] = useState([]);
   const [publicServers, setPublicServers] = useState([]);
+  const [initialServersLoaded, setInitialServersLoaded] = useState(() => hasStartupBootCompleted());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [connection, setConnection] = useState(null);
@@ -34,6 +36,7 @@ export const ServerProvider = ({ children }) => {
       setError(err.message);
     } finally {
       setIsLoading(false);
+      setInitialServersLoaded(true);
     }
   }, []);
 
@@ -146,6 +149,7 @@ export const ServerProvider = ({ children }) => {
         console.error('ServerContext: Error connecting to server list hub:', err);
         setError(err.message);
         setIsConnected(false);
+        setInitialServersLoaded(true);
       } finally {
         isConnectingRef.current = false;
       }
@@ -323,6 +327,7 @@ export const ServerProvider = ({ children }) => {
   const value = {
     servers,
     publicServers,
+    initialServersLoaded,
     isLoading,
     error,
     connection,

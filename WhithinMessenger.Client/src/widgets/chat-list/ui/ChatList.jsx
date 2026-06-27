@@ -2,7 +2,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { People, BookmarkBorder, PushPin } from '@mui/icons-material';
-import { SearchBar, UserAvatar, UserAvatarPresenceDot, CreateGroupChatModal, UserPanel } from '../../../shared/ui';
+import { SearchBar, UserAvatar, UserAvatarPresenceDot, CreateGroupChatModal } from '../../../shared/ui';
 import ContextMenu from '../../../shared/ui/molecules/ContextMenu/ContextMenu';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
@@ -17,6 +17,9 @@ import { formatChatListMessageTime } from '../../../shared/lib/utils/formatChatL
 import { buildChatListContextMenuItems } from '../../../shared/lib/utils/buildChatListContextMenuItems';
 import { getFriendActionForMember } from '../../../shared/lib/utils/friendActionForMember';
 import { inviteUserToServer } from '../../../shared/lib/utils/inviteUserToServer';
+import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
+import { muteChat, unmuteChat, isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
+import { PRESENCE_STATUS } from '../../../shared/lib/utils/userStatus';
 import './ChatList.css';
 
 const ChatList = ({
@@ -40,6 +43,8 @@ const ChatList = ({
   const { servers } = useServerContext();
   const { friends, fetchFriends, removeFriend } = useFriends();
   const { pendingRequests, sentRequests } = useFriendRequests();
+  const { blockUser, unblockUser, isUserBlocked } = useUserBlocks();
+  const [muteRevision, setMuteRevision] = useState(0);
   const location = useLocation();
   const [selectedChat, setSelectedChat] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -202,6 +207,12 @@ const ChatList = ({
     };
   }, [user?.id, getConnection]);
 
+  useEffect(() => {
+    const onMuteChanged = () => setMuteRevision((value) => value + 1);
+    window.addEventListener('chatMuteChanged', onMuteChanged);
+    return () => window.removeEventListener('chatMuteChanged', onMuteChanged);
+  }, []);
+
   const getChatPresenceStatus = useCallback(
     (chat) => {
       if (chat.isGroupChat) {
@@ -213,14 +224,44 @@ const ChatList = ({
         return chat.userStatus ?? chat.UserStatus ?? null;
       }
 
+      if (isUserBlocked(userIdKey)) {
+        return PRESENCE_STATUS.OFFLINE;
+      }
+
       return statusOverrides[userIdKey] ?? chat.userStatus ?? chat.UserStatus ?? null;
     },
-    [statusOverrides]
+    [statusOverrides, isUserBlocked]
   );
 
   const closeChatContextMenu = useCallback(() => {
     setChatContextMenu({ visible: false, x: 0, y: 0, chat: null });
   }, []);
+
+  const handleBlockUser = useCallback(async (targetUserId, targetUsername) => {
+    if (!targetUserId) return;
+    const displayName = targetUsername || 'пользователя';
+    if (!window.confirm(`Заблокировать ${displayName}? Вы не сможете отправлять сообщения друг другу.`)) {
+      return;
+    }
+
+    try {
+      await blockUser(targetUserId);
+      closeChatContextMenu();
+    } catch (error) {
+      alert(error?.message || 'Не удалось заблокировать пользователя');
+    }
+  }, [blockUser, closeChatContextMenu]);
+
+  const handleUnblockUser = useCallback(async (targetUserId) => {
+    if (!targetUserId) return;
+
+    try {
+      await unblockUser(targetUserId);
+      closeChatContextMenu();
+    } catch (error) {
+      alert(error?.message || 'Не удалось разблокировать пользователя');
+    }
+  }, [unblockUser, closeChatContextMenu]);
 
   const handleCopyText = useCallback(async (value, errorMessage) => {
     try {
@@ -253,6 +294,8 @@ const ChatList = ({
       targetUsername,
       hasUnread: unreadForChat > 0,
       isPinned,
+      isBlocked: isUserBlocked(targetUserId),
+      isMuted: isChatMuted(chatId),
       friendAction,
       servers: servers || [],
       handlers: {
@@ -275,9 +318,24 @@ const ChatList = ({
               void removeFriend(targetUserId).then(() => fetchFriends());
             }
           : undefined,
-        onIgnore: () => alert('Игнорирование пока не реализовано'),
-        onBlock: () => alert('Блокировка пока не реализована'),
-        onMute: () => alert('Заглушение пока не реализовано'),
+        onBlock: targetUserId
+          ? () => { void handleBlockUser(targetUserId, targetUsername); }
+          : undefined,
+        onUnblock: targetUserId
+          ? () => { void handleUnblockUser(targetUserId); }
+          : undefined,
+        onMute: chatId
+          ? (duration) => {
+              muteChat(chatId, duration);
+              closeChatContextMenu();
+            }
+          : undefined,
+        onUnmute: chatId
+          ? () => {
+              unmuteChat(chatId);
+              closeChatContextMenu();
+            }
+          : undefined,
         onCopyUserId: targetUserId
           ? () => handleCopyText(targetUserId, 'Не удалось скопировать ID пользователя')
           : undefined,
@@ -303,6 +361,11 @@ const ChatList = ({
     handleCopyText,
     pinChat,
     unpinChat,
+    isUserBlocked,
+    handleBlockUser,
+    handleUnblockUser,
+    closeChatContextMenu,
+    muteRevision,
   ]);
 
   const handleChatContextMenu = useCallback((event, chat) => {
@@ -583,11 +646,6 @@ const ChatList = ({
             />
           )}
         </div>
-        <UserPanel
-          userId={user?.id || user?.userId || user?.Id}
-          username={user?.username || user?.UserName || user?.userName}
-          isOpen={true}
-        />
       </div>
       <ContextMenu
         isOpen={chatContextMenu.visible}

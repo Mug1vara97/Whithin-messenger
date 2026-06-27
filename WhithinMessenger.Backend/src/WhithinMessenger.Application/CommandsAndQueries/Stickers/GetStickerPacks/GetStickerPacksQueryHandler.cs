@@ -1,4 +1,5 @@
 using MediatR;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
@@ -17,24 +18,7 @@ public class GetStickerPacksQueryHandler : IRequestHandler<GetStickerPacksQuery,
         try
         {
             var packs = await _stickerPackRepository.GetInstalledPacksForUserAsync(request.UserId, cancellationToken);
-            var dtos = packs.Select(p => new StickerPackDto
-            {
-                Id = p.Id,
-                Title = p.Title,
-                CoverImagePath = p.CoverImagePath,
-                CreatedAt = p.CreatedAt,
-                Stickers = p.Stickers
-                    .OrderBy(s => s.SortOrder)
-                    .Select(s => new StickerDto
-                    {
-                        Id = s.Id,
-                        StickerPackId = s.StickerPackId,
-                        FilePath = s.FilePath,
-                        ContentType = s.ContentType,
-                        SortOrder = s.SortOrder
-                    })
-                    .ToList()
-            }).ToList();
+            var dtos = packs.Select(StickerPackMapper.ToDto).ToList();
 
             return new GetStickerPacksResult
             {

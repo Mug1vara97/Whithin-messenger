@@ -7,6 +7,8 @@ import {
   normalizeMessageStatus,
   pickHigherMessageStatus,
 } from '../utils/messageStatus';
+import { PROFILE_UPDATED_EVENT } from '../contexts/ProfileModalContext';
+import { patchMessageWithProfile } from '../utils/profilePatchHelpers';
 
 const TYPING_IDLE_MS = 3000;
 /** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
@@ -958,6 +960,20 @@ export const useChat = (chatId, username, userId, displayName) => {
       return false;
     }
   }, [connection]);
+
+  useEffect(() => {
+    const handleProfileUpdated = (event) => {
+      const patch = event.detail;
+      if (!patch?.userId) {
+        return;
+      }
+
+      setMessages((prev) => prev.map((message) => patchMessageWithProfile(message, patch)));
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, []);
 
   return {
     messages,

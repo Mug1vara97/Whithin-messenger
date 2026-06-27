@@ -3,6 +3,7 @@ import { PersonAdd } from '@mui/icons-material';
 import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { FriendItem, FriendRequestItem } from '../../../shared/ui/molecules';
 import { AddFriendModal } from '../../../shared/ui/molecules';
+import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
 import { isUserActiveInFriendsList } from '../../../shared/lib/utils/userStatus';
 import './FriendsPanel.css';
 
@@ -12,6 +13,7 @@ const FriendsPanel = ({ onStartChat }) => {
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const { friends, loading, error, removeFriend } = useFriends();
   const { pendingRequests, sentRequests, acceptRequest, declineRequest, sendRequest } = useFriendRequests();
+  const { blockedUsers, loading: blockedLoading, unblockUser } = useUserBlocks();
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -35,6 +37,11 @@ const FriendsPanel = ({ onStartChat }) => {
     [friends, normalizedQuery]
   );
 
+  const filteredBlockedUsers = useMemo(
+    () => filterBySearch(blockedUsers, (user) => user.username || ''),
+    [blockedUsers, normalizedQuery]
+  );
+
   const filteredPendingRequests = useMemo(
     () => filterBySearch(pendingRequests, (request) => request.requesterUsername || ''),
     [pendingRequests, normalizedQuery]
@@ -56,7 +63,7 @@ const FriendsPanel = ({ onStartChat }) => {
       case 'pending':
         return null;
       case 'blocked':
-        return 'Заблокированные — 0';
+        return `Заблокированные — ${filteredBlockedUsers.length}`;
       default:
         return '';
     }
@@ -73,6 +80,17 @@ const FriendsPanel = ({ onStartChat }) => {
     }
   };
 
+  const handleUnblockUser = async (userId) => {
+    if (!userId) return;
+    if (!window.confirm('Разблокировать этого пользователя?')) return;
+
+    try {
+      await unblockUser(userId);
+    } catch (unblockError) {
+      alert(unblockError?.message || 'Не удалось разблокировать пользователя');
+    }
+  };
+
   const renderFriendList = (items) => (
     <div className="friends-panel__list">
       {items.map((friend) => (
@@ -81,6 +99,26 @@ const FriendsPanel = ({ onStartChat }) => {
           friend={friend}
           onRemoveFriend={handleRemoveFriend}
           onStartChat={onStartChat}
+        />
+      ))}
+    </div>
+  );
+
+  const renderBlockedList = (items) => (
+    <div className="friends-panel__list">
+      {items.map((blockedUser) => (
+        <FriendItem
+          key={blockedUser.userId}
+          friend={{
+            userId: blockedUser.userId,
+            username: blockedUser.username,
+            avatar: blockedUser.avatar,
+            avatarColor: blockedUser.avatarColor,
+            status: 'offline',
+          }}
+          isBlocked
+          showActions
+          onUnblock={handleUnblockUser}
         />
       ))}
     </div>
@@ -187,7 +225,19 @@ const FriendsPanel = ({ onStartChat }) => {
       return renderPendingContent();
     }
 
-    return <div className="friends-panel__empty">Нет заблокированных пользователей</div>;
+    if (blockedLoading) {
+      return <div className="friends-panel__loading">Загрузка...</div>;
+    }
+
+    if (filteredBlockedUsers.length === 0) {
+      return (
+        <div className="friends-panel__empty">
+          {normalizedQuery ? 'Ничего не найдено' : 'Нет заблокированных пользователей'}
+        </div>
+      );
+    }
+
+    return renderBlockedList(filteredBlockedUsers);
   };
 
   if (loading) {

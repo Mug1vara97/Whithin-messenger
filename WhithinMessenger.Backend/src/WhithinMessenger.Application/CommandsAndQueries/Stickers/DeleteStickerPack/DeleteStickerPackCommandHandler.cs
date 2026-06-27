@@ -1,6 +1,5 @@
 using MediatR;
 using WhithinMessenger.Application.Services;
-using WhithinMessenger.Application.Stickers;
 using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.Stickers.DeleteStickerPack;
@@ -22,15 +21,6 @@ public class DeleteStickerPackCommandHandler : IRequestHandler<DeleteStickerPack
     {
         try
         {
-            if (request.UserId != StickerPackAdmin.AllowedUploaderUserId)
-            {
-                return new DeleteStickerPackResult
-                {
-                    Success = false,
-                    ErrorMessage = "Удаление стикерпаков доступно только администратору"
-                };
-            }
-
             var pack = await _stickerPackRepository.GetByIdWithStickersAsync(request.PackId, cancellationToken);
             if (pack == null)
             {
@@ -38,6 +28,15 @@ public class DeleteStickerPackCommandHandler : IRequestHandler<DeleteStickerPack
                 {
                     Success = false,
                     ErrorMessage = "Стикерпак не найден"
+                };
+            }
+
+            if (pack.CreatedByUserId != request.UserId)
+            {
+                return new DeleteStickerPackResult
+                {
+                    Success = false,
+                    ErrorMessage = "Удалять стикерпак может только его создатель"
                 };
             }
 

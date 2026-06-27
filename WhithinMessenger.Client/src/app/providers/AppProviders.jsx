@@ -6,6 +6,9 @@ import { ServerProvider } from '../../shared/lib/contexts/ServerContext.jsx';
 import { CallProvider } from '../../shared/lib/contexts/CallContext';
 import { ProfileModalProvider } from '../../shared/lib/contexts/ProfileModalContext';
 import { PresenceProvider } from '../../shared/lib/contexts/PresenceContext';
+import { UserBlockProvider } from '../../shared/lib/contexts/UserBlockContext';
+import { ProfileRealtimeProvider } from '../../shared/lib/contexts/ProfileRealtimeContext';
+import { StartupBootProvider } from '../../shared/lib/contexts/StartupBootContext';
 import { useTokenRefresh } from '../../shared/lib/hooks/useTokenRefresh';
 
 const AppProviders = ({ children }) => {
@@ -15,17 +18,23 @@ const AppProviders = ({ children }) => {
   return (
     <ConnectionProvider>
       <AuthProvider>
+        <UserBlockProvider>
         <PresenceProvider>
+          <ProfileRealtimeProvider>
           <NotificationProvider>
             <ProfileModalProvider>
               <ServerProvider>
-                <CallProvider>
-                  {children}
-                </CallProvider>
+                <StartupBootProvider>
+                  <CallProvider>
+                    {children}
+                  </CallProvider>
+                </StartupBootProvider>
               </ServerProvider>
             </ProfileModalProvider>
           </NotificationProvider>
+          </ProfileRealtimeProvider>
         </PresenceProvider>
+        </UserBlockProvider>
       </AuthProvider>
     </ConnectionProvider>
   );

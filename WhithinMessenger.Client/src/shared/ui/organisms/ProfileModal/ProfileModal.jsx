@@ -6,6 +6,8 @@ import { userApi } from '../../../../entities/user/api';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
+import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
+import { mergeProfileState } from '../../../lib/utils/profilePatchHelpers';
 import {
   getUserStatusColor,
   getUserStatusLabel,
@@ -182,6 +184,27 @@ const ProfileModal = ({
       }
     };
   }, [isOpen, userId, viewerId, getConnection]);
+
+  useEffect(() => {
+    if (!isOpen || !userId) {
+      return undefined;
+    }
+
+    const handleProfileUpdated = (event) => {
+      const patch = event.detail;
+      if (!patch?.userId || String(patch.userId) !== String(userId)) {
+        return;
+      }
+
+      setProfile((prev) => mergeProfileState(prev, patch));
+      if (patch.description !== undefined) {
+        setBioDraft(patch.description || '');
+      }
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, [isOpen, userId]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

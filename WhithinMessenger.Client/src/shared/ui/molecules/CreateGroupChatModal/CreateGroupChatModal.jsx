@@ -1,169 +1,175 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { chatApi } from '../../../../entities/chat/api/chatApi';
-import { userApi } from '../../../../entities/user/api/userApi';
+import { friendApi } from '../../../../entities/friend/api/friendApi';
 import { useConnectionContext } from '../../../../shared/lib/contexts/ConnectionContext';
 import { useAuthContext } from '../../../../shared/lib/contexts/AuthContext';
+import { normalizeFriend } from '../../../../entities/friend/lib/friendHelpers';
 import UserAvatar from '../../atoms/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import './CreateGroupChatModal.css';
+
+const MAX_GROUP_FRIENDS = 10;
 
 const CreateGroupChatModal = ({ isOpen, onClose, onChatCreated }) => {
   const { getConnection } = useConnectionContext();
   const { user } = useAuthContext();
   const [connection, setConnection] = useState(null);
   const [chatName, setChatName] = useState('');
-  const [users, setUsers] = useState([]);
+  const [friends, setFriends] = useState([]);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [friendsLoading, setFriendsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState(null);
 
-  // Создаем соединение при открытии модального окна
   useEffect(() => {
-    if (isOpen && user?.id) {
-      const createConnection = async () => {
-        try {
-          const chatConnection = await getConnection('chatlisthub', user.id);
-          setConnection(chatConnection);
-        } catch (error) {
-          console.error('Ошибка при создании соединения:', error);
-        }
-      };
-      createConnection();
+    if (!isOpen || !user?.id) {
+      return undefined;
     }
+
+    let mounted = true;
+
+    const setup = async () => {
+      try {
+        const chatConnection = await getConnection('chatlisthub', user.id);
+        if (mounted) {
+          setConnection(chatConnection);
+        }
+      } catch (err) {
+        console.error('CreateGroupChatModal: connection error', err);
+        if (mounted) {
+          setError('Не удалось подключиться к чатам');
+        }
+      }
+    };
+
+    setup();
+
+    return () => {
+      mounted = false;
+      setConnection(null);
+    };
   }, [isOpen, user?.id, getConnection]);
 
-  useEffect(() => {
-    if (isOpen && connection) {
-      // Не вызываем loadUsers здесь, так как это будет сделано в useEffect для searchQuery
-      console.log('Modal opened with connection, will load users via searchQuery effect');
+  const loadFriends = useCallback(async () => {
+    setFriendsLoading(true);
+    setError(null);
+    try {
+      const data = await friendApi.getFriends();
+      const normalized = (Array.isArray(data) ? data : [])
+        .map(normalizeFriend)
+        .filter(Boolean);
+      setFriends(normalized);
+    } catch (err) {
+      console.error('CreateGroupChatModal: failed to load friends', err);
+      setFriends([]);
+      setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить список друзей');
+    } finally {
+      setFriendsLoading(false);
     }
-  }, [isOpen, connection]);
+  }, []);
 
   useEffect(() => {
-    if (connection) {
-      console.log('Setting up search results handler for connection:', connection.state);
-      const handleSearchResults = (results) => {
-        console.log('Received search results:', results);
-        console.log('Results count:', results?.length || 0);
-        setUsers(results || []);
-        setLoading(false);
-      };
-
-      const handleError = (error) => {
-        console.error('SignalR error in CreateGroupChatModal:', error);
-        setLoading(false);
-      };
-
-      connection.on("receivesearchresults", handleSearchResults);
-      connection.on("error", handleError);
-
-      return () => {
-        console.log('Cleaning up search results handler');
-        connection.off("receivesearchresults", handleSearchResults);
-        connection.off("error", handleError);
-      };
+    if (!isOpen) {
+      setChatName('');
+      setSelectedUserIds([]);
+      setSearchQuery('');
+      setError(null);
+      setFriends([]);
+      return;
     }
-  }, [connection]);
 
-  // Очищаем соединение при закрытии модального окна
-  useEffect(() => {
-    if (!isOpen && connection) {
-      setConnection(null);
-    }
-  }, [isOpen, connection]);
-
+    loadFriends();
+  }, [isOpen, loadFriends]);
 
   const handleUserSelect = (userId) => {
-    setSelectedUserIds(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
+        return prev.filter((id) => id !== userId);
+      }
+      if (prev.length >= MAX_GROUP_FRIENDS) {
+        return prev;
+      }
+      return [...prev, userId];
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!chatName.trim()) {
-      alert('Пожалуйста, введите название чата');
+      setError('Введите название группы');
       return;
     }
 
     if (selectedUserIds.length === 0) {
-      alert('Пожалуйста, выберите хотя бы одного участника');
+      setError('Выберите хотя бы одного друга');
+      return;
+    }
+
+    if (!connection) {
+      setError('Нет подключения к чатам');
       return;
     }
 
     try {
       setLoading(true);
+      setError(null);
       const response = await chatApi.createGroupChat(chatName.trim(), selectedUserIds, connection);
-      
+
       if (response.chatId) {
         onChatCreated(response.chatId);
         onClose();
         setChatName('');
         setSelectedUserIds([]);
+        setSearchQuery('');
       }
-    } catch (error) {
-      console.error('Ошибка при создании группового чата:', error);
-      alert('Произошла ошибка при создании группового чата');
+    } catch (err) {
+      console.error('CreateGroupChatModal: create failed', err);
+      setError(err?.response?.data?.error || err?.message || 'Не удалось создать групповой чат');
     } finally {
       setLoading(false);
     }
   };
 
-  // Обновляем поиск при изменении запроса
-  useEffect(() => {
-    if (connection) {
-      console.log('Search effect triggered, searchQuery:', searchQuery);
-      setLoading(true);
-      if (searchQuery === '') {
-        // Если поиск пустой, загружаем пользователей с существующими чатами
-        console.log('Loading users with existing chats (empty search)');
-        connection.invoke("SearchUsers", "").catch(error => {
-          console.error('Error invoking SearchUsers:', error);
-          setLoading(false);
-        });
-      } else {
-        // Если есть поисковый запрос, ищем по нему
-        console.log('Searching users with query:', searchQuery);
-        connection.invoke("SearchUsers", searchQuery).catch(error => {
-          console.error('Error invoking SearchUsers:', error);
-          setLoading(false);
-        });
-      }
+  const filteredFriends = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return friends;
     }
-  }, [connection, searchQuery]);
+    return friends.filter((friend) =>
+      (friend.username || '').toLowerCase().includes(query),
+    );
+  }, [friends, searchQuery]);
 
-  // Используем пользователей напрямую, так как фильтрация происходит на backend
-  const filteredUsers = users;
-
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Выберите друзей</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="modal-subtitle">
-          Вы можете добавить ещё {10 - selectedUserIds.length} друзей.
+    <div className="create-group-modal-overlay" onClick={onClose}>
+      <div className="create-group-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="create-group-modal__header">
+          <h2>Создать групповой чат</h2>
+          <button type="button" className="create-group-modal__close" onClick={onClose} aria-label="Закрыть">
+            ×
+          </button>
         </div>
 
+        <p className="create-group-modal__subtitle">
+          Можно добавить до {MAX_GROUP_FRIENDS} друзей. Осталось: {MAX_GROUP_FRIENDS - selectedUserIds.length}.
+        </p>
+
+        {error && <div className="create-group-modal__error">{error}</div>}
+
         {selectedUserIds.length > 0 && (
-          <div className="selected-users">
-            {selectedUserIds.map((userId, index) => {
-              const user = users.find(u => u.userId === userId || u.id === userId);
+          <div className="create-group-modal__selected">
+            {selectedUserIds.map((friendId) => {
+              const friend = friends.find((item) => String(item.userId) === String(friendId));
               return (
-                <div key={userId || index} className="selected-user-tag">
-                  <span>{user?.username || user?.displayName}</span>
-                  <button 
-                    type="button"
-                    onClick={() => handleUserSelect(userId)}
-                    className="remove-user"
-                  >
+                <div key={friendId} className="create-group-modal__tag">
+                  <span>{friend?.username || 'Друг'}</span>
+                  <button type="button" onClick={() => handleUserSelect(friendId)} aria-label="Убрать">
                     ×
                   </button>
                 </div>
@@ -173,78 +179,82 @@ const CreateGroupChatModal = ({ isOpen, onClose, onChatCreated }) => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="users-search">
+          <div className="create-group-modal__search">
             <input
               type="text"
               placeholder="Поиск друзей..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
+              className="create-group-modal__search-input"
             />
           </div>
 
-          <div className="users-list">
-            {loading ? (
-              <div className="loading">Загрузка...</div>
+          <div className="create-group-modal__list">
+            {friendsLoading ? (
+              <div className="create-group-modal__empty">Загрузка друзей...</div>
+            ) : filteredFriends.length === 0 ? (
+              <div className="create-group-modal__empty">
+                {searchQuery ? 'Друзья не найдены' : 'У вас пока нет друзей для добавления'}
+              </div>
             ) : (
-              filteredUsers.map((user, index) => (
-                <div key={user.userId || user.id || index} className="user-item">
-                  <div className="user-avatar-slot user-item__avatar">
+              filteredFriends.map((friend) => {
+                const friendId = friend.userId;
+                const isSelected = selectedUserIds.includes(friendId);
+                const isDisabled = !isSelected && selectedUserIds.length >= MAX_GROUP_FRIENDS;
+
+                return (
+                  <label
+                    key={friendId}
+                    className={`create-group-modal__item ${isDisabled ? 'is-disabled' : ''}`}
+                  >
                     <UserAvatar
-                      username={user.username}
-                      avatarUrl={user.avatar && user.avatar !== '/default-avatar.png' ? user.avatar : null}
-                      avatarColor={user.avatarColor || '#5865F2'}
+                      username={friend.username}
+                      avatarUrl={friend.avatar}
+                      avatarColor={friend.avatarColor}
                       size={40}
-                      statusIndicator={
-                        <UserAvatarPresenceDot
-                          status={user.isOnline ? 'online' : 'offline'}
-                        />
-                      }
+                      statusIndicator={<UserAvatarPresenceDot status={friend.status} />}
                     />
-                  </div>
-                  <div className="user-info">
-                    <div className="user-name">{user.displayName || user.username}</div>
-                    <div className="user-username">@{user.username}</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={selectedUserIds.includes(user.userId || user.id)}
-                    onChange={() => handleUserSelect(user.userId || user.id)}
-                    className="user-checkbox"
-                  />
-                </div>
-              ))
+                    <div className="create-group-modal__item-info">
+                      <div className="create-group-modal__item-name">{friend.username}</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={isDisabled}
+                      onChange={() => handleUserSelect(friendId)}
+                      className="create-group-modal__checkbox"
+                    />
+                  </label>
+                );
+              })
             )}
           </div>
 
-          <div className="group-name-section">
-            <div className="group-avatar-placeholder">
-              <span>✏️</span>
-            </div>
-            <div className="group-name-input">
-              <label>Название группы (необязательно)</label>
-              <input
-                type="text"
-                value={chatName}
-                onChange={(e) => setChatName(e.target.value)}
-                placeholder={selectedUserIds.length > 0 
-                  ? selectedUserIds.map(id => users.find(u => u.id === id)?.username).join(', ')
-                  : 'Введите название группы'
-                }
-              />
-            </div>
+          <div className="create-group-modal__name-section">
+            <label className="create-group-modal__name-label" htmlFor="group-chat-name">
+              Название группы
+            </label>
+            <input
+              id="group-chat-name"
+              type="text"
+              value={chatName}
+              onChange={(e) => setChatName(e.target.value)}
+              placeholder="Введите название"
+              className="create-group-modal__name-input"
+              maxLength={100}
+            />
           </div>
 
-          <div className="modal-actions">
-            <button type="button" onClick={onClose} className="cancel-button">
+          <div className="create-group-modal__actions">
+            <button type="button" onClick={onClose} className="create-group-modal__cancel">
               Отмена
             </button>
-            <button 
-              type="submit" 
-              className="create-button"
+            <button
+              type="submit"
+              className="create-group-modal__submit"
               disabled={loading || !chatName.trim() || selectedUserIds.length === 0}
             >
-              {loading ? 'Создание...' : 'Создать групповой чат'}
+              {loading ? 'Создание...' : 'Создать'}
             </button>
           </div>
         </form>

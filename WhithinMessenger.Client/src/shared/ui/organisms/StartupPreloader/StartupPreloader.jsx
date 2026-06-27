@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -186,7 +186,6 @@ const CRT_SHADER = {
 
 const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }) => {
   const viewportRef = useRef(null);
-  const [useFallback, setUseFallback] = useState(false);
   const d20FaceNumbers = [9, 6, 16, 3, 19, 14, 11, 1, 17, 8, 18, 5, 15, 12, 2, 4, 13, 7, 10, 20];
 
   useEffect(() => {
@@ -426,8 +425,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       };
       frameId = window.requestAnimationFrame(animate);
     } catch (error) {
-      console.warn('StartupPreloader: WebGL unavailable, using fallback animation.', error);
-      setUseFallback(true);
+      console.warn('StartupPreloader: WebGL unavailable.', error);
     }
 
     return () => {
@@ -463,12 +461,7 @@ const StartupPreloader = ({ isExiting = false, loadingText = 'Booting Whithin' }
       <div className="startup-preloader__scanlines" />
 
       <div className="startup-preloader__panel">
-        <div ref={viewportRef} className={`startup-preloader__viewport ${useFallback ? 'is-hidden' : ''}`} aria-hidden="true" />
-        {useFallback && (
-          <div className="startup-preloader__fallback-d20" aria-hidden="true">
-            ◇
-          </div>
-        )}
+        <div ref={viewportRef} className="startup-preloader__viewport" aria-hidden="true" />
 
         <h1 className="startup-preloader__title">Whithin</h1>
         <p className="startup-preloader__subtitle">{loadingText}</p>

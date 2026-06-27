@@ -104,6 +104,13 @@ public class StickerPackRepository : IStickerPackRepository
             .FirstOrDefaultAsync(p => p.Id == packId, cancellationToken);
     }
 
+    public async Task<StickerPack?> GetByIdForEditAsync(Guid packId, CancellationToken cancellationToken = default)
+    {
+        return await _context.StickerPacks
+            .Include(p => p.Stickers)
+            .FirstOrDefaultAsync(p => p.Id == packId, cancellationToken);
+    }
+
     public async Task<Sticker?> GetStickerByIdAsync(Guid stickerId, CancellationToken cancellationToken = default)
     {
         return await _context.Stickers

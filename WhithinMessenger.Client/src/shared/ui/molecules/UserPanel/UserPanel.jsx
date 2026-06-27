@@ -33,7 +33,6 @@ const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 const UserPanel = ({
   userId,
   username,
-  isOpen,
   serverId = null,
 }) => {
   const { user, updateUser } = useAuthContext();
@@ -96,7 +95,7 @@ const UserPanel = ({
   }, [userId]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!userId) return;
 
     const storageKey = getStorageKey();
     const savedStatus = localStorage.getItem(storageKey);
@@ -110,7 +109,7 @@ const UserPanel = ({
       manualStatusRef.current = PRESENCE_STATUS.ONLINE;
       currentStatusRef.current = PRESENCE_STATUS.ONLINE;
     }
-  }, [isOpen, userId]);
+  }, [userId]);
 
   useEffect(() => {
     if (!isStatusMenuOpen) return undefined;
@@ -185,7 +184,7 @@ const UserPanel = ({
   };
 
   useEffect(() => {
-    if (!isOpen || !userId) return undefined;
+    if (!userId) return undefined;
 
     let idleTimerId = null;
 
@@ -234,7 +233,7 @@ const UserPanel = ({
         window.removeEventListener(eventName, resetIdleTimer);
       });
     };
-  }, [isOpen, userId, isInCall]);
+  }, [userId, isInCall]);
 
   useEffect(() => {
     if (!isInCall || !userId) return;
@@ -248,7 +247,7 @@ const UserPanel = ({
   }, [isInCall, userId]);
 
   useEffect(() => {
-    if (!isOpen || !userId || !getConnection) return undefined;
+    if (!userId || !getConnection) return undefined;
 
     let mounted = true;
 
@@ -291,9 +290,9 @@ const UserPanel = ({
       }
       notificationConnectionRef.current = null;
     };
-  }, [isOpen, userId, getConnection]);
+  }, [userId, getConnection]);
 
-  if (!isOpen) return null;
+  if (!userId) return null;
 
   const avatarColor = userProfile?.avatarColor || '#5865F2';
   const profileDisplayName =

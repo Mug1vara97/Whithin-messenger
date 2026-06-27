@@ -3,13 +3,13 @@
 }
 
 .media-upload-area {
-  border: 2px dashed #ccc;
+  border: 2px dashed var(--border);
   border-radius: 8px;
   padding: 20px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: #fafafa;
+  background: var(--surface);
   min-height: 120px;
   display: flex;
   align-items: center;
@@ -17,19 +17,19 @@
 }
 
 .media-upload-area:hover {
-  border-color: #007bff;
-  background: #f0f8ff;
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
 }
 
 .media-upload-area.drag-active {
-  border-color: #007bff;
-  background: #e3f2fd;
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
   transform: scale(1.02);
 }
 
 .media-upload-area.uploading {
-  border-color: #28a745;
-  background: #f0fff4;
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
   cursor: not-allowed;
 }
 
@@ -43,6 +43,7 @@
 .upload-icon {
   font-size: 32px;
   opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .upload-text {
@@ -53,18 +54,19 @@
 
 .upload-title {
   font-weight: 500;
-  color: #333;
+  color: var(--text);
   font-size: 16px;
 }
 
 .upload-subtitle {
-  color: #666;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .upload-formats {
-  color: #999;
+  color: var(--text-muted);
   font-size: 12px;
+  opacity: 0.85;
 }
 
 .upload-progress {
@@ -78,25 +80,26 @@
 .upload-progress-icon {
   font-size: 24px;
   animation: spin 1s linear infinite;
+  color: var(--primary);
 }
 
 .upload-progress-text {
   font-weight: 500;
-  color: #333;
+  color: var(--text);
 }
 
 .upload-progress-bar {
   width: 100%;
   max-width: 200px;
   height: 4px;
-  background: #e0e0e0;
+  background: var(--border);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .upload-progress-fill {
   height: 100%;
-  background: #007bff;
+  background: var(--primary);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -106,41 +109,25 @@
   to { transform: rotate(360deg); }
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
   .media-upload-area {
     padding: 16px;
     min-height: 100px;
   }
-  
+
   .upload-icon {
     font-size: 24px;
   }
-  
+
   .upload-title {
     font-size: 14px;
   }
-  
+
   .upload-subtitle {
     font-size: 12px;
   }
-  
+
   .upload-formats {
     font-size: 10px;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

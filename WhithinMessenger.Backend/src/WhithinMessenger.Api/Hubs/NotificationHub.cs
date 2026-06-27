@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using WhithinMessenger.Api.Services;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Infrastructure.Database;
 
@@ -15,11 +16,16 @@ public class NotificationHub : Hub
         ActiveConnections.TryGetValue(userId, out var count) && count > 0;
     private readonly WithinDbContext _context;
     private readonly IMessageReceiptService _messageReceiptService;
+    private readonly IUserBlockService _userBlockService;
 
-    public NotificationHub(WithinDbContext context, IMessageReceiptService messageReceiptService)
+    public NotificationHub(
+        WithinDbContext context,
+        IMessageReceiptService messageReceiptService,
+        IUserBlockService userBlockService)
     {
         _context = context;
         _messageReceiptService = messageReceiptService;
+        _userBlockService = userBlockService;
     }
 
     public override async Task OnConnectedAsync()
@@ -148,6 +154,11 @@ public class NotificationHub : Hub
 
         foreach (var friendId in friendIds)
         {
+            if (await _userBlockService.ShouldHidePresenceAsync(friendId, userId, CancellationToken.None))
+            {
+                continue;
+            }
+
             await Clients.Group($"user-{friendId}").SendAsync("UserStatusChanged", payload);
         }
     }

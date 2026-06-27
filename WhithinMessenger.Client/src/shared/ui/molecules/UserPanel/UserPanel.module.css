@@ -3,7 +3,6 @@
     background: var(--surface, #2f3136);
     padding: 0.575rem;
     margin: 0;
-    margin-top: auto;
     display: flex;
     align-items: center;
     height: var(--user-panel-height, 63px);
@@ -12,6 +11,7 @@
 
 html:not([data-interface-design='system24']):not([data-interface-design='rounded']) .user-panel {
     border-top: 1px solid var(--border, #4f545c);
+    border-right: 1px solid var(--border, #4f545c);
 }
 
 .user-panel-content {

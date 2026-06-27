@@ -11,6 +11,7 @@ public interface IStickerPackRepository
     Task<bool> UninstallPackForUserAsync(Guid userId, Guid packId, CancellationToken cancellationToken = default);
     Task<bool> IsPackInstalledForUserAsync(Guid userId, Guid packId, CancellationToken cancellationToken = default);
     Task<StickerPack?> GetByIdWithStickersAsync(Guid packId, CancellationToken cancellationToken = default);
+    Task<StickerPack?> GetByIdForEditAsync(Guid packId, CancellationToken cancellationToken = default);
     Task<Sticker?> GetStickerByIdAsync(Guid stickerId, CancellationToken cancellationToken = default);
     Task<StickerPack> CreatePackAsync(StickerPack pack, CancellationToken cancellationToken = default);
     Task UpdatePackAsync(StickerPack pack, CancellationToken cancellationToken = default);

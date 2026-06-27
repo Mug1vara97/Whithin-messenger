@@ -1,16 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { stickerApi } from '../../../../entities/sticker/api';
+import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 import StickerMessage from '../StickerMessage/StickerMessage';
-import { Add, Close, History } from '@mui/icons-material';
+import EmojiPicker from '../EmojiPicker/EmojiPicker';
+import { Add, Close, History, InsertEmoticon, UploadFile } from '@mui/icons-material';
 import './StickerPicker.css';
 
 const LONG_PRESS_MS = 450;
+const STICKER_FILE_ACCEPT = '.webp,.png,.gif,.jpg,.jpeg,.webm,image/webp,image/png,image/gif,image/jpeg,video/webm';
+const EMOJI_PANEL_ID = '__emoji__';
 
 const normalizePack = (pack) => ({
   id: pack.id ?? pack.Id,
   title: pack.title ?? pack.Title ?? 'Стикеры',
   coverImagePath: pack.coverImagePath ?? pack.CoverImagePath ?? null,
+  createdByUserId: pack.createdByUserId ?? pack.CreatedByUserId ?? null,
   stickers: (pack.stickers ?? pack.Stickers ?? []).map((sticker) => ({
     id: sticker.id ?? sticker.Id,
     stickerPackId: sticker.stickerPackId ?? sticker.StickerPackId,
@@ -26,18 +31,28 @@ const StickerPicker = ({
   onResizeStart,
   onClose,
   onStickerSelect,
+  onEmojiSelect,
   onInstallPack,
 }) => {
+  const { user } = useAuthContext();
+  const currentUserId = user?.id || user?.userId || user?.Id;
+
   const [packs, setPacks] = useState([]);
   const [availablePacks, setAvailablePacks] = useState([]);
   const [selectedPackId, setSelectedPackId] = useState(null);
+  const [activePanel, setActivePanel] = useState(EMOJI_PANEL_ID);
   const [isLoading, setIsLoading] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [isCreatingPack, setIsCreatingPack] = useState(false);
+  const [isAddingSticker, setIsAddingSticker] = useState(false);
+  const [newPackTitle, setNewPackTitle] = useState('');
   const [error, setError] = useState(null);
   const [previewSticker, setPreviewSticker] = useState(null);
   const longPressTimerRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
+  const addStickerInputRef = useRef(null);
+  const uploadZipInputRef = useRef(null);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -118,8 +133,13 @@ const StickerPicker = ({
         }
         return normalized[0]?.id ?? null;
       });
+      setActivePanel((current) => {
+        if (current === EMOJI_PANEL_ID) return current;
+        if (current && normalized.some((pack) => pack.id === current)) return current;
+        return EMOJI_PANEL_ID;
+      });
     } catch (err) {
-      setError(err?.message || 'Не удалось загрузить стикеры');
+      setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить стикеры');
       setPacks([]);
     } finally {
       setIsLoading(false);
@@ -137,11 +157,12 @@ const StickerPicker = ({
   const openCatalog = useCallback(async () => {
     setIsCatalogOpen(true);
     setError(null);
+    setNewPackTitle('');
     try {
       const data = await stickerApi.getAvailablePacks();
       setAvailablePacks((Array.isArray(data) ? data : []).map(normalizePack));
     } catch (err) {
-      setError(err?.message || 'Не удалось загрузить каталог');
+      setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить каталог');
       setAvailablePacks([]);
     }
   }, []);
@@ -153,19 +174,107 @@ const StickerPicker = ({
       await stickerApi.installPack(packId);
       await loadPacks();
       setSelectedPackId(packId);
+      setActivePanel(packId);
       setIsCatalogOpen(false);
       onInstallPack?.(packId);
     } catch (err) {
-      setError(err?.message || 'Не удалось добавить стикерпак');
+      setError(err?.response?.data?.error || err?.message || 'Не удалось добавить стикерпак');
     } finally {
       setIsInstalling(false);
     }
   }, [loadPacks, onInstallPack]);
 
+  const handleCreateEmptyPack = useCallback(async () => {
+    const title = newPackTitle.trim();
+    if (!title) {
+      setError('Укажите название стикерпака');
+      return;
+    }
+
+    setIsCreatingPack(true);
+    setError(null);
+    try {
+      const pack = await stickerApi.createPack(title);
+      const normalized = normalizePack(pack);
+      await loadPacks();
+      setSelectedPackId(normalized.id);
+      setActivePanel(normalized.id);
+      setIsCatalogOpen(false);
+      setNewPackTitle('');
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Не удалось создать стикерпак');
+    } finally {
+      setIsCreatingPack(false);
+    }
+  }, [loadPacks, newPackTitle]);
+
+  const handleUploadZipPack = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const title = newPackTitle.trim();
+    if (!title) {
+      setError('Укажите название стикерпака перед загрузкой ZIP');
+      return;
+    }
+
+    setIsCreatingPack(true);
+    setError(null);
+    try {
+      const pack = await stickerApi.uploadPack(title, file);
+      const normalized = normalizePack(pack);
+      await loadPacks();
+      setSelectedPackId(normalized.id);
+      setActivePanel(normalized.id);
+      setIsCatalogOpen(false);
+      setNewPackTitle('');
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить стикерпак');
+    } finally {
+      setIsCreatingPack(false);
+    }
+  }, [loadPacks, newPackTitle]);
+
   const selectedPack = useMemo(
     () => packs.find((pack) => pack.id === selectedPackId) ?? null,
     [packs, selectedPackId],
   );
+
+  const isEmojiPanel = activePanel === EMOJI_PANEL_ID;
+  const activePackId = isEmojiPanel ? selectedPackId : activePanel;
+
+  const isSelectedPackOwned = useMemo(() => {
+    const pack = packs.find((item) => item.id === activePackId) ?? selectedPack;
+    if (!pack?.createdByUserId || !currentUserId) return false;
+    return String(pack.createdByUserId) === String(currentUserId);
+  }, [activePackId, currentUserId, packs, selectedPack?.createdByUserId]);
+
+  const activeStickerPack = useMemo(
+    () => packs.find((pack) => pack.id === activePackId) ?? selectedPack,
+    [activePackId, packs, selectedPack],
+  );
+
+  const handleAddStickerToPack = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const targetPackId = activePanel === EMOJI_PANEL_ID ? selectedPackId : activePanel;
+    if (!file || !targetPackId) return;
+
+    setIsAddingSticker(true);
+    setError(null);
+    try {
+      const result = await stickerApi.addStickerToPack(targetPackId, file);
+      const updatedPack = normalizePack(result.pack ?? result.Pack);
+      setPacks((prev) =>
+        prev.map((pack) => (pack.id === updatedPack.id ? updatedPack : pack)),
+      );
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Не удалось добавить стикер');
+    } finally {
+      setIsAddingSticker(false);
+    }
+  }, [activePanel, selectedPackId]);
 
   if (!open) {
     return null;
@@ -176,7 +285,7 @@ const StickerPicker = ({
       <aside
         className="sticker-picker"
         role="complementary"
-        aria-label="Выбор стикеров"
+        aria-label="Эмодзи и стикеры"
         style={width ? { width, flexBasis: width } : undefined}
       >
         <div
@@ -189,27 +298,55 @@ const StickerPicker = ({
         />
         <div className="sticker-picker__header">
           <span className="sticker-picker__title">
-            {selectedPack?.title ?? 'Стикеры'}
+            {isEmojiPanel ? 'Эмодзи' : (activeStickerPack?.title ?? 'Стикеры')}
           </span>
-          <button type="button" className="sticker-picker__close" onClick={onClose} title="Закрыть">
-            <Close fontSize="small" />
-          </button>
+          <div className="sticker-picker__header-actions">
+            {!isEmojiPanel && isSelectedPackOwned && (
+              <>
+                <input
+                  ref={addStickerInputRef}
+                  type="file"
+                  accept={STICKER_FILE_ACCEPT}
+                  className="sticker-picker__hidden-input"
+                  onChange={handleAddStickerToPack}
+                />
+                <button
+                  type="button"
+                  className="sticker-picker__header-btn"
+                  onClick={() => addStickerInputRef.current?.click()}
+                  disabled={isAddingSticker}
+                  title="Добавить стикер в пак"
+                >
+                  <Add fontSize="small" />
+                </button>
+              </>
+            )}
+            <button type="button" className="sticker-picker__close" onClick={onClose} title="Закрыть">
+              <Close fontSize="small" />
+            </button>
+          </div>
         </div>
 
         {error && <div className="sticker-picker__error">{error}</div>}
 
         <div className="sticker-picker__grid-wrap">
-          {isLoading ? (
+          {isEmojiPanel ? (
+            <EmojiPicker embedded onEmojiSelect={onEmojiSelect} />
+          ) : isLoading ? (
             <div className="sticker-picker__empty">Загрузка...</div>
           ) : packs.length === 0 ? (
             <div className="sticker-picker__empty">
-              Нажмите +, чтобы добавить стикерпак
+              Нажмите +, чтобы создать или добавить стикерпак
             </div>
-          ) : !selectedPack?.stickers?.length ? (
-            <div className="sticker-picker__empty">В этом паке пока нет стикеров</div>
+          ) : !activeStickerPack?.stickers?.length ? (
+            <div className="sticker-picker__empty">
+              {isSelectedPackOwned
+                ? 'В паке пока нет стикеров. Нажмите + сверху, чтобы добавить.'
+                : 'В этом паке пока нет стикеров'}
+            </div>
           ) : (
             <div className="sticker-picker__grid">
-              {selectedPack.stickers.map((sticker) => (
+              {activeStickerPack.stickers.map((sticker) => (
                 <button
                   key={sticker.id}
                   type="button"
@@ -231,21 +368,32 @@ const StickerPicker = ({
         <div className="sticker-picker__packs">
           <button
             type="button"
+            className={`sticker-picker__pack-btn ${isEmojiPanel ? 'is-selected' : ''}`}
+            onClick={() => setActivePanel(EMOJI_PANEL_ID)}
+            title="Эмодзи"
+          >
+            <InsertEmoticon fontSize="small" />
+          </button>
+          <button
+            type="button"
             className="sticker-picker__pack-btn"
             onClick={openCatalog}
-            title="Добавить стикерпак"
+            title="Создать или добавить стикерпак"
           >
             <Add fontSize="small" />
           </button>
           {packs.map((pack) => {
             const coverUrl = pack.coverImagePath ? buildMediaUrl(pack.coverImagePath) : null;
-            const isSelected = pack.id === selectedPackId;
+            const isSelected = !isEmojiPanel && pack.id === activePackId;
             return (
               <button
                 key={pack.id}
                 type="button"
                 className={`sticker-picker__pack-btn ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => setSelectedPackId(pack.id)}
+                onClick={() => {
+                  setSelectedPackId(pack.id);
+                  setActivePanel(pack.id);
+                }}
                 title={pack.title}
               >
                 {coverUrl ? (
@@ -269,11 +417,56 @@ const StickerPicker = ({
         <div className="sticker-catalog-overlay" onClick={() => setIsCatalogOpen(false)}>
           <div className="sticker-catalog" onClick={(e) => e.stopPropagation()}>
             <div className="sticker-catalog__header">
-              <h3>Добавить стикерпак</h3>
+              <h3>Стикерпаки</h3>
               <button type="button" onClick={() => setIsCatalogOpen(false)}>
                 <Close fontSize="small" />
               </button>
             </div>
+
+            <div className="sticker-catalog__create">
+              <label className="sticker-catalog__label" htmlFor="sticker-pack-title">
+                Создать стикерпак
+              </label>
+              <input
+                id="sticker-pack-title"
+                type="text"
+                className="sticker-catalog__input"
+                placeholder="Название пака"
+                value={newPackTitle}
+                maxLength={100}
+                onChange={(e) => setNewPackTitle(e.target.value)}
+              />
+              <div className="sticker-catalog__create-actions">
+                <button
+                  type="button"
+                  disabled={isCreatingPack}
+                  onClick={handleCreateEmptyPack}
+                >
+                  Пустой пак
+                </button>
+                <input
+                  ref={uploadZipInputRef}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sticker-picker__hidden-input"
+                  onChange={handleUploadZipPack}
+                />
+                <button
+                  type="button"
+                  className="sticker-catalog__upload-btn"
+                  disabled={isCreatingPack}
+                  onClick={() => uploadZipInputRef.current?.click()}
+                >
+                  <UploadFile fontSize="small" />
+                  ZIP-архив
+                </button>
+              </div>
+              <p className="sticker-catalog__hint">
+                Любой пользователь может создать пак. Добавлять стикеры в пак может только его создатель.
+              </p>
+            </div>
+
+            <div className="sticker-catalog__section-title">Каталог</div>
             <div className="sticker-catalog__list">
               {availablePacks.length === 0 ? (
                 <div className="sticker-picker__empty">Нет доступных стикерпаков</div>

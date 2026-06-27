@@ -106,6 +106,40 @@ public class FriendshipRepository : IFriendshipRepository
                 f.Status == FriendshipStatus.Pending, 
                 cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetBlockedUserIdsAsync(Guid blockerId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Friendships
+            .Where(f => f.RequesterId == blockerId && f.Status == FriendshipStatus.Blocked)
+            .Select(f => f.AddresseeId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetBlockerUserIdsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Friendships
+            .Where(f => f.AddresseeId == userId && f.Status == FriendshipStatus.Blocked)
+            .Select(f => f.RequesterId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsBlockedByAsync(Guid blockerId, Guid blockedUserId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Friendships.AnyAsync(
+            f => f.RequesterId == blockerId
+                 && f.AddresseeId == blockedUserId
+                 && f.Status == FriendshipStatus.Blocked,
+            cancellationToken);
+    }
+
+    public async Task<IEnumerable<Friendship>> GetBlockedFriendshipsAsync(Guid blockerId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Friendships
+            .Include(f => f.Addressee)
+            .Where(f => f.RequesterId == blockerId && f.Status == FriendshipStatus.Blocked)
+            .OrderByDescending(f => f.UpdatedAt ?? f.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
 }
 
 

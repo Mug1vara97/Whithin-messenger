@@ -8,9 +8,10 @@ import React, {
   useState,
 } from 'react';
 
-import { getPresenceSnapshot } from '../utils/userStatus';
+import { getPresenceSnapshot, PRESENCE_STATUS } from '../utils/userStatus';
 import { useAuthContext } from './AuthContext';
 import { useConnectionContext } from './ConnectionContext';
+import { useUserBlocks } from './UserBlockContext';
 
 const PresenceContext = createContext(null);
 
@@ -20,6 +21,7 @@ const noopGetPresence = (_userId, fallbackStatus) => getPresenceSnapshot(fallbac
 export const PresenceProvider = ({ children }) => {
   const { user } = useAuthContext();
   const { getConnection } = useConnectionContext();
+  const { shouldHidePresence } = useUserBlocks();
   const userId = user?.id || user?.userId || user?.Id;
   const [statusOverrides, setStatusOverrides] = useState({});
   const notificationConnectionRef = useRef(null);
@@ -65,12 +67,15 @@ export const PresenceProvider = ({ children }) => {
   const resolvePresence = useCallback(
     (memberUserId, fallbackStatus) => {
       const key = String(memberUserId ?? '');
+      if (key && shouldHidePresence(key)) {
+        return PRESENCE_STATUS.OFFLINE;
+      }
       if (key && statusOverrides[key] !== undefined) {
         return statusOverrides[key];
       }
       return fallbackStatus;
     },
-    [statusOverrides],
+    [statusOverrides, shouldHidePresence],
   );
 
   const getPresence = useCallback(

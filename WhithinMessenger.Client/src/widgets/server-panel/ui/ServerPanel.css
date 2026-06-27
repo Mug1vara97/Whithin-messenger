@@ -9,10 +9,6 @@
   overflow: hidden;
 }
 
-.server-panel .user-panel {
-  margin-top: auto;
-}
-
 .server-panel-header {
   background: var(--surface);
   position: relative;

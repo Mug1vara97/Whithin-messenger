@@ -13,28 +13,20 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
 {
     private static readonly SemaphoreSlim UploadSemaphore = new(1, 1);
 
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".webp", ".png", ".gif", ".jpg", ".jpeg", ".webm"
-    };
-
-    private const int MaxImageStickerBytes = 2 * 1024 * 1024;
-    private const int MaxVideoStickerBytes = 5 * 1024 * 1024;
-
     private readonly IStickerPackRepository _stickerPackRepository;
     private readonly IFileService _fileService;
-    private readonly IVideoConverterService _videoConverterService;
+    private readonly IStickerFileProcessingService _stickerFileProcessingService;
     private readonly ILogger<UploadStickerPackCommandHandler> _logger;
 
     public UploadStickerPackCommandHandler(
         IStickerPackRepository stickerPackRepository,
         IFileService fileService,
-        IVideoConverterService videoConverterService,
+        IStickerFileProcessingService stickerFileProcessingService,
         ILogger<UploadStickerPackCommandHandler> logger)
     {
         _stickerPackRepository = stickerPackRepository;
         _fileService = fileService;
-        _videoConverterService = videoConverterService;
+        _stickerFileProcessingService = stickerFileProcessingService;
         _logger = logger;
     }
 
@@ -57,15 +49,6 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
     {
         try
         {
-            if (request.UserId != StickerPackAdmin.AllowedUploaderUserId)
-            {
-                return new UploadStickerPackResult
-                {
-                    Success = false,
-                    ErrorMessage = "Загрузка стикерпаков доступна только администратору"
-                };
-            }
-
             var title = request.Title?.Trim();
             if (string.IsNullOrWhiteSpace(title))
             {
@@ -73,6 +56,15 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
                 {
                     Success = false,
                     ErrorMessage = "Укажите название стикерпака"
+                };
+            }
+
+            if (title.Length > 100)
+            {
+                return new UploadStickerPackResult
+                {
+                    Success = false,
+                    ErrorMessage = "Название не может быть длиннее 100 символов"
                 };
             }
 
@@ -139,7 +131,7 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
 
                 _logger.LogInformation(
                     "Saved sticker {EntryName} -> {RelativePath} ({SizeBytes} bytes)",
-                    prepared.EntryName,
+                    prepared.SourceName,
                     relativePath,
                     prepared.Bytes.Length);
             }
@@ -172,7 +164,7 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
             return new UploadStickerPackResult
             {
                 Success = true,
-                Pack = MapPack(created)
+                Pack = StickerPackMapper.ToDto(created)
             };
         }
         catch (Exception ex)
@@ -186,113 +178,36 @@ public class UploadStickerPackCommandHandler : IRequestHandler<UploadStickerPack
         }
     }
 
-    private async Task<List<PreparedStickerFile>> ExtractStickersFromArchiveAsync(
+    private async Task<List<ProcessedStickerFile>> ExtractStickersFromArchiveAsync(
         Stream archiveStream,
         CancellationToken cancellationToken)
     {
-        var prepared = new List<PreparedStickerFile>();
+        var prepared = new List<ProcessedStickerFile>();
 
         using var zip = new ZipArchive(archiveStream, ZipArchiveMode.Read);
         foreach (var entry in zip.Entries
                      .Where(e => !e.FullName.EndsWith('/') && !string.IsNullOrWhiteSpace(e.Name))
                      .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase))
         {
-            var extension = Path.GetExtension(entry.Name);
-            if (!AllowedExtensions.Contains(extension))
-            {
-                _logger.LogDebug("Skipping archive entry {EntryName}: unsupported extension", entry.FullName);
-                continue;
-            }
-
             await using var entryStream = entry.Open();
             await using var memory = new MemoryStream();
             await entryStream.CopyToAsync(memory, cancellationToken);
             var bytes = memory.ToArray();
 
-            var isWebm = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase);
-            var maxBytes = isWebm ? MaxVideoStickerBytes : MaxImageStickerBytes;
-            if (bytes.Length == 0 || bytes.Length > maxBytes)
+            var processed = await _stickerFileProcessingService.ProcessAsync(
+                entry.Name,
+                bytes,
+                cancellationToken);
+            if (processed != null)
             {
-                _logger.LogWarning(
-                    "Skipping archive entry {EntryName}: invalid size {SizeBytes} (max {MaxBytes})",
-                    entry.FullName,
-                    bytes.Length,
-                    maxBytes);
-                continue;
+                prepared.Add(processed);
             }
-
-            if (isWebm)
+            else
             {
-                var converted = await _videoConverterService.TryConvertWebmToAnimatedWebpAsync(bytes, cancellationToken);
-                if (converted != null)
-                {
-                    bytes = converted.Bytes;
-                    extension = converted.Extension;
-                    _logger.LogInformation(
-                        "Converted sticker {EntryName} to animated webp ({SizeBytes} bytes)",
-                        entry.FullName,
-                        bytes.Length);
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "Webm conversion failed for {EntryName}, keeping original webm",
-                        entry.FullName);
-                }
+                _logger.LogDebug("Skipping archive entry {EntryName}", entry.FullName);
             }
-
-            var maxStoredBytes = extension.Equals(".webm", StringComparison.OrdinalIgnoreCase)
-                ? MaxVideoStickerBytes
-                : MaxImageStickerBytes;
-            if (bytes.Length == 0 || bytes.Length > maxStoredBytes)
-            {
-                _logger.LogWarning(
-                    "Skipping archive entry {EntryName} after processing: size {SizeBytes} exceeds {MaxBytes}",
-                    entry.FullName,
-                    bytes.Length,
-                    maxStoredBytes);
-                continue;
-            }
-
-            var contentType = extension.ToLowerInvariant() switch
-            {
-                ".webp" => "image/webp",
-                ".png" => "image/png",
-                ".gif" => "image/gif",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".webm" => "video/webm",
-                _ => "application/octet-stream"
-            };
-
-            prepared.Add(new PreparedStickerFile(entry.FullName, bytes, extension.ToLowerInvariant(), contentType));
         }
 
         return prepared;
     }
-
-    private static StickerPackDto MapPack(StickerPack pack) =>
-        new()
-        {
-            Id = pack.Id,
-            Title = pack.Title,
-            CoverImagePath = pack.CoverImagePath,
-            CreatedAt = pack.CreatedAt,
-            Stickers = pack.Stickers
-                .OrderBy(s => s.SortOrder)
-                .Select(s => new StickerDto
-                {
-                    Id = s.Id,
-                    StickerPackId = s.StickerPackId,
-                    FilePath = s.FilePath,
-                    ContentType = s.ContentType,
-                    SortOrder = s.SortOrder
-                })
-                .ToList()
-        };
-
-    private sealed record PreparedStickerFile(
-        string EntryName,
-        byte[] Bytes,
-        string Extension,
-        string ContentType);
 }

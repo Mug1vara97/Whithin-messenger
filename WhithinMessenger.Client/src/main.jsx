@@ -6,6 +6,7 @@ import './shared/lib/theme/lightTheme.css'
 import { applySavedTheme } from './shared/lib/theme/appTheme'
 import { applySavedAppBackgroundSettings } from './shared/lib/theme/appBackgroundSettings'
 import { applySavedInterfaceDesign } from './shared/lib/theme/interfaceDesignSettings'
+import { hasStartupBootCompleted } from './shared/lib/startup/startupBoot'
 import './shared/lib/theme/system24Design.css'
 import './shared/lib/theme/midnightDesign.css'
 import './shared/lib/theme/frostedGlass.css'
@@ -16,6 +17,10 @@ applySavedTheme()
 applySavedInterfaceDesign()
 void applySavedAppBackgroundSettings()
 applySiteSeo()
+
+if (!hasStartupBootCompleted()) {
+  void import('./shared/ui/organisms/StartupPreloader/StartupPreloader.jsx')
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

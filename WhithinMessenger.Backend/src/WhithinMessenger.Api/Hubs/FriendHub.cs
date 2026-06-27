@@ -5,6 +5,9 @@ using WhithinMessenger.Application.CommandsAndQueries.Friends.DeclineFriendReque
 using WhithinMessenger.Application.CommandsAndQueries.Friends.GetFriendRequests;
 using WhithinMessenger.Application.CommandsAndQueries.Friends.GetFriends;
 using WhithinMessenger.Application.CommandsAndQueries.Friends.RemoveFriend;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.BlockUser;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.UnblockUser;
+using WhithinMessenger.Application.CommandsAndQueries.Friends.GetBlockedUsers;
 using WhithinMessenger.Application.CommandsAndQueries.Friends.SendFriendRequest;
 
 namespace WhithinMessenger.Api.Hubs;
@@ -79,6 +82,41 @@ public class FriendHub : Hub
         if (!result.Success)
         {
             throw new HubException(result.ErrorMessage ?? "Не удалось удалить пользователя из друзей");
+        }
+
+        return new { success = true };
+    }
+
+    public async Task<object> GetBlockedUsers()
+    {
+        var userId = GetCurrentUserIdOrThrow();
+        var result = await _mediator.Send(new GetBlockedUsersQuery(userId));
+        return new
+        {
+            blockedUsers = result.BlockedUsers,
+            blockedByUserIds = result.BlockedByUserIds,
+        };
+    }
+
+    public async Task<object> BlockUser(Guid targetUserId)
+    {
+        var userId = GetCurrentUserIdOrThrow();
+        var result = await _mediator.Send(new BlockUserCommand(userId, targetUserId));
+        if (!result.Success)
+        {
+            throw new HubException(result.ErrorMessage ?? "Не удалось заблокировать пользователя");
+        }
+
+        return new { success = true };
+    }
+
+    public async Task<object> UnblockUser(Guid targetUserId)
+    {
+        var userId = GetCurrentUserIdOrThrow();
+        var result = await _mediator.Send(new UnblockUserCommand(userId, targetUserId));
+        if (!result.Success)
+        {
+            throw new HubException(result.ErrorMessage ?? "Не удалось разблокировать пользователя");
         }
 
         return new { success = true };

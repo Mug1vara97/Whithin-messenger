@@ -84,4 +84,36 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
             new { friendId },
             cancellationToken);
     }
+
+    public async Task NotifyUserBlockedAsync(
+        Guid blockerId,
+        Guid blockedUserId,
+        CancellationToken cancellationToken = default)
+    {
+        await _friendHubContext.Clients.Group($"user-{blockerId}").SendAsync(
+            "UserBlocked",
+            new { userId = blockedUserId },
+            cancellationToken);
+
+        await _friendHubContext.Clients.Group($"user-{blockedUserId}").SendAsync(
+            "BlockedByUser",
+            new { userId = blockerId },
+            cancellationToken);
+    }
+
+    public async Task NotifyUserUnblockedAsync(
+        Guid blockerId,
+        Guid unblockedUserId,
+        CancellationToken cancellationToken = default)
+    {
+        await _friendHubContext.Clients.Group($"user-{blockerId}").SendAsync(
+            "UserUnblocked",
+            new { userId = unblockedUserId },
+            cancellationToken);
+
+        await _friendHubContext.Clients.Group($"user-{unblockedUserId}").SendAsync(
+            "UnblockedByUser",
+            new { userId = blockerId },
+            cancellationToken);
+    }
 }

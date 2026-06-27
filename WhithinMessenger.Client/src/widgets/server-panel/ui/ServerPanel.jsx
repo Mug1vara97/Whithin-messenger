@@ -71,7 +71,7 @@ const findChatInCategories = (categories, chatId) => {
   return null;
 };
 import { CategoriesList } from '../../categories-list';
-import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, UserPanel, AddMemberModal } from '../../../shared/ui/molecules';
+import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, AddMemberModal } from '../../../shared/ui/molecules';
 
 const EMPTY_GUID_LIST = [];
 import {
@@ -734,20 +734,35 @@ const ServerPanel = ({
   }, [server?.categories, server?.Categories, currentServer?.categories, currentServer?.Categories]);
 
   const handleChatClick = useCallback((chatId, groupName, chatType) => {
-    if (onChatSelected) {
-      const chat = {
-        chatId: chatId,
-        chat_id: chatId,
-        groupName: groupName,
-        username: groupName, 
-        chatType: chatType,
-        chatTypeId: chatType, 
-        isGroupChat: false, 
-        isServerChat: true 
-      };
-      onChatSelected(chat);
+    if (!onChatSelected) return;
+
+    let channelMeta = null;
+    for (const category of memoizedCategories) {
+      const categoryChats = category.chats ?? category.Chats ?? [];
+      const found = categoryChats.find(
+        (chat) => String(chat.chatId ?? chat.ChatId ?? chat.chat_id) === String(chatId),
+      );
+      if (found) {
+        channelMeta = found;
+        break;
+      }
     }
-  }, [onChatSelected]);
+
+    onChatSelected({
+      chatId,
+      chat_id: chatId,
+      groupName,
+      username: groupName,
+      chatType,
+      chatTypeId: chatType,
+      isGroupChat: false,
+      isServerChat: true,
+      isPrivate: channelMeta?.isPrivate ?? channelMeta?.IsPrivate ?? false,
+      IsPrivate: channelMeta?.isPrivate ?? channelMeta?.IsPrivate ?? false,
+      allowedRoleIds: channelMeta?.allowedRoleIds ?? channelMeta?.AllowedRoleIds ?? null,
+      members: channelMeta?.members ?? channelMeta?.Members ?? [],
+    });
+  }, [onChatSelected, memoizedCategories]);
 
   const handleAddChannel = useCallback((categoryId) => {
     const category = server?.categories?.find(cat => (cat.categoryId || cat.CategoryId) === categoryId);
@@ -1353,13 +1368,6 @@ const ServerPanel = ({
         serverId={currentServer?.serverId || currentServer?.ServerId}
         onMemberAdded={handleMemberAdded}
         connection={connectionRef.current}
-      />
-
-      <UserPanel
-        userId={user?.id || user?.userId || user?.Id}
-        username={user?.username || user?.UserName || user?.userName}
-        isOpen={true}
-        serverId={currentServer?.serverId}
       />
     </div>
   );

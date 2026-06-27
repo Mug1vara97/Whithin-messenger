@@ -51,6 +51,7 @@ public static class Infrastructure
         services.AddScoped<IChatMemberRepository, ChatMemberRepository>();
         services.AddScoped<IServerMemberRepository, ServerMemberRepository>();
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<IProfileAudienceResolver, ProfileAudienceResolver>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<IStickerPackRepository, StickerPackRepository>();
         services.AddScoped<IIdeaBoardRepository, IdeaBoardRepository>();

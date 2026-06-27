@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
+import { isPublicAuthRoute } from '../utils/authRoutes';
 
 let refreshPromise = null;
 
@@ -47,7 +48,7 @@ apiClient.interceptors.response.use(
       if (!refreshToken) {
         tokenManager.clearTokens();
         localStorage.removeItem('user');
-        if (window.location.pathname !== '/login') {
+        if (!isPublicAuthRoute()) {
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -82,7 +83,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         tokenManager.clearTokens();
         localStorage.removeItem('user');
-        if (window.location.pathname !== '/login') {
+        if (!isPublicAuthRoute()) {
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);

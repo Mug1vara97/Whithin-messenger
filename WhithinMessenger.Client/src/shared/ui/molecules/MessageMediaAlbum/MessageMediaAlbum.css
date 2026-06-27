@@ -41,7 +41,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #2b2d31;
+  background: var(--surface);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -95,6 +95,14 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+}
+
+.message-file-group .media-file-card {
+  max-width: min(100%, 420px);
+}
+
+.message-file-group .media-file-card__icon {
+  color: var(--text-secondary);
 }
 
 .message-media-block {

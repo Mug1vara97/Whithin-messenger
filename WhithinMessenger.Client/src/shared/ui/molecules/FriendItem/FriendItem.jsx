@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Person, PersonOff, MoreVert, Check, Close } from '@mui/icons-material';
+import { Person, PersonOff, MoreVert, Check, Close, Block } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import { Button } from '../../atoms/Button';
@@ -13,8 +13,10 @@ const FriendItem = ({
   onStartChat,
   onAccept,
   onDecline,
+  onUnblock,
   showActions = true,
-  isRequest = false
+  isRequest = false,
+  isBlocked = false,
 }) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const { openProfile } = useProfileModal();
@@ -111,6 +113,14 @@ const FriendItem = ({
                 <Close />
               </button>
             </>
+          ) : isBlocked ? (
+            <button
+              className="friend-item__action-button friend-item__action-button--decline"
+              onClick={() => onUnblock?.(friend.userId)}
+              title="Разблокировать"
+            >
+              <Block />
+            </button>
           ) : (
             <>
               <button

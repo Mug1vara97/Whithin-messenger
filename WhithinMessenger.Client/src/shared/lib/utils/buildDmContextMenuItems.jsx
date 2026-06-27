@@ -39,6 +39,8 @@ export const buildDmContextMenuItems = ({
   targetUsername = 'пользователя',
   hasUnread = false,
   isPinned = false,
+  isBlocked = false,
+  isMuted = false,
   friendAction = null,
   servers = [],
   handlers = {},
@@ -51,9 +53,10 @@ export const buildDmContextMenuItems = ({
     onStartCall,
     onInviteToServer,
     onRemoveFriend,
-    onIgnore,
     onBlock,
+    onUnblock,
     onMute,
+    onUnmute,
     onCopyUserId,
     onCopyChannelId,
   } = handlers;
@@ -110,23 +113,31 @@ export const buildDmContextMenuItems = ({
   }
 
   const moderationSection = [];
-  if (typeof onIgnore === 'function') {
-    moderationSection.push({ text: 'Игнорировать', onClick: onIgnore });
-  }
-  if (typeof onBlock === 'function') {
+  if (isBlocked && typeof onUnblock === 'function') {
+    moderationSection.push({ text: 'Разблокировать', onClick: onUnblock });
+  } else if (!isBlocked && typeof onBlock === 'function') {
     moderationSection.push({ text: 'Заблокировать', onClick: onBlock, danger: true });
   }
   pushSection(items, moderationSection);
 
-  const muteSubmenu = buildMuteSubmenuItems(onMute);
-  if (muteSubmenu.length > 0) {
+  if (isMuted && typeof onUnmute === 'function') {
     pushSection(items, [
       {
-        text: `Заглушить @${displayName}`,
-        hasSubmenu: true,
-        submenuItems: muteSubmenu,
+        text: `Включить уведомления @${displayName}`,
+        onClick: onUnmute,
       },
     ]);
+  } else {
+    const muteSubmenu = buildMuteSubmenuItems(onMute);
+    if (muteSubmenu.length > 0) {
+      pushSection(items, [
+        {
+          text: `Заглушить @${displayName}`,
+          hasSubmenu: true,
+          submenuItems: muteSubmenu,
+        },
+      ]);
+    }
   }
 
   const copySection = [];

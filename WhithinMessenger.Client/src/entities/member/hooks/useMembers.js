@@ -1,24 +1,24 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { memberApi } from '../api';
+import { normalizeProfilePayload, patchMemberWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
 
 export const useMembers = (connection, serverId, userId) => {
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const isFetchingRef = useRef(false);
 
   const fetchMembers = useCallback(async () => {
     if (!connection || !serverId) {
-      console.log('fetchMembers: connection or serverId not available', { connection: !!connection, serverId });
       return;
     }
 
-    if (isLoading) {
-      console.log('fetchMembers: already loading, skipping request');
+    if (isFetchingRef.current) {
       return;
     }
 
     try {
-      console.log('fetchMembers: calling GetServerMembers for serverId:', serverId);
+      isFetchingRef.current = true;
       setIsLoading(true);
       setError(null);
       await memberApi.getServerMembers(connection, serverId);
@@ -26,6 +26,7 @@ export const useMembers = (connection, serverId, userId) => {
       console.error('Error fetching members:', err);
       setError(err.message);
     } finally {
+      isFetchingRef.current = false;
       setIsLoading(false);
     }
   }, [connection, serverId]);
@@ -73,18 +74,28 @@ export const useMembers = (connection, serverId, userId) => {
     if (!connection || !serverId) return;
 
     const handleMembersLoaded = (loadedMembers) => {
-      console.log('ServerMembersLoaded event received:', loadedMembers);
-      setMembers(loadedMembers);
+      setMembers(Array.isArray(loadedMembers) ? loadedMembers : []);
     };
 
-    const handleRoleAssigned = async (assignedUserId, roleData) => {
-      console.log('RoleAssigned event received:', { assignedUserId, roleData });
-      await memberApi.getServerMembers(connection, serverId);
+    const handleRoleAssigned = () => {
+      void fetchMembers();
     };
 
-    const handleRoleRemoved = async (removedUserId, removedRoleId) => {
-      console.log('RoleRemoved event received:', { removedUserId, removedRoleId });
-      await memberApi.getServerMembers(connection, serverId);
+    const handleRoleRemoved = () => {
+      void fetchMembers();
+    };
+
+    const handleMemberAdded = () => {
+      void fetchMembers();
+    };
+
+    const handleMemberKicked = (kickedUserId) => {
+      if (kickedUserId != null) {
+        setMembers((prev) =>
+          prev.filter((member) => String(member.userId ?? member.UserId) !== String(kickedUserId)),
+        );
+      }
+      void fetchMembers();
     };
 
     const handleNicknameUpdated = (payload) => {
@@ -104,20 +115,35 @@ export const useMembers = (connection, serverId, userId) => {
       );
     };
 
-    connection.on("ServerMembersLoaded", handleMembersLoaded);
-    connection.on("RoleAssigned", handleRoleAssigned);
-    connection.on("RoleRemoved", handleRoleRemoved);
-    connection.on("MemberNicknameUpdated", handleNicknameUpdated);
+    const handleMemberProfileUpdated = (payload) => {
+      const patch = normalizeProfilePayload(payload);
+      if (!patch?.userId) {
+        return;
+      }
 
-    fetchMembers();
+      setMembers((prev) => prev.map((member) => patchMemberWithProfile(member, patch)));
+    };
+
+    connection.on('ServerMembersLoaded', handleMembersLoaded);
+    connection.on('RoleAssigned', handleRoleAssigned);
+    connection.on('RoleRemoved', handleRoleRemoved);
+    connection.on('MemberAdded', handleMemberAdded);
+    connection.on('MemberKicked', handleMemberKicked);
+    connection.on('MemberNicknameUpdated', handleNicknameUpdated);
+    connection.on('MemberProfileUpdated', handleMemberProfileUpdated);
+
+    void fetchMembers();
 
     return () => {
-      connection.off("ServerMembersLoaded", handleMembersLoaded);
-      connection.off("RoleAssigned", handleRoleAssigned);
-      connection.off("RoleRemoved", handleRoleRemoved);
-      connection.off("MemberNicknameUpdated", handleNicknameUpdated);
+      connection.off('ServerMembersLoaded', handleMembersLoaded);
+      connection.off('RoleAssigned', handleRoleAssigned);
+      connection.off('RoleRemoved', handleRoleRemoved);
+      connection.off('MemberAdded', handleMemberAdded);
+      connection.off('MemberKicked', handleMemberKicked);
+      connection.off('MemberNicknameUpdated', handleNicknameUpdated);
+      connection.off('MemberProfileUpdated', handleMemberProfileUpdated);
     };
-  }, [connection, serverId]);
+  }, [connection, serverId, fetchMembers]);
 
   return {
     members,
@@ -126,6 +152,6 @@ export const useMembers = (connection, serverId, userId) => {
     fetchMembers,
     kickMember,
     updateMemberNickname,
-    openPrivateChat
+    openPrivateChat,
   };
 };

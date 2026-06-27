@@ -13,19 +13,22 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IUserListCacheService _userListCache;
+    private readonly IUserBlockService _userBlockService;
 
     public SendMessageCommandHandler(
         IMessageRepository messageRepository,
         IUserRepository userRepository,
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
-        IUserListCacheService userListCache)
+        IUserListCacheService userListCache,
+        IUserBlockService userBlockService)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
         _userListCache = userListCache;
+        _userBlockService = userBlockService;
     }
 
     public async Task<SendMessageResult> Handle(SendMessageCommand request, CancellationToken cancellationToken)
@@ -74,6 +77,21 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                     };
                 }
             }
+            else if (string.Equals(chat.Type?.TypeName, ChatTypeNames.Private, StringComparison.OrdinalIgnoreCase))
+            {
+                var members = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
+                var recipientId = members.FirstOrDefault(memberId => memberId != request.UserId);
+                if (recipientId != Guid.Empty
+                    && await _userBlockService.IsBlockedByAsync(recipientId, request.UserId, cancellationToken))
+                {
+                    return new SendMessageResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Вы не можете отправить сообщение этому пользователю"
+                    };
+                }
+            }
+
             var newMessage = new Message
             {
                 Id = Guid.NewGuid(),

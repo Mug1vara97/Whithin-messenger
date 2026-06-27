@@ -30,4 +30,14 @@ public interface IFriendRealtimeNotifier
         Guid userId,
         Guid friendId,
         CancellationToken cancellationToken = default);
+
+    Task NotifyUserBlockedAsync(
+        Guid blockerId,
+        Guid blockedUserId,
+        CancellationToken cancellationToken = default);
+
+    Task NotifyUserUnblockedAsync(
+        Guid blockerId,
+        Guid unblockedUserId,
+        CancellationToken cancellationToken = default);
 }

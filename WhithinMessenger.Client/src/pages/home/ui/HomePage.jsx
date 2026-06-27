@@ -19,7 +19,7 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { NotificationsModal, CreateServerModal } from '../../../shared/ui/organisms';
 import { soundpadBridge } from '../../../shared/lib/soundpad/soundpadBridge';
-import { UserAvatar } from '../../../shared/ui';
+import { UserAvatar, UserPanel } from '../../../shared/ui';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { Call, CallEnd } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
@@ -1151,6 +1151,13 @@ const HomePage = () => {
   const isActiveServerOwner = checkIsServerOwner(activeServerForPermissions, user?.id);
   const userCanMuteMembers = canMuteMembers(serverChannelPermissions, isActiveServerOwner);
 
+  const serverChannelCategories = useMemo(
+    () => (serverDataFromPanel || serverData)?.categories
+      ?? (serverDataFromPanel || serverData)?.Categories
+      ?? [],
+    [serverDataFromPanel, serverData],
+  );
+
   return (
     <div className="home-page">
       <div className="home-content">
@@ -1169,31 +1176,40 @@ const HomePage = () => {
           />
           <div className="content-area">
             <ResizableSidebarShell>
-              {selectedServer ? (
-                <ServerPanel
-                  selectedServer={selectedServer}
-                  onChatSelected={handleChatSelected}
-                  selectedChat={selectedChat}
-                  onServerDataUpdated={handleServerDataUpdated}
-                  unreadCountByChat={notificationUnreadCountByChat}
+              <div className="sidebar-panel-layout">
+                <div className="sidebar-panel-layout__main">
+                  {selectedServer ? (
+                    <ServerPanel
+                      selectedServer={selectedServer}
+                      onChatSelected={handleChatSelected}
+                      selectedChat={selectedChat}
+                      onServerDataUpdated={handleServerDataUpdated}
+                      unreadCountByChat={notificationUnreadCountByChat}
+                    />
+                  ) : (
+                    <ChatList
+                      onChatSelected={handleChatSelected}
+                      onFriendsSelected={handleFriendsSelected}
+                      selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
+                      unreadCountByChat={messageUnreadCountByChat}
+                      chats={chats}
+                      searchResults={searchResults}
+                      isSearching={isSearching}
+                      isLoading={isLoading}
+                      searchUsers={searchUsers}
+                      createPrivateChat={createPrivateChat}
+                      pinChat={pinChat}
+                      unpinChat={unpinChat}
+                      reorderPinnedChats={reorderPinnedChats}
+                    />
+                  )}
+                </div>
+                <UserPanel
+                  userId={user?.id || user?.userId || user?.Id}
+                  username={user?.username || user?.UserName || user?.userName}
+                  serverId={selectedServer?.serverId ?? selectedServer?.ServerId ?? null}
                 />
-              ) : (
-                <ChatList
-                  onChatSelected={handleChatSelected}
-                  onFriendsSelected={handleFriendsSelected}
-                  selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
-                  unreadCountByChat={messageUnreadCountByChat}
-                  chats={chats}
-                  searchResults={searchResults}
-                  isSearching={isSearching}
-                  isLoading={isLoading}
-                  searchUsers={searchUsers}
-                  createPrivateChat={createPrivateChat}
-                  pinChat={pinChat}
-                  unpinChat={unpinChat}
-                  reorderPinnedChats={reorderPinnedChats}
-                />
-              )}
+              </div>
             </ResizableSidebarShell>
             <div className="main-area">
               {showFriends ? (
@@ -1248,6 +1264,8 @@ const HomePage = () => {
                       isServerOwner={isActiveServerOwner}
                       serverId={selectedServer?.serverId}
                       serverOwnerId={selectedServer?.ownerId ?? selectedServer?.OwnerId}
+                      serverChannelCategories={serverChannelCategories}
+                      serverChannelFallback={selectedChat}
                       onJoinVoiceChannel={handleJoinVoiceChannel}
                       activeChatCall={activeChatCall}
                       onEndChatCall={handleEndChatCall}

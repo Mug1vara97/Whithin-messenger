@@ -334,40 +334,20 @@ const MediaFile = ({ mediaFile }) => {
       if (videoError) {
         return (
           <div className="media-video-container">
-            <div className="media-video-error" style={{
-              padding: '20px',
-              textAlign: 'center',
-              backgroundColor: '#2f3136',
-              borderRadius: '8px',
-              border: '1px solid #40444b'
-            }}>
-              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
-                <VideocamIcon sx={{ fontSize: 48, color: '#72767d' }} />
+            <div className="media-video-error">
+              <div className="media-video-error__icon">
+                <VideocamIcon sx={{ fontSize: 48 }} />
               </div>
-              <p style={{ color: '#dcddde', marginBottom: '8px', fontSize: '14px' }}>
+              <p className="media-video-error__title">
                 Видео не может быть воспроизведено в браузере
               </p>
-              <p style={{ color: '#72767d', marginBottom: '16px', fontSize: '12px' }}>
+              <p className="media-video-error__hint">
                 Возможно, используется неподдерживаемый формат (HEVC/H.265)
               </p>
               <a
                 href={videoUrl}
                 download={mediaFile.originalFileName || 'video.mp4'}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 20px',
-                  backgroundColor: '#5865f2',
-                  color: 'white',
-                  textDecoration: 'none',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; }}
-                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#5865f2'; }}
+                className="media-video-error__download"
                 onClick={(e) => handleDownload(e, videoUrl, mediaFile.originalFileName || 'video.mp4')}
               >
                 <DownloadIcon sx={{ fontSize: 18 }} />

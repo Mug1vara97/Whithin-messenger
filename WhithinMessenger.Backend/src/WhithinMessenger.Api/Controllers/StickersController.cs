@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Api.Services;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.AddStickerToPack;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.CreateStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.DeleteStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetAvailableStickerPacks;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
@@ -11,7 +13,6 @@ using WhithinMessenger.Application.CommandsAndQueries.Stickers.InstallStickerPac
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.SendStickerMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.UploadStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
-using WhithinMessenger.Application.Stickers;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -105,6 +106,26 @@ public class StickersController : ControllerBase
         }
     }
 
+    [HttpPost("packs")]
+    public async Task<IActionResult> CreateStickerPack([FromBody] CreateStickerPackRequest request)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new CreateStickerPackCommand(userId, request.Title));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(result.Pack);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при создании стикерпака: " + ex.Message });
+        }
+    }
+
     [HttpPost("packs/upload")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)]
@@ -115,11 +136,6 @@ public class StickersController : ControllerBase
         try
         {
             var userId = (Guid)HttpContext.Items["UserId"]!;
-            if (userId != StickerPackAdmin.AllowedUploaderUserId)
-            {
-                return Forbid();
-            }
-
             var command = new UploadStickerPackCommand(userId, title, archive);
             var result = await _mediator.Send(command);
             if (!result.Success)
@@ -136,17 +152,35 @@ public class StickersController : ControllerBase
         }
     }
 
+    [HttpPost("packs/{packId:guid}/stickers")]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = 10485760)]
+    public async Task<IActionResult> AddStickerToPack(Guid packId, [FromForm] IFormFile file)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new AddStickerToPackCommand(userId, packId, file));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { pack = result.Pack, sticker = result.Sticker });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Add sticker to pack failed");
+            return StatusCode(500, new { error = "Ошибка при добавлении стикера: " + ex.Message });
+        }
+    }
+
     [HttpDelete("packs/{packId:guid}")]
     public async Task<IActionResult> DeleteStickerPack(Guid packId)
     {
         try
         {
             var userId = (Guid)HttpContext.Items["UserId"]!;
-            if (userId != StickerPackAdmin.AllowedUploaderUserId)
-            {
-                return Forbid();
-            }
-
             var result = await _mediator.Send(new DeleteStickerPackCommand(userId, packId));
             if (!result.Success)
             {
@@ -272,3 +306,5 @@ public class StickersController : ControllerBase
 }
 
 public record SendStickerRequest(string? RepliedToMessageId = null);
+
+public record CreateStickerPackRequest(string Title);

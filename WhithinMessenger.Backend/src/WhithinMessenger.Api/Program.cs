@@ -24,6 +24,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IFirebasePushSender, FirebasePushSender>();
 builder.Services.AddScoped<ChatMessageNotificationService>();
 builder.Services.AddScoped<IFriendRealtimeNotifier, FriendRealtimeNotifier>();
+builder.Services.AddScoped<IProfileRealtimeNotifier, ProfileRealtimeNotifier>();
 builder.Services.AddScoped<IMessageReceiptService, MessageReceiptService>();
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 

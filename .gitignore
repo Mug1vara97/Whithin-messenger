@@ -208,6 +208,9 @@ coverage/
 
 ## Application specific
 
+# AI session change log (local only)
+CHANGES.md
+
 # Keep important folders
 !**/wwwroot/uploads/.gitkeep
 !**/backups/.gitkeep

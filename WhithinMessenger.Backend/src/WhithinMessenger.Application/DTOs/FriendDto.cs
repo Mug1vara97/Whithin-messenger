@@ -24,3 +24,12 @@ public class FriendRequestDto
     public string? RequesterAvatarColor { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }
+
+public class BlockedUserDto
+{
+    public Guid UserId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string? Avatar { get; init; }
+    public string? AvatarColor { get; init; }
+    public DateTimeOffset BlockedAt { get; init; }
+}

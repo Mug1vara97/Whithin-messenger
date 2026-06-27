@@ -316,7 +316,7 @@ const LoginForm = () => {
         </form>
 
         <p className="auth-link">
-          Need an account? <a href="/register">Register</a>
+          Need an account? <Link to="/register">Register</Link>
         </p>
       </div>
 
