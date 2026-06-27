@@ -63,7 +63,12 @@ public class NotificationRepository : INotificationRepository
                 SenderAvatarColor = n.Message != null && n.Message.User.UserProfile != null
                     ? n.Message.User.UserProfile.AvatarColor
                     : null,
-                MessageContent = n.Message != null ? n.Message.Content : null,
+                MessageContent = n.Message != null && n.Message.EncryptionVersion <= 0
+                    ? n.Message.Content
+                    : null,
+                EncryptedPayload = n.Message != null && n.Message.EncryptionVersion > 0
+                    ? n.Message.Content
+                    : null,
                 EncryptionVersion = n.Message != null ? n.Message.EncryptionVersion : 0,
                 SenderId = n.Message != null ? n.Message.UserId : null,
             })

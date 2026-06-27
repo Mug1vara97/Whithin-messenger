@@ -168,9 +168,15 @@ public class ChatMessageNotificationService
 
             await _chatListHubContext.Clients.All.SendAsync(
                 "chatupdated",
-                chatId,
-                truncatedPreview,
-                DateTimeOffset.UtcNow,
+                new
+                {
+                    chatId,
+                    lastMessage = truncatedPreview,
+                    lastMessageTime = DateTimeOffset.UtcNow,
+                    encryptionVersion,
+                    encryptedPayload = encryptionVersion > 0 ? encryptedMessageContent : null,
+                    senderId,
+                },
                 cancellationToken);
 
             if (!notificationMembers.Any())

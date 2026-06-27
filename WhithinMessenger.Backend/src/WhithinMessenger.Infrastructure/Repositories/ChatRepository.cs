@@ -254,15 +254,32 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var previewByChatId = lastMessages
                 .GroupBy(m => m.ChatId)
-                .ToDictionary(g => g.Key, g => BuildLastMessagePreview(g.First()));
+                .ToDictionary(g => g.Key, g => g.First());
 
             foreach (var chat in chats)
             {
-                if (previewByChatId.TryGetValue(chat.ChatId, out var preview))
+                if (previewByChatId.TryGetValue(chat.ChatId, out var message))
                 {
-                    chat.LastMessage = preview;
+                    ApplyLastMessagePreview(chat, message);
                 }
             }
+        }
+
+        private static void ApplyLastMessagePreview(ChatInfo chat, Message message)
+        {
+            if (message.EncryptionVersion > 0 && !string.IsNullOrWhiteSpace(message.Content))
+            {
+                chat.LastMessage = "Зашифрованное сообщение";
+                chat.LastMessageEncryptionVersion = message.EncryptionVersion;
+                chat.LastMessageEncryptedPayload = message.Content;
+                chat.LastMessageSenderId = message.UserId;
+                return;
+            }
+
+            chat.LastMessage = BuildLastMessagePreview(message);
+            chat.LastMessageEncryptionVersion = 0;
+            chat.LastMessageEncryptedPayload = null;
+            chat.LastMessageSenderId = message.UserId;
         }
 
         private static string BuildLastMessagePreview(Message message)

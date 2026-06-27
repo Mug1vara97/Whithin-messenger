@@ -32,6 +32,7 @@ public class NotificationDto
     public string? SenderAvatarUrl { get; init; }
     public string? SenderAvatarColor { get; init; }
     public string? MessageContent { get; init; }
+    public string? EncryptedPayload { get; init; }
     public int EncryptionVersion { get; init; }
     public Guid? SenderId { get; init; }
 }

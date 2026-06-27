@@ -1,4 +1,8 @@
-import { decryptChatMessage, E2E_DECRYPT_FAILED_TEXT } from './e2eCrypto';
+import {
+  decryptChatMessage,
+  E2E_DECRYPT_FAILED_TEXT,
+  E2E_ENCRYPTION_VERSION,
+} from './e2eCrypto';
 
 const pick = (notification, ...keys) => {
   for (const key of keys) {
@@ -8,15 +12,44 @@ const pick = (notification, ...keys) => {
   return null;
 };
 
+export const isE2eEnvelope = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{')) return false;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Boolean((parsed.n || parsed.N) && (parsed.c || parsed.C));
+  } catch {
+    return false;
+  }
+};
+
 const resolveEncryptionVersion = (notification) => {
   const raw = pick(notification, 'encryptionVersion', 'EncryptionVersion');
   const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  const ciphertext = resolveEncryptedPayload(notification);
+  if (ciphertext && isE2eEnvelope(ciphertext)) {
+    return E2E_ENCRYPTION_VERSION;
+  }
+
+  return 0;
 };
 
-const resolveEncryptedPayload = (notification) => (
-  pick(notification, 'messageContent', 'MessageContent', 'encryptedPayload', 'EncryptedPayload')
-);
+export const resolveEncryptedPayload = (notification) => {
+  const explicit = pick(notification, 'encryptedPayload', 'EncryptedPayload');
+  if (explicit) return explicit;
+
+  const messageContent = pick(notification, 'messageContent', 'MessageContent');
+  if (messageContent && isE2eEnvelope(messageContent)) {
+    return messageContent;
+  }
+
+  return null;
+};
 
 const resolveSenderId = (notification) => (
   pick(notification, 'senderId', 'SenderId')
@@ -27,6 +60,29 @@ const buildMemberUserIds = (userId, senderId) => {
   if (userId) ids.add(String(userId));
   if (senderId) ids.add(String(senderId));
   return Array.from(ids);
+};
+
+const patchContentPreview = (notification, decrypted) => {
+  const content = pick(notification, 'content', 'Content');
+  if (!content || !decrypted) return content;
+
+  if (content.includes('Зашифрованное сообщение')) {
+    return content.replace('Зашифрованное сообщение', decrypted);
+  }
+
+  return content;
+};
+
+export const needsE2eDecrypt = (notification) => {
+  if (!notification || notification._e2eDecrypted || notification.e2eDecrypted) {
+    return false;
+  }
+
+  const encryptionVersion = resolveEncryptionVersion(notification);
+  const ciphertext = resolveEncryptedPayload(notification);
+  const chatId = pick(notification, 'chatId', 'ChatId');
+
+  return encryptionVersion > 0 && Boolean(ciphertext) && Boolean(chatId);
 };
 
 export const decryptNotificationPreview = async (notification, userId) => {
@@ -59,10 +115,17 @@ export const decryptNotificationPreview = async (notification, userId) => {
       return notification;
     }
 
+    const patchedContent = patchContentPreview(notification, decrypted);
+
     return {
       ...notification,
       messageContent: decrypted,
       MessageContent: decrypted,
+      encryptedPayload: ciphertext,
+      EncryptedPayload: ciphertext,
+      encryptionVersion,
+      EncryptionVersion: encryptionVersion,
+      ...(patchedContent ? { content: patchedContent, Content: patchedContent } : {}),
       _e2eDecrypted: true,
     };
   } catch (error) {

@@ -2,12 +2,17 @@ import {
   buildCallLogText,
   parseCallLogPayload,
 } from './callLogHelpers';
+import { isE2eEnvelope } from '../e2e/e2eNotification';
 
 const ATTACHMENT_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf)$/i;
 
 export function formatChatListLastMessage(raw) {
   const text = (raw ?? '').trim();
   if (!text) return null;
+
+  if (isE2eEnvelope(text)) {
+    return 'Зашифрованное сообщение';
+  }
 
   const callLogPayload = parseCallLogPayload(text);
   if (callLogPayload) {

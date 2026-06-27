@@ -8,11 +8,24 @@ export {
   clearE2ePeerKeyCache,
   decryptChatMessage,
   decryptDmMessage,
-  decryptNotificationPreview,
-  decryptNotificationsList,
   encryptChatMessage,
   encryptDmMessage,
   ensureChatKey,
   ensureE2eIdentity,
   getPeerPublicKey,
 } from './e2eCrypto';
+
+export {
+  decryptNotificationPreview,
+  decryptNotificationsList,
+  isE2eEnvelope,
+  needsE2eDecrypt,
+  resolveEncryptedPayload,
+} from './e2eNotification';
+
+export {
+  decryptChatListItem,
+  decryptChatListItems,
+  needsChatListE2eDecrypt,
+  normalizeChatUpdatedPayload,
+} from './e2eChatListPreview';

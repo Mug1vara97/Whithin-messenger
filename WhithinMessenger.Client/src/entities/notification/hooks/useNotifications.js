@@ -5,6 +5,7 @@ import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionCon
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { dispatchNotificationReceived } from '../../../shared/lib/utils/notificationRealtimeBridge';
 import { decryptNotificationPreview, decryptNotificationsList } from '../../../shared/lib/e2e';
+import { isE2eEnvelope, needsE2eDecrypt } from '../../../shared/lib/e2e/e2eNotification';
 import { isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
 import {
   dismissDesktopNotificationById,
@@ -17,6 +18,9 @@ import {
   getSoundNotificationsEnabled,
 } from '../../../shared/lib/utils/inAppNotificationSettings';
 import { getAppSoundUrl } from '../../../shared/lib/utils/appSoundSettings';
+
+const resolveCurrentUserId = (user) =>
+  user?.id || user?.userId || user?.Id || null;
 
 export const useNotifications = () => {
   const { user } = useAuthContext();
@@ -51,14 +55,39 @@ export const useNotifications = () => {
         pageSize: 50,
         unreadOnly: true,
       });
-      const decrypted = await decryptNotificationsList(data, user?.id);
+      const decrypted = await decryptNotificationsList(data, resolveCurrentUserId(user));
       setNotifications(sortByDate(decrypted));
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить уведомления');
     } finally {
       setLoading(false);
     }
-  }, [sortByDate, user?.id]);
+  }, [sortByDate, user]);
+
+  useEffect(() => {
+    const userId = resolveCurrentUserId(user);
+    if (!userId) return undefined;
+
+    let cancelled = false;
+
+    setNotifications((prev) => {
+      if (!prev.some(needsE2eDecrypt)) {
+        return prev;
+      }
+
+      void decryptNotificationsList(prev, userId).then((decrypted) => {
+        if (!cancelled) {
+          setNotifications(sortByDate(decrypted));
+        }
+      });
+
+      return prev;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sortByDate]);
 
   const refreshUnreadCount = useCallback(async () => {
     try {
@@ -228,7 +257,7 @@ export const useNotifications = () => {
   }, [applyNotificationSoundSource]);
 
   useEffect(() => {
-    if (!user?.id || !connectionContext?.getConnection) return undefined;
+    if (!resolveCurrentUserId(user) || !connectionContext?.getConnection) return undefined;
 
     let mounted = true;
     let connection = null;
@@ -239,7 +268,7 @@ export const useNotifications = () => {
         const notificationId = normalized.id;
         if (!notificationId) return;
 
-        const enriched = await decryptNotificationPreview(normalized, user?.id);
+        const enriched = await decryptNotificationPreview(normalized, resolveCurrentUserId(user));
 
         let isNewNotification = false;
         setNotifications((prev) => {
@@ -349,7 +378,7 @@ export const useNotifications = () => {
         connection.off('AllNotificationsRead', onAllNotificationsRead);
       }
     };
-  }, [user?.id, connectionContext, sortByDate, playNotificationSound]);
+  }, [user, connectionContext, sortByDate, playNotificationSound]);
 
   const hasUnread = useMemo(() => unreadCount > 0, [unreadCount]);
   const unreadCountByChat = useMemo(() => {

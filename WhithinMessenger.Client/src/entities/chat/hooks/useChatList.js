@@ -6,6 +6,14 @@ import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoi
 import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
 import { patchChatListItemWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
 import { useStartupBoot } from '../../../shared/lib/contexts/StartupBootContext';
+import {
+  decryptChatListItem,
+  decryptChatListItems,
+  needsChatListE2eDecrypt,
+  normalizeChatUpdatedPayload,
+} from '../../../shared/lib/e2e/e2eChatListPreview';
+
+const resolveCurrentUserId = (userId) => userId || null;
 
 const getPinOrder = (chat) => {
   const order = chat?.pinOrder ?? chat?.PinOrder;
@@ -95,6 +103,11 @@ const normalizeChatListItem = (chat) => {
     pinOrder: chat.pinOrder ?? chat.PinOrder ?? null,
     lastMessage: chat.lastMessage ?? chat.LastMessage ?? '',
     lastMessageTime: chat.lastMessageTime ?? chat.LastMessageTime ?? null,
+    lastMessageEncryptionVersion:
+      Number(chat.lastMessageEncryptionVersion ?? chat.LastMessageEncryptionVersion ?? 0) || 0,
+    lastMessageEncryptedPayload:
+      chat.lastMessageEncryptedPayload ?? chat.LastMessageEncryptedPayload ?? null,
+    lastMessageSenderId: chat.lastMessageSenderId ?? chat.LastMessageSenderId ?? null,
     unreadCount: chat.unreadCount ?? chat.UnreadCount ?? 0,
   };
 };
@@ -136,13 +149,19 @@ export const useChatList = (userId, onChatCreated = null) => {
   }, [initialChatsLoaded, markChatsReady]);
 
   const bindConnectionHandlers = useCallback((conn) => {
-    const handleReceiveChats = (receivedChats) => {
+    const handleReceiveChats = async (receivedChats) => {
       setInitialChatsLoaded(true);
       if (!Array.isArray(receivedChats)) {
         return;
       }
 
-      setChats(sortChats(receivedChats.map(normalizeChatListItem)));
+      const normalized = receivedChats.map(normalizeChatListItem);
+      const currentUserId = resolveCurrentUserId(userIdRef.current);
+      const decrypted = currentUserId
+        ? await decryptChatListItems(normalized, currentUserId)
+        : normalized;
+
+      setChats(sortChats(decrypted));
     };
 
     const handleSearchResults = (results) => {
@@ -192,20 +211,42 @@ export const useChatList = (userId, onChatCreated = null) => {
       }
     };
 
-    const handleChatUpdated = (chatId, lastMessage, lastMessageTime) => {
-      setChats((prevChats) => sortChats(
-        prevChats.map((chat) => {
-          if (String(chat.chatId) !== String(chatId)) {
-            return chat;
+    const handleChatUpdated = (payloadOrChatId, lastMessage, lastMessageTime) => {
+      void (async () => {
+        const patch = normalizeChatUpdatedPayload(payloadOrChatId, lastMessage, lastMessageTime);
+        const currentUserId = resolveCurrentUserId(userIdRef.current);
+
+        setChats((prevChats) => {
+          const existing = prevChats.find(
+            (chat) => String(chat.chatId) === String(patch.chatId),
+          );
+
+          const merged = normalizeChatListItem({
+            ...(existing || { chatId: patch.chatId }),
+            ...patch,
+            _e2eLastMessageDecrypted: false,
+            e2eLastMessageDecrypted: false,
+          });
+
+          if (currentUserId && needsChatListE2eDecrypt(merged)) {
+            void decryptChatListItem(merged, currentUserId).then((decrypted) => {
+              setChats((current) => sortChats(
+                current.map((chat) =>
+                  String(chat.chatId) === String(patch.chatId)
+                    ? normalizeChatListItem({ ...chat, ...decrypted })
+                    : chat,
+                ),
+              ));
+            });
           }
 
-          return {
-            ...chat,
-            lastMessage,
-            lastMessageTime,
-          };
-        }),
-      ));
+          return sortChats(
+            prevChats.map((chat) =>
+              String(chat.chatId) === String(patch.chatId) ? merged : chat,
+            ),
+          );
+        });
+      })();
     };
 
     const handleError = (errorMessage) => {
@@ -333,6 +374,31 @@ export const useChatList = (userId, onChatCreated = null) => {
       setIsConnected(false);
     };
   }, [userId, bindConnectionHandlers]);
+
+  useEffect(() => {
+    const currentUserId = resolveCurrentUserId(userId);
+    if (!currentUserId) return undefined;
+
+    let cancelled = false;
+
+    setChats((prev) => {
+      if (!prev.some(needsChatListE2eDecrypt)) {
+        return prev;
+      }
+
+      void decryptChatListItems(prev, currentUserId).then((decrypted) => {
+        if (!cancelled) {
+          setChats(sortChats(decrypted));
+        }
+      });
+
+      return prev;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     const handleProfileUpdated = (event) => {

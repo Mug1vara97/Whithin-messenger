@@ -41,6 +41,9 @@ namespace WhithinMessenger.Domain.Interfaces
         public bool IsSavedMessages { get; init; }
         public string? LastMessage { get; set; }
         public DateTimeOffset LastMessageTime { get; init; }
+        public int LastMessageEncryptionVersion { get; set; }
+        public string? LastMessageEncryptedPayload { get; set; }
+        public Guid? LastMessageSenderId { get; set; }
         public int UnreadCount { get; set; }
         public bool IsPinned { get; init; }
         public DateTimeOffset? PinnedAt { get; init; }

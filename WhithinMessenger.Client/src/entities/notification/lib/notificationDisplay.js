@@ -1,3 +1,5 @@
+import { isE2eEnvelope } from '../../../shared/lib/e2e/e2eNotification';
+
 const pick = (notification, ...keys) => {
   for (const key of keys) {
     const value = notification?.[key];
@@ -6,43 +8,49 @@ const pick = (notification, ...keys) => {
   return null;
 };
 
-export const normalizeNotification = (notification) => ({
-  id: pick(notification, 'id', 'Id', 'notificationId'),
-  chatId: pick(notification, 'chatId', 'ChatId'),
-  serverId: pick(notification, 'serverId', 'ServerId'),
-  serverName: pick(notification, 'serverName', 'ServerName'),
-  chatName: pick(notification, 'chatName', 'ChatName'),
-  senderName: pick(notification, 'senderName', 'SenderName'),
-  senderAvatarUrl: pick(notification, 'senderAvatarUrl', 'SenderAvatarUrl', 'senderAvatar', 'SenderAvatar'),
-  senderAvatarColor: pick(notification, 'senderAvatarColor', 'SenderAvatarColor', 'avatarColor', 'AvatarColor'),
-  messageId: pick(notification, 'messageId', 'MessageId'),
-  type: pick(notification, 'type', 'Type'),
-  content: pick(notification, 'content', 'Content') || '',
-  messageContent: pick(notification, 'messageContent', 'MessageContent'),
-  encryptionVersion: Number(pick(notification, 'encryptionVersion', 'EncryptionVersion') ?? 0) || 0,
-  senderId: pick(notification, 'senderId', 'SenderId'),
-  encryptedPayload: pick(notification, 'encryptedPayload', 'EncryptedPayload'),
-  isRead: notification?.isRead ?? notification?.IsRead ?? false,
-  createdAt: pick(notification, 'createdAt', 'CreatedAt'),
-});
+export const normalizeNotification = (notification) => {
+  const rawMessageContent = pick(notification, 'messageContent', 'MessageContent');
+  const encryptedPayload =
+    pick(notification, 'encryptedPayload', 'EncryptedPayload')
+    || (rawMessageContent && isE2eEnvelope(rawMessageContent) ? rawMessageContent : null);
+
+  let encryptionVersion = Number(pick(notification, 'encryptionVersion', 'EncryptionVersion') ?? 0) || 0;
+  if (!encryptionVersion && encryptedPayload) {
+    encryptionVersion = 1;
+  }
+
+  const isDecrypted = Boolean(notification?._e2eDecrypted || notification?.e2eDecrypted);
+  const messageContent = isDecrypted
+    ? rawMessageContent
+    : (encryptedPayload ? null : rawMessageContent);
+
+  return {
+    id: pick(notification, 'id', 'Id', 'notificationId'),
+    chatId: pick(notification, 'chatId', 'ChatId'),
+    serverId: pick(notification, 'serverId', 'ServerId'),
+    serverName: pick(notification, 'serverName', 'ServerName'),
+    chatName: pick(notification, 'chatName', 'ChatName'),
+    senderName: pick(notification, 'senderName', 'SenderName'),
+    senderAvatarUrl: pick(notification, 'senderAvatarUrl', 'SenderAvatarUrl', 'senderAvatar', 'SenderAvatar'),
+    senderAvatarColor: pick(notification, 'senderAvatarColor', 'SenderAvatarColor', 'avatarColor', 'AvatarColor'),
+    messageId: pick(notification, 'messageId', 'MessageId'),
+    type: pick(notification, 'type', 'Type'),
+    content: pick(notification, 'content', 'Content') || '',
+    messageContent,
+    encryptionVersion,
+    senderId: pick(notification, 'senderId', 'SenderId'),
+    encryptedPayload,
+    isRead: notification?.isRead ?? notification?.IsRead ?? false,
+    createdAt: pick(notification, 'createdAt', 'CreatedAt'),
+    e2eDecrypted: isDecrypted,
+  };
+};
 
 const isServerNotification = (item) =>
   Boolean(item.serverId) || item.type === 'server_message' || item.type === 'ServerMessage';
 
 const isGroupNotification = (item) =>
   item.type === 'group_message' || item.type === 'GroupMessage';
-
-const isE2eEnvelope = (text) => {
-  if (!text || typeof text !== 'string') return false;
-  const trimmed = text.trim();
-  if (!trimmed.startsWith('{')) return false;
-  try {
-    const parsed = JSON.parse(trimmed);
-    return Boolean((parsed.n || parsed.N) && (parsed.c || parsed.C));
-  } catch {
-    return false;
-  }
-};
 
 const formatChannelLabel = (chatName) => {
   if (!chatName) return null;
@@ -112,12 +120,13 @@ export const getNotificationRowSubtitle = (notification) => {
 export const getNotificationMessageText = (notification) => {
   const item = normalizeNotification(notification);
   const { content, senderName, chatName } = item;
-  const storedPreview = item.messageContent || pick(notification, 'messageContent', 'MessageContent');
-  if (storedPreview) {
-    if (isE2eEnvelope(storedPreview)) {
-      return 'Зашифрованное сообщение';
-    }
-    return storedPreview;
+
+  if (item.e2eDecrypted && item.messageContent) {
+    return item.messageContent;
+  }
+
+  if (item.messageContent && !isE2eEnvelope(item.messageContent)) {
+    return item.messageContent;
   }
 
   if (!content) return '';
