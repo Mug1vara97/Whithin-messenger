@@ -56,6 +56,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   const hasMoreOlderRef = useRef(false);
   const olderBatchDoneRef = useRef(null);
   const searchLoadPendingRef = useRef(null);
+  const prependBatchRef = useRef(null);
   const skipAutoScrollRef = useRef(false);
   const olderScrollSnapshotRef = useRef(null);
   const typingExpiryTimersRef = useRef(new Map());
@@ -541,10 +542,47 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     resolve({ messages, hasMoreOlder });
   }, []);
 
+  const tryFinalizePrependBatch = useCallback(() => {
+    const batch = prependBatchRef.current;
+    if (!batch || batch.messages == null || batch.hasMoreOlder == null) {
+      return;
+    }
+
+    const { messages, hasMoreOlder } = batch;
+    prependBatchRef.current = null;
+
+    skipAutoScrollRef.current = true;
+    setMessages((prev) => {
+      const incomingIds = new Set(
+        messages.map((msg) => String(msg.messageId)),
+      );
+      const rest = prev.filter((msg) => !incomingIds.has(String(msg.messageId)));
+      return [...rest, ...messages].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+      );
+    });
+    setHasMoreOlder(hasMoreOlder);
+    loadingOlderRef.current = false;
+    setIsLoadingOlder(false);
+
+    if (olderBatchDoneRef.current) {
+      const resolveBatch = olderBatchDoneRef.current;
+      olderBatchDoneRef.current = null;
+      resolveBatch();
+    }
+  }, []);
+
   const fetchOlderMessagesForSearchAsync = useCallback(async (beforeMessageId) => {
     const conn = connectionRef.current;
     const normalizedBeforeId = String(beforeMessageId ?? '');
-    if (!conn || !chatId || !normalizedBeforeId || searchLoadPendingRef.current) {
+    if (
+      !conn
+      || !chatId
+      || !normalizedBeforeId
+      || searchLoadPendingRef.current
+      || prependBatchRef.current
+      || loadingOlderRef.current
+    ) {
       return null;
     }
 
@@ -604,6 +642,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       clearTimeout(searchLoadPendingRef.current.timeoutId);
       searchLoadPendingRef.current = null;
     }
+    prependBatchRef.current = null;
     clearTypingExpiryTimers();
     clearTypingHeartbeat();
     lastTypingSentRef.current = false;
@@ -826,14 +865,13 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
             return;
           }
 
-          setHasMoreOlder(Boolean(hasMore));
-          setIsLoadingOlder(false);
-          loadingOlderRef.current = false;
-          if (olderBatchDoneRef.current) {
-            const resolveBatch = olderBatchDoneRef.current;
-            olderBatchDoneRef.current = null;
-            resolveBatch();
+          if (prependBatchRef.current) {
+            prependBatchRef.current.hasMoreOlder = Boolean(hasMore);
+            tryFinalizePrependBatch();
+            return;
           }
+
+          setHasMoreOlder(Boolean(hasMore));
         });
 
         newConnection.on('ReceiveMessages', async (messages) => {
@@ -846,25 +884,19 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
             return;
           }
 
-          if (loadingOlderRef.current) {
-            skipAutoScrollRef.current = true;
-            setMessages((prev) => {
-              const incomingIds = new Set(
-                processedMessages.map((msg) => String(msg.messageId)),
-              );
-              const rest = prev.filter((msg) => !incomingIds.has(String(msg.messageId)));
-              return [...rest, ...processedMessages].sort(
-                (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-              );
-            });
-          } else {
-            setMessages(processedMessages);
-            const pinnedFromMessages = processedMessages
-              .filter((msg) => msg.isPinned)
-              .sort((a, b) => new Date(b.pinnedAt || b.createdAt) - new Date(a.pinnedAt || a.createdAt));
-            if (pinnedFromMessages.length > 0) {
-              setPinnedMessages(pinnedFromMessages);
-            }
+          if (prependBatchRef.current) {
+            acknowledgeIncomingMessages(processedMessages);
+            prependBatchRef.current.messages = processedMessages;
+            tryFinalizePrependBatch();
+            return;
+          }
+
+          setMessages(processedMessages);
+          const pinnedFromMessages = processedMessages
+            .filter((msg) => msg.isPinned)
+            .sort((a, b) => new Date(b.pinnedAt || b.createdAt) - new Date(a.pinnedAt || a.createdAt));
+          if (pinnedFromMessages.length > 0) {
+            setPinnedMessages(pinnedFromMessages);
           }
           acknowledgeIncomingMessages(processedMessages);
         });
@@ -959,7 +991,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
       cleanup();
     };
-  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, completeSearchLoadBatch, decryptMessages, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, updateMessageStatus]);
+  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, completeSearchLoadBatch, decryptMessages, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, tryFinalizePrependBatch, updateMessageStatus]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -991,7 +1023,14 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
   const requestOlderMessagesBatch = useCallback(async ({ preserveScroll = true } = {}) => {
     const conn = connectionRef.current;
-    if (!conn || !chatId || !hasMoreOlderRef.current || loadingOlderRef.current) {
+    if (
+      !conn
+      || !chatId
+      || !hasMoreOlderRef.current
+      || loadingOlderRef.current
+      || prependBatchRef.current
+      || searchLoadPendingRef.current
+    ) {
       return false;
     }
 
@@ -1023,6 +1062,9 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       const timeoutId = setTimeout(() => {
         if (olderBatchDoneRef.current) {
           olderBatchDoneRef.current = null;
+          prependBatchRef.current = null;
+          loadingOlderRef.current = false;
+          setIsLoadingOlder(false);
           reject(new Error('Older messages batch timed out'));
         }
       }, 30000);
@@ -1034,6 +1076,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     });
 
     loadingOlderRef.current = true;
+    prependBatchRef.current = { messages: null, hasMoreOlder: null };
     setIsLoadingOlder(true);
     try {
       await conn.invoke('GetMessages', chatId, 50, String(oldest.messageId));
@@ -1042,6 +1085,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     } catch (err) {
       console.warn('GetMessages (older) failed:', err);
       loadingOlderRef.current = false;
+      prependBatchRef.current = null;
       setIsLoadingOlder(false);
       olderScrollSnapshotRef.current = null;
       if (olderBatchDoneRef.current) {

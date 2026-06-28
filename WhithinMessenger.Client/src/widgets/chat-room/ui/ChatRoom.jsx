@@ -33,7 +33,7 @@ import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
 import { resolveMessageAvatarIdentity } from '../../../shared/lib/utils/userDisplayNameHelpers';
 import { MessageStatusIndicator } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
-import MessageSearchModal from '../../../shared/ui/molecules/MessageSearch/MessageSearchModal';
+import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
 import MessageMediaContent from '../../../shared/ui/molecules/MessageMediaContent/MessageMediaContent';
 import MessageMediaAlbum from '../../../shared/ui/molecules/MessageMediaAlbum/MessageMediaAlbum';
@@ -78,7 +78,6 @@ import { filterMembersWithChannelAccess, buildChannelAccessContext } from '../..
 import { serverApi } from '../../../entities/server/api/serverApi';
 import {
   Call,
-  Search,
   Mic,
   Stop,
   PushPin,
@@ -307,7 +306,6 @@ const ChatRoom = ({
   const canPinMessages = canModerateMessages || !isServerChat;
   const canCreatePoll = !isSavedMessages && !isDirectChat && (isGroupChat || isServerChat);
   const [isPollModalOpen, setPollModalOpen] = useState(false);
-  const [isMessageSearchOpen, setMessageSearchOpen] = useState(false);
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
 
   useEffect(() => {
@@ -347,15 +345,10 @@ const ChatRoom = ({
     ensureMessageLoaded,
   });
 
-  const handleCloseMessageSearch = useCallback(() => {
-    clearSearch();
-    setMessageSearchOpen(false);
-  }, [clearSearch]);
-
   const handleSearchResultClick = useCallback(async (messageId) => {
     await scrollToMessage(messageId);
-    handleCloseMessageSearch();
-  }, [handleCloseMessageSearch, scrollToMessage]);
+    clearSearch();
+  }, [clearSearch, scrollToMessage]);
 
   const handlePinnedBarClick = useCallback(async () => {
     if (!activePinnedMessage?.messageId) return;
@@ -2182,15 +2175,15 @@ const ChatRoom = ({
             </button>
           )}
           
-          <button
-            type="button"
-            className="voice-call-button message-search-open-button"
-            onClick={() => setMessageSearchOpen(true)}
-            title="Поиск сообщений"
-            aria-label="Поиск сообщений"
-          >
-            <Search style={{ fontSize: '20px' }} />
-          </button>
+          <MessageSearch
+            searchQuery={searchQuery}
+            searchResults={searchResults}
+            isSearching={isSearching}
+            isSearchingHistory={isSearchingHistory}
+            onSearch={searchMessages}
+            onClearSearch={clearSearch}
+            onScrollToMessage={handleSearchResultClick}
+          />
         </div>
       </div>
 
@@ -3058,18 +3051,6 @@ const ChatRoom = ({
           </div>
         </div>
       )}
-
-      <MessageSearchModal
-        open={isMessageSearchOpen}
-        onClose={handleCloseMessageSearch}
-        searchQuery={searchQuery}
-        searchResults={searchResults}
-        isSearching={isSearching}
-        isSearchingHistory={isSearchingHistory}
-        onSearch={searchMessages}
-        onClearSearch={clearSearch}
-        onScrollToMessage={handleSearchResultClick}
-      />
 
       <ChatInfoModal 
         open={showChatInfo}

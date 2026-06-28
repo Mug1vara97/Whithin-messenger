@@ -498,6 +498,11 @@
   align-items: center;
   gap: 12px;
   height: 100%;
+  overflow: visible;
+}
+
+.header-actions .message-search {
+  z-index: 20;
 }
 
 .media-upload-button {
