@@ -12,6 +12,10 @@ import {
   needsChatListE2eDecrypt,
   normalizeChatUpdatedPayload,
 } from '../../../shared/lib/e2e/e2eChatListPreview';
+import {
+  handleChatKeyRewrapNeeded,
+  syncSessionE2eKeys,
+} from '../../../shared/lib/e2e/e2eSessionSync';
 
 const resolveCurrentUserId = (userId) => userId || null;
 
@@ -129,6 +133,7 @@ export const useChatList = (userId, onChatCreated = null) => {
   const onChatCreatedRef = useRef(onChatCreated);
   const navigateRef = useRef(navigate);
   const userIdRef = useRef(userId);
+  const chatsRef = useRef(chats);
 
   useEffect(() => {
     onChatCreatedRef.current = onChatCreated;
@@ -141,6 +146,10 @@ export const useChatList = (userId, onChatCreated = null) => {
   useEffect(() => {
     userIdRef.current = userId;
   }, [userId]);
+
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
 
   useEffect(() => {
     if (initialChatsLoaded) {
@@ -157,11 +166,54 @@ export const useChatList = (userId, onChatCreated = null) => {
 
       const normalized = receivedChats.map(normalizeChatListItem);
       const currentUserId = resolveCurrentUserId(userIdRef.current);
+
+      if (currentUserId) {
+        try {
+          await syncSessionE2eKeys(currentUserId, normalized);
+        } catch (error) {
+          console.warn('E2E session key sync failed:', error);
+        }
+      }
+
       const decrypted = currentUserId
         ? await decryptChatListItems(normalized, currentUserId)
         : normalized;
 
       setChats(sortChats(decrypted));
+    };
+
+    const handleE2eChatKeyRewrapNeeded = async (payload) => {
+      const currentUserId = resolveCurrentUserId(userIdRef.current);
+      if (!currentUserId || !payload?.chatId) {
+        return;
+      }
+
+      const chatId = String(payload.chatId);
+      const chatItem = chatsRef.current.find((chat) => String(chat.chatId) === chatId);
+
+      const synced = await handleChatKeyRewrapNeeded(currentUserId, payload, chatItem);
+      if (!synced) {
+        return;
+      }
+
+      setChats((prevChats) => {
+        const existing = prevChats.find((chat) => String(chat.chatId) === chatId);
+        if (!existing || !needsChatListE2eDecrypt(existing)) {
+          return prevChats;
+        }
+
+        void decryptChatListItem(existing, currentUserId).then((decrypted) => {
+          setChats((current) => sortChats(
+            current.map((chat) =>
+              String(chat.chatId) === chatId
+                ? normalizeChatListItem({ ...chat, ...decrypted })
+                : chat,
+            ),
+          ));
+        });
+
+        return prevChats;
+      });
     };
 
     const handleSearchResults = (results) => {
@@ -260,6 +312,7 @@ export const useChatList = (userId, onChatCreated = null) => {
     conn.off('chatdeleted');
     conn.off('chatupdated');
     conn.off('error');
+    conn.off('e2echatkeyrewrapneeded');
 
     conn.on('receivechats', handleReceiveChats);
     conn.on('receivesearchresults', handleSearchResults);
@@ -268,6 +321,7 @@ export const useChatList = (userId, onChatCreated = null) => {
     conn.on('chatdeleted', handleChatDeleted);
     conn.on('chatupdated', handleChatUpdated);
     conn.on('error', handleError);
+    conn.on('e2echatkeyrewrapneeded', handleE2eChatKeyRewrapNeeded);
   }, []);
 
   useEffect(() => {

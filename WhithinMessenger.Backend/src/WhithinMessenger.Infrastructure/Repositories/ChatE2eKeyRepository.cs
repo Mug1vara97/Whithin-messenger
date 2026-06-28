@@ -66,4 +66,37 @@ public class ChatE2eKeyRepository : IChatE2eKeyRepository
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetChatIdsForUserDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedDeviceId = deviceId.Trim();
+        return await _context.ChatE2eWrappedKeys
+            .AsNoTracking()
+            .Where(k => k.UserId == userId && k.DeviceId == normalizedDeviceId)
+            .Select(k => k.ChatId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task DeleteForUserDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedDeviceId = deviceId.Trim();
+        var staleWraps = await _context.ChatE2eWrappedKeys
+            .Where(k => k.UserId == userId && k.DeviceId == normalizedDeviceId)
+            .ToListAsync(cancellationToken);
+
+        if (staleWraps.Count == 0)
+        {
+            return;
+        }
+
+        _context.ChatE2eWrappedKeys.RemoveRange(staleWraps);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

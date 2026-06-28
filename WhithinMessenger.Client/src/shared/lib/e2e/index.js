@@ -30,3 +30,10 @@ export {
   needsChatListE2eDecrypt,
   normalizeChatUpdatedPayload,
 } from './e2eChatListPreview';
+
+export {
+  E2E_CHAT_KEY_SYNCED_EVENT,
+  handleChatKeyRewrapNeeded,
+  listLocalChatIds,
+  syncSessionE2eKeys,
+} from './e2eSessionSync';

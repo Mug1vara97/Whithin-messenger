@@ -13,6 +13,7 @@ import {
   decryptChatMessage,
   encryptChatMessage,
   E2eEncryptionError,
+  E2E_CHAT_KEY_SYNCED_EVENT,
   proactiveSyncChatDeviceWraps,
 } from '../e2e';
 
@@ -54,6 +55,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   const loadingOlderRef = useRef(false);
   const hasMoreOlderRef = useRef(false);
   const olderBatchDoneRef = useRef(null);
+  const searchLoadPendingRef = useRef(null);
   const skipAutoScrollRef = useRef(false);
   const olderScrollSnapshotRef = useRef(null);
   const typingExpiryTimersRef = useRef(new Map());
@@ -444,6 +446,41 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     };
   }, [chatId, decryptMessageContent, e2eEnabled, e2eMembersVersion, userId]);
 
+  useEffect(() => {
+    if (!e2eEnabled || !userId || !chatId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const handleChatKeySynced = (event) => {
+      if (String(event.detail?.chatId) !== String(chatId)) {
+        return;
+      }
+
+      const snapshot = messagesRef.current;
+      if (!snapshot.some((message) => (message.encryptionVersion ?? 0) > 0 && !message.isE2e)) {
+        return;
+      }
+
+      void Promise.all(snapshot.map((message) => (
+        (message.encryptionVersion ?? 0) > 0 && !message.isE2e
+          ? decryptMessageContent(message)
+          : message
+      ))).then((decrypted) => {
+        if (!cancelled) {
+          setMessages(decrypted);
+        }
+      });
+    };
+
+    window.addEventListener(E2E_CHAT_KEY_SYNCED_EVENT, handleChatKeySynced);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(E2E_CHAT_KEY_SYNCED_EVENT, handleChatKeySynced);
+    };
+  }, [chatId, decryptMessageContent, e2eEnabled, userId]);
+
   const currentUserDisplayName = displayName ?? null;
   const currentUserLogin = username ?? '';
 
@@ -488,6 +525,59 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     }));
   }, []);
 
+  const completeSearchLoadBatch = useCallback((patch) => {
+    const pending = searchLoadPendingRef.current;
+    if (!pending) return;
+
+    Object.assign(pending, patch);
+
+    if (pending.messages == null || pending.hasMoreOlder == null) {
+      return;
+    }
+
+    const { resolve, timeoutId, messages, hasMoreOlder } = pending;
+    clearTimeout(timeoutId);
+    searchLoadPendingRef.current = null;
+    resolve({ messages, hasMoreOlder });
+  }, []);
+
+  const fetchOlderMessagesForSearchAsync = useCallback(async (beforeMessageId) => {
+    const conn = connectionRef.current;
+    const normalizedBeforeId = String(beforeMessageId ?? '');
+    if (!conn || !chatId || !normalizedBeforeId || searchLoadPendingRef.current) {
+      return null;
+    }
+
+    const batchPromise = new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        if (searchLoadPendingRef.current) {
+          searchLoadPendingRef.current = null;
+          reject(new Error('Search messages batch timed out'));
+        }
+      }, 30000);
+
+      searchLoadPendingRef.current = {
+        messages: null,
+        hasMoreOlder: null,
+        timeoutId,
+        resolve,
+        reject,
+      };
+    });
+
+    try {
+      await conn.invoke('GetMessages', chatId, 50, normalizedBeforeId);
+      return await batchPromise;
+    } catch (err) {
+      console.warn('GetMessages (search) failed:', err);
+      if (searchLoadPendingRef.current) {
+        clearTimeout(searchLoadPendingRef.current.timeoutId);
+        searchLoadPendingRef.current = null;
+      }
+      return null;
+    }
+  }, [chatId]);
+
   useEffect(() => {
     if (!chatId || !userId) {
       setMessages([]);
@@ -510,6 +600,10 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     loadingOlderRef.current = false;
     skipAutoScrollRef.current = false;
     olderScrollSnapshotRef.current = null;
+    if (searchLoadPendingRef.current) {
+      clearTimeout(searchLoadPendingRef.current.timeoutId);
+      searchLoadPendingRef.current = null;
+    }
     clearTypingExpiryTimers();
     clearTypingHeartbeat();
     lastTypingSentRef.current = false;
@@ -726,6 +820,12 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
         newConnection.on('ReceiveMessagesMeta', (meta) => {
           if (loadGenerationRef.current !== loadGen) return;
           const hasMore = meta?.hasMoreOlder ?? meta?.HasMoreOlder ?? false;
+
+          if (searchLoadPendingRef.current) {
+            completeSearchLoadBatch({ hasMoreOlder: Boolean(hasMore) });
+            return;
+          }
+
           setHasMoreOlder(Boolean(hasMore));
           setIsLoadingOlder(false);
           loadingOlderRef.current = false;
@@ -739,6 +839,12 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
         newConnection.on('ReceiveMessages', async (messages) => {
           if (loadGenerationRef.current !== loadGen) return;
           const processedMessages = await decryptMessages(messages);
+
+          if (searchLoadPendingRef.current) {
+            acknowledgeIncomingMessages(processedMessages);
+            completeSearchLoadBatch({ messages: processedMessages });
+            return;
+          }
 
           if (loadingOlderRef.current) {
             skipAutoScrollRef.current = true;
@@ -853,7 +959,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
       cleanup();
     };
-  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, updateMessageStatus]);
+  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, completeSearchLoadBatch, decryptMessages, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, updateMessageStatus]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -1214,6 +1320,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     handleMessagesScroll,
     loadOlderMessages,
     loadOlderMessagesAsync,
+    fetchOlderMessagesForSearchAsync,
     ensureMessageLoaded,
     notifyStopTyping,
     sendMessage,

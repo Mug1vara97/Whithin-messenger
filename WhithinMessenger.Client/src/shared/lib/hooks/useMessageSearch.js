@@ -2,6 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 
 const normalizeSearchText = (value) => (value || '').toLowerCase();
 
+const isPersistedMessageId = (messageId) => {
+  const id = String(messageId ?? '');
+  return Boolean(id) && !id.startsWith('temp-');
+};
+
 const messageMatchesQuery = (message, query) => {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return false;
@@ -21,14 +26,52 @@ const waitForNextFrame = () => new Promise((resolve) => {
   requestAnimationFrame(() => resolve());
 });
 
+const getOldestPersistedMessage = (items) => {
+  const persisted = (items || []).filter((message) => isPersistedMessageId(message.messageId));
+  if (!persisted.length) return null;
+
+  return persisted.reduce((oldest, message) => {
+    const oldestTime = new Date(oldest.createdAt).getTime();
+    const messageTime = new Date(message.createdAt).getTime();
+    if (messageTime < oldestTime) return message;
+    if (messageTime > oldestTime) return oldest;
+    return String(message.messageId) < String(oldest.messageId) ? message : oldest;
+  });
+};
+
+const mergeMessagesIntoPool = (poolRef, incoming) => {
+  const existingIds = new Set(poolRef.current.map((message) => String(message.messageId)));
+  const merged = [...poolRef.current];
+
+  (incoming || []).forEach((message) => {
+    const messageId = String(message.messageId);
+    if (!existingIds.has(messageId)) {
+      merged.push(message);
+      existingIds.add(messageId);
+    }
+  });
+
+  poolRef.current = merged.sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  );
+};
+
+const syncLiveMessagesIntoPool = (poolRef, liveMessages) => {
+  if (!poolRef.current.length) {
+    poolRef.current = (liveMessages || []).slice();
+    return;
+  }
+
+  mergeMessagesIntoPool(poolRef, liveMessages);
+};
+
 /**
- * Client-side search over decrypted messages.
- * With E2E, server-side Content search cannot match ciphertext — history is paged in via SignalR.
+ * Client-side search over decrypted messages in an isolated pool.
+ * History paging for search does not mutate the visible chat timeline.
  */
 export const useMessageSearch = (messages = [], options = {}) => {
   const {
-    hasMoreOlder = false,
-    loadOlderMessagesAsync,
+    fetchOlderMessagesForSearchAsync,
     ensureMessageLoaded,
   } = options;
 
@@ -38,17 +81,13 @@ export const useMessageSearch = (messages = [], options = {}) => {
   const [isSearchingHistory, setIsSearchingHistory] = useState(false);
   const debounceTimer = useRef(null);
   const messagesRef = useRef(messages);
-  const hasMoreOlderRef = useRef(hasMoreOlder);
+  const searchPoolRef = useRef([]);
   const searchGenerationRef = useRef(0);
   const deepSearchTaskRef = useRef(null);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  useEffect(() => {
-    hasMoreOlderRef.current = hasMoreOlder;
-  }, [hasMoreOlder]);
 
   const runSearch = useCallback((query) => {
     const trimmed = query.trim();
@@ -57,12 +96,16 @@ export const useMessageSearch = (messages = [], options = {}) => {
       return;
     }
 
-    const results = messagesRef.current
+    const results = searchPoolRef.current
       .filter((message) => messageMatchesQuery(message, trimmed))
       .slice()
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     setSearchResults(results);
+  }, []);
+
+  const resetSearchPool = useCallback(() => {
+    searchPoolRef.current = messagesRef.current.slice();
   }, []);
 
   const cancelDeepSearch = useCallback(() => {
@@ -72,21 +115,28 @@ export const useMessageSearch = (messages = [], options = {}) => {
   }, []);
 
   const runDeepSearch = useCallback(async (query, generation) => {
-    if (!loadOlderMessagesAsync) {
+    if (!fetchOlderMessagesForSearchAsync) {
       setIsSearching(false);
       return;
     }
 
     setIsSearchingHistory(true);
+    let hasMoreOlder = true;
+
     try {
-      while (
-        generation === searchGenerationRef.current
-        && hasMoreOlderRef.current
-      ) {
-        const loaded = await loadOlderMessagesAsync();
-        if (!loaded) break;
-        await waitForNextFrame();
+      while (generation === searchGenerationRef.current && hasMoreOlder) {
+        const oldest = getOldestPersistedMessage(searchPoolRef.current);
+        if (!oldest) break;
+
+        const batch = await fetchOlderMessagesForSearchAsync(oldest.messageId);
+        if (generation !== searchGenerationRef.current || !batch?.messages?.length) {
+          break;
+        }
+
+        mergeMessagesIntoPool(searchPoolRef, batch.messages);
+        hasMoreOlder = Boolean(batch.hasMoreOlder);
         runSearch(query);
+        await waitForNextFrame();
       }
     } finally {
       if (generation === searchGenerationRef.current) {
@@ -95,7 +145,7 @@ export const useMessageSearch = (messages = [], options = {}) => {
         deepSearchTaskRef.current = null;
       }
     }
-  }, [loadOlderMessagesAsync, runSearch]);
+  }, [fetchOlderMessagesForSearchAsync, runSearch]);
 
   const searchMessages = useCallback((query) => {
     setSearchQuery(query);
@@ -107,17 +157,20 @@ export const useMessageSearch = (messages = [], options = {}) => {
     cancelDeepSearch();
 
     if (!query.trim()) {
+      searchPoolRef.current = [];
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
 
+    resetSearchPool();
     setIsSearching(true);
+
     debounceTimer.current = setTimeout(() => {
       const generation = searchGenerationRef.current;
       runSearch(query);
 
-      if (!loadOlderMessagesAsync || !hasMoreOlderRef.current) {
+      if (!fetchOlderMessagesForSearchAsync) {
         setIsSearching(false);
         return;
       }
@@ -125,13 +178,20 @@ export const useMessageSearch = (messages = [], options = {}) => {
       const task = runDeepSearch(query, generation);
       deepSearchTaskRef.current = task;
     }, 300);
-  }, [cancelDeepSearch, runDeepSearch, runSearch, loadOlderMessagesAsync]);
+  }, [
+    cancelDeepSearch,
+    fetchOlderMessagesForSearchAsync,
+    resetSearchPool,
+    runDeepSearch,
+    runSearch,
+  ]);
 
   const clearSearch = useCallback(() => {
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
     cancelDeepSearch();
+    searchPoolRef.current = [];
     setSearchQuery('');
     setSearchResults([]);
     setIsSearching(false);
@@ -147,19 +207,6 @@ export const useMessageSearch = (messages = [], options = {}) => {
       messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       messageElement.classList.add('highlighted');
       setTimeout(() => messageElement.classList.remove('highlighted'), 2000);
-
-      const scrollContainer = messageElement.closest('.messages');
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-      };
-
-      if (scrollContainer && 'onscrollend' in scrollContainer) {
-        scrollContainer.addEventListener('scrollend', finish, { once: true });
-      }
-
-      setTimeout(finish, 650);
       return true;
     };
 
@@ -180,6 +227,8 @@ export const useMessageSearch = (messages = [], options = {}) => {
 
   useEffect(() => {
     if (!searchQuery.trim()) return undefined;
+
+    syncLiveMessagesIntoPool(searchPoolRef, messagesRef.current);
     runSearch(searchQuery);
     return undefined;
   }, [messages, searchQuery, runSearch]);

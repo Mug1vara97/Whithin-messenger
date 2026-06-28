@@ -1,3 +1,25 @@
+.message-search--modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.message-search-field--modal,
+.message-search--modal .message-search-field.is-focused,
+.message-search--modal .message-search-field.has-value {
+  width: 100%;
+}
+
+.message-search-results--modal {
+  position: static;
+  top: auto;
+  right: auto;
+  width: 100%;
+  max-height: min(420px, calc(100vh - 220px));
+  box-shadow: none;
+}
+
 .message-search {
   position: relative;
   display: flex;

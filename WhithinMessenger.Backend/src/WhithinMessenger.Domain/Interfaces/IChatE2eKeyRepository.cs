@@ -18,4 +18,14 @@ public interface IChatE2eKeyRepository
         Guid chatId,
         IReadOnlyList<ChatE2eWrappedKey> keys,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Guid>> GetChatIdsForUserDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteForUserDeviceAsync(
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default);
 }

@@ -9,7 +9,7 @@ import React, {
 import { chatApi } from '../../../entities/chat/api/chatApi';
 import { serverApi } from '../../../entities/server/api/serverApi';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
-import { ensureE2eIdentity } from '../e2e';
+import { ensureE2eIdentity, syncSessionE2eKeys } from '../e2e';
 import { useAuthContext } from './AuthContext';
 import { useServerContext } from './useServerContext';
 
@@ -48,9 +48,14 @@ export const StartupBootProvider = ({ children }) => {
       return undefined;
     }
 
-    // Device key only: upload public key so others can encrypt for this user.
-    // Chat-key distribution still happens on first message in each chat.
-    void ensureE2eIdentity(user.id).catch(() => {});
+    // Upload device key, then refresh chat-key wraps for all locally known chats.
+    void ensureE2eIdentity(user.id, { strictUpload: true })
+      .then(() => chatApi.getUserChats())
+      .then((chatItems) => {
+        const chats = Array.isArray(chatItems) ? chatItems : [];
+        return syncSessionE2eKeys(user.id, chats);
+      })
+      .catch(() => {});
   }, [isLoading, isAuthenticated, user?.id]);
 
   useEffect(() => {
