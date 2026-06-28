@@ -1,8 +1,9 @@
 import { MEDIA_BASE_URL } from '../constants/apiEndpoints';
+import { extractAvatarFrameId, getLocalAvatarFramePath } from '../avatarDecorations/catalog';
 
 export const AVATAR_DECORATION_UI_ENABLED = true;
 
-/** Рекомендуемый размер (как у Discord Avatar Decoration). */
+/** Рекомендуемый размер рамки аватара. */
 export const AVATAR_DECORATION_RECOMMENDED_SIZE = 256;
 export const AVATAR_DECORATION_RECOMMENDED_INNER_HOLE = 160;
 
@@ -21,6 +22,65 @@ export const AVATAR_DECORATION_SPEC_HINT =
   `~${AVATAR_DECORATION_RECOMMENDED_SIZE}×${AVATAR_DECORATION_RECOMMENDED_SIZE} px, прозрачный центр ~${AVATAR_DECORATION_RECOMMENDED_INNER_HOLE}×${AVATAR_DECORATION_RECOMMENDED_INNER_HOLE} px.`;
 
 export const TEST_AVATAR_DECORATION_PATH = '/testAvatar.webp';
+
+/** Статика клиента для аватаров и превью (не путать с рамками каталога). */
+const CLIENT_PUBLIC_ASSET_PREFIXES = ['/avatar-frames/', '/testAvatar.'];
+
+const isTestAvatarDecorationPath = (path) => {
+  if (!path) return false;
+  const normalized = String(path).trim().toLowerCase().split('?')[0];
+  return normalized === TEST_AVATAR_DECORATION_PATH.toLowerCase()
+    || normalized.endsWith('/testavatar.webp');
+};
+
+const resolveClientStaticDecorationUrl = (path) => {
+  if (typeof window === 'undefined') {
+    return path;
+  }
+  return `${window.location.origin}${path}`;
+};
+
+export function isClientPublicAssetPath(path) {
+  if (!path || typeof path !== 'string') return false;
+  return CLIENT_PUBLIC_ASSET_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+export function resolveClientPublicAssetUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  if (isClientPublicAssetPath(path)) {
+    return resolveClientStaticDecorationUrl(path);
+  }
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
+export function resolveAvatarDecorationUrl(avatarDecoration) {
+  if (!avatarDecoration) return null;
+
+  const frameId = extractAvatarFrameId(avatarDecoration);
+  if (frameId) {
+    return resolveClientStaticDecorationUrl(getLocalAvatarFramePath(frameId));
+  }
+
+  if (avatarDecoration.startsWith('http://') || avatarDecoration.startsWith('https://')) {
+    return avatarDecoration;
+  }
+
+  if (avatarDecoration.startsWith('/')) {
+    if (avatarDecoration.startsWith('/avatar-frames/') || isTestAvatarDecorationPath(avatarDecoration)) {
+      return resolveClientStaticDecorationUrl(
+        isTestAvatarDecorationPath(avatarDecoration)
+          ? TEST_AVATAR_DECORATION_PATH
+          : avatarDecoration,
+      );
+    }
+    return `${MEDIA_BASE_URL}${avatarDecoration}`;
+  }
+
+  return avatarDecoration;
+}
 
 const GENERIC_MIME_TYPES = new Set(['', 'application/octet-stream']);
 
@@ -83,17 +143,6 @@ export function validateAvatarDecorationFile(file) {
   if (!isAvatarDecorationFile(file)) {
     throw new Error(AVATAR_DECORATION_FORMATS_ERROR);
   }
-}
-
-export function resolveAvatarDecorationUrl(avatarDecoration) {
-  if (!avatarDecoration) return null;
-  if (avatarDecoration.startsWith('http://') || avatarDecoration.startsWith('https://')) {
-    return avatarDecoration;
-  }
-  if (avatarDecoration.startsWith('/')) {
-    return `${MEDIA_BASE_URL}${avatarDecoration}`;
-  }
-  return avatarDecoration;
 }
 
 export function getMemberAvatarDecoration(member) {

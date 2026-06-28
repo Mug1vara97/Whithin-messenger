@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
-import { SOUNDPAD_PANEL_TOGGLE_EVENT } from '../../../lib/soundpad/soundpadPanelEvents';
+import { SOUNDPAD_PANEL_TOGGLE_EVENT, SOUNDPAD_PLAYBACK_CHANGED_EVENT } from '../../../lib/soundpad/soundpadPanelEvents';
 import { soundpadLog, soundpadError } from '../../../lib/soundpad/soundpadLogger';
 import './SoundpadPanel.css';
 
@@ -11,6 +11,16 @@ const SoundpadPanel = () => {
   const [bridgeRunning, setBridgeRunning] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(() => soundpadStorage.getConfig().showPanel !== false);
   const [isOpen, setIsOpen] = useState(false);
+  const [playingSlotId, setPlayingSlotId] = useState(() => soundpadBridge.getPlayingSlotId());
+
+  useEffect(() => {
+    const onPlaybackChange = (event) => {
+      setPlayingSlotId(event.detail?.playingSlotId ?? null);
+    };
+
+    window.addEventListener(SOUNDPAD_PLAYBACK_CHANGED_EVENT, onPlaybackChange);
+    return () => window.removeEventListener(SOUNDPAD_PLAYBACK_CHANGED_EVENT, onPlaybackChange);
+  }, []);
 
   useEffect(() => {
     const onConfigChange = () => {
@@ -125,12 +135,18 @@ const SoundpadPanel = () => {
         <div className="soundpad-panel__grid">
           {slots.map((slot) => {
             const hotkeyLabel = slot.hotkey ? hotkeyStorage.formatKey(slot.hotkey) : '';
+            const isPlaying = playingSlotId === slot.id;
+            const actionLabel = isPlaying ? 'Остановить' : 'Проиграть';
             return (
               <button
                 key={slot.id}
                 type="button"
-                className="soundpad-panel__btn"
-                title={hotkeyLabel ? `${slot.label} (${hotkeyLabel})` : slot.label}
+                className={`soundpad-panel__btn${isPlaying ? ' soundpad-panel__btn--playing' : ''}`}
+                title={
+                  hotkeyLabel
+                    ? `${slot.label} — ${actionLabel} (${hotkeyLabel})`
+                    : `${slot.label} — ${actionLabel}`
+                }
                 onClick={() =>
                   soundpadBridge.playSlot(slot.id).catch((err) => {
                     soundpadError('SoundpadPanel: play failed', slot.id, err);

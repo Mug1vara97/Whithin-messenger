@@ -8,6 +8,11 @@ import {
   DISCOVERY_TAB,
 } from '../../../widgets/discovery-hub';
 import { OPEN_DISCOVERY_EVENT } from '../../../shared/lib/utils/discoveryEvents';
+import {
+  getDiscoveryPath,
+  isDiscoveryPath,
+  parseDiscoveryTab,
+} from '../../../widgets/discovery-hub/ui/discoveryRoutes';
 import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
@@ -56,20 +61,28 @@ const HomePage = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
   const [serverDataFromPanel, setServerDataFromPanel] = useState(null);
-  const [showDiscovery, setShowDiscovery] = useState(false);
-  const [discoveryTab, setDiscoveryTab] = useState(DISCOVERY_TAB.SERVERS);
   const [discoverySearch, setDiscoverySearch] = useState('');
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [markingAllNotificationsAsRead, setMarkingAllNotificationsAsRead] = useState(false);
   
   const showFriends = location.pathname === '/channels/@me/friends';
+  const showDiscovery = isDiscoveryPath(location.pathname);
+  const discoveryTab = parseDiscoveryTab(location.pathname) ?? DISCOVERY_TAB.SERVERS;
 
   useEffect(() => {
-    if (chatId || channelId || showFriends) {
-      setShowDiscovery(false);
+    if (!showDiscovery) return;
+    setSelectedServer(null);
+    setSelectedChat(null);
+  }, [showDiscovery]);
+
+  useEffect(() => {
+    if (!isDiscoveryPath(location.pathname)) return;
+    const section = location.pathname.replace(/^\/discovery\/?/, '');
+    if (section && !Object.values(DISCOVERY_TAB).includes(section)) {
+      navigate(getDiscoveryPath(DISCOVERY_TAB.SERVERS), { replace: true });
     }
-  }, [chatId, channelId, showFriends]);
+  }, [location.pathname, navigate]);
 
   const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
@@ -898,8 +911,6 @@ const HomePage = () => {
   }, [chatId, chats, navigate, initialChatsLoaded, refreshChats]);
 
   const handleChatSelected = (chat) => {
-    setShowDiscovery(false);
-
     if (chat && !chat.isServerChat) {
       setSelectedChat(chat);
       setSelectedServer(null);
@@ -958,8 +969,7 @@ const HomePage = () => {
 
   const handleServerSelected = useCallback((server) => {
     setSelectedServer(server);
-    setSelectedChat(null); 
-    setShowDiscovery(false);
+    setSelectedChat(null);
     
     if (server) {
       navigate(`/server/${server.serverId}`);
@@ -969,21 +979,13 @@ const HomePage = () => {
   }, [navigate]);
 
   const handleCloseDiscovery = useCallback(() => {
-    setShowDiscovery(false);
     setDiscoverySearch('');
-  }, []);
+    navigate('/channels/@me');
+  }, [navigate]);
 
-  const handleDiscoverClick = useCallback((show, tab = DISCOVERY_TAB.SERVERS) => {
-    setShowDiscovery(show);
-    if (show) {
-      setDiscoveryTab(tab);
-      setDiscoverySearch('');
-      setSelectedServer(null);
-      setSelectedChat(null);
-      navigate('/channels/@me');
-    } else {
-      setDiscoverySearch('');
-    }
+  const handleDiscoverySectionChange = useCallback((tab) => {
+    setDiscoverySearch('');
+    navigate(getDiscoveryPath(tab));
   }, [navigate]);
 
   useEffect(() => {
@@ -992,15 +994,16 @@ const HomePage = () => {
 
   useEffect(() => {
     const handleOpenDiscovery = (event) => {
-      const tab = event.detail?.tab === DISCOVERY_TAB.THEMES
+      const requestedTab = event.detail?.tab;
+      const tab = requestedTab === DISCOVERY_TAB.THEMES
         ? DISCOVERY_TAB.THEMES
-        : DISCOVERY_TAB.SERVERS;
-      setShowDiscovery(true);
-      setDiscoveryTab(tab);
+        : requestedTab === DISCOVERY_TAB.DECORATIONS
+          ? DISCOVERY_TAB.DECORATIONS
+          : DISCOVERY_TAB.SERVERS;
       setDiscoverySearch('');
       setSelectedServer(null);
       setSelectedChat(null);
-      navigate('/channels/@me');
+      navigate(getDiscoveryPath(tab));
     };
 
     window.addEventListener(OPEN_DISCOVERY_EVENT, handleOpenDiscovery);
@@ -1008,7 +1011,6 @@ const HomePage = () => {
   }, [navigate]);
 
   const handleFriendsSelected = useCallback(() => {
-    setShowDiscovery(false);
     navigate('/channels/@me/friends');
   }, [navigate]);
 
@@ -1207,7 +1209,6 @@ const HomePage = () => {
           <ServerList 
             onServerSelected={handleServerSelected}
             selectedServerId={selectedServer?.serverId}
-            onDiscoverClick={handleDiscoverClick}
             onCreateServerClick={handleCreateServerClick}
             onSettingsClick={handleSettingsClick}
             onNotificationsClick={handleNotificationsClick}
@@ -1223,8 +1224,7 @@ const HomePage = () => {
                   {showDiscovery ? (
                     <DiscoverySidebar
                       activeSection={discoveryTab}
-                      onSectionChange={setDiscoveryTab}
-                      onClose={handleCloseDiscovery}
+                      onSectionChange={handleDiscoverySectionChange}
                     />
                   ) : selectedServer ? (
                     <ServerPanel
@@ -1277,6 +1277,7 @@ const HomePage = () => {
                   onSearchChange={setDiscoverySearch}
                   onServerSelected={handleServerSelected}
                   onClose={handleCloseDiscovery}
+                  onSectionChange={handleDiscoverySectionChange}
                 />
                   ) : selectedChat ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -1289,6 +1290,7 @@ const HomePage = () => {
                       userName={user?.username || user?.name}
                       onClose={handleCloseSelectedChat}
                       serverId={selectedServer?.serverId}
+                      serverOwnerId={selectedServer?.ownerId ?? selectedServer?.OwnerId}
                       canMuteMembers={userCanMuteMembers}
                     />
                   ) : isIdeasBoardChannel(selectedChat) ? (

@@ -142,6 +142,8 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 [data-frosted-glass='enabled'] .server-settings-page,
 [data-frosted-glass='enabled'] .server-settings-main,
 [data-frosted-glass='enabled'] .server-panel-header,
+[data-frosted-glass='enabled'] .discovery-sidebar,
+[data-frosted-glass='enabled'] .discovery-sidebar__header,
 [data-frosted-glass='enabled'] .server-channels,
 [data-frosted-glass='enabled'] [class*='user-panel'] {
   background: transparent !important;
@@ -165,6 +167,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 }
 
 [data-frosted-glass='enabled'] .friends-panel,
+[data-frosted-glass='enabled'] .discovery-main,
 [data-frosted-glass='enabled'] .server-discovery {
   background: var(--fg-fill-middle) !important;
 }
@@ -379,7 +382,8 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 }
 
 /* === Chat chrome — tinted from theme palette === */
-[data-frosted-glass='enabled'] .chat-header {
+[data-frosted-glass='enabled'] .chat-header,
+[data-frosted-glass='enabled'] .discovery-main__header {
   background: var(--fg-fill-header) !important;
   border-bottom-color: var(--border) !important;
 }

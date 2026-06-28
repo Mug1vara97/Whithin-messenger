@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
-import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
+import {
+  isClientPublicAssetPath,
+  resolveAvatarDecorationUrl,
+  resolveClientPublicAssetUrl,
+} from '../../../lib/utils/avatarDecorationHelpers';
 import AvatarDecorationMedia from './AvatarDecorationMedia';
 import './UserAvatar.css';
 
@@ -46,9 +50,17 @@ const UserAvatar = ({
     fallback: !hasDisplayName && !hasLogin ? username : undefined,
   });
 
+  const resolvedAvatarSrc = avatarUrl
+    ? avatarUrl.startsWith('http')
+      ? avatarUrl
+      : isClientPublicAssetPath(avatarUrl)
+        ? resolveClientPublicAssetUrl(avatarUrl)
+        : `${BASE_URL}${avatarUrl}`
+    : null;
+
   const content = !displayInitials ? (
     <img
-      src={avatarUrl.startsWith('http') ? avatarUrl : `${BASE_URL}${avatarUrl}`}
+      src={resolvedAvatarSrc}
       alt=""
       onError={() => setImageError(true)}
       style={{

@@ -11,6 +11,8 @@ public record DeleteMessageResult
 {
     public bool Success { get; init; }
     public string? ErrorMessage { get; init; }
+    public Guid? ChatId { get; init; }
+    public Guid MessageId { get; init; }
 }
 
 

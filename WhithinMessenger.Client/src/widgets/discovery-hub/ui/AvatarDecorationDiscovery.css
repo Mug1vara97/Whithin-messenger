@@ -1,0 +1,174 @@
+.avatar-decoration-discovery {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.avatar-decoration-discovery__error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger, #ed4245) 14%, transparent);
+  color: var(--danger, #ed4245);
+  font-size: 14px;
+}
+
+.avatar-decoration-discovery__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.avatar-decoration-discovery__card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #2b2d31);
+  border: 1px solid var(--border, #3f4147);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  animation: avatarDecorationCardIn 0.24s ease-out both;
+}
+
+@keyframes avatarDecorationCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.avatar-decoration-discovery__card:hover {
+  border-color: rgba(88, 101, 242, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.avatar-decoration-discovery__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  padding: 18px 12px 12px;
+  background:
+    radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--primary, #5865f2) 18%, transparent), transparent 62%),
+    var(--background-secondary, #313338);
+  border-bottom: 1px solid var(--border, #3f4147);
+}
+
+.avatar-decoration-discovery__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 0;
+  flex: 1;
+}
+
+.avatar-decoration-discovery__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.avatar-decoration-discovery__card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #f2f3f5);
+}
+
+.avatar-decoration-discovery__badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.avatar-decoration-discovery__badge--active {
+  color: var(--primary, #5865f2);
+  background: color-mix(in srgb, var(--primary, #5865f2) 16%, transparent);
+}
+
+.avatar-decoration-discovery__card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-muted, #949ba4);
+}
+
+.avatar-decoration-discovery__card-actions {
+  padding: 12px 14px 14px;
+}
+
+.avatar-decoration-discovery__btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.avatar-decoration-discovery__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.avatar-decoration-discovery__btn--apply {
+  color: #fff;
+  background: var(--primary, #5865f2);
+}
+
+.avatar-decoration-discovery__btn--apply:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary, #5865f2) 85%, #000);
+}
+
+.avatar-decoration-discovery__btn--remove {
+  color: var(--danger, #ed4245);
+  background: color-mix(in srgb, var(--danger, #ed4245) 12%, transparent);
+}
+
+.avatar-decoration-discovery__btn--remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger, #ed4245) 20%, transparent);
+}
+
+.avatar-decoration-discovery__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 240px;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-muted, #949ba4);
+}
+
+.avatar-decoration-discovery__state h3 {
+  margin: 8px 0 0;
+  font-size: 18px;
+  color: var(--text, #f2f3f5);
+}
+
+.avatar-decoration-discovery__state p {
+  margin: 0;
+  max-width: 360px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .avatar-decoration-discovery__grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}

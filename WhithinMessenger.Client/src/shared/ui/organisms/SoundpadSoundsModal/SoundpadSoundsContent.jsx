@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import PlayArrow from '@mui/icons-material/PlayArrow';
+import Stop from '@mui/icons-material/Stop';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import Keyboard from '@mui/icons-material/Keyboard';
 import Add from '@mui/icons-material/Add';
@@ -10,6 +11,7 @@ import { soundpadStorage } from '../../../lib/soundpad/soundpadStorage';
 import { findHotkeyConflict } from '../../../lib/soundpad/soundpadHotkeys';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadError } from '../../../lib/soundpad/soundpadLogger';
+import { SOUNDPAD_PLAYBACK_CHANGED_EVENT } from '../../../lib/soundpad/soundpadPanelEvents';
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import '../SoundpadSettingsModal/SoundpadSettingsModal.css';
 
@@ -30,6 +32,16 @@ const SoundpadSoundsContent = ({ active = true }) => {
   const [pendingLabel, setPendingLabel] = useState('Новый звук');
   const [editingHotkeySlotId, setEditingHotkeySlotId] = useState(null);
   const [tempHotkey, setTempHotkey] = useState('');
+  const [playingSlotId, setPlayingSlotId] = useState(() => soundpadBridge.getPlayingSlotId());
+
+  useEffect(() => {
+    const onPlaybackChange = (event) => {
+      setPlayingSlotId(event.detail?.playingSlotId ?? null);
+    };
+
+    window.addEventListener(SOUNDPAD_PLAYBACK_CHANGED_EVENT, onPlaybackChange);
+    return () => window.removeEventListener(SOUNDPAD_PLAYBACK_CHANGED_EVENT, onPlaybackChange);
+  }, []);
 
   useEffect(() => {
     if (!active) return;
@@ -164,6 +176,7 @@ const SoundpadSoundsContent = ({ active = true }) => {
         <h3 className="soundpad-modal-section__title">Саундпад</h3>
         <p className="soundpad-hint soundpad-modal-section__hint">
           Звук подмешивается в микрофон внутри Whithin. Саундпад слышен в звонке даже при выключенном микрофоне.
+          Повторное нажатие на звук или ту же горячую клавишу остановит воспроизведение.
         </p>
         <label className="soundpad-checkbox soundpad-modal-section__checkbox">
           <input
@@ -293,12 +306,18 @@ const SoundpadSoundsContent = ({ active = true }) => {
                   <div className="soundpad-slot-card__actions">
                     <button
                       type="button"
-                      className="soundpad-icon-btn soundpad-icon-btn--play"
+                      className={`soundpad-icon-btn soundpad-icon-btn--play${
+                        playingSlotId === slot.id ? ' soundpad-icon-btn--playing' : ''
+                      }`}
                       onClick={() => handlePlaySlot(slot.id)}
-                      title="Проиграть"
-                      aria-label="Проиграть"
+                      title={playingSlotId === slot.id ? 'Остановить' : 'Проиграть'}
+                      aria-label={playingSlotId === slot.id ? 'Остановить' : 'Проиграть'}
                     >
-                      <PlayArrow fontSize="small" />
+                      {playingSlotId === slot.id ? (
+                        <Stop fontSize="small" />
+                      ) : (
+                        <PlayArrow fontSize="small" />
+                      )}
                     </button>
                     <button
                       type="button"

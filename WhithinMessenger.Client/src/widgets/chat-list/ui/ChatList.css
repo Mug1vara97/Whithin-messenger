@@ -152,10 +152,6 @@
   background: var(--surface, #2f3136);
 }
 
-.chat-list--pinned-active {
-  background-color: color-mix(in srgb, var(--primary, #5865f2) 8%, var(--surface, #2f3136));
-}
-
 .chat-item {
   display: flex;
   align-items: center;
@@ -239,7 +235,6 @@
 }
 
 .chat-item--pinned {
-  background-color: color-mix(in srgb, var(--surface-hover, #36393f) 60%, transparent);
   cursor: grab;
 }
 

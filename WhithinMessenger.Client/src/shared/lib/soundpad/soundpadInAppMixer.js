@@ -21,6 +21,10 @@ class SoundpadInAppMixer {
     return Boolean(this.destination?.stream?.active);
   }
 
+  isPlaying() {
+    return this.activeSources.size > 0;
+  }
+
   async ensureInitialized(audioConstraints = { audio: true }) {
     if (this.isActive()) {
       return this.getMixedStream();

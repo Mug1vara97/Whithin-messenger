@@ -13,6 +13,7 @@ import styles from './ServerList.module.css';
 /** Ключ слота панели под текущий URL (серверы живут на /server/:id, не на /channels/...). */
 function getActiveRailKey(pathname) {
   if (!pathname) return null;
+  if (pathname === '/discovery' || pathname.startsWith('/discovery/')) return 'discovery';
   if (pathname.startsWith('/channels/@me')) return '@me';
   const serverMatch = pathname.match(/^\/server\/([^/]+)/);
   if (serverMatch?.[1]) return serverMatch[1];
@@ -21,7 +22,6 @@ function getActiveRailKey(pathname) {
 
 const ServerList = ({
   onServerSelected,
-  onDiscoverClick,
   onCreateServerClick,
   onSettingsClick,
   onNotificationsClick,
@@ -101,10 +101,8 @@ const ServerList = ({
 
 
   const handleDiscoverClick = useCallback(() => {
-    if (onDiscoverClick) {
-      onDiscoverClick(true);
-    }
-  }, [onDiscoverClick]);
+    onServerSelected?.(null);
+  }, [onServerSelected]);
 
   const handleLogout = useCallback(() => {
     if (window.confirm('Вы уверены, что хотите выйти из аккаунта?')) {
@@ -226,7 +224,6 @@ const ServerList = ({
                         skipNextServerLinkClick.current = false;
                         return;
                       }
-                      onDiscoverClick && onDiscoverClick(false);
                       onServerSelected && onServerSelected(server);
                     }}
                   >
@@ -297,7 +294,6 @@ const ServerList = ({
                     .join(' ')
                 }
                 onClick={() => {
-                  onDiscoverClick && onDiscoverClick(false);
                   onServerSelected && onServerSelected(null);
                 }}
                 title="Чаты"
@@ -325,14 +321,23 @@ const ServerList = ({
                 +
               </button>
             </li>
-            <li className={styles['server-item']}>
-              <div
-                className={styles['server-button']}
+            <li className={styles['server-item']} data-rail-slot="discovery">
+              <NavLink
+                to="/discovery"
+                className={({ isActive }) =>
+                  [
+                    styles['server-button'],
+                    styles['rail-tab-button'],
+                    isActive ? styles['rail-tab-active'] : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                }
                 onClick={handleDiscoverClick}
                 title="Обзор"
               >
-                <Explore sx={{ fontSize: 24, opacity: 0.85 }} />
-              </div>
+                <Explore sx={{ fontSize: 22, color: 'inherit' }} />
+              </NavLink>
             </li>
             {showNotificationsInRail && (
               <li className={styles['server-item']}>
@@ -392,7 +397,6 @@ export default memo(ServerList, (prevProps, nextProps) => {
     prevProps.userId === nextProps.userId &&
     prevProps.selectedServerId === nextProps.selectedServerId &&
     prevProps.onServerSelected === nextProps.onServerSelected &&
-    prevProps.onDiscoverClick === nextProps.onDiscoverClick &&
     prevProps.unreadNotificationsCount === nextProps.unreadNotificationsCount &&
     prevProps.unreadCountByServer === nextProps.unreadCountByServer
   );

@@ -17,6 +17,10 @@ class SoundpadLocalMonitor {
     return soundpadStorage.getConfig().monitorEnabled !== false;
   }
 
+  isPlaying() {
+    return this.activeSources.size > 0;
+  }
+
   getMonitorVolume() {
     return clampVolume(soundpadStorage.getConfig().monitorVolume ?? 1);
   }

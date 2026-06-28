@@ -27,7 +27,9 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
 
   const handleGlobalShortcut = useCallback((shortcut) => {
     const now = Date.now();
+    const isSoundpadShortcut = isSoundpadAction(shortcut);
     if (
+      !isSoundpadShortcut &&
       lastShortcutDispatchRef.current.action === shortcut &&
       now - lastShortcutDispatchRef.current.at < SHORTCUT_DEDUPE_MS
     ) {

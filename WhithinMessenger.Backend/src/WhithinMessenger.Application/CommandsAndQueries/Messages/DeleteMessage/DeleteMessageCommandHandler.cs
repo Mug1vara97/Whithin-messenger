@@ -97,7 +97,9 @@ public class DeleteMessageCommandHandler : IRequestHandler<DeleteMessageCommand,
 
             return new DeleteMessageResult
             {
-                Success = true
+                Success = true,
+                ChatId = message.ChatId,
+                MessageId = request.MessageId,
             };
         }
         catch (Exception ex)

@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Attributes;
+using WhithinMessenger.Api.Hubs;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetUserChats;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.CreatePrivateChat;
 using WhithinMessenger.Application.CommandsAndQueries.Chats.GetChatParticipants;
@@ -22,10 +24,12 @@ namespace WhithinMessenger.Api.Controllers
     public class ChatController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly IHubContext<GroupChatHub> _groupChatHub;
 
-        public ChatController(IMediator mediator)
+        public ChatController(IMediator mediator, IHubContext<GroupChatHub> groupChatHub)
         {
             _mediator = mediator;
+            _groupChatHub = groupChatHub;
         }
 
         [HttpGet("user-chats")]
@@ -209,6 +213,13 @@ namespace WhithinMessenger.Api.Controllers
                 if (!result.Success)
                 {
                     return BadRequest(new { error = result.ErrorMessage });
+                }
+
+                if (result.ChatId.HasValue)
+                {
+                    await _groupChatHub.Clients
+                        .Group(result.ChatId.Value.ToString())
+                        .SendAsync("MessageDeleted", result.MessageId);
                 }
 
                 return Ok(new { success = true });

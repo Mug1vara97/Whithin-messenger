@@ -141,6 +141,30 @@ const isBannerImage = (banner) => {
   return false;
 };
 
+const buildProfilePresentation = (profile) => {
+  if (!profile) return null;
+
+  const bannerIsImage = isBannerImage(profile.banner);
+  const bannerValue = profile.banner
+    ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
+    : null;
+
+  return {
+    avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
+    avatarColor: profile.avatarColor || '#5865f2',
+    banner: bannerValue,
+    nameplate: profile.nameplate || null,
+    avatarDecoration: profile.avatarDecoration || null,
+  };
+};
+
+const participantHasProfileMedia = (participant) => Boolean(
+  participant?.avatar
+  || participant?.banner
+  || participant?.nameplate
+  || participant?.avatarDecoration,
+);
+
 const normalizeChannelId = (channelId) => (channelId == null ? '' : String(channelId));
 
 let voiceJoinGeneration = 0;
@@ -1894,11 +1918,18 @@ export const useCallStore = create(
         }
       },
       
-      applyExistingPeers: (existingPeers) => {
+      applyExistingPeers: async (existingPeers) => {
         if (!existingPeers?.length) return;
 
         const state = get();
+        const existingByUserId = new Map(
+          (state.participants || []).map((participant) => [
+            String(participant.userId),
+            participant,
+          ]),
+        );
         const newMap = new Map(state.peerIdToUserIdMap);
+
         existingPeers.forEach((peer) => {
           const socketId = peer.peerId || peer.id;
           if (socketId && peer.userId) {
@@ -1906,29 +1937,43 @@ export const useCallStore = create(
           }
         });
 
-        set({
-          peerIdToUserIdMap: newMap,
-          participants: existingPeers.map((peer) => ({
+        const buildParticipantFromPeer = (peer) => {
+          const previous = existingByUserId.get(String(peer.userId));
+          return {
             userId: peer.userId,
             peerId: peer.peerId || peer.id,
-            name: peer.name,
-            isMuted: peer.isMuted || false,
-            isAudioEnabled: peer.isAudioEnabled !== undefined ? peer.isAudioEnabled : true,
-            isGlobalAudioMuted: peer.isGlobalAudioMuted || false,
-            isServerMuted: Boolean(peer.isServerMuted),
-            isServerDeafened: Boolean(peer.isServerDeafened),
-            isSpeaking: false,
-            avatar: null,
-            avatarColor: '#5865f2',
-            banner: null,
-            nameplate: null,
-            avatarDecoration: null,
-          })),
+            name: peer.name || previous?.name,
+            isMuted: peer.isMuted ?? previous?.isMuted ?? false,
+            isAudioEnabled: peer.isAudioEnabled !== undefined
+              ? peer.isAudioEnabled
+              : (previous?.isAudioEnabled ?? true),
+            isGlobalAudioMuted: peer.isGlobalAudioMuted ?? previous?.isGlobalAudioMuted ?? false,
+            isServerMuted: Boolean(peer.isServerMuted ?? previous?.isServerMuted),
+            isServerDeafened: Boolean(peer.isServerDeafened ?? previous?.isServerDeafened),
+            isSpeaking: previous?.isSpeaking ?? false,
+            avatar: previous?.avatar ?? null,
+            avatarColor: previous?.avatarColor ?? '#5865f2',
+            banner: previous?.banner ?? null,
+            nameplate: previous?.nameplate ?? null,
+            avatarDecoration: previous?.avatarDecoration ?? null,
+            videoStream: previous?.videoStream,
+            isVideoEnabled: previous?.isVideoEnabled ?? false,
+          };
+        };
+
+        set({
+          peerIdToUserIdMap: newMap,
+          participants: existingPeers.map(buildParticipantFromPeer),
         });
 
         const applyRoomId = normalizeChannelId(get().currentRoomId);
 
-        Promise.all(existingPeers.map(async (peer) => {
+        await Promise.all(existingPeers.map(async (peer) => {
+          const previous = existingByUserId.get(String(peer.userId));
+          if (participantHasProfileMedia(previous)) {
+            return;
+          }
+
           try {
             const profile = await userApi.getProfile(peer.userId);
             if (!profile) return;
@@ -1937,33 +1982,27 @@ export const useCallStore = create(
               return;
             }
 
-            const bannerIsImage = isBannerImage(profile.banner);
-            const bannerValue = profile.banner
-              ? (bannerIsImage ? `${MEDIA_BASE_URL}${profile.banner}` : profile.banner)
-              : null;
+            const presentation = buildProfilePresentation(profile);
+            if (!presentation) return;
 
             set((currentState) => ({
               participants: currentState.participants.map((participant) =>
-                participant.userId === peer.userId
-                  ? {
-                      ...participant,
-                      avatar: profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null,
-                      avatarColor: profile.avatarColor || '#5865f2',
-                      banner: bannerValue,
-                      nameplate: profile.nameplate || null,
-                      avatarDecoration: profile.avatarDecoration || null,
-                    }
+                String(participant.userId) === String(peer.userId)
+                  ? { ...participant, ...presentation }
                   : participant
               ),
             }));
           } catch (error) {
             console.warn('Failed to load profile for existing peer:', peer.userId, error);
           }
-        })).catch((error) => {
-          console.warn('Error loading profiles for existing peers:', error);
-        });
+        }));
 
         get().assignDefaultSpatialPositions();
+
+        const roomId = normalizeChannelId(get().currentRoomId);
+        if (roomId && roomId === applyRoomId) {
+          await get().refreshVoiceChannelParticipantsList(roomId);
+        }
       },
 
       refreshVoiceChannelParticipantsList: async (roomId) => {
@@ -1978,20 +2017,35 @@ export const useCallStore = create(
           isDeafened: afterJoinState.isGlobalAudioMuted || false,
           avatar: null,
           avatarColor: '#5865f2',
+          banner: null,
           nameplate: null,
           avatarDecoration: null,
         };
 
-        try {
-          const profile = await userApi.getProfile(afterJoinState.currentUserId);
-          if (profile) {
-            currentUserData.avatar = profile.avatar ? `${MEDIA_BASE_URL}${profile.avatar}` : null;
-            currentUserData.avatarColor = profile.avatarColor || '#5865f2';
-            currentUserData.nameplate = profile.nameplate || null;
-            currentUserData.avatarDecoration = profile.avatarDecoration || null;
+        const selfParticipant = afterJoinState.participants.find(
+          (participant) => String(participant.userId) === String(afterJoinState.currentUserId),
+        );
+
+        if (participantHasProfileMedia(selfParticipant)) {
+          currentUserData.avatar = selfParticipant.avatar ?? null;
+          currentUserData.avatarColor = selfParticipant.avatarColor || '#5865f2';
+          currentUserData.banner = selfParticipant.banner ?? null;
+          currentUserData.nameplate = selfParticipant.nameplate ?? null;
+          currentUserData.avatarDecoration = selfParticipant.avatarDecoration ?? null;
+        } else {
+          try {
+            const profile = await userApi.getProfile(afterJoinState.currentUserId);
+            const presentation = buildProfilePresentation(profile);
+            if (presentation) {
+              currentUserData.avatar = presentation.avatar;
+              currentUserData.avatarColor = presentation.avatarColor;
+              currentUserData.banner = presentation.banner;
+              currentUserData.nameplate = presentation.nameplate;
+              currentUserData.avatarDecoration = presentation.avatarDecoration;
+            }
+          } catch (error) {
+            console.warn('Failed to load current user profile for voice channel:', error);
           }
-        } catch (error) {
-          console.warn('Failed to load current user profile for voice channel:', error);
         }
 
         const channelParticipants = [
@@ -2006,6 +2060,7 @@ export const useCallStore = create(
             isDeafened: participant.isGlobalAudioMuted || false,
             avatar: participant.avatar,
             avatarColor: participant.avatarColor || '#5865f2',
+            banner: participant.banner ?? null,
             nameplate: participant.nameplate || null,
             avatarDecoration: participant.avatarDecoration || null,
           })),
@@ -2048,11 +2103,12 @@ export const useCallStore = create(
         );
 
         if (response?.existingPeers?.length) {
-          get().applyExistingPeers(response.existingPeers);
+          await get().applyExistingPeers(response.existingPeers);
+        } else {
+          await get().refreshVoiceChannelParticipantsList(targetRoomId);
         }
 
         voiceCallApi.syncExistingRemoteTracks();
-        await get().refreshVoiceChannelParticipantsList(targetRoomId);
 
         const afterResync = get();
         if (!afterResync.localVoiceActivityDetector) {
@@ -2185,8 +2241,10 @@ export const useCallStore = create(
             get().registerCallOnlyVoiceChannel(normalizedRoomId, finalChannelName);
 
             if (response.existingPeers?.length) {
-              get().applyExistingPeers(response.existingPeers);
+              await get().applyExistingPeers(response.existingPeers);
               rememberExistingPeersForJoinSound(response.existingPeers);
+            } else {
+              await get().refreshVoiceChannelParticipantsList(normalizedRoomId);
             }
 
             if (!isVoiceJoinCurrent(joinGen)) {

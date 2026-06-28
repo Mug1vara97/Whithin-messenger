@@ -21,6 +21,9 @@ import {
   TEST_AVATAR_DECORATION_PATH,
   validateAvatarDecorationFile,
 } from '../../../lib/utils/avatarDecorationHelpers';
+import { findCatalogDecorationByPath } from '../../../lib/avatarDecorations/catalog';
+import { openDiscovery } from '../../../lib/utils/discoveryEvents';
+import { DISCOVERY_TAB } from '../../../../widgets/discovery-hub/ui/discoveryConstants';
 import { resolveUserDisplayName } from '../../../lib/utils/userDisplayNameHelpers';
 import './ProfileCustomizeSection.css';
 
@@ -204,6 +207,7 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
   const avatarDecorationInputRef = useRef(null);
 
   const accentColor = profile?.avatarColor || '#5865f2';
+  const activeCatalogDecoration = findCatalogDecorationByPath(profile?.avatarDecoration);
   const bannerColor = isHexColor(profile?.banner) ? profile.banner : null;
   const visibleName = resolveUserDisplayName({
     displayName: profile?.displayName,
@@ -593,6 +597,11 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
           {' '}
           {AVATAR_DECORATION_SPEC_HINT}
         </p>
+        {activeCatalogDecoration && (
+          <p className="setting-description">
+            Текущая рамка из каталога: <strong>{activeCatalogDecoration.name}</strong>
+          </p>
+        )}
         <div className="profile-customize__decoration-preview">
           <UserAvatar
             displayName={profile?.displayName}
@@ -618,6 +627,14 @@ const ProfileCustomizeSection = ({ userId, username, active, onProfileUpdated })
             onClick={() => avatarDecorationInputRef.current?.click()}
           >
             Загрузить MP4/WebM/PNG
+          </button>
+          <button
+            type="button"
+            className="profile-customize__btn-secondary"
+            disabled={uploadBusy}
+            onClick={() => openDiscovery({ tab: DISCOVERY_TAB.DECORATIONS })}
+          >
+            Каталог рамок
           </button>
           <button
             type="button"

@@ -152,6 +152,18 @@ const AppRouter = () => {
               isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
             } 
           />
+          <Route
+            path="/discovery"
+            element={
+              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/discovery/:section"
+            element={
+              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+            }
+          />
           <Route 
             path="/server/:serverId/settings" 
             element={

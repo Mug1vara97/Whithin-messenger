@@ -646,6 +646,12 @@
   background: color-mix(in srgb, var(--primary, #5865f2) 28%, transparent);
 }
 
+.soundpad-icon-btn--play.soundpad-icon-btn--playing,
+.soundpad-icon-btn--play.soundpad-icon-btn--playing:hover {
+  background: color-mix(in srgb, var(--danger, #ed4245) 18%, transparent);
+  color: var(--danger, #ed4245);
+}
+
 .soundpad-icon-btn--danger {
   background: color-mix(in srgb, var(--danger, #ed4245) 12%, transparent);
   color: var(--danger, #ed4245);

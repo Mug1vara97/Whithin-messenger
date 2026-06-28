@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { People } from '@mui/icons-material';
 import { useGlobalCall } from '../../../shared/lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import {
@@ -15,6 +16,14 @@ import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
 } from '../../../shared/ui/molecules/VoiceCallChrome';
+import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
+import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
+import { memberListPanelWidthStorage } from '../../../shared/lib/utils/memberListPanelWidthStorage';
+import { useMembers } from '../../../entities/member/hooks';
+import { useRoles } from '../../../entities/role/hooks';
+import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverrides';
+import { useServerHubConnection } from '../../../shared/lib/hooks/useServerHubConnection';
+import { mapServerMemberToListItem } from '../../../shared/lib/utils/memberListUtils';
 import './VoiceCallView.css';
 
 // Определяет, является ли banner путём к изображению или цветом
@@ -53,8 +62,31 @@ const VoiceCallView = ({
   userName,
   onClose,
   serverId = null,
+  serverOwnerId = null,
   canMuteMembers = false,
 }) => {
+  const [showMemberList, setShowMemberList] = useState(true);
+  const showMembersSidebar = Boolean(serverId && showMemberList);
+
+  const serverConnection = useServerHubConnection(serverId);
+  const { members: serverMembers, isLoading: serverMembersLoading } = useMembers(
+    serverConnection,
+    serverId,
+    userId,
+  );
+  const { roles: serverRoles } = useRoles(serverConnection, serverId, userId);
+  const { resolveStatus } = usePresenceOverrides();
+
+  const sidebarMembers = useMemo(() => {
+    if (!serverId) return [];
+    return (serverMembers || []).map((member) =>
+      mapServerMemberToListItem(member, { serverOwnerId, resolveStatus, serverRoles }),
+    );
+  }, [serverId, serverMembers, serverOwnerId, resolveStatus, serverRoles]);
+
+  const handleMemberListToggle = useCallback(() => {
+    setShowMemberList((open) => !open);
+  }, []);
   const {
     isConnected,
     isMuted,
@@ -143,9 +175,7 @@ const VoiceCallView = ({
     }
 
     if (alreadyInThisChannel) {
-      startCall(channelId, channelName, serverId).catch((err) => {
-        console.error('Call resync error:', err);
-      });
+      useCallStore.getState().refreshVoiceChannelParticipantsList(channelId);
       return;
     }
 
@@ -206,7 +236,17 @@ const VoiceCallView = ({
     });
     
     // Текущий пользователь (хост)
-    const currentUser = createParticipant(userId, userName, currentUserProfile?.avatar || null, 'online', 'host');
+    const selfParticipant = participants.find(
+      (participant) => String(participant.userId || participant.id) === String(userId),
+    );
+    const resolvedSelfProfile = currentUserProfile || (selfParticipant ? {
+      avatar: selfParticipant.avatar || null,
+      avatarColor: selfParticipant.avatarColor || '#5865f2',
+      banner: selfParticipant.banner || null,
+      avatarDecoration: selfParticipant.avatarDecoration || null,
+    } : null);
+
+    const currentUser = createParticipant(userId, userName, resolvedSelfProfile?.avatar || null, 'online', 'host');
     currentUser.isMuted = isMuted;
     currentUser.isAudioEnabled = isAudioEnabled !== undefined ? isAudioEnabled : true; // Исправляем undefined
     currentUser.isGlobalAudioMuted = isGlobalAudioMuted; // Добавляем статус глобального звука
@@ -216,9 +256,9 @@ const VoiceCallView = ({
     currentUser.isVideoEnabled = isVideoEnabled; // Добавляем состояние веб-камеры
     currentUser.videoStream = cameraStream; // Добавляем видео поток
     currentUser.isCurrentUser = true; // Помечаем как текущего пользователя
-    currentUser.avatarColor = currentUserProfile?.avatarColor || '#5865f2';
-    currentUser.banner = currentUserProfile?.banner || null;
-    currentUser.avatarDecoration = currentUserProfile?.avatarDecoration || null;
+    currentUser.avatarColor = resolvedSelfProfile?.avatarColor || '#5865f2';
+    currentUser.banner = resolvedSelfProfile?.banner || null;
+    currentUser.avatarDecoration = resolvedSelfProfile?.avatarDecoration || null;
     
     console.log('🧑 Current user state:', {
       isMuted: currentUser.isMuted,
@@ -282,7 +322,7 @@ const VoiceCallView = ({
     participantVideoStates,
     participantSpeakingStates,
     appendTestParticipants,
-    currentUserProfile
+    currentUserProfile,
   ]);
 
 
@@ -311,9 +351,29 @@ const VoiceCallView = ({
 
 
   return (
-    <div className="voice-call-container">
-      {/* Main Wrapper */}
-      <div className="call-container">
+    <div className="voice-call-shell">
+      <header className="chat-header">
+        <div className="header-left">
+          <h2 className="username">{currentCall?.channelName || channelName}</h2>
+        </div>
+        {serverId && (
+          <div className="header-actions">
+            <button
+              type="button"
+              className={`member-list-toggle ${showMembersSidebar ? 'active' : ''}`}
+              onClick={handleMemberListToggle}
+              title={showMembersSidebar ? 'Скрыть список участников' : 'Показать список участников'}
+              aria-pressed={showMembersSidebar}
+            >
+              <People style={{ fontSize: '20px' }} />
+            </button>
+          </div>
+        )}
+      </header>
+
+      <div className="voice-call-body">
+        <div className="voice-call-container">
+          <div className="call-container">
         <div className="root-idle">
           <div className="video-grid-wrapper">
             {/* Scroller */}
@@ -358,7 +418,7 @@ const VoiceCallView = ({
             </div>
 
             <VoiceCallChromeOverlay
-              title={currentCall?.channelName || channelName}
+              showHeader={false}
               error={error}
               showErrorBanner={showErrorBanner}
               showAudioBlockedBanner={showAudioBlockedBanner}
@@ -401,6 +461,23 @@ const VoiceCallView = ({
             />
           </div>
         </div>
+      </div>
+        </div>
+
+        {showMembersSidebar && (
+          <ResizableSidebarShell
+            widthStorage={memberListPanelWidthStorage}
+            handleEdge="left"
+          >
+            <MemberListSidebar
+              members={sidebarMembers}
+              isLoading={serverMembersLoading}
+              emptyLabel="Участники сервера не найдены"
+              groupByRoles
+              serverRoles={serverRoles}
+            />
+          </ResizableSidebarShell>
+        )}
       </div>
     </div>
   );

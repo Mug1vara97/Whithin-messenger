@@ -93,6 +93,7 @@
 [data-interface-design='system24'] .server-settings-sidebar,
 [data-interface-design='system24'] .server-settings-page-header,
 [data-interface-design='system24'] .server-settings-scroll,
+[data-interface-design='system24'] .main-area .voice-call-shell,
 [data-interface-design='system24'] .main-area .voice-call-container,
 [data-interface-design='system24'] .group-chat-container .chat-voice-call {
   position: relative;
@@ -492,7 +493,9 @@
 /* TUI typography */
 [data-interface-design='system24'] .chat-list-header,
 [data-interface-design='system24'] .server-panel-header h3,
+[data-interface-design='system24'] .discovery-sidebar__header h3,
 [data-interface-design='system24'] .chat-header h2,
+[data-interface-design='system24'] .discovery-main__title,
 [data-interface-design='system24'] .member-list-section-title {
   font-weight: 500;
   text-transform: lowercase;

@@ -33,6 +33,7 @@ const DiscoveryHub = ({
         onSearchChange={setSearchQuery}
         onServerSelected={onServerSelected}
         onClose={onClose}
+        onSectionChange={setActiveSection}
       />
     </div>
   );

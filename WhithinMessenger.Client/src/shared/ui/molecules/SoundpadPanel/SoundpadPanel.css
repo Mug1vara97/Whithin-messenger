@@ -94,6 +94,11 @@
   background: #4752c4;
 }
 
+.soundpad-panel__btn--playing,
+.soundpad-panel__btn--playing:hover {
+  background: #ed4245;
+}
+
 .soundpad-panel__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
