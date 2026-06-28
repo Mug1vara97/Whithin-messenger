@@ -52,6 +52,8 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   const currentChatIdRef = useRef(null);
   const loadGenerationRef = useRef(0);
   const loadingOlderRef = useRef(false);
+  const hasMoreOlderRef = useRef(false);
+  const olderBatchDoneRef = useRef(null);
   const skipAutoScrollRef = useRef(false);
   const olderScrollSnapshotRef = useRef(null);
   const typingExpiryTimersRef = useRef(new Map());
@@ -366,6 +368,10 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    hasMoreOlderRef.current = hasMoreOlder;
+  }, [hasMoreOlder]);
 
   useEffect(() => {
     if (!e2eEnabled || !userId || !chatId) {
@@ -723,6 +729,11 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
           setHasMoreOlder(Boolean(hasMore));
           setIsLoadingOlder(false);
           loadingOlderRef.current = false;
+          if (olderBatchDoneRef.current) {
+            const resolveBatch = olderBatchDoneRef.current;
+            olderBatchDoneRef.current = null;
+            resolveBatch();
+          }
         });
 
         newConnection.on('ReceiveMessages', async (messages) => {
@@ -872,14 +883,14 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     scrollMessagesToBottom();
   }, [scrollMessagesToBottom]);
 
-  const loadOlderMessages = useCallback(async () => {
+  const requestOlderMessagesBatch = useCallback(async ({ preserveScroll = true } = {}) => {
     const conn = connectionRef.current;
-    if (!conn || !chatId || !hasMoreOlder || isLoadingOlder || loadingOlderRef.current) {
-      return;
+    if (!conn || !chatId || !hasMoreOlderRef.current || loadingOlderRef.current) {
+      return false;
     }
 
-    const persisted = messages.filter((msg) => isPersistedMessageId(msg.messageId));
-    if (persisted.length === 0) return;
+    const persisted = messagesRef.current.filter((msg) => isPersistedMessageId(msg.messageId));
+    if (persisted.length === 0) return false;
 
     const oldest = persisted.reduce((min, msg) => {
       const minTime = new Date(min.createdAt).getTime();
@@ -889,25 +900,78 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       return String(msg.messageId) < String(min.messageId) ? msg : min;
     });
 
-    const container = messagesContainerRef.current;
-    if (container) {
-      olderScrollSnapshotRef.current = {
-        scrollHeight: container.scrollHeight,
-        scrollTop: container.scrollTop,
-      };
+    if (preserveScroll) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        olderScrollSnapshotRef.current = {
+          scrollHeight: container.scrollHeight,
+          scrollTop: container.scrollTop,
+        };
+      }
+    } else {
+      olderScrollSnapshotRef.current = null;
+      skipAutoScrollRef.current = true;
     }
+
+    const batchDone = new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        if (olderBatchDoneRef.current) {
+          olderBatchDoneRef.current = null;
+          reject(new Error('Older messages batch timed out'));
+        }
+      }, 30000);
+
+      olderBatchDoneRef.current = () => {
+        clearTimeout(timeoutId);
+        resolve();
+      };
+    });
 
     loadingOlderRef.current = true;
     setIsLoadingOlder(true);
     try {
       await conn.invoke('GetMessages', chatId, 50, String(oldest.messageId));
+      await batchDone;
+      return true;
     } catch (err) {
       console.warn('GetMessages (older) failed:', err);
       loadingOlderRef.current = false;
       setIsLoadingOlder(false);
       olderScrollSnapshotRef.current = null;
+      if (olderBatchDoneRef.current) {
+        olderBatchDoneRef.current = null;
+      }
+      return false;
     }
-  }, [chatId, hasMoreOlder, isLoadingOlder, isPersistedMessageId, messages]);
+  }, [chatId, isPersistedMessageId]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (isLoadingOlder || loadingOlderRef.current) return;
+    await requestOlderMessagesBatch({ preserveScroll: true });
+  }, [isLoadingOlder, requestOlderMessagesBatch]);
+
+  const loadOlderMessagesAsync = useCallback(async () => {
+    if (isLoadingOlder || loadingOlderRef.current) return false;
+    return requestOlderMessagesBatch({ preserveScroll: false });
+  }, [isLoadingOlder, requestOlderMessagesBatch]);
+
+  const ensureMessageLoaded = useCallback(async (messageId) => {
+    const normalizedId = String(messageId);
+    if (!normalizedId) return false;
+
+    const hasMessage = () => messagesRef.current.some(
+      (message) => String(message.messageId) === normalizedId,
+    );
+    if (hasMessage()) return true;
+
+    while (hasMoreOlderRef.current) {
+      const loaded = await loadOlderMessagesAsync();
+      if (!loaded) break;
+      if (hasMessage()) return true;
+    }
+
+    return hasMessage();
+  }, [loadOlderMessagesAsync]);
 
   const handleMessagesScroll = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -1149,6 +1213,8 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
     handleComposerTextChange,
     handleMessagesScroll,
     loadOlderMessages,
+    loadOlderMessagesAsync,
+    ensureMessageLoaded,
     notifyStopTyping,
     sendMessage,
     editMessage,

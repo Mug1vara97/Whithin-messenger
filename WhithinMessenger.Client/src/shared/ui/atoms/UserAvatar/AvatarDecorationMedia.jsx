@@ -1,9 +1,34 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { isAvatarDecorationVideoUrl } from '../../../lib/utils/avatarDecorationHelpers';
+import { enqueueDecorationImageLoad } from '../../../lib/utils/decorationImageQueue';
 
 const AvatarDecorationMedia = ({ src, className = 'user-avatar-decoration' }) => {
   const videoRef = useRef(null);
   const isVideo = isAvatarDecorationVideoUrl(src);
+  const [resolvedSrc, setResolvedSrc] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    if (!src || isVideo) {
+      setResolvedSrc(isVideo ? src : null);
+      setRetryCount(0);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setResolvedSrc(null);
+    setRetryCount(0);
+
+    enqueueDecorationImageLoad(async () => {
+      if (!cancelled) {
+        setResolvedSrc(src);
+      }
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [src, isVideo]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -30,19 +55,35 @@ const AvatarDecorationMedia = ({ src, className = 'user-avatar-decoration' }) =>
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         aria-hidden="true"
       />
     );
   }
 
+  if (!resolvedSrc) {
+    return null;
+  }
+
+  const imageSrc = retryCount > 0
+    ? `${resolvedSrc}${resolvedSrc.includes('?') ? '&' : '?'}retry=${retryCount}`
+    : resolvedSrc;
+
   return (
     <img
       className={className}
-      src={src}
+      src={imageSrc}
       alt=""
       aria-hidden="true"
       draggable={false}
+      loading="lazy"
+      decoding="async"
+      fetchPriority="low"
+      onError={() => {
+        if (retryCount < 2) {
+          setRetryCount((count) => count + 1);
+        }
+      }}
     />
   );
 };

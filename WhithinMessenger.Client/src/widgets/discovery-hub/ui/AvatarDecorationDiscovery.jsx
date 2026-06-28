@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
@@ -22,15 +22,42 @@ const AvatarDecorationCard = ({
   previewLogin,
   onApply,
   onRemove,
-}) => (
-  <article className="avatar-decoration-discovery__card">
+}) => {
+  const cardRef = useRef(null);
+  const [decorationReady, setDecorationReady] = useState(false);
+
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node) return undefined;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setDecorationReady(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setDecorationReady(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '160px 0px' },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+  <article ref={cardRef} className="avatar-decoration-discovery__card">
     <div className="avatar-decoration-discovery__preview">
       <UserAvatar
         displayName={previewDisplayName}
         login={previewLogin}
         avatarUrl={previewAvatarUrl}
         avatarColor={previewAvatarColor}
-        avatarDecoration={item.path}
+        avatarDecoration={decorationReady ? item.path : null}
         size={88}
       />
     </div>
@@ -73,7 +100,8 @@ const AvatarDecorationCard = ({
       )}
     </div>
   </article>
-);
+  );
+};
 
 const AvatarDecorationDiscovery = ({ searchQuery = '' }) => {
   const { user } = useAuthContext();

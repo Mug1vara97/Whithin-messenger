@@ -1,79 +1,148 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-export const useMessageSearch = (chatId, connection) => {
+const normalizeSearchText = (value) => (value || '').toLowerCase();
+
+const messageMatchesQuery = (message, query) => {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return false;
+
+  const content = normalizeSearchText(message.content);
+  const sender = normalizeSearchText(
+    message.senderUsername
+      || message.senderDisplayName
+      || message.senderLogin
+      || message.username,
+  );
+
+  return content.includes(normalizedQuery) || sender.includes(normalizedQuery);
+};
+
+const waitForNextFrame = () => new Promise((resolve) => {
+  requestAnimationFrame(() => resolve());
+});
+
+/**
+ * Client-side search over decrypted messages.
+ * With E2E, server-side Content search cannot match ciphertext — history is paged in via SignalR.
+ */
+export const useMessageSearch = (messages = [], options = {}) => {
+  const {
+    hasMoreOlder = false,
+    loadOlderMessagesAsync,
+    ensureMessageLoaded,
+  } = options;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSearchingHistory, setIsSearchingHistory] = useState(false);
   const debounceTimer = useRef(null);
+  const messagesRef = useRef(messages);
+  const hasMoreOlderRef = useRef(hasMoreOlder);
+  const searchGenerationRef = useRef(0);
+  const deepSearchTaskRef = useRef(null);
 
   useEffect(() => {
-    if (!connection) return;
+    messagesRef.current = messages;
+  }, [messages]);
 
-    const handleSearchResults = (results) => {
-      setSearchResults(results);
+  useEffect(() => {
+    hasMoreOlderRef.current = hasMoreOlder;
+  }, [hasMoreOlder]);
+
+  const runSearch = useCallback((query) => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      return;
+    }
+
+    const results = messagesRef.current
+      .filter((message) => messageMatchesQuery(message, trimmed))
+      .slice()
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    setSearchResults(results);
+  }, []);
+
+  const cancelDeepSearch = useCallback(() => {
+    searchGenerationRef.current += 1;
+    deepSearchTaskRef.current = null;
+    setIsSearchingHistory(false);
+  }, []);
+
+  const runDeepSearch = useCallback(async (query, generation) => {
+    if (!loadOlderMessagesAsync) {
       setIsSearching(false);
-    };
+      return;
+    }
 
-    const handleError = (error) => {
-      console.error('Search error:', error);
-      setIsSearching(false);
-    };
+    setIsSearchingHistory(true);
+    try {
+      while (
+        generation === searchGenerationRef.current
+        && hasMoreOlderRef.current
+      ) {
+        const loaded = await loadOlderMessagesAsync();
+        if (!loaded) break;
+        await waitForNextFrame();
+        runSearch(query);
+      }
+    } finally {
+      if (generation === searchGenerationRef.current) {
+        setIsSearchingHistory(false);
+        setIsSearching(false);
+        deepSearchTaskRef.current = null;
+      }
+    }
+  }, [loadOlderMessagesAsync, runSearch]);
 
-    connection.on('SearchMessagesResult', handleSearchResults);
-    connection.on('Error', handleError);
-
-    return () => {
-      connection.off('SearchMessagesResult', handleSearchResults);
-      connection.off('Error', handleError);
-    };
-  }, [connection]);
-
-  const searchMessages = useCallback(async (query) => {
+  const searchMessages = useCallback((query) => {
     setSearchQuery(query);
-    
+
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
-    
+
+    cancelDeepSearch();
+
     if (!query.trim()) {
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
 
-    if (!connection) {
-      console.error('SignalR connection not established');
-      return;
-    }
-
     setIsSearching(true);
-    
-    debounceTimer.current = setTimeout(async () => {
-      try {
-        await connection.invoke('SearchMessages', chatId, query);
-      } catch (error) {
-        console.error('Error searching messages:', error);
+    debounceTimer.current = setTimeout(() => {
+      const generation = searchGenerationRef.current;
+      runSearch(query);
+
+      if (!loadOlderMessagesAsync || !hasMoreOlderRef.current) {
         setIsSearching(false);
+        return;
       }
+
+      const task = runDeepSearch(query, generation);
+      deepSearchTaskRef.current = task;
     }, 300);
-  }, [chatId, connection]);
+  }, [cancelDeepSearch, runDeepSearch, runSearch, loadOlderMessagesAsync]);
 
   const clearSearch = useCallback(() => {
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
+    cancelDeepSearch();
     setSearchQuery('');
     setSearchResults([]);
     setIsSearching(false);
-  }, []);
+  }, [cancelDeepSearch]);
 
-  const scrollToMessage = useCallback((messageId) => {
-    return new Promise((resolve) => {
-      const messageElement = document.getElementById(`message-${messageId}`);
-      if (!messageElement) {
-        resolve(false);
-        return;
-      }
+  const scrollToMessage = useCallback(async (messageId) => {
+    const normalizedId = String(messageId);
+
+    const scrollToElement = () => {
+      const messageElement = document.getElementById(`message-${normalizedId}`);
+      if (!messageElement) return false;
 
       messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       messageElement.classList.add('highlighted');
@@ -84,7 +153,6 @@ export const useMessageSearch = (chatId, connection) => {
       const finish = () => {
         if (settled) return;
         settled = true;
-        resolve(true);
       };
 
       if (scrollContainer && 'onscrollend' in scrollContainer) {
@@ -92,23 +160,44 @@ export const useMessageSearch = (chatId, connection) => {
       }
 
       setTimeout(finish, 650);
-    });
-  }, []);
+      return true;
+    };
+
+    if (scrollToElement()) {
+      return true;
+    }
+
+    if (ensureMessageLoaded) {
+      const loaded = await ensureMessageLoaded(normalizedId);
+      await waitForNextFrame();
+      if (loaded && scrollToElement()) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [ensureMessageLoaded]);
 
   useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, []);
+    if (!searchQuery.trim()) return undefined;
+    runSearch(searchQuery);
+    return undefined;
+  }, [messages, searchQuery, runSearch]);
+
+  useEffect(() => () => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    cancelDeepSearch();
+  }, [cancelDeepSearch]);
 
   return {
     searchQuery,
     searchResults,
     isSearching,
+    isSearchingHistory,
     searchMessages,
     clearSearch,
-    scrollToMessage
+    scrollToMessage,
   };
 };

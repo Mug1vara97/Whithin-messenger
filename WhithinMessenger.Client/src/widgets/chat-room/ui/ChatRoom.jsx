@@ -17,7 +17,7 @@ import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
 import MessageMarkdown from '../../../shared/ui/molecules/MessageMarkdown/MessageMarkdown';
 import { fetchAllChatMediaFiles, collectMediaFromMessages } from '../../../shared/lib/utils/fetchChatMedia';
-import { formatDiscordMessageTimestamp, formatShortMessageTime } from '../../../shared/lib/utils/messageTime';
+import { formatDiscordMessageTimestamp, formatShortMessageTime, buildMessagesWithDateSeparators } from '../../../shared/lib/utils/messageTime';
 import { isCallLogMessage } from '../../../shared/lib/utils/callLogHelpers';
 import { 
   useChat, 
@@ -242,6 +242,8 @@ const ChatRoom = ({
     handleComposerTextChange,
     handleMessagesScroll,
     loadOlderMessages,
+    loadOlderMessagesAsync,
+    ensureMessageLoaded,
   } = useChat(chatId, username, userId, userDisplayName, {
     e2eEnabled: true,
     getMemberUserIds: getE2eMemberUserIds,
@@ -319,6 +321,11 @@ const ChatRoom = ({
     return `${messages.length}:${mid}`;
   }, [messages]);
 
+  const messageTimelineItems = useMemo(
+    () => buildMessagesWithDateSeparators(messages),
+    [messages],
+  );
+
 
   useEffect(() => {
     if (!chatId || typeof onMessagesActivity !== 'function') return;
@@ -329,10 +336,15 @@ const ChatRoom = ({
     searchQuery,
     searchResults,
     isSearching,
+    isSearchingHistory,
     searchMessages,
     clearSearch,
     scrollToMessage
-  } = useMessageSearch(chatId, connection);
+  } = useMessageSearch(messages, {
+    hasMoreOlder,
+    loadOlderMessagesAsync,
+    ensureMessageLoaded,
+  });
 
   const handlePinnedBarClick = useCallback(async () => {
     if (!activePinnedMessage?.messageId) return;
@@ -2163,6 +2175,7 @@ const ChatRoom = ({
             searchQuery={searchQuery}
             searchResults={searchResults}
             isSearching={isSearching}
+            isSearchingHistory={isSearchingHistory}
             onSearch={searchMessages}
             onClearSearch={clearSearch}
             onScrollToMessage={scrollToMessage}
@@ -2337,7 +2350,16 @@ const ChatRoom = ({
           </div>
         )}
 
-        {!isLoading && messages.map((msg, messageIndex) => {
+        {!isLoading && messageTimelineItems.map((item) => {
+          if (item.type === 'date') {
+            return (
+              <div key={item.key} className="message-date-separator" role="separator">
+                <span className="message-date-separator__chip">{item.label}</span>
+              </div>
+            );
+          }
+
+          const msg = item.message;
           const isOwn = isMessageOwn(msg);
           const avatarIdentity = resolveMessageAvatarIdentity(msg, serverMembers);
           const isCallLog = isCallLogMessage(msg);

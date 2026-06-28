@@ -8,13 +8,19 @@ const MessageSearch = ({
   searchQuery,
   searchResults,
   isSearching,
+  isSearchingHistory = false,
   onSearch,
   onClearSearch,
   onScrollToMessage,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const hasResults = searchResults && searchResults.length > 0;
-  const showResults = searchQuery && (hasResults || isSearching);
+  const showResults = searchQuery && (hasResults || isSearching || isSearchingHistory);
+  const statusLabel = isSearchingHistory
+    ? 'Поиск по истории…'
+    : isSearching
+      ? 'Поиск…'
+      : `Найдено: ${searchResults.length}`;
 
   const handleClear = () => {
     onClearSearch();
@@ -51,11 +57,7 @@ const MessageSearch = ({
         <div className="message-search-results">
           <div className="message-search-results-header">
             <div className="message-search-results-title">
-              {isSearching ? (
-                <span>Поиск...</span>
-              ) : (
-                <span>Найдено: {searchResults.length}</span>
-              )}
+              <span>{statusLabel}</span>
             </div>
             <button
               type="button"
@@ -67,8 +69,8 @@ const MessageSearch = ({
             </button>
           </div>
           <div className="message-search-results-list">
-            {isSearching ? (
-              <div className="message-search-loading">Поиск...</div>
+            {isSearching && !hasResults ? (
+              <div className="message-search-loading">{statusLabel}</div>
             ) : hasResults ? (
               searchResults.map((msg) => (
                 <div
@@ -107,6 +109,8 @@ const MessageSearch = ({
                   </div>
                 </div>
               ))
+            ) : isSearchingHistory ? (
+              <div className="message-search-loading">{statusLabel}</div>
             ) : (
               <div className="message-search-empty">Ничего не найдено</div>
             )}

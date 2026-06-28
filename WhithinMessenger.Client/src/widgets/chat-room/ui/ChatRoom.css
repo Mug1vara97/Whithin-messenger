@@ -614,6 +614,27 @@
   flex-direction: column;
 }
 
+.message-date-separator {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 16px 0;
+  flex-shrink: 0;
+}
+
+.message-date-separator__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--surface, var(--background-secondary, #2b2d31));
+  color: var(--text-muted, #949ba4);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  user-select: none;
+}
+
 .chat-room-main.is-replying .messages,
 .chat-room-main.is-editing .messages {
   padding-bottom: var(--chat-composer-inset-expanded, 150px);

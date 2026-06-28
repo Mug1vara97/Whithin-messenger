@@ -3,6 +3,7 @@ import { e2eApi } from './e2eApi';
 
 const DEVICE_ID = 'web';
 const LEGACY_DEVICE_IDS = ['default', 'android'];
+const ALL_DEVICE_IDS = [DEVICE_ID, ...LEGACY_DEVICE_IDS];
 const IDENTITY_STORAGE_PREFIX = 'whithin:e2e:identity:';
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
 const PEER_KEY_CACHE = new Map();
@@ -274,26 +275,19 @@ const buildWrapsForMembers = async (chatKeyBytes, memberIds, currentUserId, { st
   const missingUserIds = [];
 
   for (const memberId of memberIds) {
-    let publicKeyBase64;
-    let deviceId = 'default';
+    const trimmedMemberId = String(memberId ?? '').trim();
+    if (!trimmedMemberId) continue;
 
-    if (currentUserId && String(memberId) === String(currentUserId)) {
-      const identity = loadIdentity(currentUserId) ?? await ensureE2eIdentity(currentUserId);
-      publicKeyBase64 = identity?.publicKeyBase64 ?? null;
-      deviceId = identity?.deviceId ?? DEVICE_ID;
-    } else {
-      const remote = await e2eApi.getDeviceKey(memberId);
-      publicKeyBase64 = remote?.publicKeyBase64 ?? null;
-      deviceId = remote?.deviceId ?? 'default';
-    }
-
-    if (!publicKeyBase64) {
-      missingUserIds.push(String(memberId));
+    const deviceKeys = await resolveMemberDeviceKeys(trimmedMemberId, currentUserId);
+    if (!deviceKeys.length) {
+      missingUserIds.push(trimmedMemberId);
       continue;
     }
 
-    const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, publicKeyBase64);
-    wraps.push({ userId: memberId, wrappedKeyBase64, deviceId });
+    for (const { deviceId, publicKeyBase64 } of deviceKeys) {
+      const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, publicKeyBase64);
+      wraps.push({ userId: trimmedMemberId, wrappedKeyBase64, deviceId });
+    }
   }
 
   if (strict && missingUserIds.length > 0) {
@@ -304,6 +298,34 @@ const buildWrapsForMembers = async (chatKeyBytes, memberIds, currentUserId, { st
   }
 
   return { wraps, missingUserIds };
+};
+
+const resolveMemberDeviceKeys = async (memberId, currentUserId) => {
+  if (currentUserId && String(memberId) === String(currentUserId)) {
+    const identity = loadIdentity(currentUserId) ?? await ensureE2eIdentity(currentUserId);
+    const deviceId = identity?.deviceId ?? DEVICE_ID;
+    const publicKeyBase64 = identity?.publicKeyBase64 ?? null;
+    return publicKeyBase64 ? [{ deviceId, publicKeyBase64 }] : [];
+  }
+
+  const byDeviceId = new Map();
+
+  const primary = await e2eApi.getDeviceKey(memberId);
+  if (primary?.publicKeyBase64) {
+    byDeviceId.set(primary.deviceId ?? 'default', primary.publicKeyBase64);
+  }
+
+  for (const deviceId of ALL_DEVICE_IDS) {
+    if (byDeviceId.has(deviceId)) continue;
+    const remote = await e2eApi.getDeviceKey(memberId, deviceId);
+    if (!remote?.publicKeyBase64) continue;
+    byDeviceId.set(deviceId, remote.publicKeyBase64);
+  }
+
+  return [...byDeviceId.entries()].map(([deviceId, publicKeyBase64]) => ({
+    deviceId,
+    publicKeyBase64,
+  }));
 };
 
 const resolveMissingWrapMemberIds = async (
@@ -336,6 +358,20 @@ const selfDeviceIds = (primaryDeviceId) => [
   primaryDeviceId,
   ...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId),
 ].filter((id, index, arr) => arr.indexOf(id) === index);
+
+/** Re-upload own wrap when the server has a stale wrap for the current device key. */
+const refreshOwnUnreadableDeviceWrap = async (userId, chatId, chatKeyBase64) => {
+  const identity = loadIdentity(userId) ?? await ensureE2eIdentity(userId);
+  if (!identity?.publicKeyBase64) return;
+
+  const deviceId = identity.deviceId ?? DEVICE_ID;
+  if (await ownWrapIsReadable(userId, chatId, deviceId)) return;
+
+  const sodium = await ensureSodium();
+  const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
+  const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, identity.publicKeyBase64);
+  await e2eApi.uploadChatWrappedKeys(chatId, [{ userId, wrappedKeyBase64, deviceId }]);
+};
 
 /** Re-seal chat key for this deviceId when another browser registered the same deviceId. */
 const refreshOwnDeviceWrapForCurrentServerKey = async (userId, chatId, chatKeyBase64) => {
@@ -399,35 +435,22 @@ const syncChatKeyWraps = async (
 ) => {
   if (!eligibleMemberIds.length) return;
 
-  const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
-  const missingWraps = await resolveMissingWrapMemberIds(
-    userId,
-    chatId,
-    eligibleMemberIds,
-    existingRecipients,
-  );
-  if (!missingWraps.length) {
-    await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
-    return;
-  }
+  await refreshOwnUnreadableDeviceWrap(userId, chatId, chatKeyBase64);
 
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
   const { wraps } = await buildWrapsForMembers(
     chatKeyBytes,
-    missingWraps,
+    eligibleMemberIds,
     userId,
     { strict: strictAllMembers },
   );
 
-  if (!wraps.length) {
-    await syncAlternateSelfDeviceWraps(userId, chatId, chatKeyBase64);
-    return;
+  if (wraps.length) {
+    await e2eApi.uploadChatWrappedKeys(chatId, wraps);
   }
 
-  await e2eApi.uploadChatWrappedKeys(chatId, wraps);
   await syncAlternateSelfDeviceWraps(userId, chatId, chatKeyBase64);
-  await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
 };
 
 const tryOpenChatKeyFromServer = async (userId, chatId, primaryDeviceId) => {
@@ -462,6 +485,7 @@ export const proactiveSyncChatDeviceWraps = async (userId, chatId, memberUserIds
   await ensureE2eIdentity(userId, { strictUpload: true });
   const members = normalizeMemberIds(memberUserIds, userId);
   await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
+  await refreshOwnUnreadableDeviceWrap(userId, chatId, localKeyBase64);
   await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, localKeyBase64);
 };
 
