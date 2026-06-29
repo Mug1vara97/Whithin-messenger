@@ -60,7 +60,17 @@ export const patchFriendWithProfile = (friend, patch) => {
 };
 
 export const patchChatListItemWithProfile = (chat, patch) => {
-  if (!chat || !patch?.userId || !matchesUserId(chat.userId ?? chat.UserId, patch.userId)) {
+  if (!chat || !patch?.userId) {
+    return chat;
+  }
+
+  const isGroupChat = Boolean(chat.isGroupChat ?? chat.IsGroupChat);
+  const isSavedMessages = Boolean(chat.isSavedMessages ?? chat.IsSavedMessages);
+  if (isGroupChat || isSavedMessages) {
+    return chat;
+  }
+
+  if (!matchesUserId(chat.userId ?? chat.UserId, patch.userId)) {
     return chat;
   }
 

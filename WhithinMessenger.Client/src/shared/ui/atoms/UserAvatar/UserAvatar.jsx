@@ -42,6 +42,8 @@ const UserAvatar = ({
   const isClickable = Boolean(onClick);
   const decorationUrl = resolveAvatarDecorationUrl(avatarDecoration);
   const hasDecoration = Boolean(decorationUrl);
+  const hasAvatarMedia = !displayInitials;
+  const showAccentFill = !hasDecoration || !hasAvatarMedia;
   const hasDisplayName = Boolean(displayName?.trim());
   const hasLogin = Boolean(login?.trim());
   const avatarInitial = resolveAvatarInitial({
@@ -76,7 +78,12 @@ const UserAvatar = ({
 
   return (
     <div
-      className={`user-avatar-frame ${hasDecoration ? 'user-avatar-frame--decorated' : ''} ${className}`.trim()}
+      className={[
+        'user-avatar-frame',
+        hasDecoration ? 'user-avatar-frame--decorated' : '',
+        hasDecoration && hasAvatarMedia ? 'user-avatar-frame--decorated-media' : '',
+        className,
+      ].filter(Boolean).join(' ')}
       style={{
         width: `${avatarSize}px`,
         height: `${avatarSize}px`,
@@ -84,9 +91,13 @@ const UserAvatar = ({
     >
       <div className="user-avatar-core">
         <div
-          className={`user-avatar ${isClickable ? 'user-avatar--clickable' : ''}`.trim()}
+          className={[
+            'user-avatar',
+            isClickable ? 'user-avatar--clickable' : '',
+            hasAvatarMedia ? 'user-avatar--has-media' : '',
+          ].filter(Boolean).join(' ')}
           style={{
-            backgroundColor: avatarColor || '#5865F2',
+            backgroundColor: showAccentFill ? (avatarColor || '#5865F2') : 'transparent',
             fontSize: `${Math.max(12, avatarSize * 0.35)}px`,
             fontWeight: 'bold',
             color: 'white',

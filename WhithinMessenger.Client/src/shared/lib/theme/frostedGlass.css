@@ -56,6 +56,8 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   --bottom: transparent;
   --server-list-background: transparent;
   --surface: transparent;
+  --avatar-cutout-ring: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.92);
+  --avatar-presence-ring: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.92);
   --hover: var(--fg-hover);
   --surface-hover: var(--fg-hover);
   --background-modifier-hover: var(--fg-hover);

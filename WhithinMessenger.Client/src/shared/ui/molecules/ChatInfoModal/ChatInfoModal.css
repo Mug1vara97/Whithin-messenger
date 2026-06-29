@@ -133,7 +133,7 @@
 }
 
 .chat-info-hero__avatar--private .user-avatar-frame--decorated .user-avatar {
-  border: 4px solid var(--background-secondary, #2b2d31);
+  border: 4px solid var(--avatar-cutout-ring, var(--background-secondary, #2b2d31));
   box-sizing: border-box;
 }
 

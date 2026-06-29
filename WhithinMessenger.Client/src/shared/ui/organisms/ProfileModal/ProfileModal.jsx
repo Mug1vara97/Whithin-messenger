@@ -289,7 +289,12 @@ const ProfileModal = ({
               className={`profile-modal__avatar-ring ${hasAvatarDecoration ? 'profile-modal__avatar-ring--decorated' : ''}`}
               style={hasAvatarDecoration ? undefined : { '--profile-accent': accentColor }}
             >
-              <div className="profile-modal__avatar" style={{ backgroundColor: accentColor }}>
+              <div
+                className="profile-modal__avatar"
+                style={{
+                  backgroundColor: hasAvatarDecoration && avatarUrl ? 'transparent' : accentColor,
+                }}
+              >
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="profile-modal__avatar-img" />
                 ) : (
