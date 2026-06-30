@@ -6,7 +6,7 @@ public class ApplicationUser : IdentityUser<Guid>
 {
     public DateTimeOffset CreatedAt { get; set; }
 
-    public Status Status { get; set; } = Status.Online; 
+    public Status Status { get; set; } = Status.Offline; 
 
     public DateTimeOffset LastSeen { get; set; }
 

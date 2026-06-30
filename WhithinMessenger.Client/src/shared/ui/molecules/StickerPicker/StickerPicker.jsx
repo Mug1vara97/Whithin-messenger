@@ -28,6 +28,11 @@ const normalizePack = (pack) => ({
   })),
 });
 
+const isPackOwnedByUser = (pack, currentUserId) => {
+  if (!pack?.createdByUserId || !currentUserId) return false;
+  return String(pack.createdByUserId) === String(currentUserId);
+};
+
 const StickerPicker = ({
   open,
   width,
@@ -49,6 +54,7 @@ const StickerPicker = ({
   const [isInstalling, setIsInstalling] = useState(false);
   const [isCreatingPack, setIsCreatingPack] = useState(false);
   const [isAddingSticker, setIsAddingSticker] = useState(false);
+  const [isRemovingPack, setIsRemovingPack] = useState(false);
   const [newPackTitle, setNewPackTitle] = useState('');
   const [error, setError] = useState(null);
   const [previewSticker, setPreviewSticker] = useState(null);
@@ -56,6 +62,9 @@ const StickerPicker = ({
   const longPressTriggeredRef = useRef(false);
   const addStickerInputRef = useRef(null);
   const uploadZipInputRef = useRef(null);
+  const gridWrapRef = useRef(null);
+  const packSectionRefs = useRef(new Map());
+  const scrollToPackRef = useRef(null);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -66,6 +75,14 @@ const StickerPicker = ({
 
   const closePreview = useCallback(() => {
     setPreviewSticker(null);
+  }, []);
+
+  const registerPackSection = useCallback((packId, node) => {
+    if (node) {
+      packSectionRefs.current.set(String(packId), node);
+    } else {
+      packSectionRefs.current.delete(String(packId));
+    }
   }, []);
 
   useEffect(() => {
@@ -165,22 +182,30 @@ const StickerPicker = ({
     }
   }, []);
 
+  const scrollToPack = useCallback((packId) => {
+    if (!packId) return;
+    setSelectedPackId(packId);
+    scrollToPackRef.current = String(packId);
+    const section = packSectionRefs.current.get(String(packId));
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
   const handleInstall = useCallback(async (packId) => {
     setIsInstalling(true);
     setError(null);
     try {
       await stickerApi.installPack(packId);
       await loadPacks();
-      setSelectedPackId(packId);
       setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       onInstallPack?.(packId);
+      window.setTimeout(() => scrollToPack(packId), 0);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Не удалось добавить стикерпак');
     } finally {
       setIsInstalling(false);
     }
-  }, [loadPacks, onInstallPack]);
+  }, [loadPacks, onInstallPack, scrollToPack]);
 
   const handleCreateEmptyPack = useCallback(async () => {
     const title = newPackTitle.trim();
@@ -195,16 +220,16 @@ const StickerPicker = ({
       const pack = await stickerApi.createPack(title);
       const normalized = normalizePack(pack);
       await loadPacks();
-      setSelectedPackId(normalized.id);
       setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       setNewPackTitle('');
+      window.setTimeout(() => scrollToPack(normalized.id), 0);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Не удалось создать стикерпак');
     } finally {
       setIsCreatingPack(false);
     }
-  }, [loadPacks, newPackTitle]);
+  }, [loadPacks, newPackTitle, scrollToPack]);
 
   const handleUploadZipPack = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -223,34 +248,28 @@ const StickerPicker = ({
       const pack = await stickerApi.uploadPack(title, file);
       const normalized = normalizePack(pack);
       await loadPacks();
-      setSelectedPackId(normalized.id);
       setMainTab(MAIN_TAB.STICKERS);
       setIsCatalogOpen(false);
       setNewPackTitle('');
+      window.setTimeout(() => scrollToPack(normalized.id), 0);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Не удалось загрузить стикерпак');
     } finally {
       setIsCreatingPack(false);
     }
-  }, [loadPacks, newPackTitle]);
-
-  const selectedPack = useMemo(
-    () => packs.find((pack) => pack.id === selectedPackId) ?? null,
-    [packs, selectedPackId],
-  );
+  }, [loadPacks, newPackTitle, scrollToPack]);
 
   const isEmojiTab = mainTab === MAIN_TAB.EMOJI;
   const activePackId = selectedPackId;
 
-  const isSelectedPackOwned = useMemo(() => {
-    const pack = packs.find((item) => item.id === activePackId) ?? selectedPack;
-    if (!pack?.createdByUserId || !currentUserId) return false;
-    return String(pack.createdByUserId) === String(currentUserId);
-  }, [activePackId, currentUserId, packs, selectedPack?.createdByUserId]);
+  const selectedPack = useMemo(
+    () => packs.find((pack) => pack.id === activePackId) ?? null,
+    [packs, activePackId],
+  );
 
-  const activeStickerPack = useMemo(
-    () => packs.find((pack) => pack.id === activePackId) ?? selectedPack,
-    [activePackId, packs, selectedPack],
+  const isSelectedPackOwned = useMemo(
+    () => isPackOwnedByUser(selectedPack, currentUserId),
+    [selectedPack, currentUserId],
   );
 
   const handleAddStickerToPack = useCallback(async (event) => {
@@ -273,6 +292,80 @@ const StickerPicker = ({
       setIsAddingSticker(false);
     }
   }, [selectedPackId]);
+
+  const handleDeletePack = useCallback(async (pack) => {
+    if (!pack?.id) return;
+    const confirmed = window.confirm(
+      `Удалить стикерпак «${pack.title}» навсегда? Его больше не смогут использовать другие пользователи.`,
+    );
+    if (!confirmed) return;
+
+    setIsRemovingPack(true);
+    setError(null);
+    try {
+      await stickerApi.deletePack(pack.id);
+      await loadPacks();
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Не удалось удалить стикерпак');
+    } finally {
+      setIsRemovingPack(false);
+    }
+  }, [loadPacks]);
+
+  const handleUninstallPack = useCallback(async (pack) => {
+    if (!pack?.id) return;
+    const confirmed = window.confirm(`Убрать «${pack.title}» из вашего списка стикеров?`);
+    if (!confirmed) return;
+
+    setIsRemovingPack(true);
+    setError(null);
+    try {
+      await stickerApi.uninstallPack(pack.id);
+      await loadPacks();
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Не удалось убрать стикерпак из списка');
+    } finally {
+      setIsRemovingPack(false);
+    }
+  }, [loadPacks]);
+
+  useEffect(() => {
+    const root = gridWrapRef.current;
+    if (!open || isEmojiTab || !root || packs.length === 0) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (scrollToPackRef.current) {
+          const pending = scrollToPackRef.current;
+          const target = packSectionRefs.current.get(pending);
+          if (target && entries.some((entry) => entry.target === target && entry.isIntersecting)) {
+            scrollToPackRef.current = null;
+          }
+          return;
+        }
+
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+        const packId = visible[0]?.target?.dataset?.packId;
+        if (packId) {
+          setSelectedPackId(packId);
+        }
+      },
+      {
+        root,
+        threshold: [0.15, 0.35, 0.55, 0.75],
+        rootMargin: '-8% 0px -55% 0px',
+      },
+    );
+
+    packSectionRefs.current.forEach((section) => observer.observe(section));
+
+    return () => observer.disconnect();
+  }, [open, isEmojiTab, packs]);
 
   if (!open) {
     return null;
@@ -344,7 +437,7 @@ const StickerPicker = ({
 
         {error && <div className="sticker-picker__error">{error}</div>}
 
-        <div className="sticker-picker__grid-wrap">
+        <div className="sticker-picker__grid-wrap" ref={gridWrapRef}>
           {isEmojiTab ? (
             <EmojiPicker embedded onEmojiSelect={onEmojiSelect} />
           ) : isLoading ? (
@@ -353,29 +446,70 @@ const StickerPicker = ({
             <div className="sticker-picker__empty">
               Нажмите +, чтобы создать или добавить стикерпак
             </div>
-          ) : !activeStickerPack?.stickers?.length ? (
-            <div className="sticker-picker__empty">
-              {isSelectedPackOwned
-                ? 'В паке пока нет стикеров. Нажмите + сверху, чтобы добавить.'
-                : 'В этом паке пока нет стикеров'}
-            </div>
           ) : (
-            <div className="sticker-picker__grid">
-              {activeStickerPack.stickers.map((sticker) => (
-                <button
-                  key={sticker.id}
-                  type="button"
-                  className="sticker-picker__cell"
-                  onPointerDown={handleStickerPointerDown(sticker)}
-                  onPointerUp={handleStickerPointerEnd}
-                  onPointerCancel={handleStickerPointerEnd}
-                  onPointerLeave={handleStickerPointerLeave}
-                  onClick={handleStickerClick(sticker)}
-                  title="Клик — отправить. Удерживайте для предпросмотра."
-                >
-                  <StickerMessage sticker={sticker} size={64} className="sticker-picker__cell-sticker" />
-                </button>
-              ))}
+            <div className="sticker-picker__pack-list">
+              {packs.map((pack) => {
+                const owned = isPackOwnedByUser(pack, currentUserId);
+                return (
+                  <section
+                    key={pack.id}
+                    ref={(node) => registerPackSection(pack.id, node)}
+                    data-pack-id={pack.id}
+                    className="sticker-picker__pack-section"
+                  >
+                    <div className="sticker-picker__pack-section-header">
+                      <h4 className="sticker-picker__pack-section-title">{pack.title}</h4>
+                      <div className="sticker-picker__pack-section-actions">
+                        {owned ? (
+                          <button
+                            type="button"
+                            className="sticker-picker__pack-action sticker-picker__pack-action--danger"
+                            disabled={isRemovingPack}
+                            onClick={() => void handleDeletePack(pack)}
+                          >
+                            Удалить
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="sticker-picker__pack-action"
+                            disabled={isRemovingPack}
+                            onClick={() => void handleUninstallPack(pack)}
+                          >
+                            Убрать
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {!pack.stickers?.length ? (
+                      <div className="sticker-picker__pack-empty">
+                        {owned
+                          ? 'В паке пока нет стикеров. Нажмите + сверху, чтобы добавить.'
+                          : 'В этом паке пока нет стикеров'}
+                      </div>
+                    ) : (
+                      <div className="sticker-picker__grid">
+                        {pack.stickers.map((sticker) => (
+                          <button
+                            key={sticker.id}
+                            type="button"
+                            className="sticker-picker__cell"
+                            onPointerDown={handleStickerPointerDown(sticker)}
+                            onPointerUp={handleStickerPointerEnd}
+                            onPointerCancel={handleStickerPointerEnd}
+                            onPointerLeave={handleStickerPointerLeave}
+                            onClick={handleStickerClick(sticker)}
+                            title="Клик — отправить. Удерживайте для предпросмотра."
+                          >
+                            <StickerMessage sticker={sticker} size={64} className="sticker-picker__cell-sticker" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           )}
         </div>
@@ -392,14 +526,15 @@ const StickerPicker = ({
           </button>
           {packs.map((pack) => {
             const coverUrl = pack.coverImagePath ? buildMediaUrl(pack.coverImagePath) : null;
-            const isSelected = pack.id === activePackId;
+            const isSelected = String(pack.id) === String(activePackId);
             return (
               <button
                 key={pack.id}
                 type="button"
                 className={`sticker-picker__pack-btn ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => setSelectedPackId(pack.id)}
+                onClick={() => scrollToPack(pack.id)}
                 title={pack.title}
+                aria-label={pack.title}
               >
                 {coverUrl ? (
                   <img src={coverUrl} alt="" className="sticker-picker__pack-cover" />

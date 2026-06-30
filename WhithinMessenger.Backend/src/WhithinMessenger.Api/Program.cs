@@ -43,6 +43,7 @@ builder.Services.AddScoped<WhithinMessenger.Application.Services.IVideoConverter
 
 builder.Services.AddSingleton<WhithinMessenger.Application.Services.IVideoHlsBackgroundService,
     WhithinMessenger.Application.Services.VideoHlsBackgroundService>();
+builder.Services.AddHostedService<UserPresenceStartupService>();
 
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {

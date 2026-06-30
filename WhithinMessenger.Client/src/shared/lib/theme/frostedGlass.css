@@ -82,6 +82,9 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   --fg-input: rgba(var(--background-secondary-rgb, 46, 48, 54), 0.3);
   --background-secondary: rgba(var(--background-secondary-rgb, 46, 48, 54), 0.3);
   --in-app-notif-bg: rgba(var(--background-rgb, 54, 57, 63), 0.75);
+  --fg-popover: rgba(var(--background-secondary-rgb, 46, 48, 54), 0.92);
+  --fg-popover-hover: rgba(255, 255, 255, 0.1);
+  --fg-popover-border: rgba(255, 255, 255, 0.14);
 }
 
 [data-frosted-glass='enabled'][data-frosted-overlay-tint='default'] {
@@ -101,6 +104,9 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   --fg-input: rgb(0 0 0 / 0.3);
   --background-secondary: rgb(0 0 0 / 0.3);
   --in-app-notif-bg: rgb(0 0 0 / 0.75);
+  --fg-popover: rgb(0 0 0 / 0.9);
+  --fg-popover-hover: rgb(255 255 255 / 0.1);
+  --fg-popover-border: rgb(255 255 255 / 0.14);
 }
 
 [data-frosted-glass='enabled'] {
@@ -113,6 +119,9 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   --fg-input: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.3);
   --background-secondary: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.3);
   --in-app-notif-bg: rgba(var(--fg-tint-middle-rgb, 54, 57, 63), 0.75);
+  --fg-popover: rgba(var(--fg-tint-secondary-rgb, 46, 48, 54), 0.92);
+  --fg-popover-hover: rgba(255, 255, 255, 0.1);
+  --fg-popover-border: rgba(255, 255, 255, 0.14);
 }
 
 /* Shell — always transparent */
@@ -428,6 +437,35 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
   box-sizing: border-box;
 }
 
+/* === Floating menus — readable over wallpaper === */
+[data-frosted-glass='enabled'] .context-menu,
+[data-frosted-glass='enabled'] .context-menu-submenu,
+[data-frosted-glass='enabled'] .context-menu-submenu--portal,
+[data-frosted-glass='enabled'] .friend-item__context-menu,
+[data-frosted-glass='enabled'] [class*='status-menu'],
+[data-frosted-glass='enabled'] .server-member-role-modal,
+[data-frosted-glass='enabled'] .role-management-modal,
+[data-frosted-glass='enabled'] .chat-attach-menu__dropdown,
+[data-frosted-glass='enabled'] .voice-participant-context-menu {
+  background: var(--fg-popover) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: var(--fg-popover-border) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-frosted-glass='enabled'] .context-menu-item:hover:not(.disabled),
+[data-frosted-glass='enabled'] .context-menu-button:hover,
+[data-frosted-glass='enabled'] .friend-item__context-item:hover,
+[data-frosted-glass='enabled'] .chat-attach-menu__item:hover {
+  background: var(--fg-popover-hover) !important;
+}
+
+[data-frosted-glass='enabled'] .context-menu-item.danger:hover:not(.disabled) {
+  background-color: var(--danger-hover, #c53030) !important;
+  color: #fff !important;
+}
+
 [data-frosted-glass='enabled'] .search-bar-input:focus {
   border-color: rgb(255, 255, 255, 0.12) !important;
 }
@@ -557,14 +595,6 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 [data-frosted-glass='enabled'] .channel-item:hover,
 [data-frosted-glass='enabled'] .channel-item.active {
   background: var(--fg-hover) !important;
-}
-
-[data-frosted-glass='enabled'] .chat-typing-indicator {
-  background: linear-gradient(to top, var(--fg-fill-composer) 72%, transparent) !important;
-}
-
-[data-frosted-glass='enabled'][data-interface-design='system24'] .chat-typing-indicator {
-  background: linear-gradient(to top, var(--fg-fill-middle) 72%, transparent) !important;
 }
 
 [data-frosted-glass='enabled'] .chat-pinned-bar {

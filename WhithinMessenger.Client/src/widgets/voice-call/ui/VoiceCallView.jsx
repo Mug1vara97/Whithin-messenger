@@ -17,13 +17,11 @@ import {
   VoiceCallChromeOverlay
 } from '../../../shared/ui/molecules/VoiceCallChrome';
 import { MemberListSidebar } from '../../../shared/ui/molecules/MemberListSidebar';
+import { ServerMemberSidebarModals } from '../../../shared/ui/molecules/ServerMemberSidebarModals';
 import { ResizableSidebarShell } from '../../../shared/ui/molecules/ResizableSidebarShell';
 import { memberListPanelWidthStorage } from '../../../shared/lib/utils/memberListPanelWidthStorage';
-import { useMembers } from '../../../entities/member/hooks';
-import { useRoles } from '../../../entities/role/hooks';
-import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverrides';
-import { useServerHubConnection } from '../../../shared/lib/hooks/useServerHubConnection';
-import { mapServerMemberToListItem } from '../../../shared/lib/utils/memberListUtils';
+import { useMemberListPanelOpen } from '../../../shared/lib/hooks/useMemberListPanelOpen';
+import { useServerMemberListSidebar } from '../../../shared/lib/hooks/useServerMemberListSidebar';
 import './VoiceCallView.css';
 
 // Определяет, является ли banner путём к изображению или цветом
@@ -64,29 +62,34 @@ const VoiceCallView = ({
   serverId = null,
   serverOwnerId = null,
   canMuteMembers = false,
+  userPermissions = null,
+  isServerOwner = false,
+  serverChannelCategories = [],
+  serverChannelFallback = null,
 }) => {
-  const [showMemberList, setShowMemberList] = useState(true);
+  const { open: showMemberList, toggle: handleMemberListToggle } = useMemberListPanelOpen();
   const showMembersSidebar = Boolean(serverId && showMemberList);
 
-  const serverConnection = useServerHubConnection(serverId);
-  const { members: serverMembers, isLoading: serverMembersLoading } = useMembers(
-    serverConnection,
+  const {
+    sidebarMembers,
+    serverRoles,
+    isLoading: serverMembersLoading,
+    emptyLabel,
+    getUserContextMenuItems,
+    nicknameModal,
+    roleModal,
+    kickModal,
+  } = useServerMemberListSidebar({
     serverId,
+    channelId,
     userId,
-  );
-  const { roles: serverRoles } = useRoles(serverConnection, serverId, userId);
-  const { resolveStatus } = usePresenceOverrides();
+    serverOwnerId,
+    userPermissions,
+    isServerOwner,
+    serverChannelCategories,
+    serverChannelFallback,
+  });
 
-  const sidebarMembers = useMemo(() => {
-    if (!serverId) return [];
-    return (serverMembers || []).map((member) =>
-      mapServerMemberToListItem(member, { serverOwnerId, resolveStatus, serverRoles }),
-    );
-  }, [serverId, serverMembers, serverOwnerId, resolveStatus, serverRoles]);
-
-  const handleMemberListToggle = useCallback(() => {
-    setShowMemberList((open) => !open);
-  }, []);
   const {
     isConnected,
     isMuted,
@@ -472,12 +475,20 @@ const VoiceCallView = ({
             <MemberListSidebar
               members={sidebarMembers}
               isLoading={serverMembersLoading}
-              emptyLabel="Участники сервера не найдены"
+              emptyLabel={emptyLabel}
               groupByRoles
               serverRoles={serverRoles}
+              getUserContextMenuItems={getUserContextMenuItems}
             />
           </ResizableSidebarShell>
         )}
+
+        <ServerMemberSidebarModals
+          userId={userId}
+          nicknameModal={nicknameModal}
+          roleModal={roleModal}
+          kickModal={kickModal}
+        />
       </div>
     </div>
   );

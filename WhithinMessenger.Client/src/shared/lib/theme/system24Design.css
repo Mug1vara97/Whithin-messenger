@@ -450,10 +450,6 @@
   padding-bottom: 20px;
 }
 
-[data-interface-design='system24'] .chat-typing-indicator {
-  bottom: 0;
-}
-
 /* Members sidebar */
 [data-interface-design='system24'] .member-list-sidebar {
   align-self: stretch;

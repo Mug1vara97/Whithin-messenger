@@ -101,7 +101,12 @@ export const useRoles = (connection, serverId, userId) => {
   }, [connection, userId]);
 
   useEffect(() => {
-    if (!connection) return;
+    if (!connection || !serverId) {
+      setRoles([]);
+      return undefined;
+    }
+
+    void fetchRoles();
 
     const handleRolesLoaded = (loadedRoles) => {
       console.log('useRoles: Получены роли через RolesLoaded:', loadedRoles);
@@ -156,7 +161,7 @@ export const useRoles = (connection, serverId, userId) => {
       connection.off("RoleUpdated", handleRoleUpdated);
       connection.off("RoleDeleted", handleRoleDeleted);
     };
-  }, [connection, serverId]);
+  }, [connection, serverId, fetchRoles]);
 
   return {
     roles,

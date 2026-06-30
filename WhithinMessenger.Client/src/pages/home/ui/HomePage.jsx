@@ -1292,6 +1292,10 @@ const HomePage = () => {
                       serverId={selectedServer?.serverId}
                       serverOwnerId={selectedServer?.ownerId ?? selectedServer?.OwnerId}
                       canMuteMembers={userCanMuteMembers}
+                      userPermissions={serverChannelPermissions}
+                      isServerOwner={isActiveServerOwner}
+                      serverChannelCategories={serverChannelCategories}
+                      serverChannelFallback={selectedChat}
                     />
                   ) : isIdeasBoardChannel(selectedChat) ? (
                     <IdeasBoardView

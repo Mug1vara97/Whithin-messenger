@@ -40,6 +40,11 @@ export const stickerApi = {
     return response.data;
   },
 
+  async uninstallPack(packId) {
+    const response = await apiClient.delete(`/stickers/packs/${packId}/install`);
+    return response.data;
+  },
+
   async deletePack(packId) {
     const response = await apiClient.delete(`/stickers/packs/${packId}`);
     return response.data;

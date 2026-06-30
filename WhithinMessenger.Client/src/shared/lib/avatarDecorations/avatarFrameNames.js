@@ -45,4 +45,9 @@ export const AVATAR_FRAME_NAMES = {
   '1409898407828520990': { name: 'Астральная аура' },
   '1437881614087618601': { name: 'Сетка Encom' },
   '1506049399703474186': { name: 'Граффити-спрей' },
+  darkknight: {
+    name: 'darkknight',
+    description: 'Автор: yarix',
+    extension: 'webp',
+  },
 };

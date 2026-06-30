@@ -11,6 +11,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetAvailableStick
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.GetStickerPacks;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.InstallStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.SendStickerMessage;
+using WhithinMessenger.Application.CommandsAndQueries.Stickers.UninstallStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.Stickers.UploadStickerPack;
 using WhithinMessenger.Application.CommandsAndQueries.User.GetUserProfile;
 using WhithinMessenger.Domain.Interfaces;
@@ -103,6 +104,26 @@ public class StickersController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = "Ошибка при добавлении стикерпака: " + ex.Message });
+        }
+    }
+
+    [HttpDelete("packs/{packId:guid}/install")]
+    public async Task<IActionResult> UninstallStickerPack(Guid packId)
+    {
+        try
+        {
+            var userId = (Guid)HttpContext.Items["UserId"]!;
+            var result = await _mediator.Send(new UninstallStickerPackCommand(userId, packId));
+            if (!result.Success)
+            {
+                return BadRequest(new { error = result.ErrorMessage });
+            }
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Ошибка при удалении стикерпака из списка: " + ex.Message });
         }
     }
 

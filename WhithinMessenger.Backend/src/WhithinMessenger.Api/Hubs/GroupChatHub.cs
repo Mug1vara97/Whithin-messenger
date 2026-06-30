@@ -58,6 +58,8 @@ public class GroupChatHub : Hub
 
     public static bool HasActiveConnection(Guid userId) =>
         ActiveConnections.TryGetValue(userId, out var count) && count > 0;
+
+    public static void ResetActiveConnections() => ActiveConnections.Clear();
     private readonly IMediator _mediator;
     private readonly IHubContext<ChatListHub> _chatListHubContext;
     private readonly IHttpContextAccessor _httpContextAccessor;

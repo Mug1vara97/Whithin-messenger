@@ -14,6 +14,8 @@ public class NotificationHub : Hub
 
     public static bool HasActiveConnection(Guid userId) =>
         ActiveConnections.TryGetValue(userId, out var count) && count > 0;
+
+    public static void ResetActiveConnections() => ActiveConnections.Clear();
     private readonly WithinDbContext _context;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly IUserBlockService _userBlockService;

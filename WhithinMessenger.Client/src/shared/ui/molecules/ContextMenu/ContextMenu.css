@@ -1,6 +1,6 @@
 .context-menu {
-  background: var(--background-secondary);
-  border: 1px solid var(--border);
+  background: var(--fg-popover, var(--background-secondary));
+  border: 1px solid var(--fg-popover-border, var(--border));
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   padding: 6px;
@@ -39,8 +39,8 @@
   max-width: 280px;
   padding: 6px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--background-secondary);
+  border: 1px solid var(--fg-popover-border, var(--border));
+  background: var(--fg-popover, var(--background-secondary));
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -64,7 +64,7 @@
 }
 
 .context-menu-item:hover:not(.disabled) {
-  background: var(--hover);
+  background: var(--fg-popover-hover, var(--hover));
 }
 
 .context-menu-item.disabled {

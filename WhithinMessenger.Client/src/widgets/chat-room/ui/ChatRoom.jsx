@@ -68,6 +68,7 @@ import { memberListPanelWidthStorage } from '../../../shared/lib/utils/memberLis
 import { useMembers } from '../../../entities/member/hooks';
 import { useRoles } from '../../../entities/role/hooks';
 import { usePresenceOverrides } from '../../../shared/lib/hooks/usePresenceOverrides';
+import { useMemberListPanelOpen } from '../../../shared/lib/hooks/useMemberListPanelOpen';
 import { useServerHubConnection } from '../../../shared/lib/hooks/useServerHubConnection';
 import {
   mapChatParticipantToListItem,
@@ -253,6 +254,46 @@ const ChatRoom = ({
   });
 
   const typingLabel = useMemo(() => formatTypingLabel(typingUsers), [typingUsers]);
+  const [typingIndicatorTestActive, setTypingIndicatorTestActive] = useState(false);
+
+  const visibleTypingLabel = useMemo(() => {
+    if (typingIndicatorTestActive) {
+      return 'Тестовый пользователь печатает…';
+    }
+    return typingLabel;
+  }, [typingIndicatorTestActive, typingLabel]);
+
+  useEffect(() => {
+    const isTypingTestCombo = (event) =>
+      event.key.toLowerCase() === 't' && event.ctrlKey && event.shiftKey && !event.altKey;
+
+    const handleKeyDown = (event) => {
+      if (!isTypingTestCombo(event)) return;
+      setTypingIndicatorTestActive(true);
+      event.preventDefault();
+    };
+
+    const handleKeyUp = (event) => {
+      if (
+        event.key.toLowerCase() === 't'
+        || event.key === 'Control'
+        || event.key === 'Shift'
+      ) {
+        setTypingIndicatorTestActive(false);
+      }
+    };
+
+    const handleBlur = () => setTypingIndicatorTestActive(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   const visiblePinnedMessages = useMemo(() => {
     const byId = new Map();
@@ -504,7 +545,7 @@ const ChatRoom = ({
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [stickerPanelWidth, setStickerPanelWidth] = useState(380);
   const [isSendingSticker, setIsSendingSticker] = useState(false);
-  const [showMemberList, setShowMemberList] = useState(true);
+  const { open: showMemberList, setOpen: setShowMemberList } = useMemberListPanelOpen();
   const [nicknameEditorMember, setNicknameEditorMember] = useState(null);
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
@@ -1252,7 +1293,7 @@ const ChatRoom = ({
 
   useLayoutEffect(() => {
     resizeMessageComposer();
-  }, [newMessage, replyingToMessage, editingMessageId, resizeMessageComposer]);
+  }, [newMessage, replyingToMessage, editingMessageId, visibleTypingLabel, resizeMessageComposer]);
 
   useEffect(() => {
     const container = inputContainerRef.current;
@@ -1410,12 +1451,10 @@ const ChatRoom = ({
 
   const loadChatParticipants = useCallback(async () => {
     if (!chatId || isPrivateChat || !connection) {
-      console.log('ChatRoom - Skipping participants load: chatId =', chatId, 'isPrivateChat =', isPrivateChat, 'connection =', !!connection);
       return;
     }
 
     try {
-      console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
       await connection.invoke('GetChatParticipants', chatId);
     } catch (error) {
       console.error('ChatRoom - Error loading participants via SignalR:', error);
@@ -1424,38 +1463,39 @@ const ChatRoom = ({
   }, [chatId, isPrivateChat, connection]);
 
   useEffect(() => {
+    setChatParticipants([]);
+  }, [chatId]);
+
+  useEffect(() => {
+    const shouldLoadParticipants = (isGroupChat || isServerChat) && !isPrivateChat;
+    if (!shouldLoadParticipants || !connection || !chatId) return;
+
+    void loadChatParticipants();
+  }, [isGroupChat, isServerChat, isPrivateChat, chatId, connection, loadChatParticipants]);
+
+  useEffect(() => {
     if (!connection) return;
 
     const handleReceiveChatParticipants = (participants) => {
-      console.log('ChatRoom - Received participants via SignalR:', participants);
-      console.log('ChatRoom - Participants details:', participants.map(p => ({
-        userId: p.userId,
-        username: p.username,
-        avatarUrl: p.avatarUrl,
-        avatarColor: p.avatarColor,
-        userStatus: p.userStatus
-      })));
       if (participants && Array.isArray(participants)) {
         setChatParticipants(participants);
-        console.log('ChatRoom - Loaded', participants.length, 'participants:', participants.map(p => p.username));
       } else {
-        console.log('ChatRoom - Invalid participants data:', participants);
         setChatParticipants([]);
       }
     };
 
-    const handleError = (error) => {
-      console.error('ChatRoom - SignalR error:', error);
+    const handleError = () => {
       setChatParticipants([]);
     };
 
     const handleGroupUpdated = (action) => {
-      if (!showMemberList && !showChatInfo) return;
-      if ((action === 'user_added' || action === 'user_removed') && connection && chatId) {
-        connection.invoke('GetChatParticipants', chatId).catch((error) => {
-          console.error('ChatRoom - Error reloading participants:', error);
-        });
+      if ((action === 'user_added' || action === 'user_removed') && chatId) {
+        void loadChatParticipants();
       }
+    };
+
+    const handleUserAddedToGroup = () => {
+      void loadChatParticipants();
     };
 
     const handleChatInfoReceived = (chatInfo) => {
@@ -1490,6 +1530,7 @@ const ChatRoom = ({
 
     connection.on('ReceiveChatParticipants', handleReceiveChatParticipants);
     connection.on('GroupUpdated', handleGroupUpdated);
+    connection.on('UserAddedToGroup', handleUserAddedToGroup);
     connection.on('ChatInfoReceived', handleChatInfoReceived);
     connection.on('Error', handleError);
     connection.on('chatdeleted', handleChatDeleted);
@@ -1501,25 +1542,12 @@ const ChatRoom = ({
     return () => {
       connection.off('ReceiveChatParticipants', handleReceiveChatParticipants);
       connection.off('GroupUpdated', handleGroupUpdated);
+      connection.off('UserAddedToGroup', handleUserAddedToGroup);
       connection.off('ChatInfoReceived', handleChatInfoReceived);
       connection.off('Error', handleError);
       connection.off('chatdeleted', handleChatDeleted);
     };
-  }, [connection, showChatInfo, showMemberList, chatId]);
-
-  useEffect(() => {
-    const shouldLoadParticipants = isGroupChat || isServerChat;
-    if (!shouldLoadParticipants || isPrivateChat || !connection || !chatId) return;
-    if (!showMemberList && !showChatInfo) return;
-
-    console.log('ChatRoom - Loading participants via SignalR for chatId:', chatId);
-    connection.invoke('GetChatParticipants', chatId).catch((error) => {
-      console.error('ChatRoom - Error loading participants via SignalR:', error);
-      if (!isServerChat) {
-        setChatParticipants([]);
-      }
-    });
-  }, [isGroupChat, isServerChat, isPrivateChat, chatId, connection, showMemberList, showChatInfo]);
+  }, [connection, showChatInfo, chatId, loadChatParticipants]);
 
   useEffect(() => {
     if (showChatInfo && connection && chatId) {
@@ -2625,13 +2653,6 @@ const ChatRoom = ({
           </div>
         )}
 
-        {typingLabel && (
-          <div className="chat-typing-indicator" aria-live="polite">
-            <span className="chat-typing-indicator__dots" aria-hidden="true" />
-            <span>{typingLabel}</span>
-          </div>
-        )}
-
         <div ref={messagesEndRef} />
       </div>
       </div>
@@ -2824,6 +2845,15 @@ const ChatRoom = ({
         onSubmit={handleSendMessage}
       >
         <>
+        {visibleTypingLabel && (
+          <div
+            className={`chat-typing-indicator${typingIndicatorTestActive ? ' chat-typing-indicator--test' : ''}`}
+            aria-live="polite"
+          >
+            <span className="chat-typing-indicator__dots" aria-hidden="true" />
+            <span className="chat-typing-indicator__text">{visibleTypingLabel}</span>
+          </div>
+        )}
         {editingMessageId && (
           <div className="editing-notice">
             <span className='editing-text'>Редактирование сообщения</span>
