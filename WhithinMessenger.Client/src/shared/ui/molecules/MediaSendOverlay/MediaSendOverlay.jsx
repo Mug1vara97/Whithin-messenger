@@ -1,72 +1,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import {
+  buildMediaPreviewItems,
+  buildMediaSelectionTitle,
+  revokeMediaPreviewItems,
+} from '../../../lib/utils/mediaSendPreview';
 import './MediaSendOverlay.css';
-
-const MAX_BATCH_MEDIA_COUNT = 10;
-
-const getFilePreviewKey = (file) =>
-  `${file.name}-${file.size}-${file.lastModified}-${file.type}`;
-
-const buildPreviewItems = (files) =>
-  files.slice(0, MAX_BATCH_MEDIA_COUNT).map((file) => {
-    const isImage =
-      (file.type || '').startsWith('image/') ||
-      /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(file.name || '');
-    const isVideo =
-      (file.type || '').startsWith('video/') ||
-      /\.(mp4|webm|mov|mkv|m4v)$/i.test(file.name || '');
-
-    return {
-      key: getFilePreviewKey(file),
-      file,
-      url: URL.createObjectURL(file),
-      isImage,
-      isVideo,
-    };
-  });
-
-const revokePreviewItems = (items) => {
-  items.forEach((item) => {
-    if (item.url) {
-      URL.revokeObjectURL(item.url);
-    }
-  });
-};
-
-const pluralize = (count, one, few, many) => {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
-};
-
-const buildSelectionTitle = (items) => {
-  const count = items.length;
-  const images = items.filter((item) => item.isImage).length;
-  const videos = items.filter((item) => item.isVideo).length;
-
-  if (count === 1) {
-    if (images === 1) return 'Выбрано 1 изображение';
-    if (videos === 1) return 'Выбрано 1 видео';
-    return 'Выбран 1 файл';
-  }
-
-  if (images === count) {
-    return `Выбрано ${count} ${pluralize(count, 'изображение', 'изображения', 'изображений')}`;
-  }
-  if (videos === count) {
-    return `Выбрано ${count} ${pluralize(count, 'видео', 'видео', 'видео')}`;
-  }
-
-  return `Выбрано ${count} ${pluralize(count, 'файл', 'файла', 'файлов')}`;
-};
 
 const MediaSendOverlay = ({
   files = [],
-  isUploading = false,
-  uploadProgress = 0,
-  isUploadProcessing = false,
   onCancel,
   onSend,
 }) => {
@@ -75,25 +17,23 @@ const MediaSendOverlay = ({
   const previewItemsRef = useRef([]);
 
   useLayoutEffect(() => {
-    const nextItems = files.length ? buildPreviewItems(files) : [];
+    const nextItems = files.length ? buildMediaPreviewItems(files) : [];
 
-    revokePreviewItems(previewItemsRef.current);
+    revokeMediaPreviewItems(previewItemsRef.current);
     previewItemsRef.current = nextItems;
     setPreviewItems(nextItems);
   }, [files]);
 
   useEffect(
     () => () => {
-      revokePreviewItems(previewItemsRef.current);
+      revokeMediaPreviewItems(previewItemsRef.current);
       previewItemsRef.current = [];
     },
-    []
+    [],
   );
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (isUploading) return;
-
       if (event.key === 'Escape') {
         onCancel?.();
         return;
@@ -111,28 +51,26 @@ const MediaSendOverlay = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isUploading, onCancel, onSend, caption]);
+  }, [onCancel, onSend, caption]);
 
   if (!files.length) return null;
 
   const single = previewItems.length === 1 ? previewItems[0] : null;
-  const title = buildSelectionTitle(previewItems);
+  const title = `Выбрано ${buildMediaSelectionTitle(previewItems)}`;
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (isUploading) return;
     onSend?.(caption.trim());
   };
 
   const handleCaptionKeyDown = (event) => {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    if (isUploading) return;
     onSend?.(caption.trim());
   };
 
   const handleBackdropClick = (event) => {
-    if (event.target !== event.currentTarget || isUploading) return;
+    if (event.target !== event.currentTarget) return;
     onCancel?.();
   };
 
@@ -200,20 +138,6 @@ const MediaSendOverlay = ({
           ) : null}
         </div>
 
-        {isUploading && (
-          <div className="media-send-modal__progress">
-            {isUploadProcessing
-              ? `Обработка на сервере… ${uploadProgress}%`
-              : `Загрузка… ${uploadProgress}%`}
-            <div className="media-send-modal__progress-bar">
-              <div
-                className="media-send-modal__progress-fill"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
         <form className="media-send-modal__body" onSubmit={handleSubmit}>
           <label className="media-send-modal__caption-label" htmlFor="media-send-caption">
             Подпись
@@ -226,7 +150,6 @@ const MediaSendOverlay = ({
             onChange={(event) => setCaption(event.target.value)}
             onKeyDown={handleCaptionKeyDown}
             rows={2}
-            disabled={isUploading}
             autoFocus
           />
 
@@ -235,14 +158,12 @@ const MediaSendOverlay = ({
               type="button"
               className="media-send-modal__action media-send-modal__action--cancel"
               onClick={onCancel}
-              disabled={isUploading}
             >
               Отмена
             </button>
             <button
               type="submit"
               className="media-send-modal__action media-send-modal__action--send"
-              disabled={isUploading}
             >
               Отправить
             </button>

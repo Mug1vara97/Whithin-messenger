@@ -38,6 +38,7 @@ import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
 import MessageMediaContent from '../../../shared/ui/molecules/MessageMediaContent/MessageMediaContent';
 import MessageMediaAlbum from '../../../shared/ui/molecules/MessageMediaAlbum/MessageMediaAlbum';
 import MediaSendOverlay from '../../../shared/ui/molecules/MediaSendOverlay/MediaSendOverlay';
+import ChatMediaUploadMessage from '../../../shared/ui/molecules/ChatMediaUploadMessage/ChatMediaUploadMessage';
 import { categorizeMessageMedia } from '../../../shared/lib/utils/messageMediaHelpers';
 import {
   getMessageContextMenuActions,
@@ -465,7 +466,7 @@ const ChatRoom = ({
   const [isFileDragOver, setIsFileDragOver] = useState(false);
 
   const canAcceptFileDrop = Boolean(
-    chatId && canAttach && canSend && !editingMessageId && !isSavedMessages && !uploadingFile,
+    chatId && canAttach && canSend && !editingMessageId && !isSavedMessages,
   );
 
   const isExternalFileDrag = useCallback((dataTransfer) => {
@@ -1296,6 +1297,11 @@ const ChatRoom = ({
   }, [newMessage, replyingToMessage, editingMessageId, visibleTypingLabel, resizeMessageComposer]);
 
   useEffect(() => {
+    if (!uploadingFile) return;
+    scrollToBottom();
+  }, [uploadingFile, scrollToBottom]);
+
+  useEffect(() => {
     const container = inputContainerRef.current;
     if (!container) return undefined;
 
@@ -1356,6 +1362,8 @@ const ChatRoom = ({
         return;
       }
       if (pendingMediaSend?.files?.length > 0) {
+        cancelMediaSend();
+        e.stopImmediatePropagation();
         return;
       }
       if (stickerPickerOpen) {
@@ -1392,6 +1400,7 @@ const ChatRoom = ({
     showAddUserModal,
     showCallTypeSelector,
     pendingMediaSend,
+    cancelMediaSend,
     stickerPickerOpen,
     editingMessageId,
     replyingToMessage,
@@ -2626,29 +2635,39 @@ const ChatRoom = ({
             />
             <div className="message-content">
               <strong className="message-username">{username}</strong>
-              <div className="uploading-file-container">
-                <div className="uploading-file-info">
-                  <div className="uploading-file-icon uploading-file-icon-mui">
-                    {uploadingFile.type.startsWith('image/') ? <ImageIcon sx={{ fontSize: 32 }} /> : 
-                     uploadingFile.type.startsWith('video/') ? <Videocam sx={{ fontSize: 32 }} /> : 
-                     /\.(zip|rar|7z|tar|gz)$/i.test(uploadingFile.name) ? <FolderZip sx={{ fontSize: 32 }} /> : <InsertDriveFile sx={{ fontSize: 32 }} />}
-                  </div>
-                  <div className="uploading-file-details">
-                    <div className="uploading-file-name">{uploadingFile.name}</div>
-                    <div className="uploading-file-progress">
-                      {isUploadProcessing
-                        ? `Обработка на сервере… ${uploadProgress}%`
-                        : `Загрузка… ${uploadProgress}%`}
+              {uploadingFile.previewItems?.length > 0 ? (
+                <ChatMediaUploadMessage
+                  previewItems={uploadingFile.previewItems}
+                  caption={uploadingFile.caption}
+                  uploadProgress={uploadProgress}
+                  isUploadProcessing={isUploadProcessing}
+                  fileName={uploadingFile.name}
+                />
+              ) : (
+                <div className="uploading-file-container">
+                  <div className="uploading-file-info">
+                    <div className="uploading-file-icon uploading-file-icon-mui">
+                      {uploadingFile.type.startsWith('image/') ? <ImageIcon sx={{ fontSize: 32 }} /> : 
+                       uploadingFile.type.startsWith('video/') ? <Videocam sx={{ fontSize: 32 }} /> : 
+                       /\.(zip|rar|7z|tar|gz)$/i.test(uploadingFile.name) ? <FolderZip sx={{ fontSize: 32 }} /> : <InsertDriveFile sx={{ fontSize: 32 }} />}
+                    </div>
+                    <div className="uploading-file-details">
+                      <div className="uploading-file-name">{uploadingFile.name}</div>
+                      <div className="uploading-file-progress">
+                        {isUploadProcessing
+                          ? `Обработка на сервере… ${uploadProgress}%`
+                          : `Загрузка… ${uploadProgress}%`}
+                      </div>
                     </div>
                   </div>
+                  <div className="upload-progress-bar">
+                    <div 
+                      className="upload-progress-fill" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="upload-progress-bar">
-                  <div 
-                    className="upload-progress-fill" 
-                    style={{ width: `${uploadProgress}%` }}
-                  ></div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -3040,9 +3059,6 @@ const ChatRoom = ({
       {pendingMediaSend?.files?.length > 0 && (
         <MediaSendOverlay
           files={pendingMediaSend.files}
-          isUploading={Boolean(uploadingFile)}
-          uploadProgress={uploadProgress}
-          isUploadProcessing={isUploadProcessing}
           onCancel={cancelMediaSend}
           onSend={confirmMediaSend}
         />

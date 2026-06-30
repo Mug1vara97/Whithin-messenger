@@ -7,6 +7,10 @@ import {
   probeAudioDurationFromBlobUrl,
   probeVideoDurationFromFile,
 } from '../utils/probeAudioDuration';
+import {
+  buildMediaPreviewItems,
+  revokeMediaPreviewItems,
+} from '../utils/mediaSendPreview';
 
 const VIDEO_NOTE_MAX_SEC = 60;
 const MAX_BATCH_MEDIA_COUNT = 10;
@@ -113,6 +117,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
       const { isVideoNote = false } = options;
       const fileList = await Promise.all(Array.from(files).map(attachMediaDuration));
+      const previewItems = buildMediaPreviewItems(fileList);
 
       try {
         setUploadingFile({
@@ -122,6 +127,8 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
               : `${fileList.length} файлов`,
           type: fileList[0].type,
           size: fileList.reduce((sum, file) => sum + file.size, 0),
+          previewItems,
+          caption: caption?.trim() || '',
         });
         setUploadProgress(0);
         setIsUploadProcessing(false);
@@ -200,12 +207,14 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         });
 
         await new Promise((resolve) => setTimeout(resolve, 200));
+        revokeMediaPreviewItems(previewItems);
         setUploadingFile(null);
         setUploadProgress(0);
         setIsUploadProcessing(false);
         return true;
       } catch (error) {
         console.error('❌ Ошибка загрузки файла:', error);
+        revokeMediaPreviewItems(previewItems);
         setUploadingFile(null);
         setUploadProgress(0);
         setIsUploadProcessing(false);
@@ -248,9 +257,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
     async (caption) => {
       const files = pendingMediaSend?.files;
       if (!files?.length) return;
+      setPendingMediaSend(null);
       const success = await uploadFiles(files, caption);
-      if (success) {
-        setPendingMediaSend(null);
+      if (!success) {
+        setPendingMediaSend({ files });
       }
     },
     [pendingMediaSend, uploadFiles]
