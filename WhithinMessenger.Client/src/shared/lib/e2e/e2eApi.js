@@ -30,12 +30,6 @@ export const e2eApi = {
       deviceId,
       publicKeyBase64,
     });
-    const normalizedDeviceId = String(deviceId ?? 'default');
-    for (const key of deviceKeyCache.keys()) {
-      if (key.endsWith(`:${normalizedDeviceId}`) || key.endsWith(':primary')) {
-        deviceKeyCache.delete(key);
-      }
-    }
   },
 
   async getDeviceKey(userId, deviceId = null) {

@@ -222,7 +222,7 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
     saveIdentity(userId, identity);
   }
 
-  const shouldUpload = strictUpload || identity.uploadedPublicKeyBase64 !== identity.publicKeyBase64;
+  const shouldUpload = identity.uploadedPublicKeyBase64 !== identity.publicKeyBase64;
   if (shouldUpload) {
     try {
       await e2eApi.uploadDeviceKey(identity.deviceId, identity.publicKeyBase64);
@@ -392,6 +392,8 @@ const buildWrapsForMembers = async (chatKeyBytes, memberIds, currentUserId, { st
 };
 
 const resolveMemberDeviceKeys = async (memberId, currentUserId) => {
+  const memberKey = String(memberId);
+
   if (currentUserId && String(memberId) === String(currentUserId)) {
     const identity = loadIdentity(currentUserId) ?? await ensureE2eIdentity(currentUserId);
     const deviceId = identity?.deviceId ?? DEVICE_ID;
@@ -399,11 +401,18 @@ const resolveMemberDeviceKeys = async (memberId, currentUserId) => {
     return publicKeyBase64 ? [{ deviceId, publicKeyBase64 }] : [];
   }
 
+  if (PEER_KEY_MISSING.has(memberKey)) {
+    return [];
+  }
+
   const byDeviceId = new Map();
 
   const primary = await e2eApi.getDeviceKey(memberId);
   if (primary?.publicKeyBase64) {
     byDeviceId.set(primary.deviceId ?? 'default', primary.publicKeyBase64);
+    PEER_KEY_MISSING.delete(memberKey);
+  } else {
+    PEER_KEY_MISSING.add(memberKey);
   }
 
   return [...byDeviceId.entries()].map(([deviceId, publicKeyBase64]) => ({
@@ -584,22 +593,25 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   }
 
   const members = normalizeMemberIds(memberUserIds, userId);
+  const scheduleWrapSync = (chatKeyBase64, targetMemberIds) => {
+    if (!targetMemberIds.length) return;
+    void syncChatKeyWraps(userId, chatId, chatKeyBase64, targetMemberIds, { strictAllMembers: false })
+      .catch((error) => {
+        e2eLog('wrap-sync-best-effort-failed', {
+          userId: String(userId),
+          chatId: String(chatId),
+          targetMemberIds,
+          errorMessage: error?.message ?? String(error),
+          httpStatus: error?.response?.status ?? null,
+        }, 'warn');
+      });
+  };
   const localKeyBase64 = loadLocalChatKey(chatId);
 
-  // Send path: before encrypting, try to sync wraps so recipients can decrypt immediately.
+  // Send path: return immediately, wraps sync in background.
   if (forEncrypt && localKeyBase64 && !strictAllMembers) {
     await ensureE2eIdentity(userId, { strictUpload: true });
-    try {
-      await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
-    } catch (error) {
-      e2eLog('wrap-sync-best-effort-failed', {
-        userId: String(userId),
-        chatId: String(chatId),
-        targetMemberIds: members,
-        errorMessage: error?.message ?? String(error),
-        httpStatus: error?.response?.status ?? null,
-      }, 'warn');
-    }
+    scheduleWrapSync(localKeyBase64, members);
     return localKeyBase64;
   }
 
@@ -621,17 +633,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible, { strictAllMembers: true });
     } else if (forEncrypt) {
-      try {
-        await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
-      } catch (error) {
-        e2eLog('wrap-sync-best-effort-failed', {
-          userId: String(userId),
-          chatId: String(chatId),
-          targetMemberIds: members,
-          errorMessage: error?.message ?? String(error),
-          httpStatus: error?.response?.status ?? null,
-        }, 'warn');
-      }
+      scheduleWrapSync(localKeyBase64, members);
     }
     return localKeyBase64;
   }
@@ -653,17 +655,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers: true });
     } else if (forEncrypt) {
-      try {
-        await syncChatKeyWraps(userId, chatId, keyBase64FromServer, members, { strictAllMembers: false });
-      } catch (error) {
-        e2eLog('wrap-sync-best-effort-failed', {
-          userId: String(userId),
-          chatId: String(chatId),
-          targetMemberIds: members,
-          errorMessage: error?.message ?? String(error),
-          httpStatus: error?.response?.status ?? null,
-        }, 'warn');
-      }
+      scheduleWrapSync(keyBase64FromServer, members);
     }
     return keyBase64FromServer;
   }
