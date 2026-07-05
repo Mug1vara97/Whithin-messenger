@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
-import { HubConnectionBuilder } from '@microsoft/signalr';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
 
@@ -61,6 +61,7 @@ export const ConnectionProvider = ({ children }) => {
           accessTokenFactory: () => tokenManager.getToken() || ''
         })
         .withAutomaticReconnect()
+        .configureLogging(LogLevel.Error)
         .build();
 
       await connection.start();

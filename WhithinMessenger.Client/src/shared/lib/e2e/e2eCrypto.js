@@ -11,6 +11,10 @@ const PEER_KEY_CACHE = new Map();
 const PEER_KEY_MISSING = new Set();
 const ENSURE_CHAT_KEY_INFLIGHT = new Map();
 const CHAT_KEYS_MARKED_UNAVAILABLE = new Set();
+const E2E_LOG_ONCE_KEYS = new Set();
+const CHAT_LEGACY_PROBE_ATTEMPTED = new Set();
+const SELF_DEVICE_KEY_AVAILABILITY = new Map();
+const CHAT_REWRAP_REQUESTED = new Set();
 
 const CHAT_KEY_UNAVAILABLE_MESSAGE =
   'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
@@ -20,16 +24,53 @@ const e2eLog = (event, details = {}, level = 'log') => {
   logger(`[E2E] ${event}`, details);
 };
 
+const e2eLogOnce = (key, event, details = {}, level = 'log') => {
+  if (E2E_LOG_ONCE_KEYS.has(key)) return;
+  E2E_LOG_ONCE_KEYS.add(key);
+  e2eLog(event, details, level);
+};
+
+const requestChatRewrapIfNeeded = async (userId, chatId, deviceId) => {
+  const chatKey = String(chatId);
+  if (CHAT_REWRAP_REQUESTED.has(chatKey)) {
+    return;
+  }
+
+  CHAT_REWRAP_REQUESTED.add(chatKey);
+  try {
+    await e2eApi.requestChatKeyRewrap(chatId, deviceId ?? DEVICE_ID);
+    e2eLog('chat-key-rewrap-request-sent', {
+      userId: String(userId),
+      chatId: chatKey,
+      deviceId: deviceId ?? DEVICE_ID,
+    });
+  } catch (error) {
+    e2eLog('chat-key-rewrap-request-failed', {
+      userId: String(userId),
+      chatId: chatKey,
+      deviceId: deviceId ?? DEVICE_ID,
+      errorMessage: error?.message ?? String(error),
+      httpStatus: error?.response?.status ?? null,
+    }, 'warn');
+  }
+};
+
 export const clearChatKeyUnavailableState = (chatId) => {
   if (!chatId) return;
-  CHAT_KEYS_MARKED_UNAVAILABLE.delete(String(chatId));
+  const chatKey = String(chatId);
+  CHAT_KEYS_MARKED_UNAVAILABLE.delete(chatKey);
+  CHAT_LEGACY_PROBE_ATTEMPTED.delete(chatKey);
+  CHAT_REWRAP_REQUESTED.delete(chatKey);
+  E2E_LOG_ONCE_KEYS.delete(`missing:${chatKey}`);
+  E2E_LOG_ONCE_KEYS.delete(`marked:${chatKey}`);
   invalidateChatWrappedKeyCache(chatId);
 };
 
 const markChatKeyUnavailable = (chatId) => {
   if (!chatId) return;
-  CHAT_KEYS_MARKED_UNAVAILABLE.add(String(chatId));
-  e2eLog('chat-key-marked-unavailable', { chatId: String(chatId) }, 'warn');
+  const chatKey = String(chatId);
+  CHAT_KEYS_MARKED_UNAVAILABLE.add(chatKey);
+  e2eLogOnce(`marked:${chatKey}`, 'chat-key-marked-unavailable', { chatId: chatKey }, 'warn');
 };
 
 const isChatKeyUnavailableError = (error) => (
@@ -173,6 +214,7 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
 
   try {
     await e2eApi.uploadDeviceKey(identity.deviceId, identity.publicKeyBase64);
+    SELF_DEVICE_KEY_AVAILABILITY.set(identity.deviceId ?? DEVICE_ID, true);
     identity.uploadedPublicKeyBase64 = identity.publicKeyBase64;
     saveIdentity(userId, identity);
     PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
@@ -443,12 +485,17 @@ const syncAlternateSelfDeviceWraps = async (userId, chatId, chatKeyBase64) => {
 
   for (const deviceId of selfDeviceIds(ourPrimaryDeviceId)) {
     if (deviceId === ourPrimaryDeviceId) continue;
+    if (SELF_DEVICE_KEY_AVAILABILITY.get(deviceId) === false) continue;
 
     const existing = await e2eApi.getChatWrappedKey(chatId, deviceId);
     if (existing?.wrappedKeyBase64) continue;
 
     const deviceKey = await e2eApi.getDeviceKey(userId, deviceId);
-    if (!deviceKey?.publicKeyBase64) continue;
+    if (!deviceKey?.publicKeyBase64) {
+      SELF_DEVICE_KEY_AVAILABILITY.set(deviceId, false);
+      continue;
+    }
+    SELF_DEVICE_KEY_AVAILABILITY.set(deviceId, true);
 
     const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, deviceKey.publicKeyBase64);
     wraps.push({ userId, wrappedKeyBase64, deviceId });
@@ -487,10 +534,12 @@ const syncChatKeyWraps = async (
 };
 
 const tryOpenChatKeyFromServer = async (userId, chatId, primaryDeviceId) => {
-  const deviceIds = [
-    primaryDeviceId,
-    ...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId),
-  ];
+  const chatKey = String(chatId);
+  const deviceIds = [primaryDeviceId];
+  if (!CHAT_LEGACY_PROBE_ATTEMPTED.has(chatKey)) {
+    deviceIds.push(...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId));
+    CHAT_LEGACY_PROBE_ATTEMPTED.add(chatKey);
+  }
 
   for (const deviceId of deviceIds) {
     const remote = await e2eApi.getChatWrappedKey(chatId, deviceId);
@@ -601,6 +650,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
 
   const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
   if ((existingRecipients || []).length > 0) {
+    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
     e2eLog('chat-key-missing-for-current-device', {
       userId: String(userId),
       chatId: String(chatId),
@@ -667,7 +717,9 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
 
   const chatKey = String(chatId);
   if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
-    e2eLog('chat-key-short-circuit-missing', {
+    const identity = loadIdentity(userId);
+    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    e2eLogOnce(`missing:${chatKey}`, 'chat-key-short-circuit-missing', {
       userId: String(userId),
       chatId: String(chatId),
       memberCount: Array.isArray(memberUserIds) ? memberUserIds.length : 0,

@@ -22,15 +22,6 @@ export const invalidateChatWrappedKeyCache = (chatId) => {
   chatRecipientsCache.delete(String(chatId));
 };
 
-const invalidateDeviceKeyCache = (userId) => {
-  const prefix = `${userId}:`;
-  for (const key of deviceKeyCache.keys()) {
-    if (key.startsWith(prefix)) {
-      deviceKeyCache.delete(key);
-    }
-  }
-};
-
 export const e2eApi = {
   async uploadDeviceKey(deviceId, publicKeyBase64) {
     await apiClient.put('/e2e/keys', {
@@ -174,7 +165,11 @@ export const e2eApi = {
       })),
     });
     invalidateChatWrappedKeyCache(chatId);
-    const uniqueUserIds = new Set((wraps || []).map((wrap) => String(wrap.userId ?? '')).filter(Boolean));
-    uniqueUserIds.forEach((userId) => invalidateDeviceKeyCache(userId));
+  },
+
+  async requestChatKeyRewrap(chatId, deviceId = 'web') {
+    await apiClient.post(`/e2e/chat-keys/${chatId}/rewrap-request`, {
+      deviceId,
+    });
   },
 };

@@ -6,6 +6,8 @@ using WhithinMessenger.Application.CommandsAndQueries.E2e.GetChatWrappedKey;
 using WhithinMessenger.Application.CommandsAndQueries.E2e.GetDeviceKey;
 using WhithinMessenger.Application.CommandsAndQueries.E2e.UpsertChatWrappedKeys;
 using WhithinMessenger.Application.CommandsAndQueries.E2e.UpsertDeviceKey;
+using WhithinMessenger.Application.Services;
+using WhithinMessenger.Domain.Interfaces;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -15,10 +17,17 @@ namespace WhithinMessenger.Api.Controllers;
 public class E2eController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IChatRepository _chatRepository;
+    private readonly IE2eRealtimeNotifier _e2eRealtimeNotifier;
 
-    public E2eController(IMediator mediator)
+    public E2eController(
+        IMediator mediator,
+        IChatRepository chatRepository,
+        IE2eRealtimeNotifier e2eRealtimeNotifier)
     {
         _mediator = mediator;
+        _chatRepository = chatRepository;
+        _e2eRealtimeNotifier = e2eRealtimeNotifier;
     }
 
     [HttpPut("keys")]
@@ -106,6 +115,31 @@ public class E2eController : ControllerBase
 
         return Ok(new { success = true });
     }
+
+    [HttpPost("chat-keys/{chatId:guid}/rewrap-request")]
+    public async Task<IActionResult> RequestChatKeyRewrap(
+        Guid chatId,
+        [FromBody] RequestChatKeyRewrapRequest? request = null,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+
+        var isParticipant = await _chatRepository.IsUserParticipantAsync(chatId, userId, cancellationToken);
+        if (!isParticipant)
+        {
+            return Forbid();
+        }
+
+        var members = await _chatRepository.GetChatMembersAsync(chatId, cancellationToken);
+        await _e2eRealtimeNotifier.NotifyChatKeyRewrapNeededAsync(
+            chatId,
+            userId,
+            request?.DeviceId ?? "web",
+            members,
+            cancellationToken);
+
+        return Ok(new { success = true });
+    }
 }
 
 public class UpsertE2eDeviceKeyRequest
@@ -123,5 +157,10 @@ public class ChatWrappedKeyUpload
 {
     public Guid UserId { get; set; }
     public string? WrappedKeyBase64 { get; set; }
+    public string? DeviceId { get; set; }
+}
+
+public class RequestChatKeyRewrapRequest
+{
     public string? DeviceId { get; set; }
 }

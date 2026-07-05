@@ -20,6 +20,7 @@ const shouldKeepLog = (args) => args.some(
 
 const originalConsoleLog = console.log.bind(console)
 const originalConsoleWarn = console.warn.bind(console)
+const originalConsoleInfo = console.info.bind(console)
 
 console.log = (...args) => {
   if (shouldKeepLog(args)) {
@@ -30,6 +31,12 @@ console.log = (...args) => {
 console.warn = (...args) => {
   if (shouldKeepLog(args)) {
     originalConsoleWarn(...args)
+  }
+}
+
+console.info = (...args) => {
+  if (shouldKeepLog(args)) {
+    originalConsoleInfo(...args)
   }
 }
 

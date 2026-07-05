@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { HubConnectionBuilder } from '@microsoft/signalr';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import { MessageStatus } from '../../../entities/message/model/types';
 import {
@@ -723,6 +723,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       const newConnection = new HubConnectionBuilder()
         .withUrl(`${BASE_URL}/groupchathub?userId=${userId}`)
         .withAutomaticReconnect()
+        .configureLogging(LogLevel.Error)
         .build();
 
       try {

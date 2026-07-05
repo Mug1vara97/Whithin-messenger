@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { HubConnectionBuilder } from '@microsoft/signalr';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
 import { ServerContext } from './ServerContext';
@@ -64,6 +64,7 @@ export const ServerProvider = ({ children }) => {
         const connection = new HubConnectionBuilder()
           .withUrl(`${BASE_URL}/serverlisthub?userId=${userId}`)
           .withAutomaticReconnect()
+          .configureLogging(LogLevel.Error)
           .build();
 
         await connection.start();
