@@ -75,8 +75,13 @@ export const e2eApi = {
     return request;
   },
 
-  async getChatWrappedKey(chatId, deviceId = 'default') {
+  async getChatWrappedKey(chatId, deviceId = 'default', options = {}) {
+    const { forceRefresh = false } = options;
     const cacheKey = chatWrappedKeyCacheKey(chatId, deviceId);
+    if (forceRefresh) {
+      chatWrappedKeyCache.delete(cacheKey);
+      chatWrappedKeyInFlight.delete(cacheKey);
+    }
     if (chatWrappedKeyCache.has(cacheKey)) {
       return chatWrappedKeyCache.get(cacheKey);
     }

@@ -80,6 +80,8 @@ const isWrongSecretKeyError = (error) => (
   String(error?.message ?? '').toLowerCase().includes('wrong secret key')
 );
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let sodiumReadyPromise = null;
 
 export class E2eEncryptionError extends Error {
@@ -571,6 +573,32 @@ const tryOpenChatKeyFromServer = async (userId, chatId, primaryDeviceId) => {
   return null;
 };
 
+const waitForRewrappedChatKey = async (
+  userId,
+  chatId,
+  deviceId,
+  { attempts = 6, intervalMs = 400 } = {},
+) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const remote = await e2eApi.getChatWrappedKey(chatId, deviceId, { forceRefresh: true });
+    if (remote?.wrappedKeyBase64) {
+      try {
+        const chatKeyBytes = await openSealedChatKey(userId, remote.wrappedKeyBase64);
+        const sodium = await ensureSodium();
+        const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
+        saveLocalChatKey(chatId, keyBase64);
+        return keyBase64;
+      } catch {
+        // Continue polling until a valid wrap appears.
+      }
+    }
+    if (attempt < attempts - 1) {
+      await delay(intervalMs);
+    }
+  }
+  return null;
+};
+
 /** When this device already holds the chat key, upload missing wraps (e.g. android) for other devices. */
 export const proactiveSyncChatDeviceWraps = async (userId, chatId, memberUserIds = []) => {
   if (!userId || !chatId) return;
@@ -663,6 +691,16 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
   if ((existingRecipients || []).length > 0) {
     await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    if (!forEncrypt) {
+      const recovered = await waitForRewrappedChatKey(
+        userId,
+        chatId,
+        identity?.deviceId ?? DEVICE_ID,
+      );
+      if (recovered) {
+        return recovered;
+      }
+    }
     e2eLog('chat-key-missing-for-current-device', {
       userId: String(userId),
       chatId: String(chatId),
@@ -682,6 +720,14 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   // ciphertext undecryptable on this device ("wrong secret key for the given ciphertext").
   if (!forEncrypt) {
     await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    const recovered = await waitForRewrappedChatKey(
+      userId,
+      chatId,
+      identity?.deviceId ?? DEVICE_ID,
+    );
+    if (recovered) {
+      return recovered;
+    }
     e2eLog('chat-key-decrypt-no-server-wrap', {
       userId: String(userId),
       chatId: String(chatId),
@@ -744,8 +790,18 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
 
   const chatKey = String(chatId);
   if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
-    const identity = loadIdentity(userId);
+    const identity = loadIdentity(userId) ?? await ensureE2eIdentity(userId);
     await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    if (!options?.forEncrypt) {
+      const recovered = await waitForRewrappedChatKey(
+        userId,
+        chatId,
+        identity?.deviceId ?? DEVICE_ID,
+      );
+      if (recovered) {
+        return recovered;
+      }
+    }
     e2eLogOnce(`missing:${chatKey}`, 'chat-key-short-circuit-missing', {
       userId: String(userId),
       chatId: String(chatId),
@@ -886,19 +942,21 @@ export const decryptChatMessage = async (
     }
   }
 
-  try {
-    const legacy = await decryptWithPairwiseKey(userId, peerUserId, content);
-    if (legacy != null) {
-      return legacy;
+  if (Number(encryptionVersion || 0) < E2E_ENCRYPTION_VERSION) {
+    try {
+      const legacy = await decryptWithPairwiseKey(userId, peerUserId, content);
+      if (legacy != null) {
+        return legacy;
+      }
+    } catch (error) {
+      e2eLog('legacy-pairwise-decrypt-failed', {
+        userId: String(userId),
+        chatId: String(chatId),
+        peerUserId: peerUserId ? String(peerUserId) : null,
+        encryptionVersion: Number(encryptionVersion || 0),
+        errorMessage: error?.message ?? String(error),
+      }, 'warn');
     }
-  } catch (error) {
-    e2eLog('legacy-pairwise-decrypt-failed', {
-      userId: String(userId),
-      chatId: String(chatId),
-      peerUserId: peerUserId ? String(peerUserId) : null,
-      encryptionVersion: Number(encryptionVersion || 0),
-      errorMessage: error?.message ?? String(error),
-    }, 'warn');
   }
 
   return E2E_DECRYPT_FAILED_TEXT;
