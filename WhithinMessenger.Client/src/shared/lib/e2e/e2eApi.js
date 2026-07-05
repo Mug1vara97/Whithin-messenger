@@ -1,6 +1,7 @@
 import apiClient from '../api/apiClient';
 
 const isNotFound = (error) => error?.response?.status === 404;
+const isBadRequest = (error) => error?.response?.status === 400;
 
 const chatWrappedKeyCache = new Map();
 const chatWrappedKeyInFlight = new Map();
@@ -135,13 +136,21 @@ export const e2eApi = {
 
     const request = (async () => {
       try {
-        const { data } = await apiClient.get(`/e2e/chat-keys/${chatId}/recipients`);
+        const { data, status } = await apiClient.get(`/e2e/chat-keys/${chatId}/recipients`, {
+          // 400 can happen for stale/non-member chats; treat as empty recipients.
+          validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 400 || responseStatus === 404,
+        });
+        if (status === 400 || status === 404 || data == null) {
+          const result = { userIds: [] };
+          chatRecipientsCache.set(cacheKey, result);
+          return result;
+        }
         const userIds = data.userIds ?? data.UserIds ?? [];
         const result = { userIds: Array.isArray(userIds) ? userIds : [] };
         chatRecipientsCache.set(cacheKey, result);
         return result;
       } catch (error) {
-        if (isNotFound(error)) {
+        if (isNotFound(error) || isBadRequest(error)) {
           const result = { userIds: [] };
           chatRecipientsCache.set(cacheKey, result);
           return result;

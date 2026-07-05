@@ -2,8 +2,6 @@ import _sodium from 'libsodium-wrappers';
 import { e2eApi, invalidateChatWrappedKeyCache } from './e2eApi';
 
 const DEVICE_ID = 'web';
-const LEGACY_DEVICE_IDS = ['default', 'android'];
-const ALL_DEVICE_IDS = [DEVICE_ID, ...LEGACY_DEVICE_IDS];
 const IDENTITY_STORAGE_PREFIX = 'whithin:e2e:identity:';
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
 const PEER_KEY_CACHE = new Map();
@@ -390,13 +388,6 @@ const resolveMemberDeviceKeys = async (memberId, currentUserId) => {
     byDeviceId.set(primary.deviceId ?? 'default', primary.publicKeyBase64);
   }
 
-  for (const deviceId of ALL_DEVICE_IDS) {
-    if (byDeviceId.has(deviceId)) continue;
-    const remote = await e2eApi.getDeviceKey(memberId, deviceId);
-    if (!remote?.publicKeyBase64) continue;
-    byDeviceId.set(deviceId, remote.publicKeyBase64);
-  }
-
   return [...byDeviceId.entries()].map(([deviceId, publicKeyBase64]) => ({
     deviceId,
     publicKeyBase64,
@@ -431,7 +422,6 @@ const resolveMissingWrapMemberIds = async (
 
 const selfDeviceIds = (primaryDeviceId) => [
   primaryDeviceId,
-  ...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId),
 ].filter((id, index, arr) => arr.indexOf(id) === index);
 
 /** Re-upload own wrap when the server has a stale wrap for the current device key. */
@@ -536,10 +526,7 @@ const syncChatKeyWraps = async (
 const tryOpenChatKeyFromServer = async (userId, chatId, primaryDeviceId) => {
   const chatKey = String(chatId);
   const deviceIds = [primaryDeviceId];
-  if (!CHAT_LEGACY_PROBE_ATTEMPTED.has(chatKey)) {
-    deviceIds.push(...LEGACY_DEVICE_IDS.filter((id) => id !== primaryDeviceId));
-    CHAT_LEGACY_PROBE_ATTEMPTED.add(chatKey);
-  }
+  CHAT_LEGACY_PROBE_ATTEMPTED.add(chatKey);
 
   for (const deviceId of deviceIds) {
     const remote = await e2eApi.getChatWrappedKey(chatId, deviceId);
