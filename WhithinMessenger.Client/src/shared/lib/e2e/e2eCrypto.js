@@ -15,6 +15,11 @@ const CHAT_KEYS_MARKED_UNAVAILABLE = new Set();
 const CHAT_KEY_UNAVAILABLE_MESSAGE =
   'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
 
+const e2eLog = (event, details = {}, level = 'log') => {
+  const logger = console[level] ?? console.log;
+  logger(`[E2E] ${event}`, details);
+};
+
 export const clearChatKeyUnavailableState = (chatId) => {
   if (!chatId) return;
   CHAT_KEYS_MARKED_UNAVAILABLE.delete(String(chatId));
@@ -24,6 +29,7 @@ export const clearChatKeyUnavailableState = (chatId) => {
 const markChatKeyUnavailable = (chatId) => {
   if (!chatId) return;
   CHAT_KEYS_MARKED_UNAVAILABLE.add(String(chatId));
+  e2eLog('chat-key-marked-unavailable', { chatId: String(chatId) }, 'warn');
 };
 
 const isChatKeyUnavailableError = (error) => (
@@ -176,7 +182,12 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
         'Не удалось загрузить ключ шифрования на сервер. Проверьте соединение и попробуйте снова.',
       );
     }
-    console.warn('Failed to upload E2E public key:', error);
+    e2eLog('device-key-upload-failed', {
+      userId: String(userId),
+      deviceId: identity?.deviceId ?? DEVICE_ID,
+      errorMessage: error?.message ?? String(error),
+      httpStatus: error?.response?.status ?? null,
+    }, 'warn');
   }
 
   return identity;
@@ -524,7 +535,13 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     void syncChatKeyWraps(userId, chatId, chatKeyBase64, targetMemberIds, { strictAllMembers: false })
       .then(() => refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64))
       .catch((error) => {
-        console.warn('Best-effort chat key wrap sync failed:', error);
+        e2eLog('wrap-sync-best-effort-failed', {
+          userId: String(userId),
+          chatId: String(chatId),
+          targetMemberIds,
+          errorMessage: error?.message ?? String(error),
+          httpStatus: error?.response?.status ?? null,
+        }, 'warn');
       });
   };
 
@@ -567,6 +584,12 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     identity?.deviceId ?? DEVICE_ID,
   );
   if (keyBase64FromServer) {
+    e2eLog('chat-key-restored-from-server-wrap', {
+      userId: String(userId),
+      chatId: String(chatId),
+      deviceId: identity?.deviceId ?? DEVICE_ID,
+      forEncrypt,
+    });
     saveLocalChatKey(chatId, keyBase64FromServer);
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers: true });
@@ -578,6 +601,14 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
 
   const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
   if ((existingRecipients || []).length > 0) {
+    e2eLog('chat-key-missing-for-current-device', {
+      userId: String(userId),
+      chatId: String(chatId),
+      forEncrypt,
+      recipientsWithWraps: existingRecipients.map((id) => String(id)),
+      requestedMembers: members.map((id) => String(id)),
+      localDeviceId: identity?.deviceId ?? DEVICE_ID,
+    }, 'warn');
     const message = forEncrypt
       ? 'Не удалось отправить сообщение: у вас ещё нет ключа этого чата. Откройте чат на устройстве, где переписка уже работает, и отправьте любое сообщение — затем обновите страницу здесь.'
       : CHAT_KEY_UNAVAILABLE_MESSAGE;
@@ -603,6 +634,15 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   );
 
   if (!wraps.length) {
+    e2eLog('chat-key-bootstrap-no-wrap-targets', {
+      userId: String(userId),
+      chatId: String(chatId),
+      forEncrypt,
+      strictAllMembers,
+      audience: audience.map((id) => String(id)),
+      eligible: eligible.map((id) => String(id)),
+      wrapTargets: wrapTargets.map((id) => String(id)),
+    }, 'warn');
     throw new E2eEncryptionError(
       strictAllMembers
         ? formatMissingKeysError(audience.filter((id) => !eligible.includes(String(id))), userId)
@@ -627,6 +667,12 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
 
   const chatKey = String(chatId);
   if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
+    e2eLog('chat-key-short-circuit-missing', {
+      userId: String(userId),
+      chatId: String(chatId),
+      memberCount: Array.isArray(memberUserIds) ? memberUserIds.length : 0,
+      forEncrypt: Boolean(options?.forEncrypt),
+    }, 'warn');
     throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
   }
 
@@ -733,7 +779,13 @@ export const decryptChatMessage = async (
     }
   } catch (error) {
     if (!(error instanceof E2eEncryptionError)) {
-      console.warn('Chat-key E2E decrypt failed:', error);
+      e2eLog('chat-key-decrypt-runtime-failed', {
+        userId: String(userId),
+        chatId: String(chatId),
+        encryptionVersion: Number(encryptionVersion || 0),
+        peerUserId: peerUserId ? String(peerUserId) : null,
+        errorMessage: error?.message ?? String(error),
+      }, 'warn');
     }
   }
 
@@ -743,7 +795,13 @@ export const decryptChatMessage = async (
       return legacy;
     }
   } catch (error) {
-    console.warn('Legacy pairwise E2E decrypt failed:', error);
+    e2eLog('legacy-pairwise-decrypt-failed', {
+      userId: String(userId),
+      chatId: String(chatId),
+      peerUserId: peerUserId ? String(peerUserId) : null,
+      encryptionVersion: Number(encryptionVersion || 0),
+      errorMessage: error?.message ?? String(error),
+    }, 'warn');
   }
 
   return E2E_DECRYPT_FAILED_TEXT;

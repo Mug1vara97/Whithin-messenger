@@ -22,26 +22,22 @@ class TokenManager {
   }
 
   setToken(token, expiresIn = null) {
-    console.log('TokenManager: Setting token:', token ? 'Token received' : 'No token');
     localStorage.setItem(this.ACCESS_TOKEN_KEY, token);
     
     if (expiresIn) {
       const expiryTime = Date.now() + (expiresIn * 1000);
       localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
-      console.log('TokenManager: Token expires at:', new Date(expiryTime));
     } else {
       const decoded = this.decodeToken();
       const expFromJwt = decoded?.exp ? Number(decoded.exp) * 1000 : null;
       const fallbackExpiry = Date.now() + (24 * 60 * 60 * 1000);
       const finalExpiry = expFromJwt && !Number.isNaN(expFromJwt) ? expFromJwt : fallbackExpiry;
       localStorage.setItem(this.TOKEN_EXPIRY_KEY, finalExpiry.toString());
-      console.log('TokenManager: Token expires at:', new Date(finalExpiry));
     }
   }
 
   getToken() {
     const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
-    console.log('TokenManager: Getting token:', token ? 'Token exists' : 'No token');
     return token;
   }
 
@@ -75,11 +71,7 @@ class TokenManager {
       }
     }
     const currentTime = Date.now();
-    const expired = currentTime > parseInt(expiryTime, 10);
-    if (expired) {
-      console.log('TokenManager: Token expired.');
-    }
-    return expired;
+    return currentTime > parseInt(expiryTime, 10);
   }
 
   isTokenExpiringSoon() {
@@ -126,7 +118,6 @@ class TokenManager {
   }
 
   clearTokens() {
-    console.log('TokenManager: Clearing tokens.');
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.TOKEN_EXPIRY_KEY);

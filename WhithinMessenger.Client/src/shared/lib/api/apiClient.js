@@ -16,15 +16,11 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    // Добавляем JWT токен в заголовок Authorization
     const token = tokenManager.getToken();
     if (token && tokenManager.isTokenValid()) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('API Client: Adding JWT token to request:', config.url);
-    } else {
-      console.log('API Client: No valid token available for request:', config.url);
     }
-    
+
     return config;
   },
   (error) => {

@@ -13,6 +13,26 @@ import './shared/lib/theme/frostedGlass.css'
 import { applySiteSeo } from './shared/lib/seo/siteSeo'
 import App from './App.jsx'
 
+// Keep runtime logs focused on E2E diagnostics only.
+const shouldKeepLog = (args) => args.some(
+  (arg) => typeof arg === 'string' && arg.includes('[E2E]'),
+)
+
+const originalConsoleLog = console.log.bind(console)
+const originalConsoleWarn = console.warn.bind(console)
+
+console.log = (...args) => {
+  if (shouldKeepLog(args)) {
+    originalConsoleLog(...args)
+  }
+}
+
+console.warn = (...args) => {
+  if (shouldKeepLog(args)) {
+    originalConsoleWarn(...args)
+  }
+}
+
 applySavedTheme()
 applySavedInterfaceDesign()
 void applySavedAppBackgroundSettings()

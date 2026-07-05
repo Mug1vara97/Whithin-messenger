@@ -6,8 +6,11 @@ const chatWrappedKeyCache = new Map();
 const chatWrappedKeyInFlight = new Map();
 const chatRecipientsCache = new Map();
 const chatRecipientsInFlight = new Map();
+const deviceKeyCache = new Map();
+const deviceKeyInFlight = new Map();
 
 const chatWrappedKeyCacheKey = (chatId, deviceId) => `${chatId}:${deviceId ?? 'default'}`;
+const deviceKeyCacheKey = (userId, deviceId) => `${userId}:${deviceId ?? 'primary'}`;
 
 export const invalidateChatWrappedKeyCache = (chatId) => {
   const prefix = `${chatId}:`;
@@ -19,30 +22,70 @@ export const invalidateChatWrappedKeyCache = (chatId) => {
   chatRecipientsCache.delete(String(chatId));
 };
 
+const invalidateDeviceKeyCache = (userId) => {
+  const prefix = `${userId}:`;
+  for (const key of deviceKeyCache.keys()) {
+    if (key.startsWith(prefix)) {
+      deviceKeyCache.delete(key);
+    }
+  }
+};
+
 export const e2eApi = {
   async uploadDeviceKey(deviceId, publicKeyBase64) {
     await apiClient.put('/e2e/keys', {
       deviceId,
       publicKeyBase64,
     });
+    const normalizedDeviceId = String(deviceId ?? 'default');
+    for (const key of deviceKeyCache.keys()) {
+      if (key.endsWith(`:${normalizedDeviceId}`) || key.endsWith(':primary')) {
+        deviceKeyCache.delete(key);
+      }
+    }
   },
 
   async getDeviceKey(userId, deviceId = null) {
-    try {
-      const { data } = await apiClient.get(`/e2e/keys/${userId}`, {
-        params: deviceId ? { deviceId } : undefined,
-      });
-      return {
-        deviceId: data.deviceId ?? data.DeviceId ?? 'default',
-        publicKeyBase64: data.publicKeyBase64 ?? data.PublicKeyBase64 ?? '',
-        updatedAt: data.updatedAt ?? data.UpdatedAt ?? null,
-      };
-    } catch (error) {
-      if (isNotFound(error)) {
-        return null;
-      }
-      throw error;
+    const cacheKey = deviceKeyCacheKey(userId, deviceId);
+    if (deviceKeyCache.has(cacheKey)) {
+      return deviceKeyCache.get(cacheKey);
     }
+
+    const inFlight = deviceKeyInFlight.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const request = (async () => {
+      try {
+        const { data, status } = await apiClient.get(`/e2e/keys/${userId}`, {
+          params: deviceId ? { deviceId } : undefined,
+          validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 404,
+        });
+        if (status === 404 || data == null) {
+          deviceKeyCache.set(cacheKey, null);
+          return null;
+        }
+        const result = {
+          deviceId: data.deviceId ?? data.DeviceId ?? 'default',
+          publicKeyBase64: data.publicKeyBase64 ?? data.PublicKeyBase64 ?? '',
+          updatedAt: data.updatedAt ?? data.UpdatedAt ?? null,
+        };
+        deviceKeyCache.set(cacheKey, result);
+        return result;
+      } catch (error) {
+        if (isNotFound(error)) {
+          deviceKeyCache.set(cacheKey, null);
+          return null;
+        }
+        throw error;
+      } finally {
+        deviceKeyInFlight.delete(cacheKey);
+      }
+    })();
+
+    deviceKeyInFlight.set(cacheKey, request);
+    return request;
   },
 
   async getChatWrappedKey(chatId, deviceId = 'default') {
@@ -131,5 +174,7 @@ export const e2eApi = {
       })),
     });
     invalidateChatWrappedKeyCache(chatId);
+    const uniqueUserIds = new Set((wraps || []).map((wrap) => String(wrap.userId ?? '')).filter(Boolean));
+    uniqueUserIds.forEach((userId) => invalidateDeviceKeyCache(userId));
   },
 };

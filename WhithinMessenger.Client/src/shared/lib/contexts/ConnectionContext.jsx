@@ -26,11 +26,9 @@ export const ConnectionProvider = ({ children }) => {
     if (connectionRefs.current[connectionKey]) {
       const existingConnection = connectionRefs.current[connectionKey];
       if (existingConnection.state === 'Connected' || existingConnection.state === 'Connecting') {
-        console.log(`Connection ${connectionKey} already exists with state ${existingConnection.state}, returning existing connection`);
         return existingConnection;
       } else {
         // Подключение существует, но не активно - закрываем его
-        console.log(`Connection ${connectionKey} exists but not active (state: ${existingConnection.state}), closing it`);
         try {
           await existingConnection.stop();
         } catch (error) {
@@ -42,7 +40,6 @@ export const ConnectionProvider = ({ children }) => {
 
     // Проверяем, не создается ли уже подключение
     if (pendingConnections.current.has(connectionKey)) {
-      console.log(`Connection ${connectionKey} is already being created, waiting...`);
       // Ждем завершения создания подключения
       while (pendingConnections.current.has(connectionKey)) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -54,19 +51,10 @@ export const ConnectionProvider = ({ children }) => {
     }
 
     // Создаем новое подключение
-    console.log(`Creating new connection for ${connectionKey}`);
     pendingConnections.current.add(connectionKey);
 
     try {
-      // Получаем JWT токен для аутентификации
-      const token = tokenManager.getToken();
-      const isValid = tokenManager.isTokenValid();
-      console.log(`ConnectionContext: Token for ${hubName}:`, token ? 'Token exists' : 'No token');
-      console.log(`ConnectionContext: Token valid:`, isValid);
-      
       const url = `${BASE_URL}/${hubName}?userId=${userId}`;
-      
-      console.log(`ConnectionContext: SignalR URL:`, url);
 
       const connection = new HubConnectionBuilder()
         .withUrl(url, {
@@ -83,7 +71,6 @@ export const ConnectionProvider = ({ children }) => {
       }
 
       setConnections(prev => ({ ...prev, [connectionKey]: connection }));
-      console.log(`Connection ${connectionKey} established successfully`);
       return connection;
     } catch (error) {
       console.error(`Error establishing connection ${connectionKey}:`, error);
@@ -98,7 +85,6 @@ export const ConnectionProvider = ({ children }) => {
     if (connectionRefs.current[connectionKey]) {
       try {
         await connectionRefs.current[connectionKey].stop();
-        console.log(`Connection ${connectionKey} stopped successfully`);
       } catch (error) {
         console.error(`Error stopping connection ${connectionKey}:`, error);
       } finally {
