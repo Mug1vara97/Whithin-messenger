@@ -2,6 +2,7 @@ import {
   ensureChatKey,
   ensureE2eIdentity,
   proactiveSyncChatDeviceWraps,
+  clearChatKeyUnavailableState,
 } from './e2eCrypto';
 import { needsChatListE2eDecrypt } from './e2eChatListPreview';
 
@@ -13,6 +14,8 @@ const notifyChatKeySynced = (chatId) => {
   if (typeof window === 'undefined' || !chatId) {
     return;
   }
+
+  clearChatKeyUnavailableState(chatId);
 
   window.dispatchEvent(new CustomEvent(E2E_CHAT_KEY_SYNCED_EVENT, {
     detail: { chatId: String(chatId) },

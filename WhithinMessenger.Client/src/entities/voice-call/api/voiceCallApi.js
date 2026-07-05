@@ -325,7 +325,7 @@ class VoiceCallApi {
       videoCodec: 'vp8',
       videoEncoding: {
         ...VideoPresets.h720.encoding,
-        maxBitrate: 2_500_000,
+        maxBitrate: 5_000_000,
         maxFramerate: 60,
       },
     });

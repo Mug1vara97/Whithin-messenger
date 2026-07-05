@@ -1,5 +1,5 @@
 import _sodium from 'libsodium-wrappers';
-import { e2eApi } from './e2eApi';
+import { e2eApi, invalidateChatWrappedKeyCache } from './e2eApi';
 
 const DEVICE_ID = 'web';
 const LEGACY_DEVICE_IDS = ['default', 'android'];
@@ -9,6 +9,27 @@ const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
 const PEER_KEY_CACHE = new Map();
 /** Users known to have no device key on the server (404). */
 const PEER_KEY_MISSING = new Set();
+const ENSURE_CHAT_KEY_INFLIGHT = new Map();
+const CHAT_KEYS_MARKED_UNAVAILABLE = new Set();
+
+const CHAT_KEY_UNAVAILABLE_MESSAGE =
+  'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
+
+export const clearChatKeyUnavailableState = (chatId) => {
+  if (!chatId) return;
+  CHAT_KEYS_MARKED_UNAVAILABLE.delete(String(chatId));
+  invalidateChatWrappedKeyCache(chatId);
+};
+
+const markChatKeyUnavailable = (chatId) => {
+  if (!chatId) return;
+  CHAT_KEYS_MARKED_UNAVAILABLE.add(String(chatId));
+};
+
+const isChatKeyUnavailableError = (error) => (
+  error instanceof E2eEncryptionError
+  && String(error.message).includes('ещё не выдан этому устройству')
+);
 
 let sodiumReadyPromise = null;
 
@@ -68,6 +89,7 @@ const loadLocalChatKey = (chatId) => {
 
 const saveLocalChatKey = (chatId, keyBase64) => {
   localStorage.setItem(chatKeyStorageKey(chatId), keyBase64);
+  clearChatKeyUnavailableState(chatId);
 };
 
 const normalizeMemberIds = (memberUserIds, userId) => {
@@ -489,7 +511,7 @@ export const proactiveSyncChatDeviceWraps = async (userId, chatId, memberUserIds
   await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, localKeyBase64);
 };
 
-export const ensureChatKey = async (userId, chatId, memberUserIds = [], options = {}) => {
+const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {}) => {
   const { forEncrypt = false, strictAllMembers = false } = options;
 
   if (!userId || !chatId) {
@@ -558,7 +580,7 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   if ((existingRecipients || []).length > 0) {
     const message = forEncrypt
       ? 'Не удалось отправить сообщение: у вас ещё нет ключа этого чата. Откройте чат на устройстве, где переписка уже работает, и отправьте любое сообщение — затем обновите страницу здесь.'
-      : 'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
+      : CHAT_KEY_UNAVAILABLE_MESSAGE;
     throw new E2eEncryptionError(message);
   }
 
@@ -598,6 +620,36 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   return keyBase64;
 };
 
+export const ensureChatKey = async (userId, chatId, memberUserIds = [], options = {}) => {
+  if (!userId || !chatId) {
+    throw new Error('Chat E2E requires userId and chatId');
+  }
+
+  const chatKey = String(chatId);
+  if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
+    throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
+  }
+
+  const inFlight = ENSURE_CHAT_KEY_INFLIGHT.get(chatKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const promise = ensureChatKeyImpl(userId, chatId, memberUserIds, options)
+    .catch((error) => {
+      if (isChatKeyUnavailableError(error)) {
+        markChatKeyUnavailable(chatId);
+      }
+      throw error;
+    })
+    .finally(() => {
+      ENSURE_CHAT_KEY_INFLIGHT.delete(chatKey);
+    });
+
+  ENSURE_CHAT_KEY_INFLIGHT.set(chatKey, promise);
+  return promise;
+};
+
 export const encryptChatMessage = async (userId, chatId, memberUserIds, plaintext, options = {}) => {
   const { strictAllMembers = false } = options;
   const sodium = await ensureSodium();
@@ -627,13 +679,20 @@ const decryptWithChatKey = async (userId, chatId, memberUserIds, content) => {
   const envelope = parseEnvelope(content);
   if (!envelope) return null;
 
-  const sodium = await ensureSodium();
-  const chatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
-  const chatKey = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
-  const nonce = sodium.from_base64(envelope.nonce, sodium.base64_variants.ORIGINAL);
-  const ciphertext = sodium.from_base64(envelope.ciphertext, sodium.base64_variants.ORIGINAL);
-  const plaintextBytes = sodium.crypto_secretbox_open_easy(ciphertext, nonce, chatKey);
-  return sodium.to_string(plaintextBytes);
+  try {
+    const sodium = await ensureSodium();
+    const chatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
+    const chatKey = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
+    const nonce = sodium.from_base64(envelope.nonce, sodium.base64_variants.ORIGINAL);
+    const ciphertext = sodium.from_base64(envelope.ciphertext, sodium.base64_variants.ORIGINAL);
+    const plaintextBytes = sodium.crypto_secretbox_open_easy(ciphertext, nonce, chatKey);
+    return sodium.to_string(plaintextBytes);
+  } catch (error) {
+    if (error instanceof E2eEncryptionError) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 const decryptWithPairwiseKey = async (userId, peerUserId, content) => {
@@ -673,7 +732,9 @@ export const decryptChatMessage = async (
       return decrypted;
     }
   } catch (error) {
-    console.warn('Chat-key E2E decrypt failed:', error);
+    if (!(error instanceof E2eEncryptionError)) {
+      console.warn('Chat-key E2E decrypt failed:', error);
+    }
   }
 
   try {

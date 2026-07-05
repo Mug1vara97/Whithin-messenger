@@ -12,6 +12,7 @@ import { patchMessageWithProfile } from '../utils/profilePatchHelpers';
 import {
   decryptChatMessage,
   encryptChatMessage,
+  ensureChatKey,
   E2eEncryptionError,
   E2E_CHAT_KEY_SYNCED_EVENT,
   proactiveSyncChatDeviceWraps,
@@ -365,8 +366,24 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       return normalized;
     }
 
+    const hasEncrypted = normalized.some((message) => (message.encryptionVersion ?? 0) > 0);
+    if (hasEncrypted) {
+      const memberUserIds = [...getMemberUserIds()];
+      normalized.forEach((message) => {
+        const senderId = message.senderId ?? message.SenderId;
+        if (senderId && !memberUserIds.some((id) => String(id) === String(senderId))) {
+          memberUserIds.push(senderId);
+        }
+      });
+      try {
+        await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
+      } catch {
+        // Expected when this device has no readable chat key yet.
+      }
+    }
+
     return Promise.all(normalized.map((message) => decryptMessageContent(message)));
-  }, [chatId, decryptMessageContent, e2eEnabled, normalizeMessage, userId]);
+  }, [chatId, decryptMessageContent, e2eEnabled, getMemberUserIds, normalizeMessage, userId]);
 
   useEffect(() => {
     messagesRef.current = messages;

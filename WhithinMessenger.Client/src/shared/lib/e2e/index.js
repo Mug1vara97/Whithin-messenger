@@ -6,6 +6,7 @@ export {
   resolveEncryptAudience,
   assertAllMembersHaveDeviceKeys,
   clearE2ePeerKeyCache,
+  clearChatKeyUnavailableState,
   decryptChatMessage,
   decryptDmMessage,
   encryptChatMessage,
