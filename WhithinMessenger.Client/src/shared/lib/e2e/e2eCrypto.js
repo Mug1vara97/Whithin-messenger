@@ -76,6 +76,10 @@ const isChatKeyUnavailableError = (error) => (
   && String(error.message).includes('ещё не выдан этому устройству')
 );
 
+const isWrongSecretKeyError = (error) => (
+  String(error?.message ?? '').toLowerCase().includes('wrong secret key')
+);
+
 let sodiumReadyPromise = null;
 
 export class E2eEncryptionError extends Error {
@@ -210,24 +214,30 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
     saveIdentity(userId, identity);
   }
 
-  try {
-    await e2eApi.uploadDeviceKey(identity.deviceId, identity.publicKeyBase64);
-    SELF_DEVICE_KEY_AVAILABILITY.set(identity.deviceId ?? DEVICE_ID, true);
-    identity.uploadedPublicKeyBase64 = identity.publicKeyBase64;
-    saveIdentity(userId, identity);
-    PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
-  } catch (error) {
-    if (strictUpload) {
-      throw new E2eEncryptionError(
-        'Не удалось загрузить ключ шифрования на сервер. Проверьте соединение и попробуйте снова.',
-      );
+  const shouldUpload = strictUpload || identity.uploadedPublicKeyBase64 !== identity.publicKeyBase64;
+  if (shouldUpload) {
+    try {
+      await e2eApi.uploadDeviceKey(identity.deviceId, identity.publicKeyBase64);
+      SELF_DEVICE_KEY_AVAILABILITY.set(identity.deviceId ?? DEVICE_ID, true);
+      identity.uploadedPublicKeyBase64 = identity.publicKeyBase64;
+      saveIdentity(userId, identity);
+      PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
+    } catch (error) {
+      if (strictUpload) {
+        throw new E2eEncryptionError(
+          'Не удалось загрузить ключ шифрования на сервер. Проверьте соединение и попробуйте снова.',
+        );
+      }
+      e2eLog('device-key-upload-failed', {
+        userId: String(userId),
+        deviceId: identity?.deviceId ?? DEVICE_ID,
+        errorMessage: error?.message ?? String(error),
+        httpStatus: error?.response?.status ?? null,
+      }, 'warn');
     }
-    e2eLog('device-key-upload-failed', {
-      userId: String(userId),
-      deviceId: identity?.deviceId ?? DEVICE_ID,
-      errorMessage: error?.message ?? String(error),
-      httpStatus: error?.response?.status ?? null,
-    }, 'warn');
+  } else {
+    SELF_DEVICE_KEY_AVAILABILITY.set(identity.deviceId ?? DEVICE_ID, true);
+    PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
   }
 
   return identity;
@@ -652,6 +662,21 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     throw new E2eEncryptionError(message);
   }
 
+  // Decrypt path: never bootstrap a brand-new chat key.
+  // If we cannot restore a server wrap, creating a new key would make all historical
+  // ciphertext undecryptable on this device ("wrong secret key for the given ciphertext").
+  if (!forEncrypt) {
+    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    e2eLog('chat-key-decrypt-no-server-wrap', {
+      userId: String(userId),
+      chatId: String(chatId),
+      recipientsWithWraps: (existingRecipients || []).map((id) => String(id)),
+      requestedMembers: members.map((id) => String(id)),
+      localDeviceId: identity?.deviceId ?? DEVICE_ID,
+    }, 'warn');
+    throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
+  }
+
   const wrapTargets = forEncrypt && !strictAllMembers ? [String(userId)] : eligible;
 
   if (!wrapTargets.length) {
@@ -764,15 +789,33 @@ const decryptWithChatKey = async (userId, chatId, memberUserIds, content) => {
   const envelope = parseEnvelope(content);
   if (!envelope) return null;
 
-  try {
+  const decryptEnvelope = async (chatKeyBase64) => {
     const sodium = await ensureSodium();
-    const chatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
     const chatKey = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
     const nonce = sodium.from_base64(envelope.nonce, sodium.base64_variants.ORIGINAL);
     const ciphertext = sodium.from_base64(envelope.ciphertext, sodium.base64_variants.ORIGINAL);
     const plaintextBytes = sodium.crypto_secretbox_open_easy(ciphertext, nonce, chatKey);
     return sodium.to_string(plaintextBytes);
+  };
+
+  try {
+    const chatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
+    return await decryptEnvelope(chatKeyBase64);
   } catch (error) {
+    if (isWrongSecretKeyError(error)) {
+      removeLocalChatKey(chatId);
+      clearChatKeyUnavailableState(chatId);
+      try {
+        const refreshedChatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, { forEncrypt: false });
+        return await decryptEnvelope(refreshedChatKeyBase64);
+      } catch (retryError) {
+        if (retryError instanceof E2eEncryptionError) {
+          return null;
+        }
+        throw retryError;
+      }
+    }
+
     if (error instanceof E2eEncryptionError) {
       return null;
     }
