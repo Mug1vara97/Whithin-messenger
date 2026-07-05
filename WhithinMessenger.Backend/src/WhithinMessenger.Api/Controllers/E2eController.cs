@@ -88,6 +88,13 @@ public class E2eController : ControllerBase
         var result = await _mediator.Send(new GetChatKeyRecipientsQuery(chatId, userId));
         if (!result.Success)
         {
+            // For stale/non-member channels we return an empty list so the client can gracefully skip E2E wrap sync
+            // without polluting the browser console with expected 4xx noise.
+            if (string.Equals(result.ErrorMessage, "Access denied", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new { userIds = Array.Empty<Guid>() });
+            }
+
             return BadRequest(new { error = result.ErrorMessage });
         }
 

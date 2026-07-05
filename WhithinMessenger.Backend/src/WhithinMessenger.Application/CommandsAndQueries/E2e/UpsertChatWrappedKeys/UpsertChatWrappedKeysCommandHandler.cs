@@ -7,7 +7,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.E2e.UpsertChatWrappedK
 public class UpsertChatWrappedKeysCommandHandler
     : IRequestHandler<UpsertChatWrappedKeysCommand, UpsertChatWrappedKeysResult>
 {
-    private const int MaxWrappedKeyLength = 256;
+    private const int MaxWrappedKeyLength = 1024;
 
     private readonly IChatE2eKeyRepository _repository;
     private readonly IChatRepository _chatRepository;
@@ -24,23 +24,12 @@ public class UpsertChatWrappedKeysCommandHandler
         UpsertChatWrappedKeysCommand request,
         CancellationToken cancellationToken)
     {
-        if (request.Wraps.Count == 0)
-        {
-            return new UpsertChatWrappedKeysResult
-            {
-                Success = false,
-                ErrorMessage = "No wrapped keys provided",
-            };
-        }
-
         var members = await _chatRepository.GetChatMembersAsync(request.ChatId, cancellationToken);
         if (!members.Contains(request.ActorUserId))
         {
-            return new UpsertChatWrappedKeysResult
-            {
-                Success = false,
-                ErrorMessage = "Access denied",
-            };
+            // Stale client state may attempt best-effort wrap sync for channels no longer available
+            // to this user. Treat as a no-op to avoid noisy 4xx loops.
+            return new UpsertChatWrappedKeysResult { Success = true };
         }
 
         var memberSet = members.ToHashSet();
@@ -50,21 +39,13 @@ public class UpsertChatWrappedKeysCommandHandler
         {
             if (!memberSet.Contains(wrap.UserId))
             {
-                return new UpsertChatWrappedKeysResult
-                {
-                    Success = false,
-                    ErrorMessage = "Wrapped key target is not a chat member",
-                };
+                continue;
             }
 
             if (string.IsNullOrWhiteSpace(wrap.WrappedKeyBase64)
                 || wrap.WrappedKeyBase64.Length > MaxWrappedKeyLength)
             {
-                return new UpsertChatWrappedKeysResult
-                {
-                    Success = false,
-                    ErrorMessage = "Invalid wrapped key payload",
-                };
+                continue;
             }
 
             entities.Add(new ChatE2eWrappedKey
@@ -75,6 +56,11 @@ public class UpsertChatWrappedKeysCommandHandler
                 WrappedKeyBase64 = wrap.WrappedKeyBase64.Trim(),
                 UpdatedAt = DateTimeOffset.UtcNow,
             });
+        }
+
+        if (entities.Count == 0)
+        {
+            return new UpsertChatWrappedKeysResult { Success = true };
         }
 
         await _repository.UpsertManyAsync(request.ChatId, entities, cancellationToken);

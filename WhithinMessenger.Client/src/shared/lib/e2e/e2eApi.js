@@ -9,6 +9,7 @@ const chatRecipientsCache = new Map();
 const chatRecipientsInFlight = new Map();
 const deviceKeyCache = new Map();
 const deviceKeyInFlight = new Map();
+const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const chatWrappedKeyCacheKey = (chatId, deviceId) => `${chatId}:${deviceId ?? 'default'}`;
 const deviceKeyCacheKey = (userId, deviceId) => `${userId}:${deviceId ?? 'primary'}`;
@@ -166,13 +167,25 @@ export const e2eApi = {
   },
 
   async uploadChatWrappedKeys(chatId, wraps) {
-    await apiClient.put(`/e2e/chat-keys/${chatId}`, {
-      wraps: (wraps || []).map((wrap) => ({
+    const normalizedWraps = (wraps || [])
+      .filter((wrap) => (
+        wrap
+        && typeof wrap.wrappedKeyBase64 === 'string'
+        && wrap.wrappedKeyBase64.trim().length > 0
+        && typeof wrap.userId === 'string'
+        && guidRegex.test(wrap.userId)
+      ))
+      .map((wrap) => ({
         userId: wrap.userId,
         wrappedKeyBase64: wrap.wrappedKeyBase64,
         deviceId: wrap.deviceId ?? 'default',
-      })),
-    });
+      }));
+
+    if (!normalizedWraps.length) {
+      return;
+    }
+
+    await apiClient.put(`/e2e/chat-keys/${chatId}`, { wraps: normalizedWraps });
     invalidateChatWrappedKeyCache(chatId);
   },
 

@@ -60,6 +60,7 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = true;
+    options.MaximumReceiveMessageSize = 256 * 1024;
 });
 builder.Services.AddSingleton<IUserIdProvider, UserIdProvider>();
 
