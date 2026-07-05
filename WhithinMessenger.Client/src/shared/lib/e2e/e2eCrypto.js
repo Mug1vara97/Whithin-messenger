@@ -136,6 +136,14 @@ const loadLocalChatKey = (chatId) => {
   }
 };
 
+const removeLocalChatKey = (chatId) => {
+  try {
+    localStorage.removeItem(chatKeyStorageKey(chatId));
+  } catch {
+    // Ignore storage errors in best-effort recovery path.
+  }
+};
+
 const saveLocalChatKey = (chatId, keyBase64) => {
   localStorage.setItem(chatKeyStorageKey(chatId), keyBase64);
   clearChatKeyUnavailableState(chatId);
@@ -576,27 +584,22 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   }
 
   const members = normalizeMemberIds(memberUserIds, userId);
-  const scheduleWrapSync = (chatKeyBase64, targetMemberIds) => {
-    if (!targetMemberIds.length) return;
-    void syncChatKeyWraps(userId, chatId, chatKeyBase64, targetMemberIds, { strictAllMembers: false })
-      .then(() => refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64))
-      .catch((error) => {
-        e2eLog('wrap-sync-best-effort-failed', {
-          userId: String(userId),
-          chatId: String(chatId),
-          targetMemberIds,
-          errorMessage: error?.message ?? String(error),
-          httpStatus: error?.response?.status ?? null,
-        }, 'warn');
-      });
-  };
-
   const localKeyBase64 = loadLocalChatKey(chatId);
 
-  // Send path: only the sender must have keys; peer wraps are best-effort in the background.
+  // Send path: before encrypting, try to sync wraps so recipients can decrypt immediately.
   if (forEncrypt && localKeyBase64 && !strictAllMembers) {
     await ensureE2eIdentity(userId, { strictUpload: true });
-    scheduleWrapSync(localKeyBase64, members);
+    try {
+      await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
+    } catch (error) {
+      e2eLog('wrap-sync-best-effort-failed', {
+        userId: String(userId),
+        chatId: String(chatId),
+        targetMemberIds: members,
+        errorMessage: error?.message ?? String(error),
+        httpStatus: error?.response?.status ?? null,
+      }, 'warn');
+    }
     return localKeyBase64;
   }
 
@@ -618,7 +621,17 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, localKeyBase64, eligible, { strictAllMembers: true });
     } else if (forEncrypt) {
-      scheduleWrapSync(localKeyBase64, members);
+      try {
+        await syncChatKeyWraps(userId, chatId, localKeyBase64, members, { strictAllMembers: false });
+      } catch (error) {
+        e2eLog('wrap-sync-best-effort-failed', {
+          userId: String(userId),
+          chatId: String(chatId),
+          targetMemberIds: members,
+          errorMessage: error?.message ?? String(error),
+          httpStatus: error?.response?.status ?? null,
+        }, 'warn');
+      }
     }
     return localKeyBase64;
   }
@@ -640,7 +653,17 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers: true });
     } else if (forEncrypt) {
-      scheduleWrapSync(keyBase64FromServer, members);
+      try {
+        await syncChatKeyWraps(userId, chatId, keyBase64FromServer, members, { strictAllMembers: false });
+      } catch (error) {
+        e2eLog('wrap-sync-best-effort-failed', {
+          userId: String(userId),
+          chatId: String(chatId),
+          targetMemberIds: members,
+          errorMessage: error?.message ?? String(error),
+          httpStatus: error?.response?.status ?? null,
+        }, 'warn');
+      }
     }
     return keyBase64FromServer;
   }
@@ -677,7 +700,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
   }
 
-  const wrapTargets = forEncrypt && !strictAllMembers ? [String(userId)] : eligible;
+  const wrapTargets = forEncrypt && !strictAllMembers ? members : eligible;
 
   if (!wrapTargets.length) {
     throw new E2eEncryptionError(
