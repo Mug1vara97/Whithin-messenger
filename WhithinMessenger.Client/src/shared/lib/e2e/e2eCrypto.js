@@ -14,6 +14,8 @@ const E2E_LOG_ONCE_KEYS = new Set();
 const CHAT_LEGACY_PROBE_ATTEMPTED = new Set();
 const SELF_DEVICE_KEY_AVAILABILITY = new Map();
 const CHAT_REWRAP_REQUESTED = new Set();
+const CHAT_REWRAP_FORBIDDEN = new Set();
+const CHAT_DECRYPT_RETRY_NOT_BEFORE_MS = new Map();
 const KEY_BACKUP_UPLOAD_IN_FLIGHT = new Set();
 const KEY_BACKUP_UPLOAD_REQUESTED_AT_MS = new Map();
 const CHAT_FORCE_RESET_ATTEMPTED_AT_MS = new Map();
@@ -22,6 +24,7 @@ const CHAT_KEY_UNAVAILABLE_MESSAGE =
   'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
 const KEY_BACKUP_UPLOAD_THROTTLE_MS = 20_000;
 const CHAT_FORCE_RESET_COOLDOWN_MS = 45_000;
+const CHAT_DECRYPT_RECOVERY_COOLDOWN_MS = 30_000;
 
 const e2eLog = (event, details = {}, level = 'log') => {
   const logger = console[level] ?? console.log;
@@ -36,8 +39,11 @@ const e2eLogOnce = (key, event, details = {}, level = 'log') => {
 
 const requestChatRewrapIfNeeded = async (userId, chatId, deviceId) => {
   const chatKey = String(chatId);
+  if (CHAT_REWRAP_FORBIDDEN.has(chatKey)) {
+    return { ok: false, forbidden: true };
+  }
   if (CHAT_REWRAP_REQUESTED.has(chatKey)) {
-    return;
+    return { ok: true, forbidden: false };
   }
 
   CHAT_REWRAP_REQUESTED.add(chatKey);
@@ -48,14 +54,21 @@ const requestChatRewrapIfNeeded = async (userId, chatId, deviceId) => {
       chatId: chatKey,
       deviceId: deviceId ?? DEVICE_ID,
     });
+    return { ok: true, forbidden: false };
   } catch (error) {
+    const httpStatus = error?.response?.status ?? null;
+    const forbidden = httpStatus === 403;
+    if (forbidden) {
+      CHAT_REWRAP_FORBIDDEN.add(chatKey);
+    }
     e2eLog('chat-key-rewrap-request-failed', {
       userId: String(userId),
       chatId: chatKey,
       deviceId: deviceId ?? DEVICE_ID,
       errorMessage: error?.message ?? String(error),
-      httpStatus: error?.response?.status ?? null,
+      httpStatus,
     }, 'warn');
+    return { ok: false, forbidden };
   }
 };
 
@@ -65,6 +78,8 @@ export const clearChatKeyUnavailableState = (chatId) => {
   CHAT_KEYS_MARKED_UNAVAILABLE.delete(chatKey);
   CHAT_LEGACY_PROBE_ATTEMPTED.delete(chatKey);
   CHAT_REWRAP_REQUESTED.delete(chatKey);
+  CHAT_REWRAP_FORBIDDEN.delete(chatKey);
+  CHAT_DECRYPT_RETRY_NOT_BEFORE_MS.delete(chatKey);
   E2E_LOG_ONCE_KEYS.delete(`missing:${chatKey}`);
   E2E_LOG_ONCE_KEYS.delete(`marked:${chatKey}`);
   invalidateChatWrappedKeyCache(chatId);
@@ -965,9 +980,19 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
 
   // Send path: return immediately, wraps sync in background.
   if (forEncrypt && localKeyBase64 && !strictAllMembers) {
-    await ensureE2eIdentity(userId, { strictUpload: true });
-    scheduleWrapSync(localKeyBase64, members);
-    return localKeyBase64;
+    const localIdentity = loadIdentity(userId) ?? await ensureE2eIdentity(userId, { strictUpload: true });
+    const localDeviceId = localIdentity?.deviceId ?? DEVICE_ID;
+    const ownWrapReadable = await ownWrapIsReadable(userId, chatId, localDeviceId);
+    if (ownWrapReadable) {
+      scheduleWrapSync(localKeyBase64, members);
+      return localKeyBase64;
+    }
+    // Local key may be stale/split-brain; continue into full recovery path.
+    e2eLog('chat-key-local-fast-path-skipped-unreadable-wrap', {
+      userId: String(userId),
+      chatId: String(chatId),
+      localDeviceId,
+    }, 'warn');
   }
 
   let audience = members;
@@ -1024,8 +1049,8 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     existingRecipients = retryRecipients?.userIds ?? [];
   }
   if ((existingRecipients || []).length > 0) {
-    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
-    if (!forEncrypt || !strictAllMembers) {
+    const rewrapRequest = await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    if ((!forEncrypt || !strictAllMembers) && !rewrapRequest.forbidden) {
       const recovered = await waitForRewrappedChatKey(
         userId,
         chatId,
@@ -1036,12 +1061,22 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
       }
     }
     if (forEncrypt) {
-      const forceResetKey = await attemptForceResetChatKey(
-        strictAllMembers ? eligible : members,
-        'missing-wrap-for-current-device-after-rewrap',
-      );
-      if (forceResetKey) {
-        return forceResetKey;
+      const recipientsSet = new Set((existingRecipients || []).map((id) => String(id)));
+      const isSelfOnlyRecipients = recipientsSet.size === 1 && recipientsSet.has(String(userId));
+      if (isSelfOnlyRecipients) {
+        const forceResetKey = await attemptForceResetChatKey(
+          strictAllMembers ? eligible : members,
+          'missing-wrap-for-current-device-after-rewrap-self-only',
+        );
+        if (forceResetKey) {
+          return forceResetKey;
+        }
+      } else {
+        e2eLog('chat-key-force-reset-skipped-established-chat', {
+          userId: String(userId),
+          chatId: String(chatId),
+          recipientsWithWraps: Array.from(recipientsSet),
+        }, 'warn');
       }
     }
     e2eLog('chat-key-missing-for-current-device', {
@@ -1062,14 +1097,16 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   // If we cannot restore a server wrap, creating a new key would make all historical
   // ciphertext undecryptable on this device ("wrong secret key for the given ciphertext").
   if (!forEncrypt) {
-    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
-    const recovered = await waitForRewrappedChatKey(
-      userId,
-      chatId,
-      identity?.deviceId ?? DEVICE_ID,
-    );
-    if (recovered) {
-      return recovered;
+    const rewrapRequest = await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+    if (!rewrapRequest.forbidden) {
+      const recovered = await waitForRewrappedChatKey(
+        userId,
+        chatId,
+        identity?.deviceId ?? DEVICE_ID,
+      );
+      if (recovered) {
+        return recovered;
+      }
     }
     e2eLog('chat-key-decrypt-no-server-wrap', {
       userId: String(userId),
@@ -1151,23 +1188,30 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
 
   const chatKey = String(chatId);
   if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
-    const identity = loadIdentity(userId) ?? await ensureE2eIdentity(userId);
-    await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
-    const recovered = await waitForRewrappedChatKey(
-      userId,
-      chatId,
-      identity?.deviceId ?? DEVICE_ID,
-    );
-    if (recovered) {
-      return recovered;
-    }
-    e2eLogOnce(`missing:${chatKey}`, 'chat-key-short-circuit-missing', {
-      userId: String(userId),
-      chatId: String(chatId),
-      memberCount: Array.isArray(memberUserIds) ? memberUserIds.length : 0,
-      forEncrypt: Boolean(options?.forEncrypt),
-    }, 'warn');
     if (!options?.forEncrypt) {
+      const now = Date.now();
+      const retryNotBefore = CHAT_DECRYPT_RETRY_NOT_BEFORE_MS.get(chatKey) ?? 0;
+      if (now >= retryNotBefore) {
+        const identity = loadIdentity(userId) ?? await ensureE2eIdentity(userId);
+        const rewrapRequest = await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
+        if (!rewrapRequest.forbidden) {
+          const recovered = await waitForRewrappedChatKey(
+            userId,
+            chatId,
+            identity?.deviceId ?? DEVICE_ID,
+          );
+          if (recovered) {
+            return recovered;
+          }
+        }
+        CHAT_DECRYPT_RETRY_NOT_BEFORE_MS.set(chatKey, now + CHAT_DECRYPT_RECOVERY_COOLDOWN_MS);
+      }
+      e2eLogOnce(`missing:${chatKey}`, 'chat-key-short-circuit-missing', {
+        userId: String(userId),
+        chatId: String(chatId),
+        memberCount: Array.isArray(memberUserIds) ? memberUserIds.length : 0,
+        forEncrypt: false,
+      }, 'warn');
       throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
     }
     // For send-path retries, do not permanently short-circuit: allow ensureChatKeyImpl
