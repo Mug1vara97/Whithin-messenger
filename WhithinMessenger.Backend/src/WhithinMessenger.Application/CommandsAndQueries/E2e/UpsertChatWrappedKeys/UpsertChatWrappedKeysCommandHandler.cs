@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using System.Text.RegularExpressions;
@@ -13,13 +14,16 @@ public class UpsertChatWrappedKeysCommandHandler
 
     private readonly IChatE2eKeyRepository _repository;
     private readonly IChatRepository _chatRepository;
+    private readonly ILogger<UpsertChatWrappedKeysCommandHandler> _logger;
 
     public UpsertChatWrappedKeysCommandHandler(
         IChatE2eKeyRepository repository,
-        IChatRepository chatRepository)
+        IChatRepository chatRepository,
+        ILogger<UpsertChatWrappedKeysCommandHandler> logger)
     {
         _repository = repository;
         _chatRepository = chatRepository;
+        _logger = logger;
     }
 
     public async Task<UpsertChatWrappedKeysResult> Handle(
@@ -68,6 +72,10 @@ public class UpsertChatWrappedKeysCommandHandler
         var normalizedFingerprint = request.KeyFingerprint?.Trim().ToLowerInvariant();
         if (!string.IsNullOrWhiteSpace(normalizedFingerprint) && !FingerprintRegex.IsMatch(normalizedFingerprint))
         {
+            _logger.LogWarning(
+                "E2E upsert rejected: invalid key fingerprint format actor={ActorUserId} chat={ChatId}",
+                request.ActorUserId,
+                request.ChatId);
             return new UpsertChatWrappedKeysResult
             {
                 Success = false,
@@ -75,13 +83,39 @@ public class UpsertChatWrappedKeysCommandHandler
             };
         }
 
+        _logger.LogDebug(
+            "E2E upsert start actor={ActorUserId} chat={ChatId} wraps={WrapCount} memberCount={MemberCount} hasFingerprint={HasFingerprint} forceReset={ForceReset}",
+            request.ActorUserId,
+            request.ChatId,
+            entities.Count,
+            memberSet.Count,
+            !string.IsNullOrWhiteSpace(normalizedFingerprint),
+            request.ForceReset);
+
         var writeResult = await _repository.UpsertManyGuardedAsync(
             request.ChatId,
             request.ActorUserId,
             memberSet,
             entities,
             normalizedFingerprint,
+            request.ForceReset,
             cancellationToken);
+        if (!writeResult.Success)
+        {
+            _logger.LogWarning(
+                "E2E upsert rejected actor={ActorUserId} chat={ChatId} reason={Reason}",
+                request.ActorUserId,
+                request.ChatId,
+                writeResult.ErrorMessage);
+        }
+        else
+        {
+            _logger.LogDebug(
+                "E2E upsert success actor={ActorUserId} chat={ChatId} wraps={WrapCount}",
+                request.ActorUserId,
+                request.ChatId,
+                entities.Count);
+        }
         return new UpsertChatWrappedKeysResult
         {
             Success = writeResult.Success,

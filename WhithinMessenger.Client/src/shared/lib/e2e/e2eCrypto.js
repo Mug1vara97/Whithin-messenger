@@ -232,6 +232,10 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
       identity.uploadedPublicKeyBase64 = identity.publicKeyBase64;
       saveIdentity(userId, identity);
       PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
+      e2eLog('device-key-uploaded', {
+        userId: String(userId),
+        deviceId: identity?.deviceId ?? DEVICE_ID,
+      });
     } catch (error) {
       if (strictUpload) {
         throw new E2eEncryptionError(
@@ -328,6 +332,17 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
       ineligible,
     );
   }
+
+  e2eLog('resolve-encrypt-audience', {
+    userId: String(userId),
+    strictAllMembers,
+    audienceCount: members.length,
+    eligibleCount: eligible.length,
+    ineligibleCount: ineligible.length,
+    audience: members,
+    eligible,
+    ineligible,
+  });
 
   return { audience: members, eligible, ineligible };
 };
@@ -759,6 +774,15 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
   }
 
   const wrapTargets = forEncrypt && !strictAllMembers ? members : eligible;
+  e2eLog('chat-key-bootstrap-plan', {
+    userId: String(userId),
+    chatId: String(chatId),
+    forEncrypt,
+    strictAllMembers,
+    audience: audience.map((id) => String(id)),
+    eligible: eligible.map((id) => String(id)),
+    wrapTargets: wrapTargets.map((id) => String(id)),
+  });
 
   if (!wrapTargets.length) {
     throw new E2eEncryptionError(
@@ -795,6 +819,12 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
 
   await e2eApi.uploadChatWrappedKeys(chatId, wraps, {
     keyFingerprint: await chatKeyFingerprintFromBase64(keyBase64),
+  });
+  e2eLog('chat-key-bootstrap-uploaded', {
+    userId: String(userId),
+    chatId: String(chatId),
+    wrapsUploaded: wraps.length,
+    fingerprint: (await chatKeyFingerprintFromBase64(keyBase64))?.slice(0, 12) ?? null,
   });
   saveLocalChatKey(chatId, keyBase64);
 

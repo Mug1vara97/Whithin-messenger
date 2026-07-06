@@ -25,6 +25,7 @@ public interface IChatE2eKeyRepository
         IReadOnlyCollection<Guid> memberUserIds,
         IReadOnlyList<ChatE2eWrappedKey> keys,
         string? keyFingerprint = null,
+        bool forceReset = false,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Guid>> GetChatIdsForUserDeviceAsync(

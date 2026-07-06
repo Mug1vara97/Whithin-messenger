@@ -60,6 +60,7 @@ public static class Infrastructure
         services.AddScoped<IUserPushTokenStore, UserPushTokenStore>();
         services.AddScoped<IAccountDeletionService, AccountDeletionService>();
         services.AddScoped<IUserE2eKeyRepository, UserE2eKeyRepository>();
+        services.AddScoped<IUserE2eKeyBackupRepository, UserE2eKeyBackupRepository>();
         services.AddScoped<IChatE2eKeyRepository, ChatE2eKeyRepository>();
         
         // JWT Services

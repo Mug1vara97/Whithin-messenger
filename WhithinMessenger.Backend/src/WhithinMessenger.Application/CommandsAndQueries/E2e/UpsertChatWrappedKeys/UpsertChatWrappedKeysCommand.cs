@@ -6,7 +6,8 @@ public record UpsertChatWrappedKeysCommand(
     Guid ChatId,
     Guid ActorUserId,
     IReadOnlyList<ChatWrappedKeyEntry> Wraps,
-    string? KeyFingerprint = null) : IRequest<UpsertChatWrappedKeysResult>;
+    string? KeyFingerprint = null,
+    bool ForceReset = false) : IRequest<UpsertChatWrappedKeysResult>;
 
 public record ChatWrappedKeyEntry(Guid UserId, string WrappedKeyBase64, string DeviceId = "default");
 

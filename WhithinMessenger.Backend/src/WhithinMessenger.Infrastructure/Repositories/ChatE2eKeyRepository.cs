@@ -74,17 +74,22 @@ public class ChatE2eKeyRepository : IChatE2eKeyRepository
         IReadOnlyCollection<Guid> memberUserIds,
         IReadOnlyList<ChatE2eWrappedKey> keys,
         string? keyFingerprint = null,
+        bool forceReset = false,
         CancellationToken cancellationToken = default)
     {
         var memberSet = memberUserIds.ToHashSet();
         await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
         var normalizedFingerprint = keyFingerprint?.Trim().ToLowerInvariant();
-        var existingFingerprint = await _context.ChatE2eWrappedKeys
-            .AsNoTracking()
-            .Where(k => k.ChatId == chatId && k.ChatKeyFingerprint != null)
-            .Select(k => k.ChatKeyFingerprint)
-            .FirstOrDefaultAsync(cancellationToken);
+        string? existingFingerprint = null;
+        if (!forceReset)
+        {
+            existingFingerprint = await _context.ChatE2eWrappedKeys
+                .AsNoTracking()
+                .Where(k => k.ChatId == chatId && k.ChatKeyFingerprint != null)
+                .Select(k => k.ChatKeyFingerprint)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
 
         if (!string.IsNullOrWhiteSpace(normalizedFingerprint)
             && !string.IsNullOrWhiteSpace(existingFingerprint)
@@ -120,6 +125,40 @@ public class ChatE2eKeyRepository : IChatE2eKeyRepository
         {
             await tx.RollbackAsync(cancellationToken);
             return (false, "Bootstrap requires at least one peer recipient.");
+        }
+
+        if (forceReset)
+        {
+            if (!requestRecipients.Contains(actorUserId))
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return (false, "Force reset requires actor recipient wrap.");
+            }
+
+            var hasPeerRecipient = requestRecipients.Any(id => id != actorUserId);
+            if (!hasPeerRecipient)
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return (false, "Force reset requires at least one peer recipient.");
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedFingerprint))
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return (false, "Force reset requires key fingerprint.");
+            }
+
+            var staleRows = await _context.ChatE2eWrappedKeys
+                .Where(k => k.ChatId == chatId)
+                .ToListAsync(cancellationToken);
+
+            if (staleRows.Count > 0)
+            {
+                _context.ChatE2eWrappedKeys.RemoveRange(staleRows);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            effectiveFingerprint = normalizedFingerprint;
         }
 
         foreach (var key in keys)

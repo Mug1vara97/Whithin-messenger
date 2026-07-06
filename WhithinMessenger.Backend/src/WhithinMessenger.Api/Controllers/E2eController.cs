@@ -19,15 +19,18 @@ public class E2eController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IChatRepository _chatRepository;
     private readonly IE2eRealtimeNotifier _e2eRealtimeNotifier;
+    private readonly IUserE2eKeyBackupRepository _keyBackupRepository;
 
     public E2eController(
         IMediator mediator,
         IChatRepository chatRepository,
-        IE2eRealtimeNotifier e2eRealtimeNotifier)
+        IE2eRealtimeNotifier e2eRealtimeNotifier,
+        IUserE2eKeyBackupRepository keyBackupRepository)
     {
         _mediator = mediator;
         _chatRepository = chatRepository;
         _e2eRealtimeNotifier = e2eRealtimeNotifier;
+        _keyBackupRepository = keyBackupRepository;
     }
 
     [HttpPut("keys")]
@@ -118,7 +121,8 @@ public class E2eController : ControllerBase
             chatId,
             userId,
             wraps,
-            request.KeyFingerprint));
+            request.KeyFingerprint,
+            request.ForceReset));
         if (!result.Success)
         {
             return BadRequest(new { error = result.ErrorMessage });
@@ -151,6 +155,38 @@ public class E2eController : ControllerBase
 
         return Ok(new { success = true });
     }
+
+    [HttpPut("backup")]
+    public async Task<IActionResult> UpsertKeyBackup(
+        [FromBody] UpsertE2eKeyBackupRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        if (string.IsNullOrWhiteSpace(request.PayloadJson))
+        {
+            return BadRequest(new { error = "Payload is required." });
+        }
+
+        await _keyBackupRepository.UpsertAsync(userId, request.PayloadJson, cancellationToken);
+        return Ok(new { success = true });
+    }
+
+    [HttpGet("backup")]
+    public async Task<IActionResult> GetKeyBackup(CancellationToken cancellationToken = default)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var backup = await _keyBackupRepository.GetAsync(userId, cancellationToken);
+        if (backup == null)
+        {
+            return NotFound(new { error = "Backup not found." });
+        }
+
+        return Ok(new
+        {
+            payloadJson = backup.PayloadJson,
+            updatedAt = backup.UpdatedAt,
+        });
+    }
 }
 
 public class UpsertE2eDeviceKeyRequest
@@ -163,6 +199,7 @@ public class UpsertChatWrappedKeysRequest
 {
     public ChatWrappedKeyUpload[]? Wraps { get; set; }
     public string? KeyFingerprint { get; set; }
+    public bool ForceReset { get; set; }
 }
 
 public class ChatWrappedKeyUpload
@@ -175,4 +212,9 @@ public class ChatWrappedKeyUpload
 public class RequestChatKeyRewrapRequest
 {
     public string? DeviceId { get; set; }
+}
+
+public class UpsertE2eKeyBackupRequest
+{
+    public string? PayloadJson { get; set; }
 }

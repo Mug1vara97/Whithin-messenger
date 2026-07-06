@@ -40,6 +40,7 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<PollOption> PollOptions { get; set; }
     public DbSet<PollVote> PollVotes { get; set; }
     public DbSet<UserE2eDeviceKey> UserE2eDeviceKeys { get; set; }
+    public DbSet<UserE2eKeyBackup> UserE2eKeyBackups { get; set; }
     public DbSet<ChatE2eWrappedKey> ChatE2eWrappedKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
