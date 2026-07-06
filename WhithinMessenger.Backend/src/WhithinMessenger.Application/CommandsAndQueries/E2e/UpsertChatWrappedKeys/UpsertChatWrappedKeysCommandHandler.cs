@@ -1,6 +1,7 @@
 using MediatR;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
+using System.Text.RegularExpressions;
 
 namespace WhithinMessenger.Application.CommandsAndQueries.E2e.UpsertChatWrappedKeys;
 
@@ -8,6 +9,7 @@ public class UpsertChatWrappedKeysCommandHandler
     : IRequestHandler<UpsertChatWrappedKeysCommand, UpsertChatWrappedKeysResult>
 {
     private const int MaxWrappedKeyLength = 1024;
+    private static readonly Regex FingerprintRegex = new("^[0-9a-f]{64}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly IChatE2eKeyRepository _repository;
     private readonly IChatRepository _chatRepository;
@@ -63,8 +65,27 @@ public class UpsertChatWrappedKeysCommandHandler
             return new UpsertChatWrappedKeysResult { Success = true };
         }
 
-        await _repository.UpsertManyAsync(request.ChatId, entities, cancellationToken);
+        var normalizedFingerprint = request.KeyFingerprint?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(normalizedFingerprint) && !FingerprintRegex.IsMatch(normalizedFingerprint))
+        {
+            return new UpsertChatWrappedKeysResult
+            {
+                Success = false,
+                ErrorMessage = "Invalid key fingerprint format.",
+            };
+        }
 
-        return new UpsertChatWrappedKeysResult { Success = true };
+        var writeResult = await _repository.UpsertManyGuardedAsync(
+            request.ChatId,
+            request.ActorUserId,
+            memberSet,
+            entities,
+            normalizedFingerprint,
+            cancellationToken);
+        return new UpsertChatWrappedKeysResult
+        {
+            Success = writeResult.Success,
+            ErrorMessage = writeResult.ErrorMessage,
+        };
     }
 }

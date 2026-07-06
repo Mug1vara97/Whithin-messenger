@@ -24,6 +24,22 @@ export const invalidateChatWrappedKeyCache = (chatId) => {
   chatRecipientsCache.delete(String(chatId));
 };
 
+export const invalidateDeviceKeyCache = (userId, deviceId = null) => {
+  if (!userId) return;
+  const userPrefix = `${String(userId)}:`;
+  for (const key of deviceKeyCache.keys()) {
+    if (deviceId != null) {
+      if (key === deviceKeyCacheKey(userId, deviceId)) {
+        deviceKeyCache.delete(key);
+      }
+      continue;
+    }
+    if (key.startsWith(userPrefix)) {
+      deviceKeyCache.delete(key);
+    }
+  }
+};
+
 export const e2eApi = {
   async uploadDeviceKey(deviceId, publicKeyBase64) {
     await apiClient.put('/e2e/keys', {
@@ -32,8 +48,13 @@ export const e2eApi = {
     });
   },
 
-  async getDeviceKey(userId, deviceId = null) {
+  async getDeviceKey(userId, deviceId = null, options = {}) {
+    const { forceRefresh = false } = options;
     const cacheKey = deviceKeyCacheKey(userId, deviceId);
+    if (forceRefresh) {
+      deviceKeyCache.delete(cacheKey);
+      deviceKeyInFlight.delete(cacheKey);
+    }
     if (deviceKeyCache.has(cacheKey)) {
       return deviceKeyCache.get(cacheKey);
     }
@@ -123,8 +144,13 @@ export const e2eApi = {
     return request;
   },
 
-  async getChatKeyRecipients(chatId) {
+  async getChatKeyRecipients(chatId, options = {}) {
+    const { forceRefresh = false } = options;
     const cacheKey = String(chatId);
+    if (forceRefresh) {
+      chatRecipientsCache.delete(cacheKey);
+      chatRecipientsInFlight.delete(cacheKey);
+    }
     if (chatRecipientsCache.has(cacheKey)) {
       return chatRecipientsCache.get(cacheKey);
     }
@@ -140,20 +166,26 @@ export const e2eApi = {
           // 400 can happen for stale/non-member chats; treat as empty recipients.
           validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 400 || responseStatus === 404,
         });
-        if (status === 400 || status === 404 || data == null) {
+        if (status === 404 || data == null) {
           const result = { userIds: [] };
           chatRecipientsCache.set(cacheKey, result);
           return result;
+        }
+        if (status === 400) {
+          return { userIds: [] };
         }
         const userIds = data.userIds ?? data.UserIds ?? [];
         const result = { userIds: Array.isArray(userIds) ? userIds : [] };
         chatRecipientsCache.set(cacheKey, result);
         return result;
       } catch (error) {
-        if (isNotFound(error) || isBadRequest(error)) {
+        if (isNotFound(error)) {
           const result = { userIds: [] };
           chatRecipientsCache.set(cacheKey, result);
           return result;
+        }
+        if (isBadRequest(error)) {
+          return { userIds: [] };
         }
         throw error;
       } finally {
@@ -165,7 +197,8 @@ export const e2eApi = {
     return request;
   },
 
-  async uploadChatWrappedKeys(chatId, wraps) {
+  async uploadChatWrappedKeys(chatId, wraps, options = {}) {
+    const { keyFingerprint = null } = options;
     const normalizedWraps = (wraps || [])
       .filter((wrap) => (
         wrap
@@ -184,7 +217,12 @@ export const e2eApi = {
       return;
     }
 
-    await apiClient.put(`/e2e/chat-keys/${chatId}`, { wraps: normalizedWraps });
+    await apiClient.put(`/e2e/chat-keys/${chatId}`, {
+      wraps: normalizedWraps,
+      keyFingerprint: typeof keyFingerprint === 'string' && keyFingerprint.trim().length
+        ? keyFingerprint.trim().toLowerCase()
+        : undefined,
+    });
     invalidateChatWrappedKeyCache(chatId);
   },
 

@@ -298,11 +298,6 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
 
   await ensureE2eIdentity(userId, { strictUpload: true });
 
-  // Legacy strict mode: verify every member has a device key before sending.
-  if (!strictAllMembers) {
-    return { audience: members, eligible: [String(userId)], ineligible: [] };
-  }
-
   const eligible = [];
   const ineligible = [];
 
@@ -327,7 +322,7 @@ export const resolveEncryptAudience = async (userId, memberUserIds, options = {}
     );
   }
 
-  if (ineligible.length > 0) {
+  if (strictAllMembers && ineligible.length > 0) {
     throw new E2eEncryptionError(
       formatMissingKeysError(ineligible, userId),
       ineligible,
@@ -348,6 +343,14 @@ const sealChatKeyForUser = async (chatKeyBytes, targetPublicKeyBase64) => {
   const publicKey = sodium.from_base64(targetPublicKeyBase64, sodium.base64_variants.ORIGINAL);
   const sealed = sodium.crypto_box_seal(chatKeyBytes, publicKey);
   return sodium.to_base64(sealed, sodium.base64_variants.ORIGINAL);
+};
+
+const chatKeyFingerprintFromBase64 = async (chatKeyBase64) => {
+  if (!chatKeyBase64) return null;
+  const sodium = await ensureSodium();
+  const bytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
+  const digest = sodium.crypto_generichash(32, bytes);
+  return sodium.to_hex(digest);
 };
 
 const openSealedChatKey = async (userId, wrappedKeyBase64) => {
@@ -403,9 +406,7 @@ const resolveMemberDeviceKeys = async (memberId, currentUserId) => {
     return publicKeyBase64 ? [{ deviceId, publicKeyBase64 }] : [];
   }
 
-  if (PEER_KEY_MISSING.has(memberKey)) {
-    return [];
-  }
+  PEER_KEY_MISSING.delete(memberKey);
 
   const byDeviceId = new Map();
 
@@ -464,7 +465,11 @@ const refreshOwnUnreadableDeviceWrap = async (userId, chatId, chatKeyBase64) => 
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
   const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, identity.publicKeyBase64);
-  await e2eApi.uploadChatWrappedKeys(chatId, [{ userId, wrappedKeyBase64, deviceId }]);
+  await e2eApi.uploadChatWrappedKeys(
+    chatId,
+    [{ userId, wrappedKeyBase64, deviceId }],
+    { keyFingerprint: await chatKeyFingerprintFromBase64(chatKeyBase64) },
+  );
 };
 
 /** Re-seal chat key for this deviceId when another browser registered the same deviceId. */
@@ -480,7 +485,11 @@ const refreshOwnDeviceWrapForCurrentServerKey = async (userId, chatId, chatKeyBa
   const sodium = await ensureSodium();
   const chatKeyBytes = sodium.from_base64(chatKeyBase64, sodium.base64_variants.ORIGINAL);
   const wrappedKeyBase64 = await sealChatKeyForUser(chatKeyBytes, remoteKey.publicKeyBase64);
-  await e2eApi.uploadChatWrappedKeys(chatId, [{ userId, wrappedKeyBase64, deviceId }]);
+  await e2eApi.uploadChatWrappedKeys(
+    chatId,
+    [{ userId, wrappedKeyBase64, deviceId }],
+    { keyFingerprint: await chatKeyFingerprintFromBase64(chatKeyBase64) },
+  );
 };
 
 const ownWrapIsReadable = async (userId, chatId, deviceId) => {
@@ -521,7 +530,9 @@ const syncAlternateSelfDeviceWraps = async (userId, chatId, chatKeyBase64) => {
   }
 
   if (!wraps.length) return;
-  await e2eApi.uploadChatWrappedKeys(chatId, wraps);
+  await e2eApi.uploadChatWrappedKeys(chatId, wraps, {
+    keyFingerprint: await chatKeyFingerprintFromBase64(chatKeyBase64),
+  });
   await refreshOwnDeviceWrapForCurrentServerKey(userId, chatId, chatKeyBase64);
 };
 
@@ -546,7 +557,9 @@ const syncChatKeyWraps = async (
   );
 
   if (wraps.length) {
-    await e2eApi.uploadChatWrappedKeys(chatId, wraps);
+    await e2eApi.uploadChatWrappedKeys(chatId, wraps, {
+      keyFingerprint: await chatKeyFingerprintFromBase64(chatKeyBase64),
+    });
   }
 
   await syncAlternateSelfDeviceWraps(userId, chatId, chatKeyBase64);
@@ -596,6 +609,7 @@ const waitForRewrappedChatKey = async (
       await delay(intervalMs);
     }
   }
+  CHAT_REWRAP_REQUESTED.delete(String(chatId));
   return null;
 };
 
@@ -651,8 +665,9 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     audience = resolved.audience;
     eligible = resolved.eligible;
   } else if (forEncrypt) {
-    await ensureE2eIdentity(userId, { strictUpload: true });
-    eligible = [String(userId)];
+    const resolved = await resolveEncryptAudience(userId, memberUserIds, { strictAllMembers: false });
+    audience = resolved.audience;
+    eligible = resolved.eligible;
   } else {
     await ensureE2eIdentity(userId);
   }
@@ -688,10 +703,15 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     return keyBase64FromServer;
   }
 
-  const { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId);
+  let { userIds: existingRecipients } = await e2eApi.getChatKeyRecipients(chatId, { forceRefresh: true });
+  if (forEncrypt && (!existingRecipients || existingRecipients.length === 0)) {
+    await delay(250);
+    const retryRecipients = await e2eApi.getChatKeyRecipients(chatId, { forceRefresh: true });
+    existingRecipients = retryRecipients?.userIds ?? [];
+  }
   if ((existingRecipients || []).length > 0) {
     await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
-    if (!forEncrypt) {
+    if (!forEncrypt || !strictAllMembers) {
       const recovered = await waitForRewrappedChatKey(
         userId,
         chatId,
@@ -773,7 +793,9 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     );
   }
 
-  await e2eApi.uploadChatWrappedKeys(chatId, wraps);
+  await e2eApi.uploadChatWrappedKeys(chatId, wraps, {
+    keyFingerprint: await chatKeyFingerprintFromBase64(keyBase64),
+  });
   saveLocalChatKey(chatId, keyBase64);
 
   if (forEncrypt && !strictAllMembers) {
@@ -792,15 +814,13 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
   if (CHAT_KEYS_MARKED_UNAVAILABLE.has(chatKey) && !loadLocalChatKey(chatId)) {
     const identity = loadIdentity(userId) ?? await ensureE2eIdentity(userId);
     await requestChatRewrapIfNeeded(userId, chatId, identity?.deviceId ?? DEVICE_ID);
-    if (!options?.forEncrypt) {
-      const recovered = await waitForRewrappedChatKey(
-        userId,
-        chatId,
-        identity?.deviceId ?? DEVICE_ID,
-      );
-      if (recovered) {
-        return recovered;
-      }
+    const recovered = await waitForRewrappedChatKey(
+      userId,
+      chatId,
+      identity?.deviceId ?? DEVICE_ID,
+    );
+    if (recovered) {
+      return recovered;
     }
     e2eLogOnce(`missing:${chatKey}`, 'chat-key-short-circuit-missing', {
       userId: String(userId),

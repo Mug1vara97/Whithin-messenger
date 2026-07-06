@@ -114,7 +114,11 @@ public class E2eController : ControllerBase
                 w.DeviceId ?? "default"))
             .ToList();
 
-        var result = await _mediator.Send(new UpsertChatWrappedKeysCommand(chatId, userId, wraps));
+        var result = await _mediator.Send(new UpsertChatWrappedKeysCommand(
+            chatId,
+            userId,
+            wraps,
+            request.KeyFingerprint));
         if (!result.Success)
         {
             return BadRequest(new { error = result.ErrorMessage });
@@ -158,6 +162,7 @@ public class UpsertE2eDeviceKeyRequest
 public class UpsertChatWrappedKeysRequest
 {
     public ChatWrappedKeyUpload[]? Wraps { get; set; }
+    public string? KeyFingerprint { get; set; }
 }
 
 public class ChatWrappedKeyUpload

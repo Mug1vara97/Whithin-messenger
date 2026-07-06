@@ -1,3 +1,4 @@
+using System.Linq;
 using MediatR;
 using WhithinMessenger.Domain.Interfaces;
 
@@ -30,7 +31,10 @@ public class GetChatKeyRecipientsQueryHandler : IRequestHandler<GetChatKeyRecipi
             };
         }
 
-        var userIds = await _repository.GetRecipientUserIdsAsync(request.ChatId, cancellationToken);
+        var memberSet = members.ToHashSet();
+        var userIds = (await _repository.GetRecipientUserIdsAsync(request.ChatId, cancellationToken))
+            .Where(memberSet.Contains)
+            .ToList();
         return new GetChatKeyRecipientsResult
         {
             Success = true,

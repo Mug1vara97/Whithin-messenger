@@ -17,6 +17,9 @@ public class ChatE2eWrappedKeyConfiguration : IEntityTypeConfiguration<ChatE2eWr
             .HasMaxLength(256)
             .IsRequired();
 
+        builder.Property(e => e.ChatKeyFingerprint)
+            .HasMaxLength(64);
+
         builder.Property(e => e.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

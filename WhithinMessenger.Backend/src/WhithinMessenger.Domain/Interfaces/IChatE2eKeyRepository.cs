@@ -19,6 +19,14 @@ public interface IChatE2eKeyRepository
         IReadOnlyList<ChatE2eWrappedKey> keys,
         CancellationToken cancellationToken = default);
 
+    Task<(bool Success, string? ErrorMessage)> UpsertManyGuardedAsync(
+        Guid chatId,
+        Guid actorUserId,
+        IReadOnlyCollection<Guid> memberUserIds,
+        IReadOnlyList<ChatE2eWrappedKey> keys,
+        string? keyFingerprint = null,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Guid>> GetChatIdsForUserDeviceAsync(
         Guid userId,
         string deviceId,

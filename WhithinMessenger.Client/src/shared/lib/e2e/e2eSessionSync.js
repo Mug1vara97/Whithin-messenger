@@ -3,7 +3,10 @@ import {
   ensureE2eIdentity,
   proactiveSyncChatDeviceWraps,
   clearChatKeyUnavailableState,
+  clearE2ePeerKeyCache,
 } from './e2eCrypto';
+import { invalidateDeviceKeyCache } from './e2eApi';
+import apiClient from '../api/apiClient';
 import { needsChatListE2eDecrypt } from './e2eChatListPreview';
 
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
@@ -64,6 +67,43 @@ const hasLocalChatKey = (chatId) => {
   }
 };
 
+const shouldFetchFullMembers = (chat) => {
+  if (!chat) return false;
+  if (Boolean(chat.isSavedMessages ?? chat.IsSavedMessages)) return false;
+  if (Boolean(chat.isGroupChat ?? chat.IsGroupChat)) return true;
+  const peerId = chat.userId ?? chat.UserId;
+  return !peerId;
+};
+
+const fetchChatParticipantIds = async (chatId) => {
+  try {
+    const { data, status } = await apiClient.get(`/chat/${chatId}/participants`, {
+      validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 400 || responseStatus === 404,
+    });
+    if (status !== 200 || !Array.isArray(data)) {
+      return [];
+    }
+    return data
+      .map((participant) => String(participant?.userId ?? participant?.UserId ?? '').trim())
+      .filter((value) => value.length > 0);
+  } catch {
+    return [];
+  }
+};
+
+const resolveSessionMembers = async (chat, userId) => {
+  const baseMembers = resolveChatMembers(chat, userId);
+  const chatId = String(chat?.chatId ?? chat?.ChatId ?? chat?.chat_id ?? '');
+  if (!chatId || !shouldFetchFullMembers(chat)) {
+    return baseMembers;
+  }
+  const participantIds = await fetchChatParticipantIds(chatId);
+  if (!participantIds.length) {
+    return baseMembers;
+  }
+  return Array.from(new Set([...baseMembers, ...participantIds]));
+};
+
 /** Re-upload wraps when a participant rotated their device key. */
 export const handleChatKeyRewrapNeeded = async (userId, payload, chatItem = null) => {
   const chatId = String(payload?.chatId ?? '');
@@ -73,8 +113,14 @@ export const handleChatKeyRewrapNeeded = async (userId, payload, chatItem = null
 
   const members = resolveChatMembers(chatItem, userId, payload?.userId);
   const changedUserId = payload?.userId != null ? String(payload.userId) : null;
+  const changedDeviceId = payload?.deviceId != null ? String(payload.deviceId) : null;
 
   try {
+    if (changedUserId) {
+      invalidateDeviceKeyCache(changedUserId, changedDeviceId || null);
+      clearE2ePeerKeyCache();
+    }
+
     if (hasLocalChatKey(chatId)) {
       await proactiveSyncChatDeviceWraps(userId, chatId, members);
       notifyChatKeySynced(chatId);
@@ -117,7 +163,7 @@ export const syncSessionE2eKeys = async (userId, chatItems = []) => {
   await Promise.all(
     localChatIds.map(async (chatId) => {
       const chat = chatById.get(String(chatId));
-      const members = resolveChatMembers(chat, userId);
+      const members = await resolveSessionMembers(chat, userId);
       try {
         await proactiveSyncChatDeviceWraps(userId, chatId, members);
       } catch (error) {
@@ -141,7 +187,7 @@ export const syncSessionE2eKeys = async (userId, chatItems = []) => {
         return;
       }
 
-      const members = resolveChatMembers(chat, userId);
+      const members = await resolveSessionMembers(chat, userId);
       try {
         await ensureChatKey(userId, chatId, members, { forEncrypt: false });
       } catch {

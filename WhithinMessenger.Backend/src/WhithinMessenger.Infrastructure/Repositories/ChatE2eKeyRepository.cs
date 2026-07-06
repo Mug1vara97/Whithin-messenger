@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Infrastructure.Database;
+using System.Data;
 
 namespace WhithinMessenger.Infrastructure.Repositories;
 
@@ -65,6 +66,90 @@ public class ChatE2eKeyRepository : IChatE2eKeyRepository
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> UpsertManyGuardedAsync(
+        Guid chatId,
+        Guid actorUserId,
+        IReadOnlyCollection<Guid> memberUserIds,
+        IReadOnlyList<ChatE2eWrappedKey> keys,
+        string? keyFingerprint = null,
+        CancellationToken cancellationToken = default)
+    {
+        var memberSet = memberUserIds.ToHashSet();
+        await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        var normalizedFingerprint = keyFingerprint?.Trim().ToLowerInvariant();
+        var existingFingerprint = await _context.ChatE2eWrappedKeys
+            .AsNoTracking()
+            .Where(k => k.ChatId == chatId && k.ChatKeyFingerprint != null)
+            .Select(k => k.ChatKeyFingerprint)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(normalizedFingerprint)
+            && !string.IsNullOrWhiteSpace(existingFingerprint)
+            && !string.Equals(existingFingerprint, normalizedFingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return (false, "Conflicting chat key fingerprint detected. Refresh key state and retry.");
+        }
+        var effectiveFingerprint = !string.IsNullOrWhiteSpace(normalizedFingerprint)
+            ? normalizedFingerprint
+            : existingFingerprint?.Trim().ToLowerInvariant();
+
+        var existingRecipients = await _context.ChatE2eWrappedKeys
+            .AsNoTracking()
+            .Where(k => k.ChatId == chatId && memberSet.Contains(k.UserId))
+            .Select(k => k.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var requestRecipients = keys.Select(k => k.UserId).Distinct().ToHashSet();
+        var selfOnlyRequest = requestRecipients.Count == 1 && requestRecipients.Contains(actorUserId);
+
+        // If the chat key is already established, reject self-only writes to avoid split-brain
+        // regressions from stale client audiences.
+        if (existingRecipients.Count > 0 && selfOnlyRequest)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return (false, "Chat key already established for this chat. Request full audience re-sync.");
+        }
+
+        // For first bootstrap we require at least actor + one peer recipient.
+        if (existingRecipients.Count == 0 && selfOnlyRequest)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return (false, "Bootstrap requires at least one peer recipient.");
+        }
+
+        foreach (var key in keys)
+        {
+            var existing = await _context.ChatE2eWrappedKeys
+                .FirstOrDefaultAsync(
+                    k => k.ChatId == chatId
+                         && k.UserId == key.UserId
+                         && k.DeviceId == key.DeviceId,
+                    cancellationToken);
+
+            if (existing == null)
+            {
+                key.ChatKeyFingerprint = effectiveFingerprint;
+                _context.ChatE2eWrappedKeys.Add(key);
+            }
+            else
+            {
+                existing.WrappedKeyBase64 = key.WrappedKeyBase64;
+                existing.UpdatedAt = key.UpdatedAt;
+                if (!string.IsNullOrWhiteSpace(effectiveFingerprint))
+                {
+                    existing.ChatKeyFingerprint = effectiveFingerprint;
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+        return (true, null);
     }
 
     public async Task<IReadOnlyList<Guid>> GetChatIdsForUserDeviceAsync(
