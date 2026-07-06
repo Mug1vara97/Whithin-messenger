@@ -27,6 +27,7 @@ const KEY_BACKUP_UPLOAD_THROTTLE_MS = 20_000;
 const CHAT_FORCE_RESET_COOLDOWN_MS = 45_000;
 const CHAT_DECRYPT_RECOVERY_COOLDOWN_MS = 30_000;
 const CHAT_REWRAP_REQUEST_COOLDOWN_MS = 12_000;
+const E2E_TEMP_DISABLED = true;
 
 const e2eLog = (event, details = {}, level = 'log') => {
   const logger = console[level] ?? console.log;
@@ -434,12 +435,13 @@ const derivePairwiseKey = async (secretKeyBytes, peerPublicKeyBytes) => {
   return sodium.crypto_generichash(32, shared);
 };
 
-export const E2E_ENCRYPTION_VERSION = 1;
+export const E2E_ENCRYPTION_VERSION = 0;
 export const E2E_DECRYPT_FAILED_TEXT = 'Не удалось расшифровать сообщение';
 export const E2E_PEER_KEY_MISSING_TEXT =
   'Собеседник ещё не настроил шифрование. Попросите его войти в мессенджер.';
 
 export const ensureE2eIdentity = async (userId, options = {}) => {
+  if (E2E_TEMP_DISABLED) return null;
   const { strictUpload = false } = options;
   if (!userId) return null;
 
@@ -544,6 +546,10 @@ export const getPeerPublicKey = async (peerUserId, currentUserId = null, options
 };
 
 export const resolveEncryptAudience = async (userId, memberUserIds, options = {}) => {
+  if (E2E_TEMP_DISABLED) {
+    const members = normalizeMemberIds(memberUserIds, userId);
+    return { audience: members, eligible: members, ineligible: [] };
+  }
   const { strictAllMembers = false } = options;
   const members = normalizeMemberIds(memberUserIds, userId);
   if (!members.length) {
@@ -1253,6 +1259,12 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
 };
 
 export const encryptChatMessage = async (userId, chatId, memberUserIds, plaintext, options = {}) => {
+  if (E2E_TEMP_DISABLED) {
+    return {
+      content: plaintext,
+      encryptionVersion: 0,
+    };
+  }
   const { strictAllMembers = false } = options;
   const sodium = await ensureSodium();
   const chatKeyBase64 = await ensureChatKey(userId, chatId, memberUserIds, {
@@ -1342,6 +1354,9 @@ export const decryptChatMessage = async (
   encryptionVersion,
   peerUserId = null,
 ) => {
+  if (E2E_TEMP_DISABLED) {
+    return content;
+  }
   if (!encryptionVersion || encryptionVersion <= 0) {
     return content;
   }

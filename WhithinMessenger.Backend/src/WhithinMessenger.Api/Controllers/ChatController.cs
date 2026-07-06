@@ -23,6 +23,7 @@ namespace WhithinMessenger.Api.Controllers
     [RequireAuth]
     public class ChatController : ControllerBase
     {
+        private const bool E2eTempDisabled = true;
         private readonly IMediator _mediator;
         private readonly IHubContext<GroupChatHub> _groupChatHub;
 
@@ -162,7 +163,7 @@ namespace WhithinMessenger.Api.Controllers
                     request.Content,
                     request.RepliedToMessageId,
                     request.ForwardedFromMessageId,
-                    request.EncryptionVersion
+                    E2eTempDisabled ? 0 : request.EncryptionVersion
                 );
                 var result = await _mediator.Send(command);
 

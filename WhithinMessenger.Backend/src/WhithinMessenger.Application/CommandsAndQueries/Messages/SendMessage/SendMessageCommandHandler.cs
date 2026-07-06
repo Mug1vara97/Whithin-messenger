@@ -8,6 +8,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Messages.SendMessage;
 
 public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, SendMessageResult>
 {
+    private const bool E2eTempDisabled = true;
     private readonly IMessageRepository _messageRepository;
     private readonly IUserRepository _userRepository;
     private readonly IChatRepository _chatRepository;
@@ -92,7 +93,9 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 }
             }
 
-            if (request.EncryptionVersion > 0 && request.EncryptionVersion != 1)
+            var effectiveEncryptionVersion = E2eTempDisabled ? 0 : request.EncryptionVersion;
+
+            if (effectiveEncryptionVersion > 0 && effectiveEncryptionVersion != 1)
             {
                 return new SendMessageResult
                 {
@@ -107,7 +110,7 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 ChatId = request.ChatId,
                 UserId = request.UserId,
                 Content = request.Content,
-                EncryptionVersion = request.EncryptionVersion,
+                EncryptionVersion = effectiveEncryptionVersion,
                 CreatedAt = DateTimeOffset.UtcNow,
                 RepliedToMessageId = request.RepliedToMessageId,
                 ForwardedFromMessageId = request.ForwardedFromMessageId,

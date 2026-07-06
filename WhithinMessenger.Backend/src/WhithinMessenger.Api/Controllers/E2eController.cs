@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Application.CommandsAndQueries.E2e.GetChatKeyRecipients;
@@ -16,6 +17,7 @@ namespace WhithinMessenger.Api.Controllers;
 [RequireAuth]
 public class E2eController : ControllerBase
 {
+    private const bool E2eTempDisabled = true;
     private readonly IMediator _mediator;
     private readonly IChatRepository _chatRepository;
     private readonly IE2eRealtimeNotifier _e2eRealtimeNotifier;
@@ -33,9 +35,13 @@ public class E2eController : ControllerBase
         _keyBackupRepository = keyBackupRepository;
     }
 
+    private IActionResult E2eDisabledResult() =>
+        StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "E2E is temporarily disabled." });
+
     [HttpPut("keys")]
     public async Task<IActionResult> UpsertDeviceKey([FromBody] UpsertE2eDeviceKeyRequest request)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         var result = await _mediator.Send(new UpsertE2eDeviceKeyCommand(
             userId,
@@ -53,6 +59,7 @@ public class E2eController : ControllerBase
     [HttpGet("keys/{userId:guid}")]
     public async Task<IActionResult> GetDeviceKey(Guid userId, [FromQuery] string? deviceId = null)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var result = await _mediator.Send(new GetE2eDeviceKeyQuery(userId, deviceId));
         if (!result.Success)
         {
@@ -70,6 +77,7 @@ public class E2eController : ControllerBase
     [HttpGet("chat-keys/{chatId:guid}")]
     public async Task<IActionResult> GetChatWrappedKey(Guid chatId, [FromQuery] string? deviceId = null)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         var result = await _mediator.Send(new GetChatWrappedKeyQuery(chatId, userId, deviceId ?? "default"));
         if (!result.Success)
@@ -87,6 +95,7 @@ public class E2eController : ControllerBase
     [HttpGet("chat-keys/{chatId:guid}/recipients")]
     public async Task<IActionResult> GetChatKeyRecipients(Guid chatId)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         var result = await _mediator.Send(new GetChatKeyRecipientsQuery(chatId, userId));
         if (!result.Success)
@@ -109,6 +118,7 @@ public class E2eController : ControllerBase
         Guid chatId,
         [FromBody] UpsertChatWrappedKeysRequest request)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         var wraps = (request.Wraps ?? Array.Empty<ChatWrappedKeyUpload>())
             .Select(w => new ChatWrappedKeyEntry(
@@ -137,6 +147,7 @@ public class E2eController : ControllerBase
         [FromBody] RequestChatKeyRewrapRequest? request = null,
         CancellationToken cancellationToken = default)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
 
         var isParticipant = await _chatRepository.IsUserParticipantAsync(chatId, userId, cancellationToken);
@@ -161,6 +172,7 @@ public class E2eController : ControllerBase
         [FromBody] UpsertE2eKeyBackupRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         if (string.IsNullOrWhiteSpace(request.PayloadJson))
         {
@@ -174,6 +186,7 @@ public class E2eController : ControllerBase
     [HttpGet("backup")]
     public async Task<IActionResult> GetKeyBackup(CancellationToken cancellationToken = default)
     {
+        if (E2eTempDisabled) return E2eDisabledResult();
         var userId = (Guid)HttpContext.Items["UserId"]!;
         var backup = await _keyBackupRepository.GetAsync(userId, cancellationToken);
         if (backup == null)
