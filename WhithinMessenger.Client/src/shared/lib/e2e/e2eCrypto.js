@@ -15,6 +15,7 @@ const CHAT_LEGACY_PROBE_ATTEMPTED = new Set();
 const SELF_DEVICE_KEY_AVAILABILITY = new Map();
 const CHAT_REWRAP_REQUESTED = new Set();
 const CHAT_REWRAP_FORBIDDEN = new Set();
+const CHAT_REWRAP_REQUESTED_AT_MS = new Map();
 const CHAT_DECRYPT_RETRY_NOT_BEFORE_MS = new Map();
 const KEY_BACKUP_UPLOAD_IN_FLIGHT = new Set();
 const KEY_BACKUP_UPLOAD_REQUESTED_AT_MS = new Map();
@@ -25,6 +26,7 @@ const CHAT_KEY_UNAVAILABLE_MESSAGE =
 const KEY_BACKUP_UPLOAD_THROTTLE_MS = 20_000;
 const CHAT_FORCE_RESET_COOLDOWN_MS = 45_000;
 const CHAT_DECRYPT_RECOVERY_COOLDOWN_MS = 30_000;
+const CHAT_REWRAP_REQUEST_COOLDOWN_MS = 12_000;
 
 const e2eLog = (event, details = {}, level = 'log') => {
   const logger = console[level] ?? console.log;
@@ -42,11 +44,17 @@ const requestChatRewrapIfNeeded = async (userId, chatId, deviceId) => {
   if (CHAT_REWRAP_FORBIDDEN.has(chatKey)) {
     return { ok: false, forbidden: true };
   }
+  const now = Date.now();
+  const lastRequestedAt = CHAT_REWRAP_REQUESTED_AT_MS.get(chatKey) ?? 0;
+  if (now - lastRequestedAt < CHAT_REWRAP_REQUEST_COOLDOWN_MS) {
+    return { ok: true, forbidden: false };
+  }
   if (CHAT_REWRAP_REQUESTED.has(chatKey)) {
     return { ok: true, forbidden: false };
   }
 
   CHAT_REWRAP_REQUESTED.add(chatKey);
+  CHAT_REWRAP_REQUESTED_AT_MS.set(chatKey, now);
   try {
     await e2eApi.requestChatKeyRewrap(chatId, deviceId ?? DEVICE_ID);
     e2eLog('chat-key-rewrap-request-sent', {
@@ -79,6 +87,7 @@ export const clearChatKeyUnavailableState = (chatId) => {
   CHAT_LEGACY_PROBE_ATTEMPTED.delete(chatKey);
   CHAT_REWRAP_REQUESTED.delete(chatKey);
   CHAT_REWRAP_FORBIDDEN.delete(chatKey);
+  CHAT_REWRAP_REQUESTED_AT_MS.delete(chatKey);
   CHAT_DECRYPT_RETRY_NOT_BEFORE_MS.delete(chatKey);
   E2E_LOG_ONCE_KEYS.delete(`missing:${chatKey}`);
   E2E_LOG_ONCE_KEYS.delete(`marked:${chatKey}`);
@@ -1062,11 +1071,15 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     }
     if (forEncrypt) {
       const recipientsSet = new Set((existingRecipients || []).map((id) => String(id)));
-      const isSelfOnlyRecipients = recipientsSet.size === 1 && recipientsSet.has(String(userId));
-      if (isSelfOnlyRecipients) {
+      const hasActorWrap = recipientsSet.has(String(userId));
+      const isSelfOnlyRecipients = recipientsSet.size === 1 && hasActorWrap;
+      const actorMissingInEstablishedChat = recipientsSet.size > 0 && !hasActorWrap;
+      if (isSelfOnlyRecipients || actorMissingInEstablishedChat) {
         const forceResetKey = await attemptForceResetChatKey(
           strictAllMembers ? eligible : members,
-          'missing-wrap-for-current-device-after-rewrap-self-only',
+          isSelfOnlyRecipients
+            ? 'missing-wrap-for-current-device-after-rewrap-self-only'
+            : 'missing-wrap-for-actor-established-chat',
         );
         if (forceResetKey) {
           return forceResetKey;
