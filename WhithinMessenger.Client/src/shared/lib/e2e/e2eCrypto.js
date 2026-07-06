@@ -4,6 +4,7 @@ import { e2eApi, invalidateChatWrappedKeyCache } from './e2eApi';
 const DEVICE_ID = 'web';
 const IDENTITY_STORAGE_PREFIX = 'whithin:e2e:identity:';
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
+const RECOVERY_KEY_STORAGE_PREFIX = 'whithin:e2e:recovery-key:';
 const PEER_KEY_CACHE = new Map();
 /** Users known to have no device key on the server (404). */
 const PEER_KEY_MISSING = new Set();
@@ -13,9 +14,14 @@ const E2E_LOG_ONCE_KEYS = new Set();
 const CHAT_LEGACY_PROBE_ATTEMPTED = new Set();
 const SELF_DEVICE_KEY_AVAILABILITY = new Map();
 const CHAT_REWRAP_REQUESTED = new Set();
+const KEY_BACKUP_UPLOAD_IN_FLIGHT = new Set();
+const KEY_BACKUP_UPLOAD_REQUESTED_AT_MS = new Map();
+const CHAT_FORCE_RESET_ATTEMPTED_AT_MS = new Map();
 
 const CHAT_KEY_UNAVAILABLE_MESSAGE =
   'E2E-ключ чата ещё не выдан этому устройству. Откройте этот чат на другом устройстве, где переписка работает, отправьте любое сообщение и обновите страницу здесь.';
+const KEY_BACKUP_UPLOAD_THROTTLE_MS = 20_000;
+const CHAT_FORCE_RESET_COOLDOWN_MS = 45_000;
 
 const e2eLog = (event, details = {}, level = 'log') => {
   const logger = console[level] ?? console.log;
@@ -82,6 +88,127 @@ const isWrongSecretKeyError = (error) => (
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const getOrCreateRecoveryKey = async (userId) => {
+  const existing = loadRecoveryKey(userId);
+  if (existing) return existing;
+  const sodium = await ensureSodium();
+  const keyBytes = sodium.randombytes_buf(sodium.crypto_secretbox_KEYBYTES);
+  const keyBase64 = sodium.to_base64(keyBytes, sodium.base64_variants.ORIGINAL);
+  saveRecoveryKey(userId, keyBase64);
+  e2eLog('key-backup-recovery-key-created', {
+    userId: String(userId),
+  });
+  return keyBase64;
+};
+
+const encryptBackupPayload = async (userId, payloadJson) => {
+  if (!payloadJson) return null;
+  const sodium = await ensureSodium();
+  const recoveryKeyBase64 = await getOrCreateRecoveryKey(userId);
+  const recoveryKey = sodium.from_base64(recoveryKeyBase64, sodium.base64_variants.ORIGINAL);
+  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+  const ciphertext = sodium.crypto_secretbox_easy(
+    sodium.from_string(payloadJson),
+    nonce,
+    recoveryKey,
+  );
+  return JSON.stringify({
+    enc: 'secretbox-v1',
+    n: sodium.to_base64(nonce, sodium.base64_variants.ORIGINAL),
+    c: sodium.to_base64(ciphertext, sodium.base64_variants.ORIGINAL),
+  });
+};
+
+const decryptBackupPayload = async (userId, payloadJson) => {
+  if (!payloadJson) return null;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(payloadJson);
+  } catch {
+    return null;
+  }
+
+  const enc = parsed?.enc;
+  const nonceBase64 = parsed?.n;
+  const ciphertextBase64 = parsed?.c;
+  if (!enc || !nonceBase64 || !ciphertextBase64) {
+    return payloadJson;
+  }
+  if (enc !== 'secretbox-v1') return null;
+
+  const recoveryKeyBase64 = loadRecoveryKey(userId);
+  if (!recoveryKeyBase64) {
+    e2eLog('key-backup-recovery-key-missing', {
+      userId: String(userId),
+    }, 'warn');
+    return null;
+  }
+
+  try {
+    const sodium = await ensureSodium();
+    const nonce = sodium.from_base64(nonceBase64, sodium.base64_variants.ORIGINAL);
+    const ciphertext = sodium.from_base64(ciphertextBase64, sodium.base64_variants.ORIGINAL);
+    const recoveryKey = sodium.from_base64(recoveryKeyBase64, sodium.base64_variants.ORIGINAL);
+    const plaintextBytes = sodium.crypto_secretbox_open_easy(ciphertext, nonce, recoveryKey);
+    return sodium.to_string(plaintextBytes);
+  } catch {
+    e2eLog('key-backup-decrypt-failed', {
+      userId: String(userId),
+    }, 'warn');
+    return null;
+  }
+};
+
+const scheduleKeyBackupUpload = (userId) => {
+  const normalizedUserId = String(userId ?? '').trim();
+  if (!normalizedUserId) return;
+  const now = Date.now();
+  const lastRequestedAt = KEY_BACKUP_UPLOAD_REQUESTED_AT_MS.get(normalizedUserId) ?? 0;
+  if (now - lastRequestedAt < KEY_BACKUP_UPLOAD_THROTTLE_MS) {
+    return;
+  }
+  if (KEY_BACKUP_UPLOAD_IN_FLIGHT.has(normalizedUserId)) {
+    return;
+  }
+  KEY_BACKUP_UPLOAD_IN_FLIGHT.add(normalizedUserId);
+  KEY_BACKUP_UPLOAD_REQUESTED_AT_MS.set(normalizedUserId, now);
+
+  void (async () => {
+    try {
+      const payloadJson = exportBackupPayload(normalizedUserId);
+      if (!payloadJson) return;
+      const encryptedPayload = await encryptBackupPayload(normalizedUserId, payloadJson);
+      if (!encryptedPayload) return;
+      await e2eApi.uploadKeyBackup(encryptedPayload);
+      e2eLog('key-backup-uploaded', {
+        userId: normalizedUserId,
+        chatKeyCount: listLocalChatIds().length,
+      });
+    } catch (error) {
+      e2eLog('key-backup-upload-failed', {
+        userId: normalizedUserId,
+        errorMessage: error?.message ?? String(error),
+        httpStatus: error?.response?.status ?? null,
+      }, 'warn');
+    } finally {
+      KEY_BACKUP_UPLOAD_IN_FLIGHT.delete(normalizedUserId);
+    }
+  })();
+};
+
+const tryRestoreKeyBackup = async (userId) => {
+  try {
+    const backup = await e2eApi.getKeyBackup();
+    const payloadJson = backup?.payloadJson ?? '';
+    if (!payloadJson) return false;
+    const decryptedPayload = await decryptBackupPayload(userId, payloadJson);
+    if (!decryptedPayload) return false;
+    return restoreFromBackupPayload(userId, decryptedPayload);
+  } catch {
+    return false;
+  }
+};
+
 let sodiumReadyPromise = null;
 
 export class E2eEncryptionError extends Error {
@@ -101,6 +228,18 @@ const ensureSodium = async () => {
 
 const identityStorageKey = (userId) => `${IDENTITY_STORAGE_PREFIX}${userId}`;
 const chatKeyStorageKey = (chatId) => `${CHAT_KEY_STORAGE_PREFIX}${chatId}`;
+const recoveryKeyStorageKey = (userId) => `${RECOVERY_KEY_STORAGE_PREFIX}${userId}`;
+
+const listLocalChatIds = () => {
+  try {
+    return Object.keys(localStorage)
+      .filter((key) => key.startsWith(CHAT_KEY_STORAGE_PREFIX))
+      .map((key) => key.slice(CHAT_KEY_STORAGE_PREFIX.length))
+      .filter((chatId) => chatId && chatId.trim().length > 0);
+  } catch {
+    return [];
+  }
+};
 
 const loadIdentity = (userId) => {
   try {
@@ -128,6 +267,64 @@ const saveIdentity = (userId, identity) => {
   }));
 };
 
+const exportBackupPayload = (userId) => {
+  const identity = loadIdentity(userId);
+  const chatKeys = {};
+  for (const chatId of listLocalChatIds()) {
+    const keyBase64 = loadLocalChatKey(chatId);
+    if (keyBase64) {
+      chatKeys[chatId] = keyBase64;
+    }
+  }
+
+  if (!identity && !Object.keys(chatKeys).length) {
+    return null;
+  }
+
+  return JSON.stringify({
+    identity: identity
+      ? {
+        deviceId: identity.deviceId ?? DEVICE_ID,
+        publicKeyBase64: identity.publicKeyBase64,
+        secretKeyBase64: identity.secretKeyBase64,
+        uploadedPublicKeyBase64: identity.uploadedPublicKeyBase64 ?? null,
+      }
+      : null,
+    chatKeys,
+  });
+};
+
+const restoreFromBackupPayload = (userId, payloadJson) => {
+  if (!payloadJson) return false;
+  try {
+    const parsed = JSON.parse(payloadJson);
+    let restored = false;
+    if (
+      parsed?.identity?.publicKeyBase64
+      && parsed?.identity?.secretKeyBase64
+    ) {
+      saveIdentity(userId, {
+        deviceId: parsed.identity.deviceId ?? DEVICE_ID,
+        publicKeyBase64: parsed.identity.publicKeyBase64,
+        secretKeyBase64: parsed.identity.secretKeyBase64,
+        uploadedPublicKeyBase64: parsed.identity.uploadedPublicKeyBase64 ?? null,
+      });
+      restored = true;
+    }
+
+    const chatKeys = parsed?.chatKeys ?? {};
+    for (const [chatId, keyBase64] of Object.entries(chatKeys)) {
+      if (chatId && typeof keyBase64 === 'string' && keyBase64.trim().length > 0) {
+        saveLocalChatKey(chatId, keyBase64);
+        restored = true;
+      }
+    }
+    return restored;
+  } catch {
+    return false;
+  }
+};
+
 const loadLocalChatKey = (chatId) => {
   try {
     const raw = localStorage.getItem(chatKeyStorageKey(chatId));
@@ -149,6 +346,20 @@ const removeLocalChatKey = (chatId) => {
 const saveLocalChatKey = (chatId, keyBase64) => {
   localStorage.setItem(chatKeyStorageKey(chatId), keyBase64);
   clearChatKeyUnavailableState(chatId);
+};
+
+const loadRecoveryKey = (userId) => {
+  try {
+    const raw = localStorage.getItem(recoveryKeyStorageKey(userId));
+    if (!raw) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+};
+
+const saveRecoveryKey = (userId, recoveryKeyBase64) => {
+  localStorage.setItem(recoveryKeyStorageKey(userId), recoveryKeyBase64);
 };
 
 const normalizeMemberIds = (memberUserIds, userId) => {
@@ -212,6 +423,20 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
   let identity = loadIdentity(userId);
 
   if (!identity) {
+    const restored = await tryRestoreKeyBackup(userId);
+    if (restored) {
+      identity = loadIdentity(userId);
+      if (identity) {
+        e2eLog('identity-restored-from-backup', {
+          userId: String(userId),
+          deviceId: identity?.deviceId ?? DEVICE_ID,
+          chatKeyCount: listLocalChatIds().length,
+        });
+      }
+    }
+  }
+
+  if (!identity) {
     const keypair = sodium.crypto_box_keypair();
     identity = {
       deviceId: DEVICE_ID,
@@ -254,6 +479,7 @@ export const ensureE2eIdentity = async (userId, options = {}) => {
     PEER_KEY_CACHE.set(String(userId), identity.publicKeyBase64);
   }
 
+  scheduleKeyBackupUpload(userId);
   return identity;
 };
 
@@ -615,6 +841,7 @@ const waitForRewrappedChatKey = async (
         const sodium = await ensureSodium();
         const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
         saveLocalChatKey(chatId, keyBase64);
+        scheduleKeyBackupUpload(userId);
         return keyBase64;
       } catch {
         // Continue polling until a valid wrap appears.
@@ -663,6 +890,77 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
         }, 'warn');
       });
   };
+  const attemptForceResetChatKey = async (forceResetTargets, reason) => {
+    if (!forEncrypt) return null;
+    const normalizedTargets = Array.from(new Set((forceResetTargets || [])
+      .map((id) => String(id ?? '').trim())
+      .filter((id) => id.length > 0)));
+    if (!normalizedTargets.includes(String(userId))) {
+      normalizedTargets.push(String(userId));
+    }
+
+    const chatKey = String(chatId);
+    const now = Date.now();
+    const lastAttemptAt = CHAT_FORCE_RESET_ATTEMPTED_AT_MS.get(chatKey) ?? 0;
+    if (now - lastAttemptAt < CHAT_FORCE_RESET_COOLDOWN_MS) {
+      e2eLog('chat-key-force-reset-skipped-cooldown', {
+        userId: String(userId),
+        chatId: chatKey,
+        cooldownMsRemaining: CHAT_FORCE_RESET_COOLDOWN_MS - (now - lastAttemptAt),
+      }, 'warn');
+      return null;
+    }
+    if (normalizedTargets.length < 2) {
+      e2eLog('chat-key-force-reset-skipped-no-peer', {
+        userId: String(userId),
+        chatId: chatKey,
+        reason,
+        wrapTargets: normalizedTargets,
+      }, 'warn');
+      return null;
+    }
+
+    CHAT_FORCE_RESET_ATTEMPTED_AT_MS.set(chatKey, now);
+    const sodium = await ensureSodium();
+    const chatKeyBytes = sodium.randombytes_buf(32);
+    const keyBase64 = sodium.to_base64(chatKeyBytes, sodium.base64_variants.ORIGINAL);
+    const { wraps, missingUserIds } = await buildWrapsForMembers(
+      chatKeyBytes,
+      normalizedTargets,
+      userId,
+      { strict: false },
+    );
+
+    if (wraps.length < 2) {
+      e2eLog('chat-key-force-reset-skipped-insufficient-wraps', {
+        userId: String(userId),
+        chatId: chatKey,
+        reason,
+        wrapTargets: normalizedTargets,
+        wrapsBuilt: wraps.length,
+        missingUserIds: missingUserIds.map((id) => String(id)),
+      }, 'warn');
+      return null;
+    }
+
+    await e2eApi.uploadChatWrappedKeys(chatId, wraps, {
+      forceReset: true,
+      keyFingerprint: await chatKeyFingerprintFromBase64(keyBase64),
+    });
+    e2eLog('chat-key-force-reset-uploaded', {
+      userId: String(userId),
+      chatId: chatKey,
+      reason,
+      wrapsUploaded: wraps.length,
+      wrapTargets: normalizedTargets,
+      missingUserIds: missingUserIds.map((id) => String(id)),
+    }, 'warn');
+
+    saveLocalChatKey(chatId, keyBase64);
+    scheduleKeyBackupUpload(userId);
+    scheduleWrapSync(keyBase64, members);
+    return keyBase64;
+  };
   const localKeyBase64 = loadLocalChatKey(chatId);
 
   // Send path: return immediately, wraps sync in background.
@@ -710,6 +1008,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
       forEncrypt,
     });
     saveLocalChatKey(chatId, keyBase64FromServer);
+    scheduleKeyBackupUpload(userId);
     if (forEncrypt && strictAllMembers) {
       await syncChatKeyWraps(userId, chatId, keyBase64FromServer, eligible, { strictAllMembers: true });
     } else if (forEncrypt) {
@@ -734,6 +1033,15 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
       );
       if (recovered) {
         return recovered;
+      }
+    }
+    if (forEncrypt) {
+      const forceResetKey = await attemptForceResetChatKey(
+        strictAllMembers ? eligible : members,
+        'missing-wrap-for-current-device-after-rewrap',
+      );
+      if (forceResetKey) {
+        return forceResetKey;
       }
     }
     e2eLog('chat-key-missing-for-current-device', {
@@ -827,6 +1135,7 @@ const ensureChatKeyImpl = async (userId, chatId, memberUserIds = [], options = {
     fingerprint: (await chatKeyFingerprintFromBase64(keyBase64))?.slice(0, 12) ?? null,
   });
   saveLocalChatKey(chatId, keyBase64);
+  scheduleKeyBackupUpload(userId);
 
   if (forEncrypt && !strictAllMembers) {
     scheduleWrapSync(keyBase64, members);
@@ -858,7 +1167,12 @@ export const ensureChatKey = async (userId, chatId, memberUserIds = [], options 
       memberCount: Array.isArray(memberUserIds) ? memberUserIds.length : 0,
       forEncrypt: Boolean(options?.forEncrypt),
     }, 'warn');
-    throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
+    if (!options?.forEncrypt) {
+      throw new E2eEncryptionError(CHAT_KEY_UNAVAILABLE_MESSAGE);
+    }
+    // For send-path retries, do not permanently short-circuit: allow ensureChatKeyImpl
+    // to try force-reset bootstrap when rewrap cannot recover this device.
+    CHAT_KEYS_MARKED_UNAVAILABLE.delete(chatKey);
   }
 
   const inFlight = ENSURE_CHAT_KEY_INFLIGHT.get(chatKey);

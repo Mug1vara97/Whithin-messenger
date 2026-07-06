@@ -198,7 +198,7 @@ export const e2eApi = {
   },
 
   async uploadChatWrappedKeys(chatId, wraps, options = {}) {
-    const { keyFingerprint = null } = options;
+    const { keyFingerprint = null, forceReset = false } = options;
     const normalizedWraps = (wraps || [])
       .filter((wrap) => (
         wrap
@@ -222,6 +222,7 @@ export const e2eApi = {
       keyFingerprint: typeof keyFingerprint === 'string' && keyFingerprint.trim().length
         ? keyFingerprint.trim().toLowerCase()
         : undefined,
+      forceReset: Boolean(forceReset),
     });
     invalidateChatWrappedKeyCache(chatId);
   },
@@ -230,5 +231,24 @@ export const e2eApi = {
     await apiClient.post(`/e2e/chat-keys/${chatId}/rewrap-request`, {
       deviceId,
     });
+  },
+
+  async uploadKeyBackup(payloadJson) {
+    await apiClient.put('/e2e/backup', {
+      payloadJson,
+    });
+  },
+
+  async getKeyBackup() {
+    const { data, status } = await apiClient.get('/e2e/backup', {
+      validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 404,
+    });
+    if (status === 404 || data == null) {
+      return null;
+    }
+    return {
+      payloadJson: data.payloadJson ?? data.PayloadJson ?? '',
+      updatedAt: data.updatedAt ?? data.UpdatedAt ?? null,
+    };
   },
 };
