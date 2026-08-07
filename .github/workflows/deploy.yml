@@ -29,7 +29,7 @@ jobs:
           if [ -d "whithin-messenger" ]; then
             cd whithin-messenger
             docker-compose down || true
-            docker rm -f whithin-messenger-db-1 whithin-messenger-backend-1 whithin-messenger-client-1 whithin-messenger-nginx-1 2>/dev/null || true
+            docker rm -f whithin-messenger-db-1 whithin-messenger-backend-1 whithin-messenger-client-1 whithin-messenger-nginx-1 whithin-messenger-music-signal-1 2>/dev/null || true
             cd ..
           fi
           
@@ -108,7 +108,13 @@ jobs:
           
           echo "Voice server logs:"
           docker-compose logs voice-server --tail=20
+
+          echo "Music signal logs:"
+          docker-compose logs music-signal --tail=20
           
           echo "Database logs:"
           docker-compose logs db --tail=10
+
+          echo "Music signal health:"
+          curl -sf http://127.0.0.1:8082/health || echo "music-signal health check failed"
 

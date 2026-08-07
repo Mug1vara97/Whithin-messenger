@@ -74,6 +74,19 @@ services:
       - app-network
     restart: unless-stopped
 
+  music-signal:
+    build:
+      context: ./WhithinMessenger.Backend
+      dockerfile: src/WhithinMessenger.MusicSignal/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - ASPNETCORE_URLS=http://+:8082
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - app-network
+    restart: unless-stopped
+
   client:
     build:
       context: ./WhithinMessenger.Client
@@ -154,6 +167,7 @@ services:
     depends_on:
       - client
       - backend
+      - music-signal
       - voice-server
       - livekit
     extra_hosts:
