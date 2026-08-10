@@ -3481,8 +3481,6 @@ export const useCallStore = create(
         if (ownerUserId == null) return;
         const normalizedUserId = String(ownerUserId);
         const state = get();
-        const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
-        if (!state.audioElements.get(screenShareAudioKey)) return;
 
         const isCurrentlyMuted = state.screenShareMutedStates.get(normalizedUserId) || false;
         const newIsMuted = !isCurrentlyMuted;
@@ -3509,9 +3507,6 @@ export const useCallStore = create(
         if (ownerUserId == null) return;
         const normalizedUserId = String(ownerUserId);
         const state = get();
-        const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
-        if (!state.audioElements.get(screenShareAudioKey)) return;
-
         const clamped = Math.max(0, Math.min(100, Math.round(newVolume)));
 
         set((s) => {
@@ -3520,23 +3515,21 @@ export const useCallStore = create(
           return { screenShareVolumes: newVolumes };
         });
 
-        get().applyScreenShareAudioPlayback(normalizedUserId);
-
         if (clamped > 0 && state.screenShareMutedStates.get(normalizedUserId)) {
           set((s) => {
             const newMutedStates = new Map(s.screenShareMutedStates);
             newMutedStates.set(normalizedUserId, false);
             return { screenShareMutedStates: newMutedStates };
           });
-          get().applyScreenShareAudioPlayback(normalizedUserId);
         } else if (clamped === 0 && !state.screenShareMutedStates.get(normalizedUserId)) {
           set((s) => {
             const newMutedStates = new Map(s.screenShareMutedStates);
             newMutedStates.set(normalizedUserId, true);
             return { screenShareMutedStates: newMutedStates };
           });
-          get().applyScreenShareAudioPlayback(normalizedUserId);
         }
+
+        get().applyScreenShareAudioPlayback(normalizedUserId);
       },
 
       toggleScreenShareVolumeSlider: (ownerUserId) => {

@@ -720,14 +720,12 @@ const VideoCallGrid = ({
     const modColor = '#f0b232';
     const isScreenShare = participant.isScreenShare || false;
     const ownerUserId = participant.ownerUserId != null ? String(participant.ownerUserId) : null;
-    const hasScreenShareAudio =
-      isScreenShare &&
-      !participant.isLocal &&
-      ownerUserId != null &&
-      screenShareAudioUserIds.has(ownerUserId);
+    // Громкость демонстрации — только на remote-тайле share, отдельно от микрофона владельца
+    const showScreenShareVolumeControls =
+      isScreenShare && !participant.isLocal && ownerUserId != null;
     const screenShareSliderKey = ownerUserId != null ? `screen-share-audio-${ownerUserId}` : null;
     const isAudioMuted = isScreenShare
-      ? (hasScreenShareAudio && (screenShareMutedStates.get(ownerUserId) || false))
+      ? (screenShareMutedStates.get(ownerUserId) || false)
       : (userMutedStates.get(participant.id) || false);
     const volume = isScreenShare
       ? (screenShareVolumes.get(ownerUserId) || 100)
@@ -741,7 +739,7 @@ const VideoCallGrid = ({
     const handleVolumeClick = (e) => {
       e.stopPropagation();
       if (isScreenShare) {
-        if (hasScreenShareAudio && onToggleScreenShareMute) {
+        if (showScreenShareVolumeControls && onToggleScreenShareMute) {
           onToggleScreenShareMute(ownerUserId);
         }
         return;
@@ -755,7 +753,7 @@ const VideoCallGrid = ({
       e.preventDefault();
       e.stopPropagation();
       if (isScreenShare) {
-        if (hasScreenShareAudio && onToggleScreenShareVolumeSlider) {
+        if (showScreenShareVolumeControls && onToggleScreenShareVolumeSlider) {
           onToggleScreenShareVolumeSlider(ownerUserId);
         }
         return;
@@ -768,7 +766,7 @@ const VideoCallGrid = ({
     const handleSliderChange = (e, newValue) => {
       e.stopPropagation();
       if (isScreenShare) {
-        if (hasScreenShareAudio && onChangeScreenShareVolume) {
+        if (showScreenShareVolumeControls && onChangeScreenShareVolume) {
           onChangeScreenShareVolume(ownerUserId, newValue);
         }
         return;
@@ -907,7 +905,7 @@ const VideoCallGrid = ({
             <div className="tile-volume-controls">
               {isScreenShare ? (
                 <>
-                  {hasScreenShareAudio && (
+                  {showScreenShareVolumeControls && (
                     <>
                       <button
                         type="button"

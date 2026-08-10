@@ -766,8 +766,7 @@ class VoiceCallApi {
           kind: publication.kind,
           participantIdentity: participant.identity,
           userId: participant.identity,
-          mediaType: publication.source === Track.Source.ScreenShare ? 'screen' :
-            publication.source === Track.Source.Camera ? 'camera' : 'microphone',
+          mediaType: this.getPublicationMediaType(publication),
         });
       });
     });
@@ -1042,13 +1041,10 @@ class VoiceCallApi {
       });
       
       // Emit producerClosed event for compatibility
-      const mediaType = publication.source === Track.Source.ScreenShare ? 'screen' : 
-                        publication.source === Track.Source.Camera ? 'camera' : 'microphone';
-      
       this.emit('producerClosed', {
         producerId: publication.trackSid,
         producerSocketId: participant.identity,
-        mediaType: mediaType,
+        mediaType: this.getPublicationMediaType(publication),
         kind: publication.kind
       });
     });
