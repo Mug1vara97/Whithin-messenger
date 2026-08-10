@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Headset, HeadsetOff, Settings as SettingsIcon } from '@mui/icons-material';
 import { userApi } from '../../../../entities/user/api';
-import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
+import { usePresence } from '../../../lib/contexts/PresenceContext';
 import { useGlobalCall } from '../../../lib/hooks/useGlobalCall';
 import { useCallStore } from '../../../lib/stores/callStore';
 import {
@@ -36,6 +36,7 @@ const UserPanel = ({
   serverId = null,
 }) => {
   const { user, updateUser } = useAuthContext();
+  const { applyLocalStatus, statusOverrides } = usePresence();
   const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
   const isMuted = useCallStore((state) => state.isMuted);
   const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
@@ -50,9 +51,8 @@ const UserPanel = ({
   const handleOpenOwnProfile = () => openOwnProfile(currentStatus);
   const manualStatusRef = useRef(PRESENCE_STATUS.ONLINE);
   const currentStatusRef = useRef(PRESENCE_STATUS.ONLINE);
-  const notificationConnectionRef = useRef(null);
   const statusMenuRef = useRef(null);
-  const { getConnection } = useConnectionContext();
+  const hasRestoredStatusRef = useRef(false);
 
   const getStorageKey = () => (userId ? `whithin:user-status:${userId}` : 'whithin:user-status');
 
@@ -97,19 +97,69 @@ const UserPanel = ({
   useEffect(() => {
     if (!userId) return;
 
+    hasRestoredStatusRef.current = false;
+
     const storageKey = getStorageKey();
     const savedStatus = localStorage.getItem(storageKey);
-    if (savedStatus) {
-      const normalizedSavedStatus = normalizeUserStatus(savedStatus);
-      setCurrentStatus(normalizedSavedStatus);
-      manualStatusRef.current = normalizedSavedStatus;
-      currentStatusRef.current = normalizedSavedStatus;
-    } else {
-      setCurrentStatus(PRESENCE_STATUS.ONLINE);
-      manualStatusRef.current = PRESENCE_STATUS.ONLINE;
-      currentStatusRef.current = PRESENCE_STATUS.ONLINE;
-    }
-  }, [userId]);
+    const normalizedSavedStatus = savedStatus
+      ? normalizeUserStatus(savedStatus)
+      : PRESENCE_STATUS.ONLINE;
+
+    setCurrentStatus(normalizedSavedStatus);
+    manualStatusRef.current = normalizedSavedStatus;
+    currentStatusRef.current = normalizedSavedStatus;
+    applyLocalStatus(userId, normalizedSavedStatus);
+  }, [userId, applyLocalStatus]);
+
+  // Restore preferred status to the server on connect (including Invisible / Offline).
+  useEffect(() => {
+    if (!userId || hasRestoredStatusRef.current) return undefined;
+
+    let cancelled = false;
+    hasRestoredStatusRef.current = true;
+
+    const restorePreferredStatus = async () => {
+      const storageKey = getStorageKey();
+      const savedStatus = normalizeUserStatus(
+        localStorage.getItem(storageKey) || PRESENCE_STATUS.ONLINE,
+      );
+
+      setCurrentStatus(savedStatus);
+      currentStatusRef.current = savedStatus;
+      manualStatusRef.current = savedStatus;
+      applyLocalStatus(userId, savedStatus);
+
+      try {
+        await userApi.updateStatus(userId, toBackendUserStatus(savedStatus));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error restoring user status on connect:', error);
+        }
+      }
+    };
+
+    restorePreferredStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, applyLocalStatus]);
+
+  // Sync own status from PresenceContext (other sessions / server broadcasts).
+  // Do not overwrite manualStatusRef — auto-Inactive must still return to Online on activity.
+  useEffect(() => {
+    if (!userId) return;
+    const key = String(userId);
+    const remoteStatus = statusOverrides[key];
+    if (remoteStatus === undefined) return;
+
+    const normalized = normalizeUserStatus(remoteStatus);
+    if (normalized === currentStatusRef.current) return;
+
+    setCurrentStatus(normalized);
+    currentStatusRef.current = normalized;
+    localStorage.setItem(getStorageKey(), normalized);
+  }, [userId, statusOverrides]);
 
   useEffect(() => {
     if (!isStatusMenuOpen) return undefined;
@@ -144,6 +194,7 @@ const UserPanel = ({
     setCurrentStatus(normalizedStatus);
     currentStatusRef.current = normalizedStatus;
     localStorage.setItem(storageKey, normalizedStatus);
+    applyLocalStatus(userId, normalizedStatus);
 
     if (isManualChange) {
       manualStatusRef.current = normalizedStatus;
@@ -166,47 +217,31 @@ const UserPanel = ({
     await applyStatus(statusValue, true);
   };
 
-  const syncPresenceFromServer = (statusValue) => {
-    const normalizedStatus = normalizeUserStatus(statusValue);
-    const storageKey = getStorageKey();
-    setCurrentStatus(normalizedStatus);
-    currentStatusRef.current = normalizedStatus;
-    manualStatusRef.current = normalizedStatus;
-    localStorage.setItem(storageKey, normalizedStatus);
-  };
-
-  const syncOnlineAfterHubConnect = () => {
-    const saved = normalizeUserStatus(localStorage.getItem(getStorageKey()));
-    if (saved !== PRESENCE_STATUS.OFFLINE) {
-      return;
-    }
-    syncPresenceFromServer(PRESENCE_STATUS.ONLINE);
-  };
-
   useEffect(() => {
     if (!userId) return undefined;
 
     let idleTimerId = null;
 
-    const resetIdleTimer = () => {
+    const clearIdleTimer = () => {
       if (idleTimerId) {
         window.clearTimeout(idleTimerId);
         idleTimerId = null;
       }
+    };
 
-      if (
-        manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
-        currentStatusRef.current === PRESENCE_STATUS.INACTIVE
-      ) {
-        applyStatus(PRESENCE_STATUS.ONLINE);
-      }
+    const scheduleIdleTimer = () => {
+      clearIdleTimer();
 
       if (isInCall || useCallStore.getState().isInCall) {
         return;
       }
 
+      if (document.hidden) {
+        return;
+      }
+
       idleTimerId = window.setTimeout(() => {
-        if (useCallStore.getState().isInCall) {
+        if (document.hidden || useCallStore.getState().isInCall) {
           return;
         }
         if (
@@ -218,20 +253,53 @@ const UserPanel = ({
       }, INACTIVITY_TIMEOUT_MS);
     };
 
+    const resetIdleTimer = () => {
+      if (
+        manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
+        currentStatusRef.current === PRESENCE_STATUS.INACTIVE
+      ) {
+        applyStatus(PRESENCE_STATUS.ONLINE);
+      }
+
+      scheduleIdleTimer();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearIdleTimer();
+        if (
+          !useCallStore.getState().isInCall
+          && manualStatusRef.current === PRESENCE_STATUS.ONLINE
+          && currentStatusRef.current === PRESENCE_STATUS.ONLINE
+        ) {
+          applyStatus(PRESENCE_STATUS.INACTIVE);
+        }
+        return;
+      }
+
+      if (
+        manualStatusRef.current === PRESENCE_STATUS.ONLINE &&
+        currentStatusRef.current === PRESENCE_STATUS.INACTIVE
+      ) {
+        applyStatus(PRESENCE_STATUS.ONLINE);
+      }
+      scheduleIdleTimer();
+    };
+
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
     events.forEach((eventName) => {
       window.addEventListener(eventName, resetIdleTimer, { passive: true });
     });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    resetIdleTimer();
+    scheduleIdleTimer();
 
     return () => {
-      if (idleTimerId) {
-        window.clearTimeout(idleTimerId);
-      }
+      clearIdleTimer();
       events.forEach((eventName) => {
         window.removeEventListener(eventName, resetIdleTimer);
       });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [userId, isInCall]);
 
@@ -245,52 +313,6 @@ const UserPanel = ({
       applyStatus(PRESENCE_STATUS.ONLINE);
     }
   }, [isInCall, userId]);
-
-  useEffect(() => {
-    if (!userId || !getConnection) return undefined;
-
-    let mounted = true;
-
-    const setupRealtimeStatus = async () => {
-      try {
-        const notificationConnection = await getConnection('notificationhub', userId);
-        if (!mounted) return;
-        notificationConnectionRef.current = notificationConnection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          if (String(changedUserId) !== String(userId)) {
-            return;
-          }
-          syncPresenceFromServer(payload?.status ?? payload?.Status);
-        };
-
-        const onReconnected = () => {
-          if (!mounted) return;
-          syncOnlineAfterHubConnect();
-        };
-
-        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
-        notificationConnection.onreconnected(onReconnected);
-
-        if (notificationConnection.state === 'Connected') {
-          syncOnlineAfterHubConnect();
-        }
-      } catch (error) {
-        console.error('Error setting up realtime status in user panel:', error);
-      }
-    };
-
-    setupRealtimeStatus();
-
-    return () => {
-      mounted = false;
-      if (notificationConnectionRef.current) {
-        notificationConnectionRef.current.off('UserStatusChanged');
-      }
-      notificationConnectionRef.current = null;
-    };
-  }, [userId, getConnection]);
 
   if (!userId) return null;
 
@@ -376,6 +398,7 @@ const UserPanel = ({
                     ? 'Включить микрофон'
                     : 'Выключить микрофон'
               }
+              type="button"
             >
               {isMuted ? <MicOff fontSize="small" /> : <Mic fontSize="small" />}
             </button>
@@ -391,6 +414,7 @@ const UserPanel = ({
                     ? 'Выключить звук'
                     : 'Включить звук'
               }
+              type="button"
             >
               {!isGlobalAudioMuted ? <Headset fontSize="small" /> : <HeadsetOff fontSize="small" />}
             </button>
@@ -399,6 +423,7 @@ const UserPanel = ({
               className={styles['voice-control-button']}
               onClick={() => openSettings('account')}
               title="Настройки"
+              type="button"
             >
               <SettingsIcon fontSize="small" />
             </button>

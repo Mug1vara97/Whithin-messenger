@@ -212,7 +212,7 @@ const CreateGroupChatModal = ({ isOpen, onClose, onChatCreated }) => {
                       avatarUrl={friend.avatar}
                       avatarColor={friend.avatarColor}
                       size={40}
-                      statusIndicator={<UserAvatarPresenceDot status={friend.status} />}
+                      statusIndicator={<UserAvatarPresenceDot userId={friendId} status={friend.status} />}
                     />
                     <div className="create-group-modal__item-info">
                       <div className="create-group-modal__item-name">{friend.username}</div>

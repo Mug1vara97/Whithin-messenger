@@ -16,18 +16,19 @@ public class NotificationHub : Hub
         ActiveConnections.TryGetValue(userId, out var count) && count > 0;
 
     public static void ResetActiveConnections() => ActiveConnections.Clear();
+
     private readonly WithinDbContext _context;
     private readonly IMessageReceiptService _messageReceiptService;
-    private readonly IUserBlockService _userBlockService;
+    private readonly IUserPresenceBroadcastService _presenceBroadcast;
 
     public NotificationHub(
         WithinDbContext context,
         IMessageReceiptService messageReceiptService,
-        IUserBlockService userBlockService)
+        IUserPresenceBroadcastService presenceBroadcast)
     {
         _context = context;
         _messageReceiptService = messageReceiptService;
-        _userBlockService = userBlockService;
+        _presenceBroadcast = presenceBroadcast;
     }
 
     public override async Task OnConnectedAsync()
@@ -37,7 +38,9 @@ public class NotificationHub : Hub
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userIdGuid}");
             ActiveConnections.AddOrUpdate(userIdGuid, 1, (_, current) => current + 1);
-            await MarkUserOnlineIfOfflineAsync(userIdGuid);
+
+            // Do not force Offline → Online here. Client restores preferred status
+            // (including Invisible / Offline) via PUT /api/user/status after connect.
 
             try
             {
@@ -101,23 +104,6 @@ public class NotificationHub : Hub
         return true;
     }
 
-    private async Task MarkUserOnlineIfOfflineAsync(Guid userId)
-    {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user == null)
-        {
-            return;
-        }
-
-        if (user.Status == Status.Offline)
-        {
-            user.Status = Status.Online;
-            user.LastSeen = DateTimeOffset.UtcNow;
-            await _context.SaveChangesAsync();
-            await BroadcastUserStatusChangedAsync(userId, user.Status, user.LastSeen);
-        }
-    }
-
     private async Task MarkUserOfflineAsync(Guid userId)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -133,38 +119,6 @@ public class NotificationHub : Hub
             await _context.SaveChangesAsync();
         }
 
-        await BroadcastUserStatusChangedAsync(userId, user.Status, user.LastSeen);
-    }
-
-    private async Task BroadcastUserStatusChangedAsync(Guid userId, Status status, DateTimeOffset lastSeen)
-    {
-        var normalizedStatus = status.ToString().ToLowerInvariant();
-        var lastSeenIso = lastSeen.ToString("O");
-        var payload = new
-        {
-            userId,
-            status = normalizedStatus,
-            lastSeen = lastSeenIso
-        };
-
-        await Clients.Group($"user-{userId}").SendAsync("UserStatusChanged", payload);
-
-        var friendIds = await _context.Friendships
-            .Where(f => (f.RequesterId == userId || f.AddresseeId == userId) && f.Status == FriendshipStatus.Accepted)
-            .Select(f => f.RequesterId == userId ? f.AddresseeId : f.RequesterId)
-            .ToListAsync();
-
-        foreach (var friendId in friendIds)
-        {
-            if (await _userBlockService.ShouldHidePresenceAsync(friendId, userId, CancellationToken.None))
-            {
-                continue;
-            }
-
-            await Clients.Group($"user-{friendId}").SendAsync("UserStatusChanged", payload);
-        }
+        await _presenceBroadcast.BroadcastStatusChangedAsync(userId, user.Status, user.LastSeen);
     }
 }
-
-
-

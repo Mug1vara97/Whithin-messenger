@@ -1,10 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Domain.Models;
 using WhithinMessenger.Api.Attributes;
-using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Api.Services;
 using WhithinMessenger.Infrastructure.Database;
 using MediatR;
 using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangeEmail;
@@ -12,7 +10,6 @@ using WhithinMessenger.Application.CommandsAndQueries.Auth.ChangePassword;
 using WhithinMessenger.Application.CommandsAndQueries.Users.DeleteAccount;
 using WhithinMessenger.Application.CommandsAndQueries.Users.SearchUsers;
 using WhithinMessenger.Application.Interfaces;
-using WhithinMessenger.Application.Services;
 
 namespace WhithinMessenger.Api.Controllers;
 
@@ -23,19 +20,16 @@ public class UserController : ControllerBase
 {
     private readonly WithinDbContext _context;
     private readonly IMediator _mediator;
-    private readonly IHubContext<NotificationHub> _notificationHub;
-    private readonly IUserBlockService _userBlockService;
+    private readonly IUserPresenceBroadcastService _presenceBroadcast;
 
     public UserController(
         WithinDbContext context,
         IMediator mediator,
-        IHubContext<NotificationHub> notificationHub,
-        IUserBlockService userBlockService)
+        IUserPresenceBroadcastService presenceBroadcast)
     {
         _context = context;
         _mediator = mediator;
-        _notificationHub = notificationHub;
-        _userBlockService = userBlockService;
+        _presenceBroadcast = presenceBroadcast;
     }
     [HttpGet("profile")]
     public IActionResult GetProfile()
@@ -196,38 +190,7 @@ public class UserController : ControllerBase
         var normalizedStatus = user.Status.ToString().ToLowerInvariant();
         var lastSeenIso = user.LastSeen.ToString("O");
 
-        // Sync all sessions for current user.
-        await _notificationHub.Clients.Group($"user-{userId}").SendAsync(
-            "UserStatusChanged",
-            new
-            {
-                userId,
-                status = normalizedStatus,
-                lastSeen = lastSeenIso
-            });
-
-        // Broadcast status updates to accepted friends.
-        var friendIds = await _context.Friendships
-            .Where(f => (f.RequesterId == userId || f.AddresseeId == userId) && f.Status == FriendshipStatus.Accepted)
-            .Select(f => f.RequesterId == userId ? f.AddresseeId : f.RequesterId)
-            .ToListAsync();
-
-        foreach (var friendId in friendIds)
-        {
-            if (await _userBlockService.ShouldHidePresenceAsync(friendId, userId))
-            {
-                continue;
-            }
-
-            await _notificationHub.Clients.Group($"user-{friendId}").SendAsync(
-                "UserStatusChanged",
-                new
-                {
-                    userId,
-                    status = normalizedStatus,
-                    lastSeen = lastSeenIso
-                });
-        }
+        await _presenceBroadcast.BroadcastStatusChangedAsync(userId, user.Status, user.LastSeen);
 
         return Ok(new
         {

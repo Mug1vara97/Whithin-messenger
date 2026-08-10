@@ -105,6 +105,15 @@ const getParticipantPlaybackGain = (state, userId) => {
   return (state.userVolumes.get(userId) || 100) / 100;
 };
 
+const getScreenShareAudioKey = (userId) => `screen-share-audio-${String(userId)}`;
+
+const getScreenSharePlaybackVolume = (state, userId) => {
+  const normalizedUserId = String(userId);
+  if (state.isGlobalAudioMuted) return 0;
+  if (state.screenShareMutedStates.get(normalizedUserId)) return 0;
+  return (state.screenShareVolumes.get(normalizedUserId) || 100) / 100;
+};
+
 const getRemoteSoundpadPlaybackVolume = (state, userId) => {
   const remoteEnabled = soundpadStorage.getConfig().remoteSoundpadEnabled !== false;
   if (!remoteEnabled || state.isGlobalAudioMuted) return 0;
@@ -406,6 +415,10 @@ export const useCallStore = create(
       userVolumes: new Map(),
       userMutedStates: new Map(),
       showVolumeSliders: new Map(),
+      screenShareVolumes: new Map(),
+      screenShareMutedStates: new Map(),
+      previousScreenShareVolumes: new Map(),
+      screenShareAudioUserIds: new Set(),
       
       // Состояние ошибок
       error: null,
@@ -1230,9 +1243,28 @@ export const useCallStore = create(
               
               // Очищаем состояния
               set((state) => {
+                const normalizedUserId = String(userId);
+                const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+                const screenShareAudioElement = state.audioElements.get(screenShareAudioKey);
+                if (screenShareAudioElement) {
+                  try {
+                    screenShareAudioElement.pause();
+                    screenShareAudioElement.srcObject = null;
+                    if (screenShareAudioElement.parentNode) {
+                      screenShareAudioElement.parentNode.removeChild(screenShareAudioElement);
+                    }
+                  } catch (e) {
+                    console.warn('Error cleaning screen share audio on peer left:', e);
+                  }
+                }
+
                 const newUserVolumes = new Map(state.userVolumes);
                 const newUserMutedStates = new Map(state.userMutedStates);
                 const newShowVolumeSliders = new Map(state.showVolumeSliders);
+                const newScreenShareVolumes = new Map(state.screenShareVolumes);
+                const newScreenShareMutedStates = new Map(state.screenShareMutedStates);
+                const newPreviousScreenShareVolumes = new Map(state.previousScreenShareVolumes);
+                const newScreenShareAudioUserIds = new Set(state.screenShareAudioUserIds);
                 const newGainNodes = new Map(state.gainNodes);
                 const newAudioElements = new Map(state.audioElements);
                 const newSoundpadAudioElements = new Map(state.soundpadAudioElements);
@@ -1241,23 +1273,39 @@ export const useCallStore = create(
                 const newSpatialPositions = new Map(state.participantSpatialPositions);
                 const newPreviousVolumes = new Map(state.previousVolumes);
                 const newPeerIdToUserIdMap = new Map(state.peerIdToUserIdMap);
+                const newRemoteScreenShares = new Map(state.remoteScreenShares);
                 
                 newUserVolumes.delete(userId);
                 newUserMutedStates.delete(userId);
                 newShowVolumeSliders.delete(userId);
+                newShowVolumeSliders.delete(screenShareAudioKey);
+                newScreenShareVolumes.delete(normalizedUserId);
+                newScreenShareMutedStates.delete(normalizedUserId);
+                newPreviousScreenShareVolumes.delete(normalizedUserId);
+                newScreenShareAudioUserIds.delete(normalizedUserId);
                 newGainNodes.delete(userId);
                 newAudioElements.delete(userId);
+                newAudioElements.delete(screenShareAudioKey);
                 newSoundpadAudioElements.delete(userId);
                 newAudioSources.delete(userId);
                 newPannerNodes.delete(userId);
                 newSpatialPositions.delete(userId);
                 newPreviousVolumes.delete(userId);
                 newPeerIdToUserIdMap.delete(socketId);
+                for (const [key, value] of newRemoteScreenShares.entries()) {
+                  if (String(value.userId) === normalizedUserId) {
+                    newRemoteScreenShares.delete(key);
+                  }
+                }
                 
                 return {
                   userVolumes: newUserVolumes,
                   userMutedStates: newUserMutedStates,
                   showVolumeSliders: newShowVolumeSliders,
+                  screenShareVolumes: newScreenShareVolumes,
+                  screenShareMutedStates: newScreenShareMutedStates,
+                  previousScreenShareVolumes: newPreviousScreenShareVolumes,
+                  screenShareAudioUserIds: newScreenShareAudioUserIds,
                   gainNodes: newGainNodes,
                   audioElements: newAudioElements,
                   soundpadAudioElements: newSoundpadAudioElements,
@@ -1267,6 +1315,7 @@ export const useCallStore = create(
                   spatialPositionsVersion: state.spatialPositionsVersion + 1,
                   previousVolumes: newPreviousVolumes,
                   peerIdToUserIdMap: newPeerIdToUserIdMap,
+                  remoteScreenShares: newRemoteScreenShares,
                   participants: state.participants.filter(p => p.userId !== userId)
                 };
               });
@@ -1505,19 +1554,45 @@ export const useCallStore = create(
               return;
             }
 
-            // Skip screen share audio (handled separately if needed)
+            // Screen share audio: separate HTML audio element with per-share volume/mute
             if (mediaType === 'screen') {
               console.log('🔊 callStore: Screen share audio track, creating audio element');
-              // Create audio element for screen share audio
+              const normalizedUserId = String(targetUserId);
+              const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+              const existingElement = state.audioElements.get(screenShareAudioKey);
+              if (existingElement) {
+                try {
+                  existingElement.pause();
+                  existingElement.srcObject = null;
+                  if (existingElement.parentNode) {
+                    existingElement.parentNode.removeChild(existingElement);
+                  }
+                } catch (e) {
+                  console.warn('Error cleaning previous screen share audio element:', e);
+                }
+              }
+
               const audioElement = document.createElement('audio');
               audioElement.srcObject = new MediaStream([track.mediaStreamTrack]);
               audioElement.autoplay = true;
-              audioElement.volume = 1.0;
               audioElement.playsInline = true;
               audioElement.style.display = 'none';
               document.body.appendChild(audioElement);
               const outputDeviceId = volumeStorage.getOutputDeviceId();
               await applyOutputAudioDevice(outputDeviceId, [audioElement]);
+
+              set((currentState) => {
+                const newAudioElements = new Map(currentState.audioElements);
+                newAudioElements.set(screenShareAudioKey, audioElement);
+                const newScreenShareAudioUserIds = new Set(currentState.screenShareAudioUserIds);
+                newScreenShareAudioUserIds.add(normalizedUserId);
+                return {
+                  audioElements: newAudioElements,
+                  screenShareAudioUserIds: newScreenShareAudioUserIds,
+                };
+              });
+
+              get().applyScreenShareAudioPlayback(normalizedUserId);
 
               try {
                 await audioElement.play();
@@ -1598,6 +1673,7 @@ export const useCallStore = create(
               if (!isVideoEnabled) {
                 // Screen share stopped - remove from remoteScreenShares
                 console.log('🖥️ callStore: Screen share stopped for user:', targetUserId);
+                get().cleanupScreenShareAudio(targetUserId);
                 set((state) => {
                   const newRemoteScreenShares = new Map(state.remoteScreenShares);
                   // Remove all screen shares from this user
@@ -1655,6 +1731,7 @@ export const useCallStore = create(
             if (mediaType === 'screen') {
               const newRemoteScreenShares = new Map(state.remoteScreenShares);
               let removedCount = 0;
+              const removedUserIds = new Set();
 
               for (const [screenShareId, screenShare] of newRemoteScreenShares.entries()) {
                 const matchesProducer = screenShareId === producerId;
@@ -1662,9 +1739,22 @@ export const useCallStore = create(
                   (screenShare.socketId === producerSocketId || screenShare.userId === producerSocketId);
 
                 if (matchesProducer || matchesSocket) {
+                  if (screenShare.userId) {
+                    removedUserIds.add(screenShare.userId);
+                  }
                   newRemoteScreenShares.delete(screenShareId);
                   removedCount += 1;
                 }
+              }
+
+              if (producerKind === 'audio') {
+                const audioOwnerId =
+                  state.peerIdToUserIdMap.get(producerSocketId) || producerSocketId;
+                if (audioOwnerId) {
+                  get().cleanupScreenShareAudio(audioOwnerId);
+                }
+              } else if (removedUserIds.size > 0) {
+                removedUserIds.forEach((ownerId) => get().cleanupScreenShareAudio(ownerId));
               }
 
               if (removedCount > 0) {
@@ -2438,28 +2528,44 @@ export const useCallStore = create(
               set({ remoteScreenShares: newRemoteScreenShares });
             } else if (producerData.kind === 'audio') {
               console.log('Screen share audio producer detected, creating audio element');
-              
-              // Создаем audio element для screen share audio
+
+              const normalizedUserId = String(userId);
+              const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+              const existingElement = get().audioElements.get(screenShareAudioKey);
+              if (existingElement) {
+                try {
+                  existingElement.pause();
+                  existingElement.srcObject = null;
+                  if (existingElement.parentNode) {
+                    existingElement.parentNode.removeChild(existingElement);
+                  }
+                } catch (e) {
+                  console.warn('Error cleaning previous screen share audio element:', e);
+                }
+              }
+
               const audioElement = document.createElement('audio');
               audioElement.srcObject = new MediaStream([consumer.track]);
               audioElement.autoplay = true;
-              audioElement.volume = 1.0; // Полная громкость для screen share audio
-              audioElement.muted = false;
               audioElement.playsInline = true;
               audioElement.controls = false;
               audioElement.style.display = 'none';
-              
-              // Добавляем в DOM для воспроизведения
+
               document.body.appendChild(audioElement);
-              
-              // Сохраняем audio element для screen share audio
-              const screenShareAudioKey = `screen-share-audio-${userId}`;
+
               const currentState = get();
               const newAudioElements = new Map(currentState.audioElements);
               newAudioElements.set(screenShareAudioKey, audioElement);
-              
-              set({ audioElements: newAudioElements });
-              
+              const newScreenShareAudioUserIds = new Set(currentState.screenShareAudioUserIds);
+              newScreenShareAudioUserIds.add(normalizedUserId);
+
+              set({
+                audioElements: newAudioElements,
+                screenShareAudioUserIds: newScreenShareAudioUserIds,
+              });
+
+              get().applyScreenShareAudioPlayback(normalizedUserId);
+
               console.log('Screen share audio element created:', screenShareAudioKey);
             }
             
@@ -2759,6 +2865,7 @@ export const useCallStore = create(
             isAudioEnabled: !deafened,
           });
           get().applyAllParticipantAudioRouting();
+          get().applyAllScreenShareAudioPlayback();
         }
 
         set((prev) => {
@@ -3035,7 +3142,62 @@ export const useCallStore = create(
       applyAllParticipantAudioRouting: () => {
         const state = get();
         state.audioElements.forEach((_, userId) => {
+          if (typeof userId === 'string' && userId.startsWith('screen-share-audio-')) {
+            return;
+          }
           get().applyParticipantAudioRouting(userId);
+        });
+      },
+
+      applyScreenShareAudioPlayback: (userId) => {
+        if (userId == null) return;
+        const normalizedUserId = String(userId);
+        const state = get();
+        const audioElement = state.audioElements.get(getScreenShareAudioKey(normalizedUserId));
+        if (!audioElement) return;
+
+        const volume = getScreenSharePlaybackVolume(state, normalizedUserId);
+        audioElement.volume = volume;
+        audioElement.muted = volume === 0;
+      },
+
+      applyAllScreenShareAudioPlayback: () => {
+        const state = get();
+        state.screenShareAudioUserIds.forEach((userId) => {
+          get().applyScreenShareAudioPlayback(userId);
+        });
+      },
+
+      cleanupScreenShareAudio: (userId) => {
+        if (userId == null) return;
+        const normalizedUserId = String(userId);
+        const state = get();
+        const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+        const audioElement = state.audioElements.get(screenShareAudioKey);
+        if (audioElement) {
+          try {
+            audioElement.pause();
+            audioElement.srcObject = null;
+            if (audioElement.parentNode) {
+              audioElement.parentNode.removeChild(audioElement);
+            }
+          } catch (e) {
+            console.warn('Error cleaning screen share audio element:', e);
+          }
+        }
+
+        set((current) => {
+          const newAudioElements = new Map(current.audioElements);
+          newAudioElements.delete(screenShareAudioKey);
+          const newScreenShareAudioUserIds = new Set(current.screenShareAudioUserIds);
+          newScreenShareAudioUserIds.delete(normalizedUserId);
+          const newShowVolumeSliders = new Map(current.showVolumeSliders);
+          newShowVolumeSliders.delete(screenShareAudioKey);
+          return {
+            audioElements: newAudioElements,
+            screenShareAudioUserIds: newScreenShareAudioUserIds,
+            showVolumeSliders: newShowVolumeSliders,
+          };
         });
       },
 
@@ -3314,6 +3476,79 @@ export const useCallStore = create(
           return { showVolumeSliders: newShowVolumeSliders };
         });
       },
+
+      toggleScreenShareMute: (ownerUserId) => {
+        if (ownerUserId == null) return;
+        const normalizedUserId = String(ownerUserId);
+        const state = get();
+        const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+        if (!state.audioElements.get(screenShareAudioKey)) return;
+
+        const isCurrentlyMuted = state.screenShareMutedStates.get(normalizedUserId) || false;
+        const newIsMuted = !isCurrentlyMuted;
+
+        if (newIsMuted) {
+          const currentVolume = state.screenShareVolumes.get(normalizedUserId) || 100;
+          set((s) => {
+            const newPreviousVolumes = new Map(s.previousScreenShareVolumes);
+            newPreviousVolumes.set(normalizedUserId, currentVolume);
+            return { previousScreenShareVolumes: newPreviousVolumes };
+          });
+        }
+
+        set((s) => {
+          const newMutedStates = new Map(s.screenShareMutedStates);
+          newMutedStates.set(normalizedUserId, newIsMuted);
+          return { screenShareMutedStates: newMutedStates };
+        });
+
+        get().applyScreenShareAudioPlayback(normalizedUserId);
+      },
+
+      changeScreenShareVolume: (ownerUserId, newVolume) => {
+        if (ownerUserId == null) return;
+        const normalizedUserId = String(ownerUserId);
+        const state = get();
+        const screenShareAudioKey = getScreenShareAudioKey(normalizedUserId);
+        if (!state.audioElements.get(screenShareAudioKey)) return;
+
+        const clamped = Math.max(0, Math.min(100, Math.round(newVolume)));
+
+        set((s) => {
+          const newVolumes = new Map(s.screenShareVolumes);
+          newVolumes.set(normalizedUserId, clamped);
+          return { screenShareVolumes: newVolumes };
+        });
+
+        get().applyScreenShareAudioPlayback(normalizedUserId);
+
+        if (clamped > 0 && state.screenShareMutedStates.get(normalizedUserId)) {
+          set((s) => {
+            const newMutedStates = new Map(s.screenShareMutedStates);
+            newMutedStates.set(normalizedUserId, false);
+            return { screenShareMutedStates: newMutedStates };
+          });
+          get().applyScreenShareAudioPlayback(normalizedUserId);
+        } else if (clamped === 0 && !state.screenShareMutedStates.get(normalizedUserId)) {
+          set((s) => {
+            const newMutedStates = new Map(s.screenShareMutedStates);
+            newMutedStates.set(normalizedUserId, true);
+            return { screenShareMutedStates: newMutedStates };
+          });
+          get().applyScreenShareAudioPlayback(normalizedUserId);
+        }
+      },
+
+      toggleScreenShareVolumeSlider: (ownerUserId) => {
+        if (ownerUserId == null) return;
+        const sliderKey = getScreenShareAudioKey(ownerUserId);
+        set((state) => {
+          const newShowVolumeSliders = new Map(state.showVolumeSliders);
+          const currentState = newShowVolumeSliders.get(sliderKey) || false;
+          newShowVolumeSliders.set(sliderKey, !currentState);
+          return { showVolumeSliders: newShowVolumeSliders };
+        });
+      },
       
       // Глобальное отключение/включение звука всех участников
       toggleGlobalAudio: () => {
@@ -3381,6 +3616,7 @@ export const useCallStore = create(
         }
         
         get().applyAllParticipantAudioRouting();
+        get().applyAllScreenShareAudioPlayback();
         get().applyRemoteSoundpadVolumes();
         
         // Воспроизводим звук глобального мьюта/размьюта (только локально)
@@ -3717,6 +3953,10 @@ export const useCallStore = create(
           userVolumes: new Map(),
           userMutedStates: new Map(),
           showVolumeSliders: new Map(),
+          screenShareVolumes: new Map(),
+          screenShareMutedStates: new Map(),
+          previousScreenShareVolumes: new Map(),
+          screenShareAudioUserIds: new Set(),
           gainNodes: new Map(),
           audioElements: new Map(),
           audioSources: new Map(),
@@ -3893,6 +4133,10 @@ export const useCallStore = create(
             userVolumes: new Map(),
             userMutedStates: new Map(),
             showVolumeSliders: new Map(),
+            screenShareVolumes: new Map(),
+            screenShareMutedStates: new Map(),
+            previousScreenShareVolumes: new Map(),
+            screenShareAudioUserIds: new Set(),
             gainNodes: new Map(),
             audioElements: new Map(),
             audioSources: new Map(),

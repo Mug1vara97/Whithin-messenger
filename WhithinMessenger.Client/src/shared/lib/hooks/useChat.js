@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import { MessageStatus } from '../../../entities/message/model/types';
 import {
@@ -17,6 +17,11 @@ import {
   E2E_CHAT_KEY_SYNCED_EVENT,
   proactiveSyncChatDeviceWraps,
 } from '../e2e';
+import {
+  SIGNALR_RECONNECT_DELAYS_MS,
+  ensureHubStarted,
+  subscribeNetworkRecovery,
+} from '../signalr/reconnectPolicy';
 
 const TYPING_IDLE_MS = 3000;
 /** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
@@ -694,10 +699,10 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       if (!conn) return;
       detachHandlers(conn);
       try {
-        if (conn.state === 'Connected' && leaveChatId) {
+        if (conn.state === HubConnectionState.Connected && leaveChatId) {
           await conn.invoke('LeaveGroup', leaveChatId);
         }
-        if (conn.state !== 'Disconnected') {
+        if (conn.state !== HubConnectionState.Disconnected) {
           await conn.stop();
         }
       } catch (err) {
@@ -722,9 +727,47 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
       const newConnection = new HubConnectionBuilder()
         .withUrl(`${BASE_URL}/groupchathub?userId=${userId}`)
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
         .configureLogging(LogLevel.Error)
         .build();
+
+      const rejoinChatRoom = async () => {
+        if (loadGenerationRef.current !== loadGen) return;
+        if (connectionRef.current !== newConnection) return;
+        try {
+          await newConnection.invoke('JoinGroup', chatId);
+          if (loadGenerationRef.current !== loadGen) return;
+          setIsConnected(true);
+          setError(null);
+        } catch (err) {
+          console.warn('JoinGroup after reconnect failed:', err);
+        }
+      };
+
+      const recoverChatConnection = async () => {
+        if (loadGenerationRef.current !== loadGen) return;
+        if (connectionRef.current !== newConnection) return;
+        const started = await ensureHubStarted(newConnection, 'groupchathub');
+        if (!started || loadGenerationRef.current !== loadGen) return;
+        await rejoinChatRoom();
+      };
+
+      newConnection.onreconnecting(() => {
+        if (loadGenerationRef.current !== loadGen) return;
+        setIsConnected(false);
+      });
+
+      newConnection.onreconnected(async () => {
+        await rejoinChatRoom();
+      });
+
+      newConnection.onclose(() => {
+        if (loadGenerationRef.current !== loadGen) return;
+        setIsConnected(false);
+        window.setTimeout(() => {
+          void recoverChatConnection();
+        }, 1500);
+      });
 
       try {
         await newConnection.start();
@@ -975,7 +1018,25 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
     connect();
 
+    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
+      const conn = connectionRef.current;
+      if (!conn || loadGenerationRef.current !== loadGen) return;
+      void (async () => {
+        const started = await ensureHubStarted(conn, 'groupchathub');
+        if (!started || loadGenerationRef.current !== loadGen) return;
+        if (conn.state !== HubConnectionState.Connected) return;
+        try {
+          await conn.invoke('JoinGroup', chatId);
+          setIsConnected(true);
+          setError(null);
+        } catch (err) {
+          console.warn('JoinGroup after network recovery failed:', err);
+        }
+      })();
+    });
+
     return () => {
+      unsubscribeNetwork();
       loadGenerationRef.current += 1;
       const cleanup = async () => {
         if (typingIdleTimerRef.current) {
@@ -997,7 +1058,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
         if (conn) {
           try {
-            if (conn.state === 'Connected' && chatId && shouldStopTyping) {
+            if (conn.state === HubConnectionState.Connected && chatId && shouldStopTyping) {
               await conn.invoke('NotifyStopTyping', chatId);
             }
             await stopConnection(conn, activeChatId || chatId);

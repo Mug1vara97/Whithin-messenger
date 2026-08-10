@@ -117,6 +117,9 @@ const ChatVoiceCall = ({
     userVolumes,
     userMutedStates,
     showVolumeSliders,
+    screenShareVolumes,
+    screenShareMutedStates,
+    screenShareAudioUserIds,
     remoteScreenShares,
     participantSpeakingStates,
     participantMuteStates,
@@ -129,6 +132,9 @@ const ChatVoiceCall = ({
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
+    toggleScreenShareMute,
+    changeScreenShareVolume,
+    toggleScreenShareVolumeSlider,
     toggleScreenShare,
     stopScreenShare,
     changeScreenShareSource,
@@ -323,6 +329,12 @@ const ChatVoiceCall = ({
                 onToggleUserMute={toggleUserMute}
                 onChangeUserVolume={changeUserVolume}
                 onToggleVolumeSlider={toggleVolumeSlider}
+                screenShareVolumes={screenShareVolumes}
+                screenShareMutedStates={screenShareMutedStates}
+                screenShareAudioUserIds={screenShareAudioUserIds}
+                onToggleScreenShareMute={toggleScreenShareMute}
+                onChangeScreenShareVolume={changeScreenShareVolume}
+                onToggleScreenShareVolumeSlider={toggleScreenShareVolumeSlider}
                 screenShareStream={screenShareStream}
                 isScreenSharing={isScreenSharing}
                 screenShareParticipant={

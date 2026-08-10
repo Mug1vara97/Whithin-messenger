@@ -31,6 +31,9 @@ export const CallProvider = ({ children }) => {
   const userVolumes = useCallStore(state => state.userVolumes);
   const userMutedStates = useCallStore(state => state.userMutedStates);
   const showVolumeSliders = useCallStore(state => state.showVolumeSliders);
+  const screenShareVolumes = useCallStore(state => state.screenShareVolumes);
+  const screenShareMutedStates = useCallStore(state => state.screenShareMutedStates);
+  const screenShareAudioUserIds = useCallStore(state => state.screenShareAudioUserIds);
   const error = useCallStore(state => state.error);
   const audioBlocked = useCallStore(state => state.audioBlocked);
   const connecting = useCallStore(state => state.connecting);
@@ -130,6 +133,9 @@ export const CallProvider = ({ children }) => {
     userVolumes,
     userMutedStates,
     showVolumeSliders,
+    screenShareVolumes,
+    screenShareMutedStates,
+    screenShareAudioUserIds,
     error,
     audioBlocked,
     connecting,
@@ -161,6 +167,9 @@ export const CallProvider = ({ children }) => {
     toggleUserMute: useCallStore.getState().toggleUserMute,
     changeUserVolume: useCallStore.getState().changeUserVolume,
     toggleVolumeSlider: useCallStore.getState().toggleVolumeSlider,
+    toggleScreenShareMute: useCallStore.getState().toggleScreenShareMute,
+    changeScreenShareVolume: useCallStore.getState().changeScreenShareVolume,
+    toggleScreenShareVolumeSlider: useCallStore.getState().toggleScreenShareVolumeSlider,
     toggleGlobalAudio: useCallStore.getState().toggleGlobalAudio,
     toggleNoiseSuppression: useCallStore.getState().toggleNoiseSuppression,
     changeNoiseSuppressionMode: useCallStore.getState().changeNoiseSuppressionMode,
@@ -198,6 +207,9 @@ export const CallProvider = ({ children }) => {
     userVolumes,
     userMutedStates,
     showVolumeSliders,
+    screenShareVolumes,
+    screenShareMutedStates,
+    screenShareAudioUserIds,
     error,
     audioBlocked,
     connecting,

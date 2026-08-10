@@ -3,6 +3,11 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
 import { ServerContext } from './ServerContext';
+import {
+  SIGNALR_RECONNECT_DELAYS_MS,
+  ensureHubStarted,
+  subscribeNetworkRecovery,
+} from '../signalr/reconnectPolicy';
 
 export const ServerProvider = ({ children }) => {
   const [servers, setServers] = useState([]);
@@ -63,7 +68,7 @@ export const ServerProvider = ({ children }) => {
         console.log('ServerContext: Creating SignalR connection to serverlisthub');
         const connection = new HubConnectionBuilder()
           .withUrl(`${BASE_URL}/serverlisthub?userId=${userId}`)
-          .withAutomaticReconnect()
+          .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
           .configureLogging(LogLevel.Error)
           .build();
 
@@ -144,6 +149,38 @@ export const ServerProvider = ({ children }) => {
           }
         });
 
+        connection.onreconnecting(() => {
+          setIsConnected(false);
+        });
+
+        connection.onreconnected(async () => {
+          setIsConnected(true);
+          try {
+            await connection.invoke('JoinServerListGroup');
+            await fetchServers();
+          } catch (err) {
+            console.error('ServerContext: Error after reconnect:', err);
+          }
+        });
+
+        connection.onclose(() => {
+          setIsConnected(false);
+          window.setTimeout(() => {
+            void (async () => {
+              if (connectionRef.current !== connection) return;
+              const started = await ensureHubStarted(connection, 'serverlisthub');
+              if (!started) return;
+              setIsConnected(true);
+              try {
+                await connection.invoke('JoinServerListGroup');
+                await fetchServers();
+              } catch (err) {
+                console.error('ServerContext: Error after network recovery:', err);
+              }
+            })();
+          }, 1500);
+        });
+
         await fetchServers();
 
       } catch (err) {
@@ -157,6 +194,26 @@ export const ServerProvider = ({ children }) => {
     };
 
     connectToServerList();
+
+    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
+      const connection = connectionRef.current;
+      if (!connection) return;
+      void (async () => {
+        const started = await ensureHubStarted(connection, 'serverlisthub');
+        if (!started) return;
+        setIsConnected(true);
+        try {
+          await connection.invoke('JoinServerListGroup');
+          await fetchServers();
+        } catch (err) {
+          console.error('ServerContext: Error after network recovery:', err);
+        }
+      })();
+    });
+
+    return () => {
+      unsubscribeNetwork();
+    };
   }, [fetchServers]); // Возвращаем fetchServers, но мемоизируем его
 
   useEffect(() => {

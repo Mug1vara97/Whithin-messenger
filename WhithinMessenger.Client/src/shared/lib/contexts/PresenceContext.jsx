@@ -8,7 +8,11 @@ import React, {
   useState,
 } from 'react';
 
-import { getPresenceSnapshot, PRESENCE_STATUS } from '../utils/userStatus';
+import {
+  getPresenceSnapshot,
+  normalizeUserStatus,
+  PRESENCE_STATUS,
+} from '../utils/userStatus';
 import { useAuthContext } from './AuthContext';
 import { useConnectionContext } from './ConnectionContext';
 import { useUserBlocks } from './UserBlockContext';
@@ -17,6 +21,8 @@ const PresenceContext = createContext(null);
 
 const noopResolvePresence = (_userId, fallbackStatus) => fallbackStatus;
 const noopGetPresence = (_userId, fallbackStatus) => getPresenceSnapshot(fallbackStatus);
+const noopApplyLocalStatus = () => {};
+const noopGetLastSeen = () => null;
 
 export const PresenceProvider = ({ children }) => {
   const { user } = useAuthContext();
@@ -24,31 +30,45 @@ export const PresenceProvider = ({ children }) => {
   const { shouldHidePresence } = useUserBlocks();
   const userId = user?.id || user?.userId || user?.Id;
   const [statusOverrides, setStatusOverrides] = useState({});
+  const [lastSeenOverrides, setLastSeenOverrides] = useState({});
   const notificationConnectionRef = useRef(null);
+  const statusHandlerRef = useRef(null);
 
   useEffect(() => {
     if (!userId || !getConnection) return undefined;
     let mounted = true;
+
+    const onUserStatusChanged = (payload) => {
+      const changedUserId = payload?.userId ?? payload?.UserId;
+      const changedStatus = payload?.status ?? payload?.Status;
+      const changedLastSeen = payload?.lastSeen ?? payload?.LastSeen;
+      if (!changedUserId || changedStatus === undefined || changedStatus === null) {
+        return;
+      }
+
+      const key = String(changedUserId);
+      const normalized = normalizeUserStatus(changedStatus);
+
+      setStatusOverrides((prev) => {
+        if (prev[key] === normalized) return prev;
+        return { ...prev, [key]: normalized };
+      });
+
+      if (changedLastSeen !== undefined && changedLastSeen !== null) {
+        setLastSeenOverrides((prev) => {
+          if (prev[key] === changedLastSeen) return prev;
+          return { ...prev, [key]: changedLastSeen };
+        });
+      }
+    };
+
+    statusHandlerRef.current = onUserStatusChanged;
 
     const setup = async () => {
       try {
         const notificationConnection = await getConnection('notificationhub', userId);
         if (!mounted) return;
         notificationConnectionRef.current = notificationConnection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          const changedStatus = payload?.status ?? payload?.Status;
-          if (!changedUserId || changedStatus === undefined || changedStatus === null) {
-            return;
-          }
-
-          setStatusOverrides((prev) => ({
-            ...prev,
-            [String(changedUserId)]: changedStatus,
-          }));
-        };
-
         notificationConnection.on('UserStatusChanged', onUserStatusChanged);
       } catch (error) {
         console.error('PresenceProvider: subscribe failed', error);
@@ -59,10 +79,33 @@ export const PresenceProvider = ({ children }) => {
 
     return () => {
       mounted = false;
-      notificationConnectionRef.current?.off('UserStatusChanged');
+      const connection = notificationConnectionRef.current;
+      const handler = statusHandlerRef.current;
+      if (connection && handler) {
+        connection.off('UserStatusChanged', handler);
+      }
       notificationConnectionRef.current = null;
+      statusHandlerRef.current = null;
     };
   }, [userId, getConnection]);
+
+  const applyLocalStatus = useCallback((memberUserId, status, lastSeen = null) => {
+    const key = String(memberUserId ?? '');
+    if (!key) return;
+
+    const normalized = normalizeUserStatus(status);
+    setStatusOverrides((prev) => {
+      if (prev[key] === normalized) return prev;
+      return { ...prev, [key]: normalized };
+    });
+
+    if (lastSeen !== undefined && lastSeen !== null) {
+      setLastSeenOverrides((prev) => {
+        if (prev[key] === lastSeen) return prev;
+        return { ...prev, [key]: lastSeen };
+      });
+    }
+  }, []);
 
   const resolvePresence = useCallback(
     (memberUserId, fallbackStatus) => {
@@ -73,7 +116,7 @@ export const PresenceProvider = ({ children }) => {
       if (key && statusOverrides[key] !== undefined) {
         return statusOverrides[key];
       }
-      return fallbackStatus;
+      return normalizeUserStatus(fallbackStatus);
     },
     [statusOverrides, shouldHidePresence],
   );
@@ -84,9 +127,34 @@ export const PresenceProvider = ({ children }) => {
     [resolvePresence],
   );
 
+  const getLastSeen = useCallback(
+    (memberUserId, fallbackLastSeen = null) => {
+      const key = String(memberUserId ?? '');
+      if (key && lastSeenOverrides[key] !== undefined) {
+        return lastSeenOverrides[key];
+      }
+      return fallbackLastSeen;
+    },
+    [lastSeenOverrides],
+  );
+
   const value = useMemo(
-    () => ({ resolvePresence, getPresence, statusOverrides }),
-    [resolvePresence, getPresence, statusOverrides],
+    () => ({
+      resolvePresence,
+      getPresence,
+      getLastSeen,
+      applyLocalStatus,
+      statusOverrides,
+      lastSeenOverrides,
+    }),
+    [
+      resolvePresence,
+      getPresence,
+      getLastSeen,
+      applyLocalStatus,
+      statusOverrides,
+      lastSeenOverrides,
+    ],
   );
 
   return <PresenceContext.Provider value={value}>{children}</PresenceContext.Provider>;
@@ -98,7 +166,10 @@ export const usePresence = () => {
     return {
       resolvePresence: noopResolvePresence,
       getPresence: noopGetPresence,
+      getLastSeen: noopGetLastSeen,
+      applyLocalStatus: noopApplyLocalStatus,
       statusOverrides: {},
+      lastSeenOverrides: {},
     };
   }
   return context;

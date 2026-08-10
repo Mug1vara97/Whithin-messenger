@@ -4,6 +4,7 @@ import { useFriends, useFriendRequests } from '../../../entities/friend';
 import { FriendItem, FriendRequestItem } from '../../../shared/ui/molecules';
 import { AddFriendModal } from '../../../shared/ui/molecules';
 import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
+import { usePresence } from '../../../shared/lib/contexts/PresenceContext';
 import { isUserActiveInFriendsList } from '../../../shared/lib/utils/userStatus';
 import './FriendsPanel.css';
 
@@ -14,6 +15,7 @@ const FriendsPanel = ({ onStartChat }) => {
   const { friends, loading, error, removeFriend } = useFriends();
   const { pendingRequests, sentRequests, acceptRequest, declineRequest, sendRequest } = useFriendRequests();
   const { blockedUsers, loading: blockedLoading, unblockUser } = useUserBlocks();
+  const { resolvePresence, statusOverrides } = usePresence();
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -23,8 +25,11 @@ const FriendsPanel = ({ onStartChat }) => {
   };
 
   const onlineFriends = useMemo(
-    () => friends.filter((friend) => isUserActiveInFriendsList(friend.status)),
-    [friends]
+    () =>
+      friends.filter((friend) =>
+        isUserActiveInFriendsList(resolvePresence(friend.userId, friend.status)),
+      ),
+    [friends, resolvePresence, statusOverrides],
   );
 
   const filteredOnlineFriends = useMemo(

@@ -5,14 +5,10 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { userApi } from '../../../../entities/user/api';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
-import { useConnectionContext } from '../../../lib/contexts/ConnectionContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
+import { useResolvedPresence } from '../../../lib/contexts/PresenceContext';
 import { mergeProfileState } from '../../../lib/utils/profilePatchHelpers';
-import {
-  getUserStatusColor,
-  getUserStatusLabel,
-  normalizeUserStatus,
-} from '../../../lib/utils/userStatus';
+import { normalizeUserStatus } from '../../../lib/utils/userStatus';
 import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
@@ -47,8 +43,6 @@ const ProfileModal = ({
   const [bioError, setBioError] = useState('');
   const [copyHint, setCopyHint] = useState('');
   const { user } = useAuthContext();
-  const { getConnection } = useConnectionContext();
-  const viewerId = user?.id || user?.userId || user?.Id;
 
   const profileUserId = profile?.userId ?? profile?.UserId;
   const profileMatchesUser =
@@ -92,9 +86,9 @@ const ProfileModal = ({
     fallback: username || 'П',
   });
   const accentColor = activeProfile?.avatarColor || '#5865f2';
-  const presenceStatus = normalizeUserStatus(activeProfile?.status ?? initialStatus);
-  const presenceLabel = getUserStatusLabel(presenceStatus);
-  const presenceColor = getUserStatusColor(presenceStatus);
+  const presence = useResolvedPresence(userId, activeProfile?.status ?? initialStatus);
+  const presenceLabel = presence.label;
+  const presenceColor = presence.color;
 
   const bannerStyle = useMemo(() => {
     const banner = activeProfile?.banner;
@@ -149,41 +143,6 @@ const ProfileModal = ({
     setIsEditingBio(false);
     setBioError('');
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !userId || !getConnection || !viewerId) return undefined;
-
-    let mounted = true;
-    let connectionRef = null;
-
-    const setupStatusListener = async () => {
-      try {
-        const connection = await getConnection('notificationhub', viewerId);
-        if (!mounted) return;
-        connectionRef = connection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          if (String(changedUserId) !== String(userId)) return;
-          const nextStatus = normalizeUserStatus(payload?.status ?? payload?.Status);
-          setProfile((prev) => ({ ...(prev || {}), status: nextStatus }));
-        };
-
-        connection.on('UserStatusChanged', onUserStatusChanged);
-      } catch (error) {
-        console.error('Error subscribing to profile status updates:', error);
-      }
-    };
-
-    setupStatusListener();
-
-    return () => {
-      mounted = false;
-      if (connectionRef) {
-        connectionRef.off('UserStatusChanged');
-      }
-    };
-  }, [isOpen, userId, viewerId, getConnection]);
 
   useEffect(() => {
     if (!isOpen || !userId) {

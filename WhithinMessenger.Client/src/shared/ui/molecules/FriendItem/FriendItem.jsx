@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Person, PersonOff, MoreVert, Check, Close, Block } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
-import { Button } from '../../atoms/Button';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
-import { getUserStatusLabel, normalizeUserStatus, PRESENCE_STATUS } from '../../../lib/utils/userStatus';
+import { usePresence, useResolvedPresence } from '../../../lib/contexts/PresenceContext';
+import { PRESENCE_STATUS } from '../../../lib/utils/userStatus';
 import './FriendItem.css';
 
-const FriendItem = ({ 
-  friend, 
-  onRemoveFriend, 
+const FriendItem = ({
+  friend,
+  onRemoveFriend,
   onStartChat,
   onAccept,
   onDecline,
@@ -20,29 +20,32 @@ const FriendItem = ({
 }) => {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const { openProfile } = useProfileModal();
+  const { getLastSeen } = usePresence();
 
   const profileUserId = friend.userId || friend.requesterUserId;
   const profileUsername = friend.username || friend.requesterUsername;
+  const presence = useResolvedPresence(profileUserId, friend.status);
+  const lastSeen = getLastSeen(profileUserId, friend.lastSeen);
 
   const handleOpenProfile = () => {
     if (!profileUserId) return;
-    openProfile(profileUserId, profileUsername, friend.status);
+    openProfile(profileUserId, profileUsername, presence.normalized);
   };
 
-  const formatLastSeen = (lastSeen) => {
-    if (!lastSeen) return '';
-    
-    const date = new Date(lastSeen);
+  const formatLastSeen = (value) => {
+    if (!value) return '';
+
+    const date = new Date(value);
     const now = new Date();
     const diffInHours = (now - date) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 1) {
       return 'только что';
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}ч назад`;
-    } else {
-      return date.toLocaleDateString();
     }
+    if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}ч назад`;
+    }
+    return date.toLocaleDateString();
   };
 
   return (
@@ -67,33 +70,27 @@ const FriendItem = ({
             avatarDecoration={friend.avatarDecoration || friend.requesterAvatarDecoration}
             size="medium"
             statusIndicator={
-              !isRequest ? <UserAvatarPresenceDot status={friend.status} /> : null
+              !isRequest ? <UserAvatarPresenceDot status={presence.normalized} /> : null
             }
           />
         </div>
 
         <div className="friend-item__info">
-          <div className="friend-item__name">
-            {profileUsername}
-          </div>
+          <div className="friend-item__name">{profileUsername}</div>
           {!isRequest && (
             <div className="friend-item__status">
-              {normalizeUserStatus(friend.status) === PRESENCE_STATUS.OFFLINE && friend.lastSeen
-                ? `Был в сети ${formatLastSeen(friend.lastSeen)}`
-                : getUserStatusLabel(friend.status)}
+              {presence.normalized === PRESENCE_STATUS.OFFLINE && lastSeen
+                ? `Был в сети ${formatLastSeen(lastSeen)}`
+                : presence.label}
             </div>
           )}
-          {isRequest && (
-            <div className="friend-item__request-info">
-              Запрос в друзья
-            </div>
-          )}
+          {isRequest && <div className="friend-item__request-info">Запрос в друзья</div>}
           {friend.description && (
             <div className="friend-item__description">{friend.description}</div>
           )}
         </div>
       </div>
-      
+
       {showActions && (
         <div className="friend-item__actions">
           {isRequest ? (
@@ -102,6 +99,7 @@ const FriendItem = ({
                 className="friend-item__action-button friend-item__action-button--accept"
                 onClick={() => onAccept?.(friend.id)}
                 title="Принять"
+                type="button"
               >
                 <Check />
               </button>
@@ -109,6 +107,7 @@ const FriendItem = ({
                 className="friend-item__action-button friend-item__action-button--decline"
                 onClick={() => onDecline?.(friend.id)}
                 title="Отклонить"
+                type="button"
               >
                 <Close />
               </button>
@@ -118,6 +117,7 @@ const FriendItem = ({
               className="friend-item__action-button friend-item__action-button--decline"
               onClick={() => onUnblock?.(friend.userId)}
               title="Разблокировать"
+              type="button"
             >
               <Block />
             </button>
@@ -127,6 +127,7 @@ const FriendItem = ({
                 className="friend-item__action-button friend-item__action-button--message"
                 onClick={() => onStartChat?.(friend.userId)}
                 title="Написать сообщение"
+                type="button"
               >
                 <Person />
               </button>
@@ -134,6 +135,7 @@ const FriendItem = ({
                 className="friend-item__action-button friend-item__action-button--more"
                 onClick={() => setShowContextMenu(!showContextMenu)}
                 title="Еще"
+                type="button"
               >
                 <MoreVert />
               </button>
@@ -141,15 +143,16 @@ const FriendItem = ({
           )}
         </div>
       )}
-      
+
       {showContextMenu && (
         <div className="friend-item__context-menu">
-          <button 
+          <button
             className="friend-item__context-item"
             onClick={() => {
               onRemoveFriend?.(friend.userId);
               setShowContextMenu(false);
             }}
+            type="button"
           >
             <PersonOff />
             Удалить из друзей

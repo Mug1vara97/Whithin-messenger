@@ -177,7 +177,7 @@ const AddUserModal = ({ open, onClose, chatId, onUserAdded, connection }) => {
                     avatarUrl={user.avatarUrl ? buildMediaUrl(user.avatarUrl) : null}
                     avatarColor={user.avatarColor}
                     size={40}
-                    statusIndicator={<UserAvatarPresenceDot status={user.userStatus} />}
+                    statusIndicator={<UserAvatarPresenceDot userId={user.userId} status={user.userStatus} />}
                   />
                   <div className="add-user-info">
                     <span className="add-user-name">{user.username}</span>

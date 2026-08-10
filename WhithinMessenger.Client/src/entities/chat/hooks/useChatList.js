@@ -16,6 +16,11 @@ import {
   handleChatKeyRewrapNeeded,
   syncSessionE2eKeys,
 } from '../../../shared/lib/e2e/e2eSessionSync';
+import {
+  SIGNALR_RECONNECT_DELAYS_MS,
+  ensureHubStarted,
+  subscribeNetworkRecovery,
+} from '../../../shared/lib/signalr/reconnectPolicy';
 
 const resolveCurrentUserId = (userId) => userId || null;
 
@@ -358,9 +363,22 @@ export const useChatList = (userId, onChatCreated = null) => {
           transport: signalR.HttpTransportType.WebSockets,
           accessTokenFactory: () => tokenManager.getToken() || '',
         })
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
         .configureLogging(signalR.LogLevel.Warning)
         .build();
+
+      const recoverChatListConnection = async () => {
+        if (cancelled || connectionRef.current !== newConnection) return;
+        const started = await ensureHubStarted(newConnection, 'chatlisthub');
+        if (!started || cancelled) return;
+        bindConnectionHandlers(newConnection);
+        setIsConnected(true);
+        try {
+          await newConnection.invoke('GetUserChats');
+        } catch (err) {
+          console.error('Error reloading chats after network recovery:', err);
+        }
+      };
 
       newConnection.on('chatunreadupdated', (chatId, unreadCount) => {
         setChats((prevChats) =>
@@ -373,6 +391,9 @@ export const useChatList = (userId, onChatCreated = null) => {
       newConnection.onclose((error) => {
         console.log('SignalR connection closed:', error);
         setIsConnected(false);
+        window.setTimeout(() => {
+          void recoverChatListConnection();
+        }, 1500);
       });
 
       newConnection.onreconnecting((error) => {
@@ -418,8 +439,24 @@ export const useChatList = (userId, onChatCreated = null) => {
 
     createConnection();
 
+    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
+      const conn = connectionRef.current;
+      if (!conn || cancelled) return;
+      void (async () => {
+        const started = await ensureHubStarted(conn, 'chatlisthub');
+        if (!started || cancelled) return;
+        setIsConnected(true);
+        try {
+          await conn.invoke('GetUserChats');
+        } catch (err) {
+          console.error('Error reloading chats after network recovery:', err);
+        }
+      })();
+    });
+
     return () => {
       cancelled = true;
+      unsubscribeNetwork();
       if (connectionRef.current) {
         connectionRef.current.stop();
         connectionRef.current = null;

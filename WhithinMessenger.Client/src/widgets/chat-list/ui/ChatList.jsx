@@ -6,7 +6,7 @@ import { SearchBar, UserAvatar, UserAvatarPresenceDot, CreateGroupChatModal } fr
 import ContextMenu from '../../../shared/ui/molecules/ContextMenu/ContextMenu';
 import { useChatList } from '../../../entities/chat';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
-import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { usePresence } from '../../../shared/lib/contexts/PresenceContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
@@ -37,7 +37,7 @@ const ChatList = ({
   reorderPinnedChats: reorderPinnedChatsProp,
 }) => {
   const { user } = useAuthContext();
-  const { getConnection } = useConnectionContext();
+  const { resolvePresence, statusOverrides } = usePresence();
   const { openProfile } = useProfileModal();
   const { markChatAsRead } = useNotificationContext();
   const { servers } = useServerContext();
@@ -48,14 +48,12 @@ const ChatList = ({
   const location = useLocation();
   const [selectedChat, setSelectedChat] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [statusOverrides, setStatusOverrides] = useState({});
   const [chatContextMenu, setChatContextMenu] = useState({
     visible: false,
     x: 0,
     y: 0,
     chat: null,
   });
-  const notificationConnectionRef = useRef(null);
 
   const useParentChatList = chatsProp !== undefined;
   const internalChatList = useChatList(useParentChatList ? null : user?.id);
@@ -171,43 +169,6 @@ const ChatList = ({
   }, []);
 
   useEffect(() => {
-    if (!user?.id || !getConnection) return undefined;
-    let mounted = true;
-
-    const setupPresenceRealtime = async () => {
-      try {
-        const notificationConnection = await getConnection('notificationhub', user.id);
-        if (!mounted) return;
-        notificationConnectionRef.current = notificationConnection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          const changedStatus = payload?.status ?? payload?.Status;
-          if (!changedUserId || !changedStatus) return;
-
-          setStatusOverrides((prev) => ({
-            ...prev,
-            [String(changedUserId)]: changedStatus
-          }));
-        };
-
-        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
-      } catch (error) {
-        console.error('Failed to subscribe chat-list presence updates:', error);
-      }
-    };
-
-    setupPresenceRealtime();
-
-    return () => {
-      mounted = false;
-      if (notificationConnectionRef.current) {
-        notificationConnectionRef.current.off('UserStatusChanged');
-      }
-    };
-  }, [user?.id, getConnection]);
-
-  useEffect(() => {
     const onMuteChanged = () => setMuteRevision((value) => value + 1);
     window.addEventListener('chatMuteChanged', onMuteChanged);
     return () => window.removeEventListener('chatMuteChanged', onMuteChanged);
@@ -228,9 +189,9 @@ const ChatList = ({
         return PRESENCE_STATUS.OFFLINE;
       }
 
-      return statusOverrides[userIdKey] ?? chat.userStatus ?? chat.UserStatus ?? null;
+      return resolvePresence(userIdKey, chat.userStatus ?? chat.UserStatus ?? null);
     },
-    [statusOverrides, isUserBlocked]
+    [resolvePresence, isUserBlocked, statusOverrides]
   );
 
   const closeChatContextMenu = useCallback(() => {
@@ -427,7 +388,10 @@ const ChatList = ({
               size={40}
               statusIndicator={
                 !chat.isGroupChat ? (
-                  <UserAvatarPresenceDot status={chatPresenceStatus} />
+                  <UserAvatarPresenceDot
+                    userId={chat.userId ?? chat.UserId}
+                    status={chatPresenceStatus}
+                  />
                 ) : null
               }
             />

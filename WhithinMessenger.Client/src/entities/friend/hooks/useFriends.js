@@ -12,7 +12,6 @@ export const useFriends = () => {
   const { getConnection } = useConnectionContext();
   const { user } = useAuthContext();
   const connectionRef = useRef(null);
-  const notificationConnectionRef = useRef(null);
 
   const getFriendConnection = useCallback(async () => {
     if (!user?.id) {
@@ -116,47 +115,6 @@ export const useFriends = () => {
       }
     };
   }, [user?.id, getFriendConnection, fetchFriends]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    let mounted = true;
-
-    const setupPresenceRealtime = async () => {
-      try {
-        const notificationConnection = await getConnection('notificationhub', user.id);
-        if (!mounted) return;
-        notificationConnectionRef.current = notificationConnection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          const status = payload?.status ?? payload?.Status;
-          const lastSeen = payload?.lastSeen ?? payload?.LastSeen;
-
-          setFriends((prev) =>
-            prev.map((friend) =>
-              String(friend.userId) === String(changedUserId)
-                ? { ...friend, status: status ?? friend.status, lastSeen: lastSeen ?? friend.lastSeen }
-                : friend
-            )
-          );
-        };
-
-        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
-      } catch (err) {
-        console.error('Error setting up presence realtime in friends:', err);
-      }
-    };
-
-    setupPresenceRealtime();
-
-    return () => {
-      mounted = false;
-      if (notificationConnectionRef.current) {
-        notificationConnectionRef.current.off('UserStatusChanged');
-      }
-    };
-  }, [user?.id, getConnection]);
 
   useEffect(() => {
     const handleProfileUpdated = (event) => {

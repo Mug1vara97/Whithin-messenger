@@ -27,6 +27,7 @@ builder.Services.AddScoped<IFriendRealtimeNotifier, FriendRealtimeNotifier>();
 builder.Services.AddScoped<IProfileRealtimeNotifier, ProfileRealtimeNotifier>();
 builder.Services.AddScoped<IE2eRealtimeNotifier, E2eRealtimeNotifier>();
 builder.Services.AddScoped<IMessageReceiptService, MessageReceiptService>();
+builder.Services.AddScoped<IUserPresenceBroadcastService, UserPresenceBroadcastService>();
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
 {

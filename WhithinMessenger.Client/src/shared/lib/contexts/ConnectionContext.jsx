@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
 import { BASE_URL } from '../constants/apiEndpoints';
 import tokenManager from '../services/tokenManager';
+import {
+  SIGNALR_RECONNECT_DELAYS_MS,
+  ensureHubStarted,
+  isHubUsable,
+  subscribeNetworkRecovery,
+} from '../signalr/reconnectPolicy';
 
 const ConnectionContext = createContext();
 
@@ -18,39 +24,69 @@ export const ConnectionProvider = ({ children }) => {
   const [connections, setConnections] = useState({});
   const connectionRefs = useRef({});
   const pendingConnections = useRef(new Set());
+  const restartingKeys = useRef(new Set());
+
+  const restartConnectionIfNeeded = useCallback(async (connectionKey) => {
+    const connection = connectionRefs.current[connectionKey];
+    if (!connection || restartingKeys.current.has(connectionKey)) return;
+
+    if (connection.state === HubConnectionState.Connected) return;
+    if (connection.state === HubConnectionState.Connecting
+      || connection.state === HubConnectionState.Reconnecting) {
+      return;
+    }
+
+    restartingKeys.current.add(connectionKey);
+    try {
+      await ensureHubStarted(connection, connectionKey);
+    } finally {
+      restartingKeys.current.delete(connectionKey);
+    }
+  }, []);
+
+  const recoverAllConnections = useCallback(async () => {
+    const keys = Object.keys(connectionRefs.current);
+    await Promise.all(keys.map((key) => restartConnectionIfNeeded(key)));
+  }, [restartConnectionIfNeeded]);
 
   const getConnection = useCallback(async (hubName, userId) => {
     const connectionKey = `${hubName}_${userId}`;
-    
-    // Проверяем существующее подключение
+
     if (connectionRefs.current[connectionKey]) {
       const existingConnection = connectionRefs.current[connectionKey];
-      if (existingConnection.state === 'Connected' || existingConnection.state === 'Connecting') {
+      if (isHubUsable(existingConnection)) {
         return existingConnection;
-      } else {
-        // Подключение существует, но не активно - закрываем его
-        try {
-          await existingConnection.stop();
-        } catch (error) {
-          console.error(`Error stopping existing connection ${connectionKey}:`, error);
-        }
-        delete connectionRefs.current[connectionKey];
       }
+
+      if (existingConnection.state === HubConnectionState.Disconnected) {
+        const restarted = await ensureHubStarted(existingConnection, connectionKey);
+        if (restarted) {
+          return existingConnection;
+        }
+      }
+
+      try {
+        await existingConnection.stop();
+      } catch (error) {
+        console.error(`Error stopping existing connection ${connectionKey}:`, error);
+      }
+      delete connectionRefs.current[connectionKey];
+      setConnections((prev) => {
+        const next = { ...prev };
+        delete next[connectionKey];
+        return next;
+      });
     }
 
-    // Проверяем, не создается ли уже подключение
     if (pendingConnections.current.has(connectionKey)) {
-      // Ждем завершения создания подключения
       while (pendingConnections.current.has(connectionKey)) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      // Возвращаем созданное подключение
       if (connectionRefs.current[connectionKey]) {
         return connectionRefs.current[connectionKey];
       }
     }
 
-    // Создаем новое подключение
     pendingConnections.current.add(connectionKey);
 
     try {
@@ -58,11 +94,18 @@ export const ConnectionProvider = ({ children }) => {
 
       const connection = new HubConnectionBuilder()
         .withUrl(url, {
-          accessTokenFactory: () => tokenManager.getToken() || ''
+          accessTokenFactory: () => tokenManager.getToken() || '',
         })
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
         .configureLogging(LogLevel.Error)
         .build();
+
+      connection.onclose(() => {
+        // VPN / network drop after retries exhausted — try again when possible.
+        window.setTimeout(() => {
+          void restartConnectionIfNeeded(connectionKey);
+        }, 1500);
+      });
 
       await connection.start();
       connectionRefs.current[connectionKey] = connection;
@@ -71,7 +114,7 @@ export const ConnectionProvider = ({ children }) => {
         connection.on('chatunreadupdated', () => {});
       }
 
-      setConnections(prev => ({ ...prev, [connectionKey]: connection }));
+      setConnections((prev) => ({ ...prev, [connectionKey]: connection }));
       return connection;
     } catch (error) {
       console.error(`Error establishing connection ${connectionKey}:`, error);
@@ -79,7 +122,7 @@ export const ConnectionProvider = ({ children }) => {
     } finally {
       pendingConnections.current.delete(connectionKey);
     }
-  }, []);
+  }, [restartConnectionIfNeeded]);
 
   const closeConnection = useCallback(async (hubName, userId) => {
     const connectionKey = `${hubName}_${userId}`;
@@ -90,16 +133,21 @@ export const ConnectionProvider = ({ children }) => {
         console.error(`Error stopping connection ${connectionKey}:`, error);
       } finally {
         delete connectionRefs.current[connectionKey];
-        setConnections(prev => {
-          const newConnections = { ...prev };
-          delete newConnections[connectionKey];
-          return newConnections;
+        setConnections((prev) => {
+          const next = { ...prev };
+          delete next[connectionKey];
+          return next;
         });
       }
     }
   }, []);
 
-  // Cleanup connections on unmount
+  useEffect(() => {
+    return subscribeNetworkRecovery(() => {
+      void recoverAllConnections();
+    });
+  }, [recoverAllConnections]);
+
   useEffect(() => {
     return () => {
       for (const key in connectionRefs.current) {
@@ -111,7 +159,9 @@ export const ConnectionProvider = ({ children }) => {
   }, []);
 
   return (
-    <ConnectionContext.Provider value={{ getConnection, closeConnection, connections }}>
+    <ConnectionContext.Provider
+      value={{ getConnection, closeConnection, connections, recoverAllConnections }}
+    >
       {children}
     </ConnectionContext.Provider>
   );

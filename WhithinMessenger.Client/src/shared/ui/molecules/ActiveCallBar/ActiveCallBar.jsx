@@ -26,6 +26,9 @@ const ActiveCallBar = () => {
     userVolumes,
     userMutedStates,
     showVolumeSliders,
+    screenShareVolumes,
+    screenShareMutedStates,
+    screenShareAudioUserIds,
     error,
     audioBlocked,
     participantMuteStates,
@@ -39,6 +42,9 @@ const ActiveCallBar = () => {
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
+    toggleScreenShareMute,
+    changeScreenShareVolume,
+    toggleScreenShareVolumeSlider,
     endCall,
     clearError,
     setAudioBlocked
@@ -220,6 +226,12 @@ const ActiveCallBar = () => {
                 onToggleUserMute={toggleUserMute}
                 onChangeUserVolume={changeUserVolume}
                 onToggleVolumeSlider={toggleVolumeSlider}
+                screenShareVolumes={screenShareVolumes}
+                screenShareMutedStates={screenShareMutedStates}
+                screenShareAudioUserIds={screenShareAudioUserIds}
+                onToggleScreenShareMute={toggleScreenShareMute}
+                onChangeScreenShareVolume={changeScreenShareVolume}
+                onToggleScreenShareVolumeSlider={toggleScreenShareVolumeSlider}
               />
             </div>
           )}

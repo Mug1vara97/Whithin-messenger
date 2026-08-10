@@ -7,6 +7,7 @@ import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import UserNameplate from '../../atoms/UserNameplate';
 import ContextMenu from '../ContextMenu/ContextMenu';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
+import { usePresence, useResolvedPresence } from '../../../lib/contexts/PresenceContext';
 
 import {
   groupMembersByPresence,
@@ -17,6 +18,61 @@ import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 
 import './MemberListSidebar.css';
 
+const MemberListItem = ({ member, showStatusDot = true, onOpenProfile, onContextMenu }) => {
+  const presence = useResolvedPresence(member.userId, member.status);
+  const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
+  const displayNameStyle = member.roleColor ? { color: member.roleColor } : undefined;
+  const statusForProfile = presence.normalized;
+
+  return (
+    <div
+      className="member-list-item member-list-item--clickable"
+      title={member.username}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenProfile(member.userId, member.username, statusForProfile)}
+      onContextMenu={(event) => onContextMenu(event, member)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpenProfile(member.userId, member.username, statusForProfile);
+        }
+      }}
+    >
+      <div className="member-list-item__layout">
+        <div className="user-avatar-slot member-list-avatar-wrap">
+          <UserAvatar
+            displayName={member.displayName}
+            login={member.login}
+            username={member.login}
+            avatarUrl={avatarUrl}
+            avatarColor={member.avatarColor}
+            avatarDecoration={member.avatarDecoration}
+            size={40}
+            statusIndicator={
+              showStatusDot ? <UserAvatarPresenceDot status={presence.normalized} /> : null
+            }
+          />
+        </div>
+        <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
+          <div className="member-list-nameplate__body">
+            <span className="member-list-name" style={displayNameStyle}>
+              {member.username}
+            </span>
+            {member.isServerOwner && (
+              <WorkspacePremium
+                className="member-list-owner-icon"
+                fontSize="inherit"
+                titleAccess="Владелец сервера"
+              />
+            )}
+          </div>
+        </UserNameplate>
+      </div>
+    </div>
+  );
+};
+
 const MemberListSidebar = ({
   members = [],
   isLoading = false,
@@ -26,6 +82,7 @@ const MemberListSidebar = ({
   getUserContextMenuItems,
 }) => {
   const { openProfile } = useProfileModal();
+  const { resolvePresence, statusOverrides } = usePresence();
   const [contextMenu, setContextMenu] = useState({
     visible: false,
     x: 0,
@@ -37,12 +94,21 @@ const MemberListSidebar = ({
     setContextMenu((prev) => ({ ...prev, visible: false, member: null }));
   }, []);
 
+  const liveMembers = useMemo(
+    () =>
+      members.map((member) => ({
+        ...member,
+        status: resolvePresence(member.userId, member.status),
+      })),
+    [members, resolvePresence, statusOverrides],
+  );
+
   const grouped = useMemo(() => {
     if (groupByRoles && serverRoles.length > 0) {
-      return groupServerMembersByRoles(members, serverRoles);
+      return groupServerMembersByRoles(liveMembers, serverRoles);
     }
-    return { mode: 'presence', ...groupMembersByPresence(members) };
-  }, [members, groupByRoles, serverRoles]);
+    return { mode: 'presence', ...groupMembersByPresence(liveMembers) };
+  }, [liveMembers, groupByRoles, serverRoles]);
 
   const handleMemberContextMenu = useCallback(
     (event, member) => {
@@ -70,57 +136,15 @@ const MemberListSidebar = ({
     });
   }, [contextMenu.member, contextMenu.x, contextMenu.y, getUserContextMenuItems]);
 
-  const renderMember = (member, showStatusDot = true) => {
-    const avatarUrl = member.avatar ? buildMediaUrl(member.avatar) : null;
-    const displayNameStyle = member.roleColor ? { color: member.roleColor } : undefined;
-
-    return (
-      <div
-        key={String(member.userId)}
-        className="member-list-item member-list-item--clickable"
-        title={member.username}
-        role="button"
-        tabIndex={0}
-        onClick={() => openProfile(member.userId, member.username, member.status)}
-        onContextMenu={(event) => handleMemberContextMenu(event, member)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            openProfile(member.userId, member.username, member.status);
-          }
-        }}
-      >
-        <div className="member-list-item__layout">
-          <div className="user-avatar-slot member-list-avatar-wrap">
-            <UserAvatar
-              displayName={member.displayName}
-              login={member.login}
-              username={member.login}
-              avatarUrl={avatarUrl}
-              avatarColor={member.avatarColor}
-              avatarDecoration={member.avatarDecoration}
-              size={40}
-              statusIndicator={<UserAvatarPresenceDot status={member.status} />}
-            />
-          </div>
-          <UserNameplate nameplate={member.nameplate} className="member-list-nameplate">
-            <div className="member-list-nameplate__body">
-              <span className="member-list-name" style={displayNameStyle}>
-                {member.username}
-              </span>
-              {member.isServerOwner && (
-                <WorkspacePremium
-                  className="member-list-owner-icon"
-                  fontSize="inherit"
-                  titleAccess="Владелец сервера"
-                />
-              )}
-            </div>
-          </UserNameplate>
-        </div>
-      </div>
-    );
-  };
+  const renderMember = (member, showStatusDot = true) => (
+    <MemberListItem
+      key={String(member.userId)}
+      member={member}
+      showStatusDot={showStatusDot}
+      onOpenProfile={openProfile}
+      onContextMenu={handleMemberContextMenu}
+    />
+  );
 
   const renderRoleSection = (section, showStatusDot) => (
     <section key={String(section.roleId)} className="member-list-section">

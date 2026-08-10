@@ -4,6 +4,11 @@ import { HubConnectionBuilder } from '@microsoft/signalr';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
+import {
+  SIGNALR_RECONNECT_DELAYS_MS,
+  ensureHubStarted,
+  subscribeNetworkRecovery,
+} from '../../../shared/lib/signalr/reconnectPolicy';
 
 // Хелпер для получения заголовков авторизации
 const getAuthHeaders = () => {
@@ -619,11 +624,11 @@ const ServerPanel = ({
           skipNegotiation: true,
           transport: 1
         })
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
         .build();
       console.log('ServerPanel: Connection created, starting...');
 
-      newConnection.onreconnected(() => {
+      const rejoinServerGroup = () => {
         if (selectedServer?.serverId) {
           setServerHubConnection(newConnection, selectedServer.serverId);
           setTimeout(() => {
@@ -631,6 +636,20 @@ const ServerPanel = ({
               .catch(error => console.error('Error rejoining server group:', error));
           }, 200);
         }
+      };
+
+      newConnection.onreconnected(() => {
+        rejoinServerGroup();
+      });
+
+      newConnection.onclose(() => {
+        window.setTimeout(() => {
+          void (async () => {
+            if (connectionRef.current !== newConnection) return;
+            const started = await ensureHubStarted(newConnection, 'serverhub');
+            if (started) rejoinServerGroup();
+          })();
+        }, 1500);
       });
 
       try {
@@ -703,8 +722,26 @@ const ServerPanel = ({
 
     connectToServer();
 
+    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
+      const connection = connectionRef.current;
+      if (!connection || !isMounted) return;
+      void (async () => {
+        const started = await ensureHubStarted(connection, 'serverhub');
+        if (!started || !isMounted) return;
+        if (selectedServer?.serverId) {
+          setServerHubConnection(connection, selectedServer.serverId);
+          try {
+            await connection.invoke('JoinServerGroup', selectedServer.serverId.toString());
+          } catch (error) {
+            console.error('Error rejoining server group after network recovery:', error);
+          }
+        }
+      })();
+    });
+
     return () => {
       isMounted = false;
+      unsubscribeNetwork();
       isConnectingRef.current = false;
       currentServerRef.current = null;
       if (connectionRef.current) {

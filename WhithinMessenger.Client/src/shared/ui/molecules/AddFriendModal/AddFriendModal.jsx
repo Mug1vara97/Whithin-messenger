@@ -189,7 +189,11 @@ const AddFriendModal = ({ isOpen, onClose, onSendRequest }) => {
                         size="medium"
                         statusIndicator={
                           meta.tone === 'status' ? (
-                            <UserAvatarPresenceDot status={user.userStatus} title={meta.label} />
+                            <UserAvatarPresenceDot
+                              userId={user.userId}
+                              status={user.userStatus}
+                              title={meta.label}
+                            />
                           ) : null
                         }
                       />

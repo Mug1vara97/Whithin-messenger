@@ -89,10 +89,10 @@ const isParticipantOnline = (participant, resolvePresence) => {
   const userId = participant?.userId ?? participant?.UserId ?? null;
   const rawStatus = participant?.userStatus ?? participant?.UserStatus ?? null;
   const status = resolvePresence
-    ? resolvePresence(userId, rawStatus)?.normalized
+    ? resolvePresence(userId, rawStatus)
     : normalizeUserStatus(rawStatus);
 
-  return status !== PRESENCE_STATUS.OFFLINE;
+  return normalizeUserStatus(status) !== PRESENCE_STATUS.OFFLINE;
 };
 
 const formatFileSize = (bytes) => {
@@ -442,9 +442,10 @@ const ChatInfoModal = ({
                       avatarDecoration={isGroup ? null : chatInfo?.avatarDecoration}
                       size={isGroup ? 72 : 88}
                       statusIndicator={
-                        isPrivate && chatInfo?.status ? (
+                        isPrivate ? (
                           <UserAvatarPresenceDot
-                            status={privatePresence.normalized ?? chatInfo.status}
+                            userId={chatInfo?.userId}
+                            status={privatePresence.normalized ?? chatInfo?.status}
                           />
                         ) : null
                       }

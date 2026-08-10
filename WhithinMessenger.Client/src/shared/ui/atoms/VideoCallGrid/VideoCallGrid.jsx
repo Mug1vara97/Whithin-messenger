@@ -240,6 +240,12 @@ const VideoCallGrid = ({
   onToggleUserMute,
   onChangeUserVolume,
   onToggleVolumeSlider,
+  screenShareVolumes = new Map(),
+  screenShareMutedStates = new Map(),
+  screenShareAudioUserIds = new Set(),
+  onToggleScreenShareMute,
+  onChangeScreenShareVolume,
+  onToggleScreenShareVolumeSlider,
   screenShareStream = null,
   isScreenSharing = false,
   screenShareParticipant = null,
@@ -713,14 +719,33 @@ const VideoCallGrid = ({
     const iconSize = isSmall ? 16 : 18;
     const modColor = '#f0b232';
     const isScreenShare = participant.isScreenShare || false;
-    const isAudioMuted = userMutedStates.get(participant.id) || false;
-    const volume = userVolumes.get(participant.id) || 100;
-    const showSlider = showVolumeSliders.get(participant.id) || false;
+    const ownerUserId = participant.ownerUserId != null ? String(participant.ownerUserId) : null;
+    const hasScreenShareAudio =
+      isScreenShare &&
+      !participant.isLocal &&
+      ownerUserId != null &&
+      screenShareAudioUserIds.has(ownerUserId);
+    const screenShareSliderKey = ownerUserId != null ? `screen-share-audio-${ownerUserId}` : null;
+    const isAudioMuted = isScreenShare
+      ? (hasScreenShareAudio && (screenShareMutedStates.get(ownerUserId) || false))
+      : (userMutedStates.get(participant.id) || false);
+    const volume = isScreenShare
+      ? (screenShareVolumes.get(ownerUserId) || 100)
+      : (userVolumes.get(participant.id) || 100);
+    const showSlider = isScreenShare
+      ? (screenShareSliderKey ? showVolumeSliders.get(screenShareSliderKey) || false : false)
+      : (showVolumeSliders.get(participant.id) || false);
     const ownerCamera = isScreenShare ? resolveOwnerCameraStream(participant) : null;
     const showCameraPip = Boolean(isScreenShare && ownerCamera?.stream);
     
     const handleVolumeClick = (e) => {
       e.stopPropagation();
+      if (isScreenShare) {
+        if (hasScreenShareAudio && onToggleScreenShareMute) {
+          onToggleScreenShareMute(ownerUserId);
+        }
+        return;
+      }
       if (onToggleUserMute) {
         onToggleUserMute(participant.id);
       }
@@ -729,6 +754,12 @@ const VideoCallGrid = ({
     const handleVolumeRightClick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (isScreenShare) {
+        if (hasScreenShareAudio && onToggleScreenShareVolumeSlider) {
+          onToggleScreenShareVolumeSlider(ownerUserId);
+        }
+        return;
+      }
       if (onToggleVolumeSlider) {
         onToggleVolumeSlider(participant.id);
       }
@@ -736,6 +767,12 @@ const VideoCallGrid = ({
 
     const handleSliderChange = (e, newValue) => {
       e.stopPropagation();
+      if (isScreenShare) {
+        if (hasScreenShareAudio && onChangeScreenShareVolume) {
+          onChangeScreenShareVolume(ownerUserId, newValue);
+        }
+        return;
+      }
       if (onChangeUserVolume) {
         onChangeUserVolume(participant.id, newValue);
       }
@@ -869,19 +906,72 @@ const VideoCallGrid = ({
             {(isScreenShare || !participant.isCurrentUser) && (
             <div className="tile-volume-controls">
               {isScreenShare ? (
-                <button
-                  type="button"
-                  className="screen-share-fullscreen-btn"
-                  onClick={(e) => handleScreenShareFullscreen(participant.id, e)}
-                  title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
-                  aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
-                >
-                  {fullscreenScreenShareId === participant.id ? (
-                    <FullscreenExitIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
-                  ) : (
-                    <FullscreenIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                <>
+                  {hasScreenShareAudio && (
+                    <>
+                      <button
+                        type="button"
+                        className={`tile-volume-btn ${
+                          isAudioMuted || volume === 0
+                            ? 'muted'
+                            : 'silent'
+                        }`}
+                        onClick={handleVolumeClick}
+                        onContextMenu={handleVolumeRightClick}
+                        title="ЛКМ - мут звука демонстрации, ПКМ - слайдер"
+                      >
+                        {isAudioMuted || volume === 0 ? (
+                          <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+                        ) : (
+                          <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+                        )}
+                      </button>
+
+                      {showSlider && (
+                        <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
+                          <Slider
+                            value={volume}
+                            onChange={handleSliderChange}
+                            orientation="vertical"
+                            min={0}
+                            max={100}
+                            step={1}
+                            size="small"
+                            sx={{
+                              color: '#5865f2',
+                              height: '80px',
+                              '& .MuiSlider-track': {
+                                backgroundColor: '#5865f2',
+                              },
+                              '& .MuiSlider-thumb': {
+                                backgroundColor: '#fff',
+                                width: 12,
+                                height: 12,
+                                '&:hover': {
+                                  boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
+                                },
+                              },
+                            }}
+                          />
+                          <span className="volume-percentage">{volume}%</span>
+                        </div>
+                      )}
+                    </>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    className="screen-share-fullscreen-btn"
+                    onClick={(e) => handleScreenShareFullscreen(participant.id, e)}
+                    title={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                    aria-label={fullscreenScreenShareId === participant.id ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                  >
+                    {fullscreenScreenShareId === participant.id ? (
+                      <FullscreenExitIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                    ) : (
+                      <FullscreenIcon sx={{ fontSize: isSmall ? 18 : 20 }} />
+                    )}
+                  </button>
+                </>
               ) : (
                 <>
                   <button 
@@ -1063,7 +1153,10 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
     'enableAutoFocus',
     'userVolumes',
     'userMutedStates',
-    'showVolumeSliders'
+    'showVolumeSliders',
+    'screenShareVolumes',
+    'screenShareMutedStates',
+    'screenShareAudioUserIds',
   ];
   
   for (const prop of criticalProps) {
@@ -1089,12 +1182,20 @@ const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) =
             return false;
           }
         }
-      } else if (prop === 'remoteScreenShares' || prop === 'userVolumes' || prop === 'userMutedStates' || prop === 'showVolumeSliders') {
-        // Для всех Map проверяем размер - если изменился, нужен перерендер
+      } else if (
+        prop === 'remoteScreenShares' ||
+        prop === 'userVolumes' ||
+        prop === 'userMutedStates' ||
+        prop === 'showVolumeSliders' ||
+        prop === 'screenShareVolumes' ||
+        prop === 'screenShareMutedStates' ||
+        prop === 'screenShareAudioUserIds'
+      ) {
+        // Для всех Map/Set проверяем размер - если изменился, нужен перерендер
         if (prevProps[prop]?.size !== nextProps[prop]?.size) {
           return false;
         }
-        // Если размер одинаковый, но это разные объекты Map, тоже перерендериваем
+        // Если размер одинаковый, но это разные объекты Map/Set, тоже перерендериваем
         // (т.к. содержимое могло измениться)
         if (prevProps[prop] !== nextProps[prop]) {
           return false;

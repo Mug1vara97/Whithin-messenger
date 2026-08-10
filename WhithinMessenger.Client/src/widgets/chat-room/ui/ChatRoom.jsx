@@ -5,7 +5,6 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
-import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
 import {
   patchChatUserProfileWithProfile,
@@ -174,8 +173,6 @@ const ChatRoom = ({
   unpinChat,
 }) => {
   const { user } = useAuthContext();
-  const connectionContext = useConnectionContext();
-  const getConnection = connectionContext?.getConnection;
   const navigate = useNavigate();
   const username = user?.username;
   const userDisplayName = user?.displayName ?? user?.DisplayName ?? null;
@@ -565,7 +562,6 @@ const ChatRoom = ({
     member: null,
   });
   const [kickTargetMember, setKickTargetMember] = useState(null);
-  const notificationConnectionRef = useRef(null);
 
   const serverConnection = useServerHubConnection(isServerChat ? serverId : null);
   const {
@@ -1608,46 +1604,6 @@ const ChatRoom = ({
       cancelled = true;
     };
   }, [showChatInfo, chatId]);
-
-  useEffect(() => {
-    if (!userId || !getConnection) return undefined;
-    let mounted = true;
-
-    const setupRealtimePresence = async () => {
-      try {
-        const notificationConnection = await getConnection('notificationhub', userId);
-        if (!mounted) return;
-        notificationConnectionRef.current = notificationConnection;
-
-        const onUserStatusChanged = (payload) => {
-          const changedUserId = payload?.userId ?? payload?.UserId;
-          const status = payload?.status ?? payload?.Status;
-          const lastSeen = payload?.lastSeen ?? payload?.LastSeen;
-
-          setChatParticipants((prev) =>
-            prev.map((participant) =>
-              String(participant.userId) === String(changedUserId)
-                ? { ...participant, userStatus: status ?? participant.userStatus, lastSeen: lastSeen ?? participant.lastSeen }
-                : participant
-            )
-          );
-        };
-
-        notificationConnection.on('UserStatusChanged', onUserStatusChanged);
-      } catch (error) {
-        console.error('ChatRoom - failed to subscribe to presence updates:', error);
-      }
-    };
-
-    setupRealtimePresence();
-
-    return () => {
-      mounted = false;
-      if (notificationConnectionRef.current) {
-        notificationConnectionRef.current.off('UserStatusChanged');
-      }
-    };
-  }, [userId, getConnection]);
 
   useEffect(() => {
     const handleProfileUpdated = (event) => {

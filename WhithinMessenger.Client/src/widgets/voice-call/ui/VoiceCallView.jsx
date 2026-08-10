@@ -102,6 +102,9 @@ const VoiceCallView = ({
     userVolumes,
     userMutedStates,
     showVolumeSliders,
+    screenShareVolumes,
+    screenShareMutedStates,
+    screenShareAudioUserIds,
     isGlobalAudioMuted,
     isInCall,
     currentRoomId,
@@ -124,6 +127,9 @@ const VoiceCallView = ({
     toggleUserMute,
     changeUserVolume,
     toggleVolumeSlider,
+    toggleScreenShareMute,
+    changeScreenShareVolume,
+    toggleScreenShareVolumeSlider,
     toggleGlobalAudio,
     toggleScreenShare,
     stopScreenShare,
@@ -396,6 +402,12 @@ const VoiceCallView = ({
                       onToggleUserMute={toggleUserMute}
                       onChangeUserVolume={changeUserVolume}
                       onToggleVolumeSlider={toggleVolumeSlider}
+                      screenShareVolumes={screenShareVolumes}
+                      screenShareMutedStates={screenShareMutedStates}
+                      screenShareAudioUserIds={screenShareAudioUserIds}
+                      onToggleScreenShareMute={toggleScreenShareMute}
+                      onChangeScreenShareVolume={changeScreenShareVolume}
+                      onToggleScreenShareVolumeSlider={toggleScreenShareVolumeSlider}
                       screenShareStream={screenShareStream}
                       isScreenSharing={isScreenSharing}
                       screenShareParticipant={isScreenSharing ? {
