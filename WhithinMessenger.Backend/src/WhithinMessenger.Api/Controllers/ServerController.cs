@@ -19,7 +19,7 @@ public class ServerController : ControllerBase
     private readonly IServerRepository _serverRepository;
     private readonly IMediator _mediator;
     private readonly IWebHostEnvironment _environment;
-    private readonly IHubContext<ServerHub> _serverHub;
+    private readonly IHubContext<AppHub> _serverHub;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IServerAuditLogService _auditLog;
 
@@ -27,7 +27,7 @@ public class ServerController : ControllerBase
         IServerRepository serverRepository,
         IMediator mediator,
         IWebHostEnvironment environment,
-        IHubContext<ServerHub> serverHub,
+        IHubContext<AppHub> serverHub,
         ServerPermissionChecker permissionChecker,
         IServerAuditLogService auditLog)
     {
@@ -557,7 +557,7 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
-            await _serverHub.Clients.Group(serverId.ToString())
+            await _serverHub.Clients.Group(HubGroups.Server(serverId))
                 .SendAsync("ChannelMemberAdded", serverId, channelId, body.UserId);
             await _serverHub.Clients.User(body.UserId.ToString())
                 .SendAsync("ChannelMemberAdded", serverId, channelId, body.UserId);
@@ -585,7 +585,7 @@ public class ServerController : ControllerBase
                     return Forbid(result.ErrorMessage);
                 return BadRequest(new { error = result.ErrorMessage });
             }
-            await _serverHub.Clients.Group(serverId.ToString())
+            await _serverHub.Clients.Group(HubGroups.Server(serverId))
                 .SendAsync("ChannelMemberRemoved", serverId, channelId, memberUserId);
             await _serverHub.Clients.User(memberUserId.ToString())
                 .SendAsync("ChannelMemberRemoved", serverId, channelId, memberUserId);
@@ -627,7 +627,7 @@ public class ServerController : ControllerBase
                 return BadRequest(new { error = result.ErrorMessage });
             }
 
-            await _serverHub.Clients.Group(serverId.ToString()).SendAsync("MemberNicknameUpdated", new
+            await _serverHub.Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberNicknameUpdated", new
             {
                 userId = result.UserId,
                 nickname = result.Nickname,

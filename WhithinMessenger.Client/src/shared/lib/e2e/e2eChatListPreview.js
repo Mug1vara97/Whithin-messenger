@@ -4,6 +4,7 @@ import {
   E2E_ENCRYPTION_VERSION,
 } from './e2eCrypto';
 import { isE2eEnvelope } from './e2eNotification';
+import { E2E_ENABLED } from './e2eConfig';
 
 const pick = (chat, ...keys) => {
   for (const key of keys) {
@@ -60,6 +61,10 @@ const buildMemberUserIds = (userId, senderId) => {
 };
 
 export const needsChatListE2eDecrypt = (chat) => {
+  // E2E выключен: превью показывается как «Зашифрованное сообщение» через formatChatListLastMessage.
+  if (!E2E_ENABLED) {
+    return false;
+  }
   if (!chat || chat._e2eLastMessageDecrypted || chat.e2eLastMessageDecrypted) {
     return false;
   }

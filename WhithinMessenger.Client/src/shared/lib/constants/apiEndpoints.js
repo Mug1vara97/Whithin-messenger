@@ -35,13 +35,10 @@ export const API_ENDPOINTS = {
 };
 
 // SignalR Hub endpoints
+// Единый SignalR-хаб: все домены (чаты, серверы, друзья, уведомления) на одном соединении.
+// Соединение выдаёт ConnectionContext.getConnection(); напрямую HubConnectionBuilder не использовать.
 export const HUB_ENDPOINTS = {
-  SERVER_HUB: '/serverhub',
-  CHAT_LIST_HUB: '/chatlisthub',
-  GROUP_CHAT_HUB: '/groupchathub',
-  STATUS_HUB: '/statushub',
-  NOTIFICATION_HUB: '/notificationhub',
-  FRIEND_HUB: '/friendhub',
+  APP_HUB: '/hub',
 };
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 

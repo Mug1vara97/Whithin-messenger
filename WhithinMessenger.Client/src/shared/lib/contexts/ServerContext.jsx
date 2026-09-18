@@ -1,15 +1,17 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { BASE_URL } from '../constants/apiEndpoints';
+import { HubConnectionState } from '@microsoft/signalr';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
 import { ServerContext } from './ServerContext';
-import {
-  SIGNALR_RECONNECT_DELAYS_MS,
-  ensureHubStarted,
-  subscribeNetworkRecovery,
-} from '../signalr/reconnectPolicy';
+import { useConnectionContext } from './ConnectionContext';
 
 export const ServerProvider = ({ children }) => {
+  const connectionContext = useConnectionContext();
+  const getSharedConnection = connectionContext?.getConnection;
+  const acquireGroup = connectionContext?.acquireGroup;
+  const subscribeReconnected = connectionContext?.onReconnected;
+  const subscribeReconnecting = connectionContext?.onReconnecting;
+  const subscribeClosed = connectionContext?.onClose;
+
   const [servers, setServers] = useState([]);
   const [publicServers, setPublicServers] = useState([]);
   const [initialServersLoaded, setInitialServersLoaded] = useState(() => hasStartupBootCompleted());
@@ -17,25 +19,24 @@ export const ServerProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  
+
   const connectionRef = useRef(null);
   const isConnectingRef = useRef(false);
-  const hasInitializedRef = useRef(false);
+  const attachedUserIdRef = useRef(null);
+  /** Освобождение хендлеров/подписок/группы текущего attach. */
+  const detachRef = useRef(null);
 
   const fetchServers = useCallback(async () => {
-    if (!connectionRef.current) {
-      console.log('ServerContext: No SignalR connection available for fetching servers');
+    const conn = connectionRef.current;
+    if (!conn || conn.state !== HubConnectionState.Connected) {
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      console.log('ServerContext: Fetching servers via SignalR Hub');
-      
-      const serversData = await connectionRef.current.invoke('GetUserServers');
-      setServers(serversData);
-      console.log('ServerContext: Servers loaded via SignalR:', serversData);
+      const serversData = await conn.invoke('GetUserServers');
+      setServers(Array.isArray(serversData) ? serversData : []);
     } catch (err) {
       console.error('ServerContext: Error fetching servers via SignalR:', err);
       setError(err.message);
@@ -45,176 +46,124 @@ export const ServerProvider = ({ children }) => {
     }
   }, []);
 
+  const detach = useCallback(() => {
+    if (detachRef.current) {
+      const fn = detachRef.current;
+      detachRef.current = null;
+      fn();
+    }
+    connectionRef.current = null;
+    attachedUserIdRef.current = null;
+    setConnection(null);
+    setIsConnected(false);
+  }, []);
+
+  /**
+   * Подключиться к общему хабу и подписаться на события списка серверов.
+   * Имя сохранено для совместимости (HomePage вызывает createConnection(user.id)).
+   */
   const createConnection = useCallback(async (userId) => {
-    if (!userId) return;
-    
-    if (connectionRef.current && connectionRef.current.state === 'Connected') {
-      console.log('ServerContext: Connection already exists and is connected, skipping...');
-      return;
-    }
-    
-    if (hasInitializedRef.current || connectionRef.current) {
-      console.log('ServerContext: Connection already initialized or exists, skipping...');
-      return;
-    }
+    if (!userId || !getSharedConnection || !acquireGroup) return;
+    if (isConnectingRef.current) return;
+    if (attachedUserIdRef.current === String(userId) && connectionRef.current) return;
 
-    const connectToServerList = async () => {
-      if (isConnectingRef.current) return;
-      
-      try {
-        isConnectingRef.current = true;
-        hasInitializedRef.current = true;
-        
-        console.log('ServerContext: Creating SignalR connection to serverlisthub');
-        const connection = new HubConnectionBuilder()
-          .withUrl(`${BASE_URL}/serverlisthub?userId=${userId}`)
-          .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
-          .configureLogging(LogLevel.Error)
-          .build();
+    isConnectingRef.current = true;
+    try {
+      detach();
 
-        await connection.start();
-        connectionRef.current = connection;
-        setConnection(connection);
-        setIsConnected(true);
-        console.log('ServerContext: SignalR connection established for user:', userId);
+      const conn = await getSharedConnection('hub', userId);
 
-        await connection.invoke('JoinServerListGroup');
-        console.log('ServerContext: Joined server list group');
-
-        connection.on('ServerCreated', (serverData) => {
-          console.log('ServerContext: ServerCreated event received:', serverData);
-          setServers(prev => {
-            const exists = prev.some(server => server.serverId === serverData.serverId);
-            if (exists) {
-              console.log('ServerContext: Server already exists, skipping addition');
-              return prev;
-            }
-            console.log('ServerContext: Adding new server to list:', serverData);
-            return [...prev, serverData];
-          });
-          
-          console.log('ServerContext: Server created, dispatching event:', serverData.serverId);
-          window.dispatchEvent(new CustomEvent('serverCreated', { detail: serverData }));
-        });
-
-        connection.on('ServerJoined', (serverData) => {
-          console.log('ServerContext: ServerJoined event received:', serverData);
-          setServers(prev => {
-            const exists = prev.some(server => server.serverId === serverData.serverId);
-            if (exists) {
-              console.log('ServerContext: Server already exists, skipping addition');
-              return prev;
-            }
-            console.log('ServerContext: Adding server to list:', serverData);
-            return [...prev, serverData];
-          });
-        });
-
-        connection.on('YouWereAddedToServer', async (data) => {
-          console.log('ServerContext: YouWereAddedToServer event received:', data);
-          try {
-            const updatedServers = await connection.invoke('GetUserServers');
-            setServers(updatedServers);
-            console.log('ServerContext: Server list updated after being added to server');
-          } catch (err) {
-            console.error('ServerContext: Error fetching updated server list:', err);
+      const handleServerCreated = (serverData) => {
+        setServers((prev) => {
+          if (prev.some((server) => server.serverId === serverData.serverId)) {
+            return prev;
           }
+          return [...prev, serverData];
         });
+        window.dispatchEvent(new CustomEvent('serverCreated', { detail: serverData }));
+      };
 
-        connection.on('ServerLeft', async (serverId) => {
-          console.log('ServerContext: ServerLeft event received:', serverId);
-          setServers(prev => prev.filter(server => server.serverId !== serverId));
-          console.log('ServerContext: Server removed from list');
-        });
-
-        connection.on('ServerDeleted', async (serverId) => {
-          console.log('ServerContext: ServerDeleted event received:', serverId);
-          console.log('ServerContext: Connection state:', connection.state);
-          setServers(prev => {
-            const filtered = prev.filter(server => server.serverId !== serverId);
-            console.log('ServerContext: Servers after filtering:', filtered);
-            return filtered;
-          });
-          console.log('ServerContext: Server removed from list');
-        });
-
-        connection.on('ServerListUpdated', async () => {
-          console.log('ServerContext: ServerListUpdated event received, fetching updated servers');
-          try {
-            const updatedServers = await connection.invoke('GetUserServers');
-            setServers(updatedServers);
-            console.log('ServerContext: Server list updated after ServerListUpdated event');
-          } catch (err) {
-            console.error('ServerContext: Error fetching updated servers:', err);
+      const handleServerJoined = (serverData) => {
+        setServers((prev) => {
+          if (prev.some((server) => server.serverId === serverData.serverId)) {
+            return prev;
           }
+          return [...prev, serverData];
         });
+      };
 
-        connection.onreconnecting(() => {
-          setIsConnected(false);
-        });
+      const handleYouWereAddedToServer = () => {
+        void fetchServers();
+      };
 
-        connection.onreconnected(async () => {
-          setIsConnected(true);
-          try {
-            await connection.invoke('JoinServerListGroup');
-            await fetchServers();
-          } catch (err) {
-            console.error('ServerContext: Error after reconnect:', err);
-          }
-        });
+      const handleServerLeft = (serverId) => {
+        setServers((prev) => prev.filter((server) => server.serverId !== serverId));
+      };
 
-        connection.onclose(() => {
-          setIsConnected(false);
-          window.setTimeout(() => {
-            void (async () => {
-              if (connectionRef.current !== connection) return;
-              const started = await ensureHubStarted(connection, 'serverlisthub');
-              if (!started) return;
-              setIsConnected(true);
-              try {
-                await connection.invoke('JoinServerListGroup');
-                await fetchServers();
-              } catch (err) {
-                console.error('ServerContext: Error after network recovery:', err);
-              }
-            })();
-          }, 1500);
-        });
+      const handleServerDeleted = (serverId) => {
+        setServers((prev) => prev.filter((server) => server.serverId !== serverId));
+      };
 
-        await fetchServers();
+      const handleServerListUpdated = () => {
+        void fetchServers();
+      };
 
-      } catch (err) {
-        console.error('ServerContext: Error connecting to server list hub:', err);
-        setError(err.message);
-        setIsConnected(false);
-        setInitialServersLoaded(true);
-      } finally {
-        isConnectingRef.current = false;
+      const handlers = [
+        ['ServerCreated', handleServerCreated],
+        ['ServerJoined', handleServerJoined],
+        ['YouWereAddedToServer', handleYouWereAddedToServer],
+        ['ServerLeft', handleServerLeft],
+        ['ServerDeleted', handleServerDeleted],
+        ['ServerListUpdated', handleServerListUpdated],
+      ];
+      for (const [eventName, handler] of handlers) {
+        conn.on(eventName, handler);
       }
-    };
 
-    connectToServerList();
+      const unsubscribers = [];
+      if (subscribeReconnecting) {
+        unsubscribers.push(subscribeReconnecting(() => setIsConnected(false)));
+      }
+      if (subscribeClosed) {
+        unsubscribers.push(subscribeClosed(() => setIsConnected(false)));
+      }
+      if (subscribeReconnected) {
+        unsubscribers.push(subscribeReconnected(() => {
+          setIsConnected(true);
+          void fetchServers();
+        }));
+      }
 
-    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
-      const connection = connectionRef.current;
-      if (!connection) return;
-      void (async () => {
-        const started = await ensureHubStarted(connection, 'serverlisthub');
-        if (!started) return;
-        setIsConnected(true);
-        try {
-          await connection.invoke('JoinServerListGroup');
-          await fetchServers();
-        } catch (err) {
-          console.error('ServerContext: Error after network recovery:', err);
+      // Группа serverlist:{userId} — переподписка после реконнекта в ConnectionContext.
+      const releaseGroup = acquireGroup('serverlist', userId);
+
+      detachRef.current = () => {
+        for (const [eventName, handler] of handlers) {
+          conn.off(eventName, handler);
         }
-      })();
-    });
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+        releaseGroup();
+      };
 
-    return () => {
-      unsubscribeNetwork();
-    };
-  }, [fetchServers]); // Возвращаем fetchServers, но мемоизируем его
+      connectionRef.current = conn;
+      attachedUserIdRef.current = String(userId);
+      setConnection(conn);
+      setIsConnected(conn.state === HubConnectionState.Connected);
+
+      await fetchServers();
+    } catch (err) {
+      console.error('ServerContext: Error connecting to hub (server list):', err);
+      setError(err.message);
+      setIsConnected(false);
+      setInitialServersLoaded(true);
+    } finally {
+      isConnectingRef.current = false;
+    }
+  }, [acquireGroup, detach, fetchServers, getSharedConnection, subscribeClosed, subscribeReconnected, subscribeReconnecting]);
+
+  useEffect(() => () => detach(), [detach]);
 
   useEffect(() => {
     console.log('ServerContext: Servers state updated:', servers);
@@ -365,22 +314,6 @@ export const ServerProvider = ({ children }) => {
   const isUserMember = useCallback((serverId) => {
     return servers.some(server => server.serverId === serverId);
   }, [servers]);
-
-  useEffect(() => {
-    return () => {
-      if (connectionRef.current) {
-        connectionRef.current.off('ServerCreated');
-        connectionRef.current.off('ServerJoined');
-        connectionRef.current.off('YouWereAddedToServer');
-        connectionRef.current.off('ServerLeft');
-        connectionRef.current.off('ServerDeleted');
-        connectionRef.current.off('ServerListUpdated');
-        
-        connectionRef.current.stop();
-        connectionRef.current = null;
-      }
-    };
-  }, []);
 
   const value = {
     servers,

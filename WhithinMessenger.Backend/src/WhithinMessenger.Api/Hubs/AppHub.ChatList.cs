@@ -14,38 +14,17 @@ using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs
 {
-    public class ChatListHub : Hub
+    /// <summary>
+    /// ChatList-домен единого хаба (бывший ChatListHub): список чатов, поиск, создание чатов, pin.
+    /// Клиентские события этого домена исторически в нижнем регистре (receivechats, chatcreated, ...).
+    /// </summary>
+    public partial class AppHub
     {
-        private readonly IMediator _mediator;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ILogger<ChatListHub> _logger;
-
-        public ChatListHub(IMediator mediator, IHttpContextAccessor httpContextAccessor, ILogger<ChatListHub> logger)
-        {
-            _mediator = mediator;
-            _httpContextAccessor = httpContextAccessor;
-            _logger = logger;
-        }
-
-        public async Task JoinChatGroup(int chatId)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"chat-{chatId}");
-        }
-
-
-        public async Task LeaveChatGroup(int chatId)
-        {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"chat-{chatId}");
-        }
-
         public async Task GetUserChats()
         {
             try
             {
-                _logger.LogInformation("ChatListHub: GetUserChats called");
                 var userId = GetCurrentUserId();
-                _logger.LogInformation($"ChatListHub: GetCurrentUserId returned: {userId}");
-                
                 if (userId == null)
                 {
                     _logger.LogWarning("ChatListHub: User not authorized");
@@ -53,10 +32,8 @@ namespace WhithinMessenger.Api.Hubs
                     return;
                 }
 
-                _logger.LogInformation($"ChatListHub: Getting chats for user: {userId}");
                 var query = new GetUserChatsQuery(userId.Value);
                 var result = await _mediator.Send(query);
-                _logger.LogInformation($"ChatListHub: Found {result.Chats.Count} chats");
                 await Clients.Caller.SendAsync("receivechats", result.Chats);
             }
             catch (Exception ex)
@@ -91,8 +68,6 @@ namespace WhithinMessenger.Api.Hubs
                         targetUserId = targetUserId
                     };
 
-                    Console.WriteLine($"Sending ChatCreated to participants (createdBy: {userId}, targetUserId: {targetUserId})");
-                    
                     await Clients.User(userId.ToString()).SendAsync("chatcreated", userId, chatData);
                     
                     await Clients.User(targetUserId.ToString()).SendAsync("chatcreated", userId, chatData);
@@ -155,9 +130,10 @@ namespace WhithinMessenger.Api.Hubs
 
                 if (result.Success)
                 {
+                    // Адресно каждому участнику (все его вкладки/устройства), а не Clients.All.
                     foreach (var userId in allUserIds)
                     {
-                        await Clients.All.SendAsync("chatcreated", userId, new { chatId = result.ChatId });
+                        await Clients.User(userId.ToString()).SendAsync("chatcreated", userId, new { chatId = result.ChatId });
                     }
 
                     await Clients.Caller.SendAsync("groupchatcreated", new
@@ -251,57 +227,6 @@ namespace WhithinMessenger.Api.Hubs
             var query = new GetUserChatsQuery(userId);
             var chatsResult = await _mediator.Send(query);
             await Clients.User(userId.ToString()).SendAsync("receivechats", chatsResult.Chats);
-        }
-
-
-        private Guid? GetCurrentUserId()
-        {
-            _logger.LogInformation($"ChatListHub: GetCurrentUserId called");
-            _logger.LogInformation($"ChatListHub: Context.User is null: {Context.User == null}");
-            _logger.LogInformation($"ChatListHub: Context.User.Identity.IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}");
-            
-            // Сначала пробуем получить из JWT claims
-            var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
-            _logger.LogInformation($"ChatListHub: JWT UserId claim: {userIdClaim}");
-            
-            if (Guid.TryParse(userIdClaim, out var userId))
-            {
-                _logger.LogInformation($"ChatListHub: Found UserId from JWT: {userId}");
-                return userId;
-            }
-
-            // Fallback на query parameter (для совместимости)
-            var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
-            _logger.LogInformation($"ChatListHub: Query UserId: {userIdFromQuery}");
-            
-            if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
-            {
-                _logger.LogInformation($"ChatListHub: Found UserId from query: {userIdFromQueryParsed}");
-                return userIdFromQueryParsed;
-            }
-
-            _logger.LogWarning("ChatListHub: No UserId found");
-            return null;
-        }
-
-        public override async Task OnConnectedAsync()
-        {
-            var userId = GetCurrentUserId();
-            if (userId.HasValue)
-            {
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
-            }
-            await base.OnConnectedAsync();
-        }
-
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            var userId = GetCurrentUserId();
-            if (userId.HasValue)
-            {
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user-{userId}");
-            }
-            await base.OnDisconnectedAsync(exception);
         }
     }
 }

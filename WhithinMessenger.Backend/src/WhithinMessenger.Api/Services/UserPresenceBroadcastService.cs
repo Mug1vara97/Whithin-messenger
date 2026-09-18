@@ -16,12 +16,12 @@ public interface IUserPresenceBroadcastService
 
 public sealed class UserPresenceBroadcastService : IUserPresenceBroadcastService
 {
-    private readonly IHubContext<NotificationHub> _notificationHub;
+    private readonly IHubContext<AppHub> _notificationHub;
     private readonly IProfileAudienceResolver _audienceResolver;
     private readonly IUserBlockService _userBlockService;
 
     public UserPresenceBroadcastService(
-        IHubContext<NotificationHub> notificationHub,
+        IHubContext<AppHub> notificationHub,
         IProfileAudienceResolver audienceResolver,
         IUserBlockService userBlockService)
     {
@@ -58,7 +58,7 @@ public sealed class UserPresenceBroadcastService : IUserPresenceBroadcastService
 
             notifyTasks.Add(
                 _notificationHub.Clients
-                    .Group($"user-{viewerId}")
+                    .Group(HubGroups.User(viewerId))
                     .SendAsync("UserStatusChanged", payload, cancellationToken));
         }
 

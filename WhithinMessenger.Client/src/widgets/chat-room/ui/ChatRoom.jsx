@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMe
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { useNotificationContext } from '../../../shared/lib/contexts/NotificationContext';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
@@ -173,6 +174,8 @@ const ChatRoom = ({
   unpinChat,
 }) => {
   const { user } = useAuthContext();
+  const connectionContext = useConnectionContext();
+  const subscribeHubReconnected = connectionContext?.onReconnected;
   const navigate = useNavigate();
   const username = user?.username;
   const userDisplayName = user?.displayName ?? user?.DisplayName ?? null;
@@ -690,12 +693,12 @@ const ChatRoom = ({
 
     serverConnection.on('ChannelMemberAdded', handleChannelAccessChanged);
     serverConnection.on('ChannelMemberRemoved', handleChannelAccessChanged);
-    serverConnection.on('ChatUpdated', handleChatUpdated);
+    serverConnection.on('ChannelUpdated', handleChatUpdated);
 
     return () => {
       serverConnection.off('ChannelMemberAdded', handleChannelAccessChanged);
       serverConnection.off('ChannelMemberRemoved', handleChannelAccessChanged);
-      serverConnection.off('ChatUpdated', handleChatUpdated);
+      serverConnection.off('ChannelUpdated', handleChatUpdated);
     };
   }, [
     isServerChat,
@@ -1539,10 +1542,11 @@ const ChatRoom = ({
     connection.on('ChatInfoReceived', handleChatInfoReceived);
     connection.on('Error', handleError);
     connection.on('chatdeleted', handleChatDeleted);
-    
-    connection.onclose(() => handleConnectionStateChanged('Disconnected'));
-    connection.onreconnecting(() => handleConnectionStateChanged('Reconnecting'));
-    connection.onreconnected(() => handleConnectionStateChanged('Connected'));
+
+    // Соединение общее: onreconnected без отписки утекает, поэтому через ConnectionContext.
+    const unsubscribeReconnected = subscribeHubReconnected
+      ? subscribeHubReconnected(() => handleConnectionStateChanged('Connected'))
+      : null;
 
     return () => {
       connection.off('ReceiveChatParticipants', handleReceiveChatParticipants);
@@ -1551,8 +1555,9 @@ const ChatRoom = ({
       connection.off('ChatInfoReceived', handleChatInfoReceived);
       connection.off('Error', handleError);
       connection.off('chatdeleted', handleChatDeleted);
+      if (unsubscribeReconnected) unsubscribeReconnected();
     };
-  }, [connection, showChatInfo, chatId, loadChatParticipants]);
+  }, [connection, showChatInfo, chatId, loadChatParticipants, subscribeHubReconnected]);
 
   useEffect(() => {
     if (showChatInfo && connection && chatId) {

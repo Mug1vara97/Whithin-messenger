@@ -43,7 +43,8 @@ const LegacyNameplateVideo = ({ mediaUrl, className = 'user-nameplate__media' })
     if (objectUrlRef.current) return;
 
     try {
-      const response = await fetch(mediaUrl, { credentials: 'include' });
+      // Статика /uploads отдаётся с Access-Control-Allow-Origin: * — с credentials браузер такой ответ блокирует.
+      const response = await fetch(mediaUrl, { credentials: 'omit' });
       if (!response.ok) return;
 
       const buffer = await response.arrayBuffer();

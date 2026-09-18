@@ -112,31 +112,38 @@ export const useFriendRequests = () => {
     if (!user?.id) return;
 
     let mounted = true;
+    let unbind = null;
+
+    const handleFriendRequestReceived = () => {
+      fetchFriendRequests();
+    };
+    const handleFriendRequestDeclined = (data) => {
+      setSentRequests(prev => prev.filter(req => req.id !== data.requestId));
+    };
+    const handleFriendRequestAccepted = () => {
+      fetchFriendRequests();
+    };
+    const handleFriendAdded = () => {
+      fetchFriendRequests();
+    };
 
     const setupRealtime = async () => {
       try {
         const connection = await getFriendConnection();
-        if (!mounted) return;
+        if (!mounted || !connection) return;
 
-        connection.on('FriendRequestReceived', (data) => {
-          console.log('FriendRequestReceived event:', data);
-          fetchFriendRequests();
-        });
+        connection.on('FriendRequestReceived', handleFriendRequestReceived);
+        connection.on('FriendRequestDeclined', handleFriendRequestDeclined);
+        connection.on('FriendRequestAccepted', handleFriendRequestAccepted);
+        connection.on('FriendAdded', handleFriendAdded);
 
-        connection.on('FriendRequestDeclined', (data) => {
-          console.log('FriendRequestDeclined event:', data);
-          setSentRequests(prev => prev.filter(req => req.id !== data.requestId));
-        });
-
-        connection.on('FriendRequestAccepted', () => {
-          fetchFriendRequests();
-        });
-
-        connection.on('FriendAdded', () => {
-          fetchFriendRequests();
-        });
-
-        console.log('Friend requests realtime subscriptions set up');
+        // Соединение общее — снимаем только свои хендлеры (по ссылке).
+        unbind = () => {
+          connection.off('FriendRequestReceived', handleFriendRequestReceived);
+          connection.off('FriendRequestDeclined', handleFriendRequestDeclined);
+          connection.off('FriendRequestAccepted', handleFriendRequestAccepted);
+          connection.off('FriendAdded', handleFriendAdded);
+        };
       } catch (err) {
         console.error('Error setting up friend requests realtime:', err);
       }
@@ -146,12 +153,7 @@ export const useFriendRequests = () => {
 
     return () => {
       mounted = false;
-      if (connectionRef.current) {
-        connectionRef.current.off('FriendRequestReceived');
-        connectionRef.current.off('FriendRequestDeclined');
-        connectionRef.current.off('FriendRequestAccepted');
-        connectionRef.current.off('FriendAdded');
-      }
+      if (unbind) unbind();
     };
   }, [user?.id, getFriendConnection, fetchFriendRequests]);
 

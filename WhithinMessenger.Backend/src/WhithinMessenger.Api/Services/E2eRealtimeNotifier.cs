@@ -6,11 +6,11 @@ namespace WhithinMessenger.Api.Services;
 
 public class E2eRealtimeNotifier : IE2eRealtimeNotifier
 {
-    private readonly IHubContext<ChatListHub> _chatListHubContext;
+    private readonly IHubContext<AppHub> _hub;
 
-    public E2eRealtimeNotifier(IHubContext<ChatListHub> chatListHubContext)
+    public E2eRealtimeNotifier(IHubContext<AppHub> hub)
     {
-        _chatListHubContext = chatListHubContext;
+        _hub = hub;
     }
 
     public async Task NotifyChatKeyRewrapNeededAsync(
@@ -40,8 +40,8 @@ public class E2eRealtimeNotifier : IE2eRealtimeNotifier
                 continue;
             }
 
-            await _chatListHubContext.Clients
-                .Group($"user-{memberId}")
+            await _hub.Clients
+                .Group(HubGroups.User(memberId))
                 .SendAsync("e2echatkeyrewrapneeded", payload, cancellationToken);
         }
     }

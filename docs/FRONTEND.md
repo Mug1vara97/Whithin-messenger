@@ -186,39 +186,42 @@ export const useChatList = () => {
 
 ### Подключение
 
+Одно соединение на пользователя к единому хабу `/hub` (`HUB_ENDPOINTS.APP_HUB`).
+Соединение выдаёт `ConnectionContext`; напрямую `HubConnectionBuilder` в фичах не использовать.
+
 ```javascript
-import { HubConnectionBuilder } from '@microsoft/signalr';
+import { useConnectionContext } from 'shared/lib/contexts/ConnectionContext';
 
-const connection = new HubConnectionBuilder()
-  .withUrl('/groupchathub')
-  .withAutomaticReconnect()
-  .build();
+const { getConnection, acquireGroup, onReconnected } = useConnectionContext();
 
-await connection.start();
+// Общее соединение (первый аргумент оставлен для совместимости и игнорируется)
+const connection = await getConnection('hub', user.id);
 
-// Слушать события
-connection.on('ReceiveMessage', (message) => {
-  // Обновить UI
-});
+// Подписка — всегда с ссылкой на хендлер, чтобы off() снял только свой
+const handler = (message) => { /* обновить UI */ };
+connection.on('MessageSent', handler);
+// ... при размонтировании:
+connection.off('MessageSent', handler);
+
+// Группы с подсчётом ссылок: 'chat' | 'server' | 'serverlist'.
+// После реконнекта ConnectionContext сам переподписывает все удерживаемые группы.
+const release = acquireGroup('chat', chatId);
+// ... при размонтировании:
+release();
+
+// Реконнект: подписки возвращают unsubscribe (у HubConnection.onreconnected его нет)
+const unsubscribe = onReconnected(() => refetch());
 
 // Вызвать метод сервера
-await connection.invoke('SendMessage', chatId, content);
+await connection.invoke('SendMessage', content, username, chatId);
 ```
 
-### В компоненте
+Правила для общего соединения:
 
-```jsx
-function ChatRoom({ chatId }) {
-  const { messages, sendMessage } = useChatRoom(chatId);
-  
-  return (
-    <div>
-      {messages.map(msg => <MessageItem key={msg.id} message={msg} />)}
-      <MessageInput onSend={sendMessage} />
-    </div>
-  );
-}
-```
+- не вызывать `connection.stop()` — им управляет `ConnectionContext`;
+- не вызывать `connection.off('Event')` без хендлера — снимет чужие подписки;
+- не регистрировать `connection.onreconnected/onclose` напрямую — использовать `onReconnected/onReconnecting/onClose` из контекста;
+- события фильтровать по `chatId`/`serverId` в хендлере: соединение одно, приходят события всех групп, в которых состоит пользователь.
 
 ## Стилизация
 

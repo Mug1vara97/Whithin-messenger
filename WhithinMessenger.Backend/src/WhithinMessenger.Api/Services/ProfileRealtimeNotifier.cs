@@ -9,21 +9,18 @@ namespace WhithinMessenger.Api.Services;
 
 public class ProfileRealtimeNotifier : IProfileRealtimeNotifier
 {
-    private readonly IHubContext<NotificationHub> _notificationHubContext;
-    private readonly IHubContext<ServerHub> _serverHubContext;
+    private readonly IHubContext<AppHub> _hub;
     private readonly IProfileAudienceResolver _audienceResolver;
     private readonly IUserListCacheService _userListCache;
     private readonly WithinDbContext _context;
 
     public ProfileRealtimeNotifier(
-        IHubContext<NotificationHub> notificationHubContext,
-        IHubContext<ServerHub> serverHubContext,
+        IHubContext<AppHub> hub,
         IProfileAudienceResolver audienceResolver,
         IUserListCacheService userListCache,
         WithinDbContext context)
     {
-        _notificationHubContext = notificationHubContext;
-        _serverHubContext = serverHubContext;
+        _hub = hub;
         _audienceResolver = audienceResolver;
         _userListCache = userListCache;
         _context = context;
@@ -54,8 +51,8 @@ public class ProfileRealtimeNotifier : IProfileRealtimeNotifier
         await _userListCache.InvalidateUserChatsAsync(audience, cancellationToken);
 
         var notifyTasks = audience.Select(viewerId =>
-            _notificationHubContext.Clients
-                .Group($"user-{viewerId}")
+            _hub.Clients
+                .Group(HubGroups.User(viewerId))
                 .SendAsync("UserProfileUpdated", payload, cancellationToken));
 
         await Task.WhenAll(notifyTasks);
@@ -67,8 +64,8 @@ public class ProfileRealtimeNotifier : IProfileRealtimeNotifier
             .ToListAsync(cancellationToken);
 
         var serverNotifyTasks = serverIds.Select(serverId =>
-            _serverHubContext.Clients
-                .Group(serverId.ToString())
+            _hub.Clients
+                .Group(HubGroups.Server(serverId))
                 .SendAsync("MemberProfileUpdated", payload, cancellationToken));
 
         await Task.WhenAll(serverNotifyTasks);

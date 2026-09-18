@@ -1,4 +1,5 @@
 import apiClient from '../api/apiClient';
+import { E2E_ENABLED } from './e2eConfig';
 
 const isNotFound = (error) => error?.response?.status === 404;
 const isBadRequest = (error) => error?.response?.status === 400;
@@ -40,8 +41,10 @@ export const invalidateDeviceKeyCache = (userId, deviceId = null) => {
   }
 };
 
+// Пока E2E_ENABLED === false (бэкенд отвечает 503 на /api/e2e/*), ни один метод не ходит в сеть.
 export const e2eApi = {
   async uploadDeviceKey(deviceId, publicKeyBase64) {
+    if (!E2E_ENABLED) return;
     await apiClient.put('/e2e/keys', {
       deviceId,
       publicKeyBase64,
@@ -49,6 +52,7 @@ export const e2eApi = {
   },
 
   async getDeviceKey(userId, deviceId = null, options = {}) {
+    if (!E2E_ENABLED) return null;
     const { forceRefresh = false } = options;
     const cacheKey = deviceKeyCacheKey(userId, deviceId);
     if (forceRefresh) {
@@ -97,6 +101,7 @@ export const e2eApi = {
   },
 
   async getChatWrappedKey(chatId, deviceId = 'default', options = {}) {
+    if (!E2E_ENABLED) return null;
     const { forceRefresh = false } = options;
     const cacheKey = chatWrappedKeyCacheKey(chatId, deviceId);
     if (forceRefresh) {
@@ -145,6 +150,7 @@ export const e2eApi = {
   },
 
   async getChatKeyRecipients(chatId, options = {}) {
+    if (!E2E_ENABLED) return { userIds: [] };
     const { forceRefresh = false } = options;
     const cacheKey = String(chatId);
     if (forceRefresh) {
@@ -198,6 +204,7 @@ export const e2eApi = {
   },
 
   async uploadChatWrappedKeys(chatId, wraps, options = {}) {
+    if (!E2E_ENABLED) return;
     const { keyFingerprint = null, forceReset = false } = options;
     const normalizedWraps = (wraps || [])
       .filter((wrap) => (
@@ -228,18 +235,21 @@ export const e2eApi = {
   },
 
   async requestChatKeyRewrap(chatId, deviceId = 'web') {
+    if (!E2E_ENABLED) return;
     await apiClient.post(`/e2e/chat-keys/${chatId}/rewrap-request`, {
       deviceId,
     });
   },
 
   async uploadKeyBackup(payloadJson) {
+    if (!E2E_ENABLED) return;
     await apiClient.put('/e2e/backup', {
       payloadJson,
     });
   },
 
   async getKeyBackup() {
+    if (!E2E_ENABLED) return null;
     const { data, status } = await apiClient.get('/e2e/backup', {
       validateStatus: (responseStatus) => responseStatus === 200 || responseStatus === 404,
     });

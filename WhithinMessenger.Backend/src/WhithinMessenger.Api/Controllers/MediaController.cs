@@ -22,7 +22,7 @@ public class MediaController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IFileService _fileService;
-    private readonly IHubContext<GroupChatHub> _hubContext;
+    private readonly IHubContext<AppHub> _hubContext;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
     private readonly ILogger<MediaController> _logger;
@@ -30,7 +30,7 @@ public class MediaController : ControllerBase
     public MediaController(
         IMediator mediator,
         IFileService fileService,
-        IHubContext<GroupChatHub> hubContext,
+        IHubContext<AppHub> hubContext,
         IMessageReceiptService messageReceiptService,
         ChatMessageNotificationService chatMessageNotificationService,
         ILogger<MediaController> logger)
@@ -131,7 +131,7 @@ public class MediaController : ControllerBase
                     string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId);
                     string? avatarUrl = userProfile?.Avatar;
 
-                    await _hubContext.Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
+                    await _hubContext.Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId,  // Используем MessageId для корректного удаления
                             senderId = userId,
@@ -250,7 +250,7 @@ public class MediaController : ControllerBase
                 string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId);
                 string? avatarUrl = userProfile?.Avatar;
 
-                await _hubContext.Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent",
+                await _hubContext.Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent",
                     new
                     {
                         messageId = result.MessageId,

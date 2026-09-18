@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { HubConnectionBuilder } from '@microsoft/signalr';
 import {
   ArrowBack,
   Badge,
@@ -9,7 +8,8 @@ import {
   Security,
 } from '@mui/icons-material';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
-import { BASE_URL, API_ENDPOINTS, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { BASE_URL, API_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
 import { RoleManagement } from '../../../widgets/role-management';
 import { MemberManagement } from '../../../widgets/member-management';
 import { ServerSettings } from '../../../widgets/server-settings';
@@ -41,6 +41,9 @@ const ServerSettingsPage = () => {
   const { serverId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const connectionContext = useConnectionContext();
+  const getSharedConnection = connectionContext?.getConnection;
+  const acquireGroup = connectionContext?.acquireGroup;
   const [server, setServer] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,60 +53,59 @@ const ServerSettingsPage = () => {
   const [userPermissions, setUserPermissions] = useState({});
   const [isServerOwner, setIsServerOwner] = useState(false);
 
+  /** Освобождение хендлеров и группы текущего подключения. */
+  const detachRef = useRef(null);
+
   const initializeConnection = useCallback(async () => {
     if (!serverId || !user?.id) {
       console.warn('Missing serverId or user.id for connection initialization');
-      return;
+      return false;
+    }
+    if (!getSharedConnection || !acquireGroup) {
+      return false;
     }
 
     try {
-      const newConnection = new HubConnectionBuilder()
-        .withUrl(`${BASE_URL}${HUB_ENDPOINTS.SERVER_HUB}?userId=${user.id}`)
-        .withAutomaticReconnect()
-        .build();
+      const conn = await getSharedConnection('hub', user.id);
 
-      newConnection.onreconnected(async (connectionId) => {
-        console.log('SignalR reconnected:', connectionId);
-        try {
-          await newConnection.invoke("JoinServerGroup", serverId);
-          console.log('Rejoined server group after reconnect:', serverId);
-        } catch (err) {
-          console.error('Failed to rejoin server group:', err);
-        }
-      });
-
-      await newConnection.start();
-      console.log('Connected to ServerHub for settings');
-      
-      await newConnection.invoke("JoinServerGroup", serverId);
-      console.log('Joined server group:', serverId);
-      
-      connectionRef.current = newConnection;
-      setConnection(newConnection);
-
-      newConnection.on('ServerUpdated', (updatedServer) => {
-        console.log('Server updated:', updatedServer);
+      const handleServerUpdated = (updatedServer) => {
+        const updatedId = updatedServer?.serverId ?? updatedServer?.ServerId;
+        if (updatedId != null && String(updatedId) !== String(serverId)) return;
         setServer(updatedServer);
-      });
-
-      newConnection.on('UserPermissionsUpdated', (updatedUserId, permissions) => {
+      };
+      const handleUserPermissionsUpdated = (updatedUserId, permissions) => {
         if (String(updatedUserId) === String(user?.id)) {
           setUserPermissions(permissions || {});
         }
-      });
-
-      newConnection.on('Error', (errorMessage) => {
+      };
+      const handleHubError = (errorMessage) => {
         console.error('SignalR Error:', errorMessage);
         setError(errorMessage);
-      });
+      };
 
+      conn.on('ServerUpdated', handleServerUpdated);
+      conn.on('UserPermissionsUpdated', handleUserPermissionsUpdated);
+      conn.on('Error', handleHubError);
+
+      // Группа server:{id} с подсчётом ссылок; переподписка после реконнекта — в ConnectionContext.
+      const releaseGroup = acquireGroup('server', String(serverId));
+
+      detachRef.current = () => {
+        conn.off('ServerUpdated', handleServerUpdated);
+        conn.off('UserPermissionsUpdated', handleUserPermissionsUpdated);
+        conn.off('Error', handleHubError);
+        releaseGroup();
+      };
+
+      connectionRef.current = conn;
+      setConnection(conn);
       return true;
     } catch (err) {
       console.error('Failed to initialize SignalR connection:', err);
       setError('Не удалось подключиться к серверу');
       return false;
     }
-  }, [serverId, user?.id]);
+  }, [serverId, user?.id, getSharedConnection, acquireGroup]);
 
   const fetchServerData = useCallback(async (retryCount = 0) => {
     if (!serverId) return;
@@ -205,11 +207,15 @@ const ServerSettingsPage = () => {
     initializeAndFetch();
 
     return () => {
-      if (connectionRef.current) {
-        connectionRef.current.stop();
+      if (detachRef.current) {
+        const fn = detachRef.current;
+        detachRef.current = null;
+        fn();
       }
+      connectionRef.current = null;
+      setConnection(null);
     };
-  }, [serverId, user?.id]);
+  }, [serverId, user?.id, initializeConnection, fetchServerData]);
 
   const userCanManageServer = canManageServer(userPermissions, isServerOwner);
   const userCanManageRoles = canManageRoles(userPermissions, isServerOwner);

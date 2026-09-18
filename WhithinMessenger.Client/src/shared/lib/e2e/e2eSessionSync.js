@@ -8,6 +8,7 @@ import {
 import { invalidateDeviceKeyCache } from './e2eApi';
 import apiClient from '../api/apiClient';
 import { needsChatListE2eDecrypt } from './e2eChatListPreview';
+import { E2E_ENABLED } from './e2eConfig';
 
 const CHAT_KEY_STORAGE_PREFIX = 'whithin:e2e:chat-key:';
 
@@ -106,6 +107,9 @@ const resolveSessionMembers = async (chat, userId) => {
 
 /** Re-upload wraps when a participant rotated their device key. */
 export const handleChatKeyRewrapNeeded = async (userId, payload, chatItem = null) => {
+  if (!E2E_ENABLED) {
+    return false;
+  }
   const chatId = String(payload?.chatId ?? '');
   if (!userId || !chatId) {
     return false;
@@ -144,7 +148,7 @@ export const handleChatKeyRewrapNeeded = async (userId, payload, chatItem = null
  * and bootstrap keys for encrypted chats that still lack one locally.
  */
 export const syncSessionE2eKeys = async (userId, chatItems = []) => {
-  if (!userId) {
+  if (!E2E_ENABLED || !userId) {
     return;
   }
 

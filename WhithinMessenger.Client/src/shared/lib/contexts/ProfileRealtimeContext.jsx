@@ -18,26 +18,25 @@ export const ProfileRealtimeProvider = ({ children }) => {
 
     let mounted = true;
 
+    const onUserProfileUpdated = (payload) => {
+      const normalized = normalizeProfilePayload(payload);
+      if (!normalized) {
+        return;
+      }
+
+      window.dispatchEvent(
+        new CustomEvent(PROFILE_UPDATED_EVENT, { detail: normalized }),
+      );
+    };
+
     const setup = async () => {
       try {
-        const connection = await getConnection('notificationhub', userId);
+        const connection = await getConnection('hub', userId);
         if (!mounted) {
           return;
         }
 
         connectionRef.current = connection;
-
-        const onUserProfileUpdated = (payload) => {
-          const normalized = normalizeProfilePayload(payload);
-          if (!normalized) {
-            return;
-          }
-
-          window.dispatchEvent(
-            new CustomEvent(PROFILE_UPDATED_EVENT, { detail: normalized }),
-          );
-        };
-
         connection.on('UserProfileUpdated', onUserProfileUpdated);
       } catch (error) {
         console.error('ProfileRealtimeProvider: subscribe failed', error);
@@ -48,7 +47,8 @@ export const ProfileRealtimeProvider = ({ children }) => {
 
     return () => {
       mounted = false;
-      connectionRef.current?.off('UserProfileUpdated');
+      // Соединение общее — снимаем только свой хендлер.
+      connectionRef.current?.off('UserProfileUpdated', onUserProfileUpdated);
       connectionRef.current = null;
     };
   }, [userId, getConnection]);

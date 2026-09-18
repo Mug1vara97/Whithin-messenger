@@ -13,7 +13,7 @@ public class ChatMessageNotificationService
     private readonly IChatRepository _chatRepository;
     private readonly IMessageRepository _messageRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IHubContext<ChatListHub> _chatListHubContext;
+    private readonly IHubContext<AppHub> _hub;
     private readonly ILogger<ChatMessageNotificationService> _logger;
 
     public ChatMessageNotificationService(
@@ -21,14 +21,14 @@ public class ChatMessageNotificationService
         IChatRepository chatRepository,
         IMessageRepository messageRepository,
         IUserRepository userRepository,
-        IHubContext<ChatListHub> chatListHubContext,
+        IHubContext<AppHub> hub,
         ILogger<ChatMessageNotificationService> logger)
     {
         _notificationService = notificationService;
         _chatRepository = chatRepository;
         _messageRepository = messageRepository;
         _userRepository = userRepository;
-        _chatListHubContext = chatListHubContext;
+        _hub = hub;
         _logger = logger;
     }
 
@@ -166,7 +166,9 @@ public class ChatMessageNotificationService
 
             var thumbnailUrl = ChatMessagePreviewBuilder.BuildPublicMediaUrl(thumbnailPath);
 
-            await _chatListHubContext.Clients.All.SendAsync(
+            // Только участникам чата (все их вкладки/устройства), а не Clients.All:
+            // на едином хабе All — это вообще все пользователи, а payload содержит превью сообщения.
+            await _hub.Clients.Users(chatMembers.Select(id => id.ToString()).ToList()).SendAsync(
                 "chatupdated",
                 new
                 {
@@ -221,7 +223,7 @@ public class ChatMessageNotificationService
                     cancellationToken: cancellationToken);
 
                 var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, memberId);
-                await _chatListHubContext.Clients.Group($"user-{memberId}")
+                await _hub.Clients.Group(HubGroups.User(memberId))
                     .SendAsync("chatunreadupdated", chatId, unreadCount, cancellationToken);
             }
         }

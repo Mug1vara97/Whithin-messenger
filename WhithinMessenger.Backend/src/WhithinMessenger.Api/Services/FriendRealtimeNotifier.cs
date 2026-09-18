@@ -6,12 +6,14 @@ namespace WhithinMessenger.Api.Services;
 
 public class FriendRealtimeNotifier : IFriendRealtimeNotifier
 {
-    private readonly IHubContext<FriendHub> _friendHubContext;
+    private readonly IHubContext<AppHub> _hub;
 
-    public FriendRealtimeNotifier(IHubContext<FriendHub> friendHubContext)
+    public FriendRealtimeNotifier(IHubContext<AppHub> hub)
     {
-        _friendHubContext = friendHubContext;
+        _hub = hub;
     }
+
+    private IClientProxy User(Guid userId) => _hub.Clients.Group(HubGroups.User(userId));
 
     public async Task NotifyFriendRequestReceivedAsync(
         Guid addresseeId,
@@ -20,7 +22,7 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         string senderUsername,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{addresseeId}").SendAsync(
+        await User(addresseeId).SendAsync(
             "FriendRequestReceived",
             new
             {
@@ -37,7 +39,7 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         string? friendUsername,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{requesterId}").SendAsync(
+        await User(requesterId).SendAsync(
             "FriendRequestAccepted",
             new
             {
@@ -53,7 +55,7 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         string? friendUsername,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{addresseeId}").SendAsync(
+        await User(addresseeId).SendAsync(
             "FriendAdded",
             new
             {
@@ -68,7 +70,7 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         Guid requestId,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{requesterId}").SendAsync(
+        await User(requesterId).SendAsync(
             "FriendRequestDeclined",
             new { requestId },
             cancellationToken);
@@ -79,7 +81,7 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         Guid friendId,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{userId}").SendAsync(
+        await User(userId).SendAsync(
             "FriendRemoved",
             new { friendId },
             cancellationToken);
@@ -90,12 +92,12 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         Guid blockedUserId,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{blockerId}").SendAsync(
+        await User(blockerId).SendAsync(
             "UserBlocked",
             new { userId = blockedUserId },
             cancellationToken);
 
-        await _friendHubContext.Clients.Group($"user-{blockedUserId}").SendAsync(
+        await User(blockedUserId).SendAsync(
             "BlockedByUser",
             new { userId = blockerId },
             cancellationToken);
@@ -106,12 +108,12 @@ public class FriendRealtimeNotifier : IFriendRealtimeNotifier
         Guid unblockedUserId,
         CancellationToken cancellationToken = default)
     {
-        await _friendHubContext.Clients.Group($"user-{blockerId}").SendAsync(
+        await User(blockerId).SendAsync(
             "UserUnblocked",
             new { userId = unblockedUserId },
             cancellationToken);
 
-        await _friendHubContext.Clients.Group($"user-{unblockedUserId}").SendAsync(
+        await User(unblockedUserId).SendAsync(
             "UnblockedByUser",
             new { userId = blockerId },
             cancellationToken);

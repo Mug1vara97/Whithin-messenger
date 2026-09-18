@@ -13,54 +13,22 @@ using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs;
 
-public class ServerHub : Hub
+/// <summary>
+/// Server-домен единого хаба (бывший ServerHub): каналы, категории, роли, участники, idea board.
+/// Группы: HubGroups.Server(serverId).
+/// События каналов сервера называются Channel* (ChannelCreated/Updated/Deleted), чтобы не
+/// пересекаться с chatcreated/chatupdated/chatdeleted списка чатов на том же соединении.
+/// </summary>
+public partial class AppHub
 {
-    private readonly IMediator _mediator;
-    private readonly ServerPermissionChecker _permissionChecker;
-
-    public ServerHub(IMediator mediator, ServerPermissionChecker permissionChecker)
-    {
-        _mediator = mediator;
-        _permissionChecker = permissionChecker;
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        // Удалено избыточное логирование для производительности
-        // Этот метод вызывается при каждом SignalR вызове
-        
-        // Сначала пробуем получить из JWT claims
-        var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
-        
-        if (Guid.TryParse(userIdClaim, out var userId))
-        {
-            return userId;
-        }
-
-        // Fallback на query parameter (для совместимости)
-        var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
-        
-        if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
-        {
-            return userIdFromQueryParsed;
-        }
-
-        // Логируем только если не нашли userId (это ошибка)
-        Console.WriteLine($"ServerHub: No UserId found in request");
-        return null;
-    }
-
     public async Task JoinServerGroup(string serverId)
     {
-        var userId = GetCurrentUserId();
-        await Groups.AddToGroupAsync(Context.ConnectionId, serverId);
-        // Логируем только успешные подключения (не каждый раз)
-        // Console.WriteLine($"erverHub: User {userId} joined group {serverId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, HubGroups.Server(serverId));
     }
 
     public async Task LeaveServerGroup(string serverId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, serverId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, HubGroups.Server(serverId));
     }
 
     public async Task MoveCategory(Guid serverId, Guid categoryId, int newPosition)
@@ -79,7 +47,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("CategoriesReordered", result.Categories);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("CategoriesReordered", result.Categories);
             }
             else
             {
@@ -108,7 +76,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("CategoryCreated", result.Category);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("CategoryCreated", result.Category);
             }
             else
             {
@@ -137,7 +105,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("CategoryCreated", result.Category);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("CategoryCreated", result.Category);
             }
             else
             {
@@ -166,7 +134,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("CategoryDeleted", categoryId);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("CategoryDeleted", categoryId);
             }
             else
             {
@@ -202,7 +170,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("CategoryUpdated", result.Category);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("CategoryUpdated", result.Category);
             }
             else
             {
@@ -231,7 +199,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ChatsReordered", result.Categories);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("ChatsReordered", result.Categories);
             }
             else
             {
@@ -263,11 +231,11 @@ public class ServerHub : Hub
                 if (result.NotifyUserIds != null && result.NotifyUserIds.Count > 0)
                 {
                     var userIdStrings = result.NotifyUserIds.Select(id => id.ToString()).ToList();
-                    await Clients.Users(userIdStrings).SendAsync("ChatCreated", result.Chat, categoryId);
+                    await Clients.Users(userIdStrings).SendAsync("ChannelCreated", result.Chat, categoryId);
                 }
                 else
                 {
-                    await Clients.Group(serverId.ToString()).SendAsync("ChatCreated", result.Chat, categoryId);
+                    await Clients.Group(HubGroups.Server(serverId)).SendAsync("ChannelCreated", result.Chat, categoryId);
                 }
             }
             else
@@ -298,7 +266,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ChatUpdated", result.Chat);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("ChannelUpdated", result.Chat);
             }
             else
             {
@@ -327,7 +295,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ChatUpdated", result.Chat);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("ChannelUpdated", result.Chat);
             }
             else
             {
@@ -340,7 +308,7 @@ public class ServerHub : Hub
         }
     }
 
-    public async Task DeleteChat(Guid serverId, Guid chatId)
+    public async Task DeleteChannel(Guid serverId, Guid chatId)
     {
         try
         {
@@ -356,7 +324,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ChatDeleted", chatId, result.CategoryId);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("ChannelDeleted", chatId, result.CategoryId);
             }
             else
             {
@@ -414,7 +382,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("RoleCreated", result.Role);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("RoleCreated", result.Role);
             }
             else
             {
@@ -443,7 +411,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(result.ServerId.ToString()).SendAsync("RoleUpdated", result.Role);
+                await Clients.Group(HubGroups.Server(result.ServerId)).SendAsync("RoleUpdated", result.Role);
 
                 foreach (var affected in result.AffectedUserPermissions)
                 {
@@ -480,7 +448,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(result.ServerId.ToString()).SendAsync("RoleDeleted", roleId);
+                await Clients.Group(HubGroups.Server(result.ServerId)).SendAsync("RoleDeleted", roleId);
             }
             else
             {
@@ -538,7 +506,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(result.ServerId.ToString()).SendAsync("RoleAssigned", userId, result.Role);
+                await Clients.Group(HubGroups.Server(result.ServerId)).SendAsync("RoleAssigned", userId, result.Role);
                 if (result.TargetUserPermissions != null)
                 {
                     await Clients.User(userId.ToString()).SendAsync(
@@ -578,7 +546,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(result.ServerId.ToString()).SendAsync("RoleRemoved", userId, roleId);
+                await Clients.Group(HubGroups.Server(result.ServerId)).SendAsync("RoleRemoved", userId, roleId);
                 await Clients.User(userId.ToString()).SendAsync("UserRolesLoaded", result.RemainingRoles);
                 await Clients.User(userId.ToString()).SendAsync("UserPermissionsUpdated", userId, result.MergedPermissions);
             }
@@ -622,7 +590,7 @@ public class ServerHub : Hub
                 throw new HubException("Недостаточно прав для отключения микрофона или звука участников");
             }
 
-            await Clients.Group(serverId.ToString()).SendAsync(
+            await Clients.Group(HubGroups.Server(serverId)).SendAsync(
                 "VoiceMemberModerated",
                 new
                 {
@@ -660,7 +628,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("MemberKicked", userId);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberKicked", userId);
                 await Clients.User(userId.ToString()).SendAsync("YouWereKicked", serverId);
             }
             else
@@ -694,7 +662,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("MemberNicknameUpdated", new
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberNicknameUpdated", new
                 {
                     userId = result.UserId,
                     nickname = result.Nickname,
@@ -729,7 +697,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("MemberAdded", new
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberAdded", new
                 {
                     serverId,
                     userId,
@@ -737,21 +705,11 @@ public class ServerHub : Hub
                     addedBy = currentUserId.Value
                 });
 
-                // Уведомляем пользователя через ServerListHub
-                var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
-                if (serverListHubContext != null)
+                await Clients.User(userId.ToString()).SendAsync("YouWereAddedToServer", new
                 {
-                    await serverListHubContext.Clients.User(userId.ToString()).SendAsync("YouWereAddedToServer", new
-                    {
-                        serverId,
-                        addedBy = currentUserId.Value
-                    });
-                    // Notification sent successfully
-                }
-                else
-                {
-                    Console.WriteLine($"ServerHub: Failed to get ServerListHub context");
-                }
+                    serverId,
+                    addedBy = currentUserId.Value
+                });
             }
             else
             {
@@ -809,7 +767,7 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ServerNameUpdated", serverId, newName);
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("ServerNameUpdated", serverId, newName);
             }
             else
             {
@@ -841,7 +799,7 @@ public class ServerHub : Hub
                 var infoResult = await _mediator.Send(new GetServerInfoQuery(serverId, userId.Value));
                 if (infoResult.Success && infoResult.ServerInfo != null)
                 {
-                    await Clients.Group(serverId.ToString()).SendAsync("ServerUpdated", infoResult.ServerInfo);
+                    await Clients.Group(HubGroups.Server(serverId)).SendAsync("ServerUpdated", infoResult.ServerInfo);
                 }
             }
             else
@@ -874,7 +832,7 @@ public class ServerHub : Hub
                 var infoResult = await _mediator.Send(new GetServerInfoQuery(serverId, userId.Value));
                 if (infoResult.Success && infoResult.ServerInfo != null)
                 {
-                    await Clients.Group(serverId.ToString()).SendAsync("ServerUpdated", infoResult.ServerInfo);
+                    await Clients.Group(HubGroups.Server(serverId)).SendAsync("ServerUpdated", infoResult.ServerInfo);
                 }
             }
             else
@@ -948,63 +906,7 @@ public class ServerHub : Hub
         }
     }
 
-    public async Task CreateServer(string serverName, bool isPublic = false, string? description = null)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId == null)
-            {
-                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
-                return;
-            }
-
-            var command = new CreateServerCommand(serverName, userId.Value, isPublic, description);
-            var result = await _mediator.Send(command);
-
-            if (result.Success)
-            {
-                await Clients.Caller.SendAsync("ServerCreated", result.Server);
-            }
-            else
-            {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
-            }
-        }
-        catch (Exception ex)
-        {
-            await Clients.Caller.SendAsync("Error", $"Ошибка при создании сервера: {ex.Message}");
-        }
-    }
-
-    public async Task GetUserServers()
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId == null)
-            {
-                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
-                return;
-            }
-
-            var query = new GetUserServersQuery(userId.Value);
-            var result = await _mediator.Send(query);
-
-            if (result.Success)
-            {
-                await Clients.Caller.SendAsync("UserServersLoaded", result.Servers);
-            }
-            else
-            {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
-            }
-        }
-        catch (Exception ex)
-        {
-            await Clients.Caller.SendAsync("Error", $"Ошибка при получении списка серверов: {ex.Message}");
-        }
-    }
+    // CreateServer / GetUserServers живут в AppHub.ServerList.cs (возвращают результат вызова).
 
     public async Task LeaveServer(Guid serverId)
     {
@@ -1022,19 +924,14 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("MemberLeft", new
+                await Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberLeft", new
                 {
                     serverId = serverId,
                     userId = userId.Value
                 });
 
-                await Clients.Caller.SendAsync("ServerLeft", serverId);
-                
-                var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
-                if (serverListHubContext != null)
-                {
-                    await serverListHubContext.Clients.User(userId.Value.ToString()).SendAsync("ServerLeft", serverId);
-                }
+                // Все вкладки/устройства ушедшего пользователя (включая вызывающую).
+                await Clients.User(userId.Value.ToString()).SendAsync("ServerLeft", serverId);
             }
             else
             {
@@ -1065,25 +962,18 @@ public class ServerHub : Hub
 
             if (result.Success)
             {
-                await Clients.Group(serverId.ToString()).SendAsync("ServerDeleted", serverId);
-                await Clients.Caller.SendAsync("ServerDeleted", serverId);
-                
-                var serverListHubContext = Context.GetHttpContext()?.RequestServices?.GetRequiredService<IHubContext<ServerListHub>>();
-                if (serverListHubContext != null)
+                // Один раз каждому участнику (все его соединения) — покрывает и панель сервера,
+                // и список серверов, и вызывающего.
+                var recipientIds = new HashSet<string> { userId.Value.ToString() };
+                if (serverMembers != null)
                 {
-                    await serverListHubContext.Clients.User(userId.Value.ToString()).SendAsync("ServerDeleted", serverId);
-                    
-                    if (serverMembers != null && serverMembers.Any())
+                    foreach (var member in serverMembers)
                     {
-                        foreach (var member in serverMembers)
-                        {
-                            if (member.UserId != userId.Value)
-                            {
-                                await serverListHubContext.Clients.User(member.UserId.ToString()).SendAsync("ServerDeleted", serverId);
-                            }
-                        }
+                        recipientIds.Add(member.UserId.ToString());
                     }
                 }
+
+                await Clients.Users(recipientIds.ToList()).SendAsync("ServerDeleted", serverId);
             }
             else
             {
@@ -1143,7 +1033,7 @@ public class ServerHub : Hub
                 chatId, userId.Value, title, body, tag, sourceUrl));
             if (result.Success && result.ServerId.HasValue)
             {
-                await Clients.Group(result.ServerId.Value.ToString())
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
                     .SendAsync("IdeaBoardCardCreated", result.Card);
             }
             else
@@ -1178,7 +1068,7 @@ public class ServerHub : Hub
                 cardId, userId.Value, title, body, tag, sourceUrl, isFiled));
             if (result.Success && result.ServerId.HasValue)
             {
-                await Clients.Group(result.ServerId.Value.ToString())
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
                     .SendAsync("IdeaBoardCardUpdated", result.Card);
             }
             else
@@ -1207,7 +1097,7 @@ public class ServerHub : Hub
                 cardId, userId.Value, positionX, positionY, rotation));
             if (result.Success && result.ServerId.HasValue)
             {
-                await Clients.Group(result.ServerId.Value.ToString())
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
                     .SendAsync("IdeaBoardCardPositionUpdated", result.Card);
             }
             else
@@ -1235,7 +1125,7 @@ public class ServerHub : Hub
             var result = await _mediator.Send(new DeleteIdeaBoardCardCommand(cardId, userId.Value));
             if (result.Success && result.ServerId.HasValue)
             {
-                await Clients.Group(result.ServerId.Value.ToString())
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
                     .SendAsync("IdeaBoardCardDeleted", result.Card);
             }
             else

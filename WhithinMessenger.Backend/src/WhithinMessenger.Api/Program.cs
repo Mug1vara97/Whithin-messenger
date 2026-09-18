@@ -88,10 +88,10 @@ builder.Services.AddCors(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Register NotificationService and IHubContext<Hub> for NotificationHub after SignalR is configured
+// Application-слой (NotificationService) работает с IHubContext<Hub>; отдаём ему единый AppHub.
 builder.Services.AddScoped<Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>>(provider =>
 {
-    return (Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>)provider.GetRequiredService<IHubContext<NotificationHub>>();
+    return (Microsoft.AspNetCore.SignalR.IHubContext<Microsoft.AspNetCore.SignalR.Hub>)provider.GetRequiredService<IHubContext<AppHub>>();
 });
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.INotificationService>(provider =>
@@ -139,13 +139,7 @@ builder.Services.AddAuthentication(options =>
         {
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && 
-                (path.StartsWithSegments("/chatlisthub") || 
-                 path.StartsWithSegments("/groupchathub") || 
-                 path.StartsWithSegments("/serverhub") || 
-                 path.StartsWithSegments("/serverlisthub") ||
-                 path.StartsWithSegments("/friendhub") ||
-                 path.StartsWithSegments("/notificationhub")))
+            if (!string.IsNullOrEmpty(accessToken) && HubRoutes.IsHubPath(path))
             {
                 context.Token = accessToken;
             }
@@ -240,34 +234,15 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.MapControllers();
 
-app.MapHub<ChatListHub>("/chatlisthub", options =>
+// Единый хаб. Основной маршрут — /hub. Старые маршруты (/chatlisthub, /groupchathub, ...)
+// указывают на тот же AppHub, чтобы не ломать уже установленные клиенты (Android);
+// все соединения при этом живут в одном HubLifetimeManager<AppHub> и получают одни и те же события.
+foreach (var hubPath in HubRoutes.All)
 {
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
-
-app.MapHub<GroupChatHub>("/groupchathub", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
-
-app.MapHub<ServerHub>("/serverhub", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
-
-app.MapHub<ServerListHub>("/serverlisthub", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
-
-app.MapHub<NotificationHub>("/notificationhub", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
-
-app.MapHub<FriendHub>("/friendhub", options =>
-{
-    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
-});
+    app.MapHub<AppHub>(hubPath, options =>
+    {
+        options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+    });
+}
 
 app.Run();

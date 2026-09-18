@@ -161,12 +161,12 @@ export const useServerMemberListSidebar = ({
 
     serverConnection.on('ChannelMemberAdded', handleChannelAccessChanged);
     serverConnection.on('ChannelMemberRemoved', handleChannelAccessChanged);
-    serverConnection.on('ChatUpdated', handleChatUpdated);
+    serverConnection.on('ChannelUpdated', handleChatUpdated);
 
     return () => {
       serverConnection.off('ChannelMemberAdded', handleChannelAccessChanged);
       serverConnection.off('ChannelMemberRemoved', handleChannelAccessChanged);
-      serverConnection.off('ChatUpdated', handleChatUpdated);
+      serverConnection.off('ChannelUpdated', handleChatUpdated);
     };
   }, [
     serverConnection,

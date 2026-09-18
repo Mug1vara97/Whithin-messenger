@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as signalR from '@microsoft/signalr';
-import tokenManager from '../../../shared/lib/services/tokenManager';
-import { BASE_URL, HUB_ENDPOINTS } from '../../../shared/lib/constants/apiEndpoints';
+import { HubConnectionState } from '@microsoft/signalr';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
 import { patchChatListItemWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
 import { useStartupBoot } from '../../../shared/lib/contexts/StartupBootContext';
@@ -16,11 +15,6 @@ import {
   handleChatKeyRewrapNeeded,
   syncSessionE2eKeys,
 } from '../../../shared/lib/e2e/e2eSessionSync';
-import {
-  SIGNALR_RECONNECT_DELAYS_MS,
-  ensureHubStarted,
-  subscribeNetworkRecovery,
-} from '../../../shared/lib/signalr/reconnectPolicy';
 
 const resolveCurrentUserId = (userId) => userId || null;
 
@@ -124,6 +118,11 @@ const normalizeChatListItem = (chat) => {
 export const useChatList = (userId, onChatCreated = null) => {
   const navigate = useNavigate();
   const { markChatsReady } = useStartupBoot();
+  const connectionContext = useConnectionContext();
+  const getSharedConnection = connectionContext?.getConnection;
+  const subscribeReconnected = connectionContext?.onReconnected;
+  const subscribeReconnecting = connectionContext?.onReconnecting;
+  const subscribeClosed = connectionContext?.onClose;
   const [chats, setChats] = useState([]);
   const [initialChatsLoaded, setInitialChatsLoaded] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -310,31 +309,41 @@ export const useChatList = (userId, onChatCreated = null) => {
       console.error('SignalR error:', errorMessage);
     };
 
-    conn.off('receivechats');
-    conn.off('receivesearchresults');
-    conn.off('chatcreated');
-    conn.off('privatechatcreated');
-    conn.off('chatdeleted');
-    conn.off('chatupdated');
-    conn.off('error');
-    conn.off('e2echatkeyrewrapneeded');
+    const handleChatUnreadUpdated = (chatId, unreadCount) => {
+      setChats((prevChats) =>
+        prevChats.map((chat) =>
+          String(chat.chatId) === String(chatId) ? { ...chat, unreadCount } : chat,
+        ),
+      );
+    };
 
-    conn.on('receivechats', handleReceiveChats);
-    conn.on('receivesearchresults', handleSearchResults);
-    conn.on('chatcreated', handleChatCreated);
-    conn.on('privatechatcreated', handlePrivateChatCreated);
-    conn.on('chatdeleted', handleChatDeleted);
-    conn.on('chatupdated', handleChatUpdated);
-    conn.on('error', handleError);
-    conn.on('e2echatkeyrewrapneeded', handleE2eChatKeyRewrapNeeded);
+    // Соединение общее — снимаем только свои хендлеры (по ссылке), не conn.off('event').
+    const handlers = [
+      ['receivechats', handleReceiveChats],
+      ['receivesearchresults', handleSearchResults],
+      ['chatcreated', handleChatCreated],
+      ['privatechatcreated', handlePrivateChatCreated],
+      ['chatdeleted', handleChatDeleted],
+      ['chatupdated', handleChatUpdated],
+      ['chatunreadupdated', handleChatUnreadUpdated],
+      ['error', handleError],
+      ['e2echatkeyrewrapneeded', handleE2eChatKeyRewrapNeeded],
+    ];
+
+    for (const [eventName, handler] of handlers) {
+      conn.on(eventName, handler);
+    }
+
+    return () => {
+      for (const [eventName, handler] of handlers) {
+        conn.off(eventName, handler);
+      }
+    };
   }, []);
 
   useEffect(() => {
-    if (!userId) {
-      if (connectionRef.current) {
-        connectionRef.current.stop();
-        connectionRef.current = null;
-      }
+    if (!userId || !getSharedConnection) {
+      connectionRef.current = null;
       setConnection(null);
       setIsConnected(false);
       setInitialChatsLoaded(false);
@@ -343,128 +352,77 @@ export const useChatList = (userId, onChatCreated = null) => {
     }
 
     let cancelled = false;
+    let unbindHandlers = null;
+    const unsubscribers = [];
 
-    const createConnection = async () => {
-      if (connectionRef.current) {
-        try {
-          await connectionRef.current.stop();
-        } catch (error) {
-          console.error('useChatList: failed to stop previous connection:', error);
-        }
-        connectionRef.current = null;
+    const reloadChats = async (conn, reason) => {
+      if (cancelled || !conn || conn.state !== HubConnectionState.Connected) return;
+      try {
+        await conn.invoke('GetUserChats');
+      } catch (err) {
+        console.error(`Error reloading chats (${reason}):`, err);
       }
+    };
 
+    const attachToSharedConnection = async () => {
       setInitialChatsLoaded(false);
 
-      const hubUrl = `${BASE_URL}${HUB_ENDPOINTS.CHAT_LIST_HUB}?userId=${userId}`;
-      const newConnection = new signalR.HubConnectionBuilder()
-        .withUrl(hubUrl, {
-          skipNegotiation: true,
-          transport: signalR.HttpTransportType.WebSockets,
-          accessTokenFactory: () => tokenManager.getToken() || '',
-        })
-        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
-        .configureLogging(signalR.LogLevel.Warning)
-        .build();
-
-      const recoverChatListConnection = async () => {
-        if (cancelled || connectionRef.current !== newConnection) return;
-        const started = await ensureHubStarted(newConnection, 'chatlisthub');
-        if (!started || cancelled) return;
-        bindConnectionHandlers(newConnection);
-        setIsConnected(true);
-        try {
-          await newConnection.invoke('GetUserChats');
-        } catch (err) {
-          console.error('Error reloading chats after network recovery:', err);
-        }
-      };
-
-      newConnection.on('chatunreadupdated', (chatId, unreadCount) => {
-        setChats((prevChats) =>
-          prevChats.map((chat) =>
-            String(chat.chatId) === String(chatId) ? { ...chat, unreadCount } : chat,
-          ),
-        );
-      });
-
-      newConnection.onclose((error) => {
-        console.log('SignalR connection closed:', error);
-        setIsConnected(false);
-        window.setTimeout(() => {
-          void recoverChatListConnection();
-        }, 1500);
-      });
-
-      newConnection.onreconnecting((error) => {
-        console.log('SignalR reconnecting:', error);
-        setIsConnected(false);
-      });
-
-      newConnection.onreconnected(async (connectionId) => {
-        console.log('SignalR reconnected:', connectionId);
-        setIsConnected(true);
-        bindConnectionHandlers(newConnection);
-        try {
-          await newConnection.invoke('GetUserChats');
-        } catch (err) {
-          console.error('Error reloading chats after reconnect:', err);
-        }
-      });
-
-      bindConnectionHandlers(newConnection);
-
+      let conn;
       try {
-        await newConnection.start();
-        if (cancelled) {
-          await newConnection.stop();
-          return;
-        }
-
-        connectionRef.current = newConnection;
-        setConnection(newConnection);
-        setIsConnected(true);
-        console.log('SignalR ChatListHub соединение установлено');
-
-        await newConnection.invoke('GetUserChats');
+        conn = await getSharedConnection('hub', userId);
       } catch (err) {
-        console.error('Ошибка подключения к ChatListHub:', err);
+        console.error('Ошибка подключения к hub (chat list):', err);
         if (!cancelled) {
           setIsConnected(false);
           setConnection(null);
           setInitialChatsLoaded(true);
         }
+        return;
       }
+      if (cancelled) return;
+
+      unbindHandlers = bindConnectionHandlers(conn);
+      connectionRef.current = conn;
+      setConnection(conn);
+      setIsConnected(conn.state === HubConnectionState.Connected);
+
+      if (subscribeReconnecting) {
+        unsubscribers.push(subscribeReconnecting(() => {
+          if (!cancelled) setIsConnected(false);
+        }));
+      }
+      if (subscribeClosed) {
+        unsubscribers.push(subscribeClosed(() => {
+          if (!cancelled) setIsConnected(false);
+        }));
+      }
+      if (subscribeReconnected) {
+        unsubscribers.push(subscribeReconnected(() => {
+          if (cancelled) return;
+          setIsConnected(true);
+          void reloadChats(connectionRef.current, 'reconnect');
+        }));
+      }
+
+      await reloadChats(conn, 'initial');
     };
 
-    createConnection();
-
-    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
-      const conn = connectionRef.current;
-      if (!conn || cancelled) return;
-      void (async () => {
-        const started = await ensureHubStarted(conn, 'chatlisthub');
-        if (!started || cancelled) return;
-        setIsConnected(true);
-        try {
-          await conn.invoke('GetUserChats');
-        } catch (err) {
-          console.error('Error reloading chats after network recovery:', err);
-        }
-      })();
-    });
+    void attachToSharedConnection();
 
     return () => {
       cancelled = true;
-      unsubscribeNetwork();
-      if (connectionRef.current) {
-        connectionRef.current.stop();
-        connectionRef.current = null;
+      for (const unsubscribe of unsubscribers) {
+        unsubscribe();
       }
+      if (unbindHandlers) {
+        unbindHandlers();
+        unbindHandlers = null;
+      }
+      connectionRef.current = null;
       setConnection(null);
       setIsConnected(false);
     };
-  }, [userId, bindConnectionHandlers]);
+  }, [userId, bindConnectionHandlers, getSharedConnection, subscribeReconnected, subscribeReconnecting, subscribeClosed]);
 
   useEffect(() => {
     const currentUserId = resolveCurrentUserId(userId);
@@ -508,7 +466,7 @@ export const useChatList = (userId, onChatCreated = null) => {
   }, []);
 
   const refreshChats = useCallback(async () => {
-    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+    if (!connectionRef.current || connectionRef.current.state !== HubConnectionState.Connected) {
       return;
     }
 
@@ -528,7 +486,7 @@ export const useChatList = (userId, onChatCreated = null) => {
 
     setIsSearching(true);
 
-    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+    if (connectionRef.current?.state === HubConnectionState.Connected) {
       try {
         await connectionRef.current.invoke('SearchUsers', query.trim());
       } catch (error) {
@@ -540,7 +498,7 @@ export const useChatList = (userId, onChatCreated = null) => {
   }, []);
 
   const createPrivateChat = useCallback(async (targetUserId) => {
-    if (connectionRef.current?.state !== signalR.HubConnectionState.Connected) {
+    if (connectionRef.current?.state !== HubConnectionState.Connected) {
       return undefined;
     }
 
@@ -571,7 +529,7 @@ export const useChatList = (userId, onChatCreated = null) => {
   }, []);
 
   const setChatPinned = useCallback(async (chatId, isPinned) => {
-    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+    if (!connectionRef.current || connectionRef.current.state !== HubConnectionState.Connected) {
       return false;
     }
 
@@ -588,7 +546,7 @@ export const useChatList = (userId, onChatCreated = null) => {
   const unpinChat = useCallback(async (chatId) => setChatPinned(chatId, false), [setChatPinned]);
 
   const reorderPinnedChats = useCallback(async (orderedChatIds) => {
-    if (!connectionRef.current || connectionRef.current.state !== signalR.HubConnectionState.Connected) {
+    if (!connectionRef.current || connectionRef.current.state !== HubConnectionState.Connected) {
       return false;
     }
 

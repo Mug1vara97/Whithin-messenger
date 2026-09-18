@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HubConnectionBuilder } from '@microsoft/signalr';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
-import {
-  SIGNALR_RECONNECT_DELAYS_MS,
-  ensureHubStarted,
-  subscribeNetworkRecovery,
-} from '../../../shared/lib/signalr/reconnectPolicy';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 
 // Хелпер для получения заголовков авторизации
 const getAuthHeaders = () => {
@@ -110,6 +105,9 @@ const ServerPanel = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const connectionContext = useConnectionContext();
+  const getSharedConnection = connectionContext?.getConnection;
+  const acquireGroup = connectionContext?.acquireGroup;
   
   const [server, setServer] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -473,9 +471,9 @@ const ServerPanel = ({
       if (selectedServer?.serverId === srvId) fetchServerData();
     };
 
-    serverConnection.on("ChatCreated", handleChatCreated);
-    serverConnection.on("ChatDeleted", handleChatDeleted);
-    serverConnection.on("ChatUpdated", handleChatUpdated);
+    serverConnection.on("ChannelCreated", handleChatCreated);
+    serverConnection.on("ChannelDeleted", handleChatDeleted);
+    serverConnection.on("ChannelUpdated", handleChatUpdated);
     serverConnection.on("CategoryCreated", handleCategoryCreated);
     serverConnection.on("CategoryDeleted", handleCategoryDeleted);
     serverConnection.on("CategoryUpdated", handleCategoryUpdated);
@@ -538,9 +536,9 @@ const ServerPanel = ({
     serverConnection.on('VoiceMemberModerated', handleVoiceMemberModerated);
 
     return () => {
-      serverConnection.off("ChatCreated", handleChatCreated);
-      serverConnection.off("ChatDeleted", handleChatDeleted);
-      serverConnection.off("ChatUpdated", handleChatUpdated);
+      serverConnection.off("ChannelCreated", handleChatCreated);
+      serverConnection.off("ChannelDeleted", handleChatDeleted);
+      serverConnection.off("ChannelUpdated", handleChatUpdated);
       serverConnection.off("CategoryCreated", handleCategoryCreated);
       serverConnection.off("CategoryDeleted", handleCategoryDeleted);
       serverConnection.off("CategoryUpdated", handleCategoryUpdated);
@@ -582,139 +580,47 @@ const ServerPanel = ({
   }, [selectedServer, fetchServerData]);
 
 
+  // Единое соединение (AppHub) из ConnectionContext + ref-counted вступление в группу server:{id}.
   useEffect(() => {
     let isMounted = true;
-    
-    if (currentServerRef.current === selectedServer?.serverId && 
-        connectionRef.current && 
-        connectionRef.current.state === 'Connected') {
-      console.log('Connection already exists and is connected, skipping...');
-      return;
+    const serverId = selectedServer?.serverId;
+
+    if (!serverId || !user?.id || !getSharedConnection || !acquireGroup) {
+      return undefined;
     }
-    
+
+    let releaseGroup = null;
+    let attachedConnection = null;
+
+    const handleMemberAdded = (data) => {
+      if (!isMounted) return;
+      console.log('MemberAdded event received:', data);
+    };
+    const handleHubError = (errorMessage) => {
+      if (!isMounted) return;
+      console.error('AppHub error:', errorMessage);
+    };
+
     const connectToServer = async () => {
-      console.log('connectToServer: selectedServer?.serverId:', selectedServer?.serverId, 'user?.userId:', user?.userId, 'user?.id:', user?.id);
-      if (!selectedServer?.serverId || !user?.id) return;
-      
-      if (currentServerRef.current === selectedServer.serverId && 
-          connectionRef.current && 
-          (connectionRef.current.state === 'Connected' || connectionRef.current.state === 'Connecting')) {
-        console.log('Connection already exists for this server, skipping...');
-        return;
-      }
-      
-      if (isConnectingRef.current) {
-        console.log('Connection already in progress, skipping...');
-        return;
-      }
-      
+      if (isConnectingRef.current) return;
       isConnectingRef.current = true;
-      
-      if (connectionRef.current) {
-        console.log('Stopping existing connection...');
-        const previousServerId = currentServerRef.current;
-        await         connectionRef.current.stop();
-        connectionRef.current = null;
-        setServerConnection(null);
-        clearServerHubConnection(previousServerId);
-      }
-      console.log('ServerPanel: Creating connection to serverhub with userId:', user.id);
-      const newConnection = new HubConnectionBuilder()
-        .withUrl(`${BASE_URL}/serverhub?userId=${user.id}`, {
-          skipNegotiation: true,
-          transport: 1
-        })
-        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
-        .build();
-      console.log('ServerPanel: Connection created, starting...');
-
-      const rejoinServerGroup = () => {
-        if (selectedServer?.serverId) {
-          setServerHubConnection(newConnection, selectedServer.serverId);
-          setTimeout(() => {
-            newConnection.invoke("JoinServerGroup", selectedServer.serverId.toString())
-              .catch(error => console.error('Error rejoining server group:', error));
-          }, 200);
-        }
-      };
-
-      newConnection.onreconnected(() => {
-        rejoinServerGroup();
-      });
-
-      newConnection.onclose(() => {
-        window.setTimeout(() => {
-          void (async () => {
-            if (connectionRef.current !== newConnection) return;
-            const started = await ensureHubStarted(newConnection, 'serverhub');
-            if (started) rejoinServerGroup();
-          })();
-        }, 1500);
-      });
-
       try {
-        console.log('ServerPanel: Attempting to start connection...');
-        await newConnection.start();
-        console.log('ServerPanel: Connection started successfully');
-        
-        if (!isMounted) {
-          console.log('Component unmounted during connection, stopping...');
-          await newConnection.stop();
-          return;
-        }
-        
-        if (!isMounted) {
-          console.log('Component unmounted before setting connection, stopping...');
-          await newConnection.stop();
-          return;
-        }
-        
-        connectionRef.current = newConnection;
-        setServerConnection(newConnection);
-        setServerHubConnection(newConnection, selectedServer.serverId);
-        currentServerRef.current = selectedServer.serverId;
-        console.log('Connected to server hub');
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        try {
-          await newConnection.invoke("JoinServerGroup", selectedServer.serverId.toString());
-          console.log('ServerPanel: Successfully connected to serverhub and joined group');
-        } catch (error) {
-          console.error('ServerPanel: Error joining server group:', error);
-        }
-        
-        if (!isMounted) {
-          console.log('Component unmounted before adding handlers, stopping...');
-          await newConnection.stop();
-          return;
-        }
-        
-        // SignalR event handlers are registered in useEffect above
+        const conn = await getSharedConnection('hub', user.id);
+        if (!isMounted) return;
 
-        newConnection.on("MemberAdded", (data) => {
-          if (!isMounted) return;
-          console.log('MemberAdded event received:', data);
-        });
+        attachedConnection = conn;
+        conn.on('MemberAdded', handleMemberAdded);
+        conn.on('Error', handleHubError);
 
-        newConnection.on("ServerLeft", (serverId) => {
-          if (!isMounted) return;
-          console.log('ServerLeft event received in ServerPanel:', serverId);
-        });
+        // Группа переподписывается автоматически после реконнекта (ConnectionContext).
+        releaseGroup = acquireGroup('server', String(serverId));
 
-        newConnection.on("ServerDeleted", (serverId) => {
-          if (!isMounted) return;
-          console.log('ServerDeleted event received in ServerPanel:', serverId);
-        });
-
-        newConnection.on("Error", (errorMessage) => {
-          if (!isMounted) return;
-          console.error('ServerHub error:', errorMessage);
-        });
-        
+        connectionRef.current = conn;
+        currentServerRef.current = serverId;
+        setServerHubConnection(conn, serverId);
+        setServerConnection(conn);
       } catch (error) {
-        console.error('Error connecting to server hub:', error);
-        console.log('ServerPanel: Connection failed, connectionRef.current:', connectionRef.current);
+        console.error('Error attaching to hub for server:', error);
       } finally {
         isConnectingRef.current = false;
       }
@@ -722,48 +628,24 @@ const ServerPanel = ({
 
     connectToServer();
 
-    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
-      const connection = connectionRef.current;
-      if (!connection || !isMounted) return;
-      void (async () => {
-        const started = await ensureHubStarted(connection, 'serverhub');
-        if (!started || !isMounted) return;
-        if (selectedServer?.serverId) {
-          setServerHubConnection(connection, selectedServer.serverId);
-          try {
-            await connection.invoke('JoinServerGroup', selectedServer.serverId.toString());
-          } catch (error) {
-            console.error('Error rejoining server group after network recovery:', error);
-          }
-        }
-      })();
-    });
-
     return () => {
       isMounted = false;
-      unsubscribeNetwork();
       isConnectingRef.current = false;
-      currentServerRef.current = null;
-      if (connectionRef.current) {
-        connectionRef.current.off("ChatCreated");
-        connectionRef.current.off("ChatDeleted");
-        connectionRef.current.off("ChatUpdated");
-        connectionRef.current.off("CategoryCreated");
-        connectionRef.current.off("CategoryDeleted");
-        connectionRef.current.off("CategoriesReordered");
-        connectionRef.current.off("ChatsReordered");
-        connectionRef.current.off("MemberAdded");
-        connectionRef.current.off("ServerLeft");
-        connectionRef.current.off("ServerDeleted");
-        connectionRef.current.off("Error");
-        
-        const disconnectedServerId = selectedServer?.serverId;
-        connectionRef.current.stop();
-        setServerConnection(null);
-        clearServerHubConnection(disconnectedServerId);
+      if (attachedConnection) {
+        attachedConnection.off('MemberAdded', handleMemberAdded);
+        attachedConnection.off('Error', handleHubError);
       }
+      if (releaseGroup) {
+        releaseGroup();
+      }
+      if (currentServerRef.current === serverId) {
+        currentServerRef.current = null;
+      }
+      connectionRef.current = null;
+      setServerConnection(null);
+      clearServerHubConnection(serverId);
     };
-  }, [selectedServer?.serverId, user?.id, onServerDataUpdated, user?.userId]); // Возвращаем все зависимости
+  }, [selectedServer?.serverId, user?.id, getSharedConnection, acquireGroup]);
 
 
   const memoizedCategories = useMemo(() => {
@@ -920,7 +802,7 @@ const ServerPanel = ({
         channelIdType: typeof channelId
       });
       
-      await serverConnection.invoke("DeleteChat", 
+      await serverConnection.invoke("DeleteChannel", 
         serverId,
         channelId
       );

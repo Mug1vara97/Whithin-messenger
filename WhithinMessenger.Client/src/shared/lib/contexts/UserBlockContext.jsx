@@ -116,17 +116,18 @@ export const UserBlockProvider = ({ children }) => {
     if (!userId || !getConnection) return undefined;
 
     let mounted = true;
+    const events = ['UserBlocked', 'UserUnblocked', 'BlockedByUser', 'UnblockedByUser'];
+    const handler = () => refreshBlockedUsers();
 
     const setup = async () => {
       try {
-        const connection = await getConnection('friendhub', userId);
+        const connection = await getConnection('hub', userId);
         if (!mounted) return;
         connectionRef.current = connection;
 
-        connection.on('UserBlocked', () => refreshBlockedUsers());
-        connection.on('UserUnblocked', () => refreshBlockedUsers());
-        connection.on('BlockedByUser', () => refreshBlockedUsers());
-        connection.on('UnblockedByUser', () => refreshBlockedUsers());
+        for (const eventName of events) {
+          connection.on(eventName, handler);
+        }
       } catch (error) {
         console.error('UserBlockProvider: subscribe failed', error);
       }
@@ -136,11 +137,11 @@ export const UserBlockProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      // Соединение общее — снимаем только свои хендлеры.
       if (connectionRef.current) {
-        connectionRef.current.off('UserBlocked');
-        connectionRef.current.off('UserUnblocked');
-        connectionRef.current.off('BlockedByUser');
-        connectionRef.current.off('UnblockedByUser');
+        for (const eventName of events) {
+          connectionRef.current.off(eventName, handler);
+        }
       }
       connectionRef.current = null;
     };

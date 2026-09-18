@@ -28,13 +28,13 @@ public class MessageReceiptService : IMessageReceiptService
     private readonly IChatRepository _chatRepository;
     private readonly IUserRepository _userRepository;
     private readonly IMessageRepository _messageRepository;
-    private readonly IHubContext<GroupChatHub> _groupChatHub;
+    private readonly IHubContext<AppHub> _groupChatHub;
 
     public MessageReceiptService(
         IChatRepository chatRepository,
         IUserRepository userRepository,
         IMessageRepository messageRepository,
-        IHubContext<GroupChatHub> groupChatHub)
+        IHubContext<AppHub> groupChatHub)
     {
         _chatRepository = chatRepository;
         _userRepository = userRepository;
@@ -102,13 +102,13 @@ public class MessageReceiptService : IMessageReceiptService
             return;
         }
 
-        await _groupChatHub.Clients.Group(chatId.ToString())
+        await _groupChatHub.Clients.Group(HubGroups.Chat(chatId))
             .SendAsync("MessageStatusChanged", messageId, status, cancellationToken);
     }
 
     private async Task<bool> IsRecipientReachableAsync(Guid userId, CancellationToken cancellationToken)
     {
-        if (NotificationHub.HasActiveConnection(userId) || GroupChatHub.HasActiveConnection(userId))
+        if (AppHub.HasActiveConnection(userId))
         {
             return true;
         }

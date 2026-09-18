@@ -57,6 +57,7 @@ const HomePage = () => {
   const { openSettings, closeSettings, isSettingsOpen } = useProfileModal();
   const connectionContext = useConnectionContext();
   const getConnection = connectionContext?.getConnection;
+  const acquireGroup = connectionContext?.acquireGroup;
   
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -122,7 +123,8 @@ const HomePage = () => {
   const localCallAcceptChatIdRef = useRef(null);
   const ringtoneAudioRef = useRef(null);
   const outgoingRingtoneAudioRef = useRef(null);
-  const joinedChatGroupsRef = useRef(new Set());
+  /** chatId -> release() из ConnectionContext.acquireGroup */
+  const joinedChatGroupsRef = useRef(new Map());
   const chatsRef = useRef([]);
   const callerProfilesRef = useRef(new Map());
   const waitingForRingtoneGestureRef = useRef(false);
@@ -472,28 +474,40 @@ const HomePage = () => {
   }, [getConnection, user?.id, user?.username, navigate, handleJoinVoiceChannel, forceEndOutgoingRingingCall, stopOutgoingCallRingtone]);
 
   useEffect(() => {
-    if (!groupChatConnection || groupChatConnection.state !== 'Connected' || !Array.isArray(chats)) return;
+    if (!groupChatConnection || groupChatConnection.state !== 'Connected' || !Array.isArray(chats) || !acquireGroup) return;
 
+    // Соединение общее с useChat: членство в группах — через ref-count в ConnectionContext,
+    // переподписка после реконнекта там же.
+    const wantedChatIds = new Set();
     chats.forEach((chat) => {
       const chatIdValue = String(chat.chatId || chat.chat_id || '');
-      if (!chatIdValue || joinedChatGroupsRef.current.has(chatIdValue)) return;
-
-      groupChatConnection
-        .invoke('JoinGroup', chatIdValue)
-        .then(() => {
-          joinedChatGroupsRef.current.add(chatIdValue);
-        })
-        .catch((error) => {
-          console.warn('HomePage: failed to join chat group for incoming calls:', chatIdValue, error);
-        });
+      if (!chatIdValue) return;
+      wantedChatIds.add(chatIdValue);
+      if (joinedChatGroupsRef.current.has(chatIdValue)) return;
+      joinedChatGroupsRef.current.set(chatIdValue, acquireGroup('chat', chatIdValue));
     });
+
+    // Чаты, которых больше нет в списке (удалены/покинуты), отпускаем.
+    for (const [chatIdValue, release] of Array.from(joinedChatGroupsRef.current.entries())) {
+      if (!wantedChatIds.has(chatIdValue)) {
+        joinedChatGroupsRef.current.delete(chatIdValue);
+        release();
+      }
+    }
 
     groupChatConnection
       .invoke('AcknowledgePendingDeliveries')
       .catch((error) => {
         console.warn('HomePage: AcknowledgePendingDeliveries failed:', error);
       });
-  }, [chats, groupChatConnection]);
+  }, [chats, groupChatConnection, acquireGroup]);
+
+  useEffect(() => () => {
+    for (const release of joinedChatGroupsRef.current.values()) {
+      release();
+    }
+    joinedChatGroupsRef.current.clear();
+  }, []);
 
   const activeIncomingCallKey = incomingCall
     ? `${incomingCall.chatId}:${incomingCall.callerId || incomingCall.callerName || ''}`

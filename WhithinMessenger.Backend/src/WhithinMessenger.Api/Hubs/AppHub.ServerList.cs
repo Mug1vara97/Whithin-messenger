@@ -7,42 +7,18 @@ using System.Security.Claims;
 
 namespace WhithinMessenger.Api.Hubs;
 
-public class ServerListHub : Hub
+/// <summary>
+/// ServerList-домен единого хаба (бывший ServerListHub): список серверов пользователя,
+/// создание/вступление, порядок. Группы: HubGroups.ServerList(userId).
+/// </summary>
+public partial class AppHub
 {
-    private readonly IMediator _mediator;
-    private readonly IServerRepository _serverRepository;
-
-    public ServerListHub(IMediator mediator, IServerRepository serverRepository)
-    {
-        _mediator = mediator;
-        _serverRepository = serverRepository;
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        // Сначала пробуем получить из JWT claims
-        var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
-        if (Guid.TryParse(userIdClaim, out var userId))
-        {
-            return userId;
-        }
-
-        // Fallback на query parameter (для совместимости)
-        var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
-        if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
-        {
-            return userIdFromQueryParsed;
-        }
-
-        return null;
-    }
-
     public async Task JoinServerListGroup()
     {
         var userId = GetCurrentUserId();
         if (userId != null)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"serverlist_{userId}");
+            await Groups.AddToGroupAsync(Context.ConnectionId, HubGroups.ServerList(userId.Value));
         }
     }
 
@@ -51,7 +27,7 @@ public class ServerListHub : Hub
         var userId = GetCurrentUserId();
         if (userId != null)
         {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"serverlist_{userId}");
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, HubGroups.ServerList(userId.Value));
         }
     }
 
@@ -184,7 +160,7 @@ public class ServerListHub : Hub
             var userId = GetCurrentUserId();
             if (userId != null)
             {
-                await Clients.Group($"serverlist_{userId}").SendAsync("ServerListUpdated");
+                await Clients.Group(HubGroups.ServerList(userId.Value)).SendAsync("ServerListUpdated");
             }
         }
         catch (Exception ex)
@@ -212,7 +188,7 @@ public class ServerListHub : Hub
             await _serverRepository.SaveUserServerOrderAsync(userId.Value, serverIds, Context.ConnectionAborted);
 
             // Синхронизируем все вкладки/устройства текущего пользователя.
-            await Clients.Group($"serverlist_{userId.Value}").SendAsync("ServerListUpdated");
+            await Clients.Group(HubGroups.ServerList(userId.Value)).SendAsync("ServerListUpdated");
         }
         catch (Exception ex)
         {
@@ -220,47 +196,4 @@ public class ServerListHub : Hub
         }
     }
 
-    public async Task NotifyUserAddedToServer(Guid userId, Guid serverId, Guid addedBy)
-    {
-        try
-        {
-            Console.WriteLine($"ServerListHub: Notifying user {userId} that they were added to server {serverId}");
-            await Clients.User(userId.ToString()).SendAsync("YouWereAddedToServer", new
-            {
-                serverId,
-                addedBy
-            });
-            Console.WriteLine($"ServerListHub: YouWereAddedToServer sent successfully to user {userId}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"ServerListHub: Error sending YouWereAddedToServer to user {userId}: {ex.Message}");
-        }
-    }
-
-    public static async Task NotifyUserAddedToServer(IServiceProvider? serviceProvider, Guid userId, Guid serverId, Guid addedBy)
-    {
-        try
-        {
-            Console.WriteLine($"ServerListHub: Static method - Notifying user {userId} that they were added to server {serverId}");
-            if (serviceProvider != null)
-            {
-                var hubContext = serviceProvider.GetRequiredService<IHubContext<ServerListHub>>();
-                await hubContext.Clients.User(userId.ToString()).SendAsync("YouWereAddedToServer", new
-                {
-                    serverId,
-                    addedBy
-                });
-                Console.WriteLine($"ServerListHub: Static method - YouWereAddedToServer sent successfully to user {userId}");
-            }
-            else
-            {
-                Console.WriteLine($"ServerListHub: Static method - ServiceProvider is null");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"ServerListHub: Static method - Error sending YouWereAddedToServer to user {userId}: {ex.Message}");
-        }
-    }
 }

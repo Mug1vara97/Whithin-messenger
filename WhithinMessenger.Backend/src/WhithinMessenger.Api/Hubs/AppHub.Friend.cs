@@ -12,15 +12,12 @@ using WhithinMessenger.Application.CommandsAndQueries.Friends.SendFriendRequest;
 
 namespace WhithinMessenger.Api.Hubs;
 
-public class FriendHub : Hub
+/// <summary>
+/// Friend-домен единого хаба (бывший FriendHub). Push-события (FriendRequestReceived, FriendAdded, ...)
+/// шлёт FriendRealtimeNotifier через IHubContext&lt;AppHub&gt; в группу HubGroups.User(userId).
+/// </summary>
+public partial class AppHub
 {
-    private readonly IMediator _mediator;
-
-    public FriendHub(IMediator mediator)
-    {
-        _mediator = mediator;
-    }
-
     public async Task<IEnumerable<object>> GetFriends()
     {
         var userId = GetCurrentUserIdOrThrow();
@@ -120,55 +117,5 @@ public class FriendHub : Hub
         }
 
         return new { success = true };
-    }
-
-    public override async Task OnConnectedAsync()
-    {
-        var userId = GetCurrentUserId();
-        if (userId.HasValue)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
-        }
-
-        await base.OnConnectedAsync();
-    }
-
-    public override async Task OnDisconnectedAsync(Exception? exception)
-    {
-        var userId = GetCurrentUserId();
-        if (userId.HasValue)
-        {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user-{userId}");
-        }
-
-        await base.OnDisconnectedAsync(exception);
-    }
-
-    private Guid GetCurrentUserIdOrThrow()
-    {
-        var userId = GetCurrentUserId();
-        if (!userId.HasValue)
-        {
-            throw new HubException("Пользователь не авторизован");
-        }
-
-        return userId.Value;
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userIdClaim = Context.User?.FindFirst("UserId")?.Value;
-        if (Guid.TryParse(userIdClaim, out var userId))
-        {
-            return userId;
-        }
-
-        var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].FirstOrDefault();
-        if (Guid.TryParse(userIdFromQuery, out var userIdFromQueryParsed))
-        {
-            return userIdFromQueryParsed;
-        }
-
-        return null;
     }
 }

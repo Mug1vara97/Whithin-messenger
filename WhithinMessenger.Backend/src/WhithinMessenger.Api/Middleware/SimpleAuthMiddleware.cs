@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using WhithinMessenger.Domain.Models;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
+using WhithinMessenger.Api.Hubs;
 
 namespace WhithinMessenger.Api.Middleware;
 
@@ -20,11 +21,7 @@ public class SimpleAuthMiddleware
     {
         _logger.LogInformation($"SimpleAuthMiddleware: Processing request to {context.Request.Path}");
 
-        if (context.Request.Path.StartsWithSegments("/chatlisthub") || 
-            context.Request.Path.StartsWithSegments("/groupchathub") ||
-            context.Request.Path.StartsWithSegments("/serverhub") ||
-            context.Request.Path.StartsWithSegments("/serverlisthub") ||
-            context.Request.Path.StartsWithSegments("/notificationhub"))
+        if (HubRoutes.IsHubPath(context.Request.Path))
         {
             _logger.LogInformation($"SimpleAuthMiddleware: SignalR request, skipping auth for {context.Request.Path}");
             

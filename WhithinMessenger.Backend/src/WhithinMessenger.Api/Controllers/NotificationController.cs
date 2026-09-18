@@ -20,23 +20,20 @@ public class NotificationController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IMessageRepository _messageRepository;
-    private readonly IHubContext<ChatListHub> _chatListHub;
-    private readonly IHubContext<GroupChatHub> _groupChatHub;
+    private readonly IHubContext<AppHub> _hub;
     private readonly IChatRepository _chatRepository;
     private readonly WhithinMessenger.Application.Services.IUserPushTokenStore _userPushTokenStore;
 
     public NotificationController(
         IMediator mediator,
         IMessageRepository messageRepository,
-        IHubContext<ChatListHub> chatListHub,
-        IHubContext<GroupChatHub> groupChatHub,
+        IHubContext<AppHub> hub,
         IChatRepository chatRepository,
         WhithinMessenger.Application.Services.IUserPushTokenStore userPushTokenStore)
     {
         _mediator = mediator;
         _messageRepository = messageRepository;
-        _chatListHub = chatListHub;
-        _groupChatHub = groupChatHub;
+        _hub = hub;
         _chatRepository = chatRepository;
         _userPushTokenStore = userPushTokenStore;
     }
@@ -164,7 +161,7 @@ public class NotificationController : ControllerBase
         }
 
         var unreadCount = await _messageRepository.GetUnreadCountByChatAsync(chatId, userId.Value);
-        await _chatListHub.Clients.Group($"user-{userId.Value}")
+        await _hub.Clients.Group(HubGroups.User(userId.Value))
             .SendAsync("chatunreadupdated", chatId, unreadCount);
 
         if (result.MarkedMessages.Count > 0)
@@ -179,7 +176,7 @@ public class NotificationController : ControllerBase
 
             foreach (var receipt in result.MarkedMessages)
             {
-                await _groupChatHub.Clients.Group(chatId.ToString())
+                await _hub.Clients.Group(HubGroups.Chat(chatId))
                     .SendAsync("MessageRead", receipt.MessageId, userId.Value, readAt);
             }
 
@@ -199,7 +196,7 @@ public class NotificationController : ControllerBase
 
                     foreach (var (messageId, status) in statuses)
                     {
-                        await _groupChatHub.Clients.Group(chatId.ToString())
+                        await _hub.Clients.Group(HubGroups.Chat(chatId))
                             .SendAsync("MessageStatusChanged", messageId, status);
                     }
                 }

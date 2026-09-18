@@ -25,9 +25,9 @@ namespace WhithinMessenger.Api.Controllers
     {
         private const bool E2eTempDisabled = true;
         private readonly IMediator _mediator;
-        private readonly IHubContext<GroupChatHub> _groupChatHub;
+        private readonly IHubContext<AppHub> _groupChatHub;
 
-        public ChatController(IMediator mediator, IHubContext<GroupChatHub> groupChatHub)
+        public ChatController(IMediator mediator, IHubContext<AppHub> groupChatHub)
         {
             _mediator = mediator;
             _groupChatHub = groupChatHub;
@@ -219,7 +219,7 @@ namespace WhithinMessenger.Api.Controllers
                 if (result.ChatId.HasValue)
                 {
                     await _groupChatHub.Clients
-                        .Group(result.ChatId.Value.ToString())
+                        .Group(HubGroups.Chat(result.ChatId.Value))
                         .SendAsync("MessageDeleted", result.MessageId);
                 }
 

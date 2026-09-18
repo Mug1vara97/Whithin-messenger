@@ -25,7 +25,7 @@ namespace WhithinMessenger.Api.Controllers;
 public class StickersController : ControllerBase
 {
     private readonly IMediator _mediator;
-    private readonly IHubContext<GroupChatHub> _hubContext;
+    private readonly IHubContext<AppHub> _hubContext;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly IMessageRepository _messageRepository;
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
@@ -33,7 +33,7 @@ public class StickersController : ControllerBase
 
     public StickersController(
         IMediator mediator,
-        IHubContext<GroupChatHub> hubContext,
+        IHubContext<AppHub> hubContext,
         IMessageReceiptService messageReceiptService,
         IMessageRepository messageRepository,
         ChatMessageNotificationService chatMessageNotificationService,
@@ -262,7 +262,7 @@ public class StickersController : ControllerBase
                     }
                 }
 
-                await _hubContext.Clients.Group(chatId.ToString()).SendAsync("MessageSent",
+                await _hubContext.Clients.Group(HubGroups.Chat(chatId)).SendAsync("MessageSent",
                     new
                     {
                         messageId = result.MessageId,

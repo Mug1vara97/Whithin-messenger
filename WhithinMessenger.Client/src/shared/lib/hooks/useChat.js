@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { BASE_URL } from '../constants/apiEndpoints';
+import { HubConnectionState } from '@microsoft/signalr';
+import { useConnectionContext } from '../contexts/ConnectionContext';
 import { MessageStatus } from '../../../entities/message/model/types';
 import {
   isOwnMessage,
@@ -15,14 +15,10 @@ import {
   ensureChatKey,
   E2eEncryptionError,
   E2E_CHAT_KEY_SYNCED_EVENT,
+  E2E_DISABLED_PLACEHOLDER_TEXT,
+  E2E_ENABLED,
   proactiveSyncChatDeviceWraps,
 } from '../e2e';
-import {
-  SIGNALR_RECONNECT_DELAYS_MS,
-  ensureHubStarted,
-  subscribeNetworkRecovery,
-} from '../signalr/reconnectPolicy';
-
 const TYPING_IDLE_MS = 3000;
 /** Повторный пинг, чтобы у получателя сбрасывался 5‑секундный таймер. */
 const TYPING_HEARTBEAT_MS = 2000;
@@ -37,12 +33,22 @@ export const formatTypingLabel = (users) => {
 
 export const useChat = (chatId, username, userId, displayName, options = {}) => {
   const {
-    e2eEnabled = true,
+    // Глобальный выключатель E2E имеет приоритет над опцией вызывающего.
+    e2eEnabled: e2eEnabledOption = E2E_ENABLED,
     getMemberUserIds = () => [],
     peerUserId = null,
     e2eMembersVersion = 0,
     strictAllMembers = false,
   } = options;
+  const e2eEnabled = E2E_ENABLED && e2eEnabledOption;
+  const connectionContext = useConnectionContext();
+  const getSharedConnection = connectionContext?.getConnection;
+  const acquireGroup = connectionContext?.acquireGroup;
+  const ensureGroupJoined = connectionContext?.ensureGroupJoined;
+  const subscribeReconnected = connectionContext?.onReconnected;
+  const subscribeReconnecting = connectionContext?.onReconnecting;
+  const subscribeClosed = connectionContext?.onClose;
+
   const [messages, setMessages] = useState([]);
   const [connection, setConnection] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -332,13 +338,22 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
   }, [normalizeForwardedMessage, normalizeMediaFile, normalizePoll, normalizeSticker, userId, username]);
 
   const decryptMessageContent = useCallback(async (message) => {
-    if (!message || !e2eEnabled || !userId || !chatId) {
+    if (!message) {
       return message;
     }
 
     const encryptionVersion = message.encryptionVersion ?? 0;
     if (encryptionVersion <= 0) {
       return message;
+    }
+
+    // E2E выключен: старые зашифрованные сообщения показываем заглушкой вместо JSON-конверта.
+    if (!e2eEnabled || !userId || !chatId) {
+      return {
+        ...message,
+        content: E2E_DISABLED_PLACEHOLDER_TEXT,
+        isE2e: true,
+      };
     }
 
     const memberUserIds = [...getMemberUserIds()];
@@ -368,7 +383,8 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       .filter(Boolean);
 
     if (!e2eEnabled || !userId || !chatId) {
-      return normalized;
+      // Без E2E ключи не тянем, но заглушку для старых зашифрованных сообщений всё равно ставим.
+      return Promise.all(normalized.map((message) => decryptMessageContent(message)));
     }
 
     const hasEncrypted = normalized.some((message) => (message.encryptionVersion ?? 0) > 0);
@@ -676,112 +692,104 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
       typingIdleTimerRef.current = null;
     }
 
+    // Соединение общее для всего приложения: здесь мы только вешаем/снимаем свои хендлеры
+    // и входим/выходим из группы чата. connection.stop() здесь вызывать нельзя.
+    const attachedHandlers = [];
+    const attach = (conn, eventName, handler) => {
+      conn.on(eventName, handler);
+      attachedHandlers.push([eventName, handler]);
+    };
     const detachHandlers = (conn) => {
       if (!conn) return;
-      conn.off('MessageSent');
-      conn.off('MessageEdited');
-      conn.off('MessageDeleted');
-      conn.off('MessageStatusChanged');
-      conn.off('MessageDelivered');
-      conn.off('MessageRead');
-      conn.off('ReceiveMessages');
-      conn.off('ReceiveMessagesMeta');
-      conn.off('UserTyping');
-      conn.off('UserStoppedTyping');
-      conn.off('MessagePinned');
-      conn.off('MessageUnpinned');
-      conn.off('ReceivePinnedMessages');
-      conn.off('PollUpdated');
-      conn.off('Error');
+      for (const [eventName, handler] of attachedHandlers) {
+        conn.off(eventName, handler);
+      }
+      attachedHandlers.length = 0;
     };
 
-    const stopConnection = async (conn, leaveChatId) => {
+    // Членство в группе чата держим через ConnectionContext (с подсчётом ссылок):
+    // HomePage тоже состоит в группах всех чатов ради входящих звонков.
+    let releaseChatGroup = null;
+
+    const leaveChatRoom = async (conn) => {
       if (!conn) return;
       detachHandlers(conn);
-      try {
-        if (conn.state === HubConnectionState.Connected && leaveChatId) {
-          await conn.invoke('LeaveGroup', leaveChatId);
-        }
-        if (conn.state !== HubConnectionState.Disconnected) {
-          await conn.stop();
-        }
-      } catch (err) {
-        console.warn('stopConnection:', err);
+      if (releaseChatGroup) {
+        const release = releaseChatGroup;
+        releaseChatGroup = null;
+        release();
       }
     };
 
+    const unsubscribers = [];
+
     const connect = async () => {
       if (loadGenerationRef.current !== loadGen) return;
+      if (!getSharedConnection || !acquireGroup) {
+        setError('SignalR connection is not available');
+        setIsLoading(false);
+        return;
+      }
 
-      const previousChatId = currentChatIdRef.current;
       const existingConnection = connectionRef.current;
       if (existingConnection) {
         connectionRef.current = null;
         currentChatIdRef.current = null;
         setConnection(null);
         setIsConnected(false);
-        await stopConnection(existingConnection, previousChatId);
+        await leaveChatRoom(existingConnection);
       }
 
       if (loadGenerationRef.current !== loadGen) return;
 
-      const newConnection = new HubConnectionBuilder()
-        .withUrl(`${BASE_URL}/groupchathub?userId=${userId}`)
-        .withAutomaticReconnect(SIGNALR_RECONNECT_DELAYS_MS)
-        .configureLogging(LogLevel.Error)
-        .build();
+      let newConnection;
+      try {
+        newConnection = await getSharedConnection('hub', userId);
+      } catch (err) {
+        if (loadGenerationRef.current !== loadGen) return;
+        console.error('Connection failed: ', err);
+        setError('Ошибка подключения к чату: ' + err.message);
+        setIsLoading(false);
+        return;
+      }
 
-      const rejoinChatRoom = async () => {
+      if (loadGenerationRef.current !== loadGen) return;
+
+      // Переподписка на группу после реконнекта делается в ConnectionContext.
+      const handleReconnected = () => {
         if (loadGenerationRef.current !== loadGen) return;
         if (connectionRef.current !== newConnection) return;
-        try {
-          await newConnection.invoke('JoinGroup', chatId);
+        if (newConnection.state !== HubConnectionState.Connected) return;
+        setIsConnected(true);
+        setError(null);
+      };
+
+      if (subscribeReconnecting) {
+        unsubscribers.push(subscribeReconnecting(() => {
           if (loadGenerationRef.current !== loadGen) return;
-          setIsConnected(true);
-          setError(null);
-        } catch (err) {
-          console.warn('JoinGroup after reconnect failed:', err);
-        }
-      };
-
-      const recoverChatConnection = async () => {
-        if (loadGenerationRef.current !== loadGen) return;
-        if (connectionRef.current !== newConnection) return;
-        const started = await ensureHubStarted(newConnection, 'groupchathub');
-        if (!started || loadGenerationRef.current !== loadGen) return;
-        await rejoinChatRoom();
-      };
-
-      newConnection.onreconnecting(() => {
-        if (loadGenerationRef.current !== loadGen) return;
-        setIsConnected(false);
-      });
-
-      newConnection.onreconnected(async () => {
-        await rejoinChatRoom();
-      });
-
-      newConnection.onclose(() => {
-        if (loadGenerationRef.current !== loadGen) return;
-        setIsConnected(false);
-        window.setTimeout(() => {
-          void recoverChatConnection();
-        }, 1500);
-      });
+          setIsConnected(false);
+        }));
+      }
+      if (subscribeReconnected) {
+        unsubscribers.push(subscribeReconnected(handleReconnected));
+      }
+      if (subscribeClosed) {
+        unsubscribers.push(subscribeClosed(() => {
+          if (loadGenerationRef.current !== loadGen) return;
+          setIsConnected(false);
+        }));
+      }
 
       try {
-        await newConnection.start();
-        if (loadGenerationRef.current !== loadGen) {
-          await stopConnection(newConnection, null);
-          return;
-        }
-
         connectionRef.current = newConnection;
         setConnection(newConnection);
-        setIsConnected(true);
+        setIsConnected(newConnection.state === HubConnectionState.Connected);
 
         const receiveMessageHandler = async (messageData) => {
           if (loadGenerationRef.current !== loadGen) return;
+          // Соединение состоит в группах всех чатов пользователя — фильтруем по chatId.
+          const eventChatId = messageData?.chatId ?? messageData?.ChatId;
+          if (eventChatId != null && String(eventChatId) !== chatIdStr) return;
           const normalized = normalizeMessage(messageData);
           if (!normalized) return;
           const newMessage = await decryptMessageContent(normalized);
@@ -830,8 +838,14 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
           setPinnedMessages((prev) => prev.filter((msg) => String(msg.messageId) !== String(messageId)));
         };
 
+        const isForeignChatPayload = (payload) => {
+          const eventChatId = payload?.chatId ?? payload?.ChatId;
+          return eventChatId != null && String(eventChatId) !== chatIdStr;
+        };
+
         const messagePinnedHandler = async (payload) => {
           if (loadGenerationRef.current !== loadGen) return;
+          if (isForeignChatPayload(payload)) return;
           const messageId = payload?.messageId ?? payload?.MessageId;
           const pinnedAt = payload?.pinnedAt ?? payload?.PinnedAt ?? new Date().toISOString();
           if (!messageId) return;
@@ -863,6 +877,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
         const messageUnpinnedHandler = async (payload) => {
           if (loadGenerationRef.current !== loadGen) return;
+          if (isForeignChatPayload(payload)) return;
           const messageId = payload?.messageId ?? payload?.MessageId;
           if (!messageId) return;
 
@@ -890,6 +905,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
         const pollUpdatedHandler = (payload) => {
           if (loadGenerationRef.current !== loadGen) return;
+          if (isForeignChatPayload(payload)) return;
           const messageId = payload?.messageId ?? payload?.MessageId;
           const poll = normalizePoll(payload?.poll ?? payload?.Poll);
           const viewerUserId = payload?.viewerUserId ?? payload?.ViewerUserId;
@@ -917,7 +933,7 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
           updateMessageStatus(messageId, status);
         };
 
-        newConnection.on('ReceiveMessagesMeta', (meta) => {
+        const receiveMessagesMetaHandler = (meta) => {
           if (loadGenerationRef.current !== loadGen) return;
           const hasMore = meta?.hasMoreOlder ?? meta?.HasMoreOlder ?? false;
 
@@ -933,9 +949,9 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
           }
 
           setHasMoreOlder(Boolean(hasMore));
-        });
+        };
 
-        newConnection.on('ReceiveMessages', async (messages) => {
+        const receiveMessagesHandler = async (messages) => {
           if (loadGenerationRef.current !== loadGen) return;
           const processedMessages = await decryptMessages(messages);
 
@@ -960,41 +976,44 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
             setPinnedMessages(pinnedFromMessages);
           }
           acknowledgeIncomingMessages(processedMessages);
-        });
+        };
 
-        newConnection.off('MessageSent', receiveMessageHandler);
-        newConnection.on('MessageSent', receiveMessageHandler);
-        newConnection.off('MessageEdited', messageEditedHandler);
-        newConnection.on('MessageEdited', messageEditedHandler);
-        newConnection.off('MessageDeleted', messageDeletedHandler);
-        newConnection.on('MessageDeleted', messageDeletedHandler);
-        newConnection.off('MessageStatusChanged', messageStatusChangedHandler);
-        newConnection.on('MessageStatusChanged', messageStatusChangedHandler);
-        newConnection.off('MessagePinned', messagePinnedHandler);
-        newConnection.on('MessagePinned', messagePinnedHandler);
-        newConnection.off('MessageUnpinned', messageUnpinnedHandler);
-        newConnection.on('MessageUnpinned', messageUnpinnedHandler);
-        newConnection.off('ReceivePinnedMessages', receivePinnedMessagesHandler);
-        newConnection.on('ReceivePinnedMessages', receivePinnedMessagesHandler);
-        newConnection.off('PollUpdated', pollUpdatedHandler);
-        newConnection.on('PollUpdated', pollUpdatedHandler);
-
-        newConnection.on('UserTyping', (eventChatId, typingUserId, typingUsername) => {
+        const userTypingHandler = (eventChatId, typingUserId, typingUsername) => {
           if (String(eventChatId) !== chatIdStr) return;
           addTypingUser(typingUserId, typingUsername);
-        });
+        };
 
-        newConnection.on('UserStoppedTyping', (eventChatId, typingUserId) => {
+        const userStoppedTypingHandler = (eventChatId, typingUserId) => {
           if (String(eventChatId) !== chatIdStr) return;
           removeTypingUser(typingUserId);
-        });
+        };
 
-        newConnection.on('Error', (errorMessage) => {
+        const errorHandler = (errorMessage) => {
+          if (loadGenerationRef.current !== loadGen) return;
           console.error('SignalR Error:', errorMessage);
           setError(errorMessage);
-        });
+        };
 
-        await newConnection.invoke('JoinGroup', chatId);
+        attach(newConnection, 'ReceiveMessagesMeta', receiveMessagesMetaHandler);
+        attach(newConnection, 'ReceiveMessages', receiveMessagesHandler);
+        attach(newConnection, 'MessageSent', receiveMessageHandler);
+        attach(newConnection, 'MessageEdited', messageEditedHandler);
+        attach(newConnection, 'MessageDeleted', messageDeletedHandler);
+        attach(newConnection, 'MessageStatusChanged', messageStatusChangedHandler);
+        attach(newConnection, 'MessagePinned', messagePinnedHandler);
+        attach(newConnection, 'MessageUnpinned', messageUnpinnedHandler);
+        attach(newConnection, 'ReceivePinnedMessages', receivePinnedMessagesHandler);
+        attach(newConnection, 'PollUpdated', pollUpdatedHandler);
+        attach(newConnection, 'UserTyping', userTypingHandler);
+        attach(newConnection, 'UserStoppedTyping', userStoppedTypingHandler);
+        attach(newConnection, 'Error', errorHandler);
+
+        releaseChatGroup = acquireGroup('chat', chatIdStr);
+        if (ensureGroupJoined) {
+          await ensureGroupJoined('chat', chatIdStr);
+        }
+        if (loadGenerationRef.current !== loadGen) return;
+
         await newConnection.invoke('GetMessages', chatId, 50, '');
         await newConnection.invoke('GetPinnedMessages', chatId);
 
@@ -1018,25 +1037,15 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
 
     connect();
 
-    const unsubscribeNetwork = subscribeNetworkRecovery(() => {
-      const conn = connectionRef.current;
-      if (!conn || loadGenerationRef.current !== loadGen) return;
-      void (async () => {
-        const started = await ensureHubStarted(conn, 'groupchathub');
-        if (!started || loadGenerationRef.current !== loadGen) return;
-        if (conn.state !== HubConnectionState.Connected) return;
-        try {
-          await conn.invoke('JoinGroup', chatId);
-          setIsConnected(true);
-          setError(null);
-        } catch (err) {
-          console.warn('JoinGroup after network recovery failed:', err);
-        }
-      })();
-    });
-
     return () => {
-      unsubscribeNetwork();
+      for (const unsubscribe of unsubscribers) {
+        try {
+          unsubscribe();
+        } catch {
+          // ignore
+        }
+      }
+      unsubscribers.length = 0;
       loadGenerationRef.current += 1;
       const cleanup = async () => {
         if (typingIdleTimerRef.current) {
@@ -1050,7 +1059,6 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
         setTypingUsers([]);
 
         const conn = connectionRef.current;
-        const activeChatId = currentChatIdRef.current;
         connectionRef.current = null;
         currentChatIdRef.current = null;
         setConnection(null);
@@ -1061,16 +1069,20 @@ export const useChat = (chatId, username, userId, displayName, options = {}) => 
             if (conn.state === HubConnectionState.Connected && chatId && shouldStopTyping) {
               await conn.invoke('NotifyStopTyping', chatId);
             }
-            await stopConnection(conn, activeChatId || chatId);
           } catch (err) {
             console.error('Cleanup error:', err);
           }
+        }
+        await leaveChatRoom(conn);
+        if (releaseChatGroup) {
+          releaseChatGroup();
+          releaseChatGroup = null;
         }
       };
 
       cleanup();
     };
-  }, [chatId, userId, username, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, completeSearchLoadBatch, decryptMessages, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, tryFinalizePrependBatch, updateMessageStatus]);
+  }, [chatId, userId, username, getSharedConnection, acquireGroup, ensureGroupJoined, subscribeReconnected, subscribeReconnecting, subscribeClosed, addTypingUser, acknowledgeIncomingDelivery, acknowledgeIncomingMessages, clearTypingExpiryTimers, clearTypingHeartbeat, completeSearchLoadBatch, decryptMessages, normalizeMessage, removeTypingUser, replaceOwnOptimisticMessage, tryFinalizePrependBatch, updateMessageStatus]);
 
   useEffect(() => {
     if (messages.length === 0) return;

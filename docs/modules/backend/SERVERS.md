@@ -374,7 +374,7 @@ sequenceDiagram
 }
 ```
 
-## SignalR Events (ServerHub)
+## SignalR Events (AppHub, группа `server:{serverId}`)
 
 **ServerCreated**: Уведомление о создании сервера
 

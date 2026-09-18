@@ -77,28 +77,33 @@ export const useFriends = () => {
     if (!user?.id) return;
 
     let mounted = true;
+    let unbind = null;
+
+    const handleFriendAdded = () => {
+      fetchFriends();
+    };
+    const handleFriendRemoved = (data) => {
+      setFriends(prev => prev.filter(friend => friend.userId !== data.friendId));
+    };
+    const handleFriendRequestAccepted = () => {
+      fetchFriends();
+    };
 
     const setupRealtime = async () => {
       try {
         const connection = await getFriendConnection();
-        if (!mounted) return;
+        if (!mounted || !connection) return;
 
-        connection.on('FriendAdded', (data) => {
-          console.log('FriendAdded event:', data);
-          fetchFriends();
-        });
+        connection.on('FriendAdded', handleFriendAdded);
+        connection.on('FriendRemoved', handleFriendRemoved);
+        connection.on('FriendRequestAccepted', handleFriendRequestAccepted);
 
-        connection.on('FriendRemoved', (data) => {
-          console.log('FriendRemoved event:', data);
-          setFriends(prev => prev.filter(friend => friend.userId !== data.friendId));
-        });
-
-        connection.on('FriendRequestAccepted', (data) => {
-          console.log('FriendRequestAccepted event:', data);
-          fetchFriends();
-        });
-
-        console.log('Friends realtime subscriptions set up');
+        // Соединение общее — снимаем только свои хендлеры (по ссылке).
+        unbind = () => {
+          connection.off('FriendAdded', handleFriendAdded);
+          connection.off('FriendRemoved', handleFriendRemoved);
+          connection.off('FriendRequestAccepted', handleFriendRequestAccepted);
+        };
       } catch (err) {
         console.error('Error setting up friends realtime:', err);
       }
@@ -108,11 +113,7 @@ export const useFriends = () => {
 
     return () => {
       mounted = false;
-      if (connectionRef.current) {
-        connectionRef.current.off('FriendAdded');
-        connectionRef.current.off('FriendRemoved');
-        connectionRef.current.off('FriendRequestAccepted');
-      }
+      if (unbind) unbind();
     };
   }, [user?.id, getFriendConnection, fetchFriends]);
 

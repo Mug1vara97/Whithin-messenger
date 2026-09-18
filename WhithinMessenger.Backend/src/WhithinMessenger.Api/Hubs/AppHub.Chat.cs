@@ -32,7 +32,11 @@ using WhithinMessenger.Domain.Models;
 
 namespace WhithinMessenger.Api.Hubs
 {
-public class GroupChatHub : Hub
+/// <summary>
+/// Chat-домен единого хаба (бывший GroupChatHub): сообщения, звонки, опросы, typing.
+/// Группы: HubGroups.Chat(chatId).
+/// </summary>
+public partial class AppHub
 {
     private const int CallRingTimeoutSeconds = 180;
     // Если инициатор сам отклонил звонок слишком быстро, то из-за гонок/порядка событий может
@@ -53,53 +57,6 @@ public class GroupChatHub : Hub
 
     private static readonly ConcurrentDictionary<Guid, CallSession> CallSessions = new();
     private static readonly ConcurrentDictionary<Guid, CancellationTokenSource> CallRingTimeouts = new();
-
-    private static readonly ConcurrentDictionary<Guid, int> ActiveConnections = new();
-
-    public static bool HasActiveConnection(Guid userId) =>
-        ActiveConnections.TryGetValue(userId, out var count) && count > 0;
-
-    public static void ResetActiveConnections() => ActiveConnections.Clear();
-    private readonly IMediator _mediator;
-    private readonly IHubContext<ChatListHub> _chatListHubContext;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<GroupChatHub> _logger;
-    private readonly INotificationService _notificationService;
-    private readonly IChatRepository _chatRepository;
-    private readonly IMessageRepository _messageRepository;
-    private readonly ChatMessageNotificationService _chatMessageNotificationService;
-    private readonly IMessageReceiptService _messageReceiptService;
-    private readonly IUserRepository _userRepository;
-    private readonly IServerMemberRepository _serverMemberRepository;
-    private readonly IHubContext<NotificationHub> _notificationHubContext;
-
-    public GroupChatHub(
-        IMediator mediator,
-        IHubContext<ChatListHub> chatListHubContext,
-        IHttpContextAccessor httpContextAccessor,
-        ILogger<GroupChatHub> logger,
-        INotificationService notificationService,
-        IChatRepository chatRepository,
-        IMessageRepository messageRepository,
-        ChatMessageNotificationService chatMessageNotificationService,
-        IMessageReceiptService messageReceiptService,
-        IUserRepository userRepository,
-        IServerMemberRepository serverMemberRepository,
-        IHubContext<NotificationHub> notificationHubContext)
-    {
-        _mediator = mediator;
-        _chatListHubContext = chatListHubContext;
-        _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
-        _notificationService = notificationService;
-        _chatRepository = chatRepository;
-        _messageRepository = messageRepository;
-        _chatMessageNotificationService = chatMessageNotificationService;
-        _messageReceiptService = messageReceiptService;
-        _userRepository = userRepository;
-        _serverMemberRepository = serverMemberRepository;
-        _notificationHubContext = notificationHubContext;
-    }
 
     private async Task<(string VisibleName, string? DisplayName, string Login)> ResolveChatSenderIdentityAsync(
         Guid chatId,
@@ -134,7 +91,7 @@ public class GroupChatHub : Hub
         {
             if (Guid.TryParse(chatId, out Guid parsedChatId))
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, parsedChatId.ToString());
+                await Groups.AddToGroupAsync(Context.ConnectionId, HubGroups.Chat(parsedChatId));
             }
         }
 
@@ -142,7 +99,7 @@ public class GroupChatHub : Hub
         {
             if (Guid.TryParse(chatId, out Guid parsedChatId))
             {
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, parsedChatId.ToString());
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, HubGroups.Chat(parsedChatId));
             }
         }
 
@@ -378,7 +335,7 @@ public class GroupChatHub : Hub
                     _logger.LogInformation($"AddUserToGroup: User {parsedTargetUserId} added to group {parsedChatId}");
                     await Clients.Caller.SendAsync("UserAddedToGroup", parsedTargetUserId);
                     
-                    await Clients.Group(chatId).SendAsync("GroupUpdated", "user_added", parsedTargetUserId);
+                    await Clients.Group(HubGroups.Chat(chatId)).SendAsync("GroupUpdated", "user_added", parsedTargetUserId);
                 }
                 else
                 {
@@ -471,7 +428,7 @@ public class GroupChatHub : Hub
                     string? avatarUrl = userProfile?.Avatar;
                     string? avatarDecoration = userProfile?.AvatarDecoration;
 
-                    await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
+                    await Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId,
                             senderId = userId.Value,
@@ -539,7 +496,7 @@ public class GroupChatHub : Hub
                     
                     if (messageResult.Success && messageResult.Message != null)
                     {
-                        await Clients.Group(messageResult.Message.ChatId.ToString()).SendAsync("MessageEdited", messageId, newContent);
+                        await Clients.Group(HubGroups.Chat(messageResult.Message.ChatId)).SendAsync("MessageEdited", messageId, newContent);
                     }
                     else
                     {
@@ -595,7 +552,7 @@ public class GroupChatHub : Hub
                     if (chatId.HasValue)
                     {
                         _logger.LogInformation($"DeleteMessage: Sending MessageDeleted to group: {chatId}");
-                        await Clients.Group(chatId.Value.ToString()).SendAsync("MessageDeleted", messageId);
+                        await Clients.Group(HubGroups.Chat(chatId.Value)).SendAsync("MessageDeleted", messageId);
                         _logger.LogInformation($"DeleteMessage: MessageDeleted sent successfully");
                     }
                     else
@@ -634,7 +591,7 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                await Clients.Group(HubGroups.Chat(result.ChatId.Value)).SendAsync(
                     "MessagePinned",
                     new
                     {
@@ -667,7 +624,7 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                await Clients.Group(HubGroups.Chat(result.ChatId.Value)).SendAsync(
                     "MessageUnpinned",
                     new
                     {
@@ -750,7 +707,7 @@ public class GroupChatHub : Hub
                 var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
                 var username = senderIdentity.VisibleName;
 
-                await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", new
+                await Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent", new
                 {
                     messageId = message.Id,
                     senderId = userId.Value,
@@ -807,7 +764,7 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                await Clients.Group(result.ChatId.Value.ToString()).SendAsync(
+                await Clients.Group(HubGroups.Chat(result.ChatId.Value)).SendAsync(
                     "PollUpdated",
                     new
                     {
@@ -840,7 +797,7 @@ public class GroupChatHub : Hub
                 if (wasMarked)
                 {
                     var readAt = DateTimeOffset.UtcNow;
-                    await Clients.Group(chatId.ToString()).SendAsync("MessageRead", messageId, userId, readAt);
+                    await Clients.Group(HubGroups.Chat(chatId)).SendAsync("MessageRead", messageId, userId, readAt);
                 }
 
                 await _messageReceiptService.BroadcastMessageStatusAsync(chatId, messageId);
@@ -867,7 +824,7 @@ public class GroupChatHub : Hub
                 if (wasMarked)
                 {
                     var deliveredAt = DateTimeOffset.UtcNow;
-                    await Clients.Group(chatId.ToString()).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
+                    await Clients.Group(HubGroups.Chat(chatId)).SendAsync("MessageDelivered", messageId, userId, deliveredAt);
                 }
 
                 await _messageReceiptService.BroadcastMessageStatusAsync(chatId, messageId);
@@ -957,7 +914,7 @@ public class GroupChatHub : Hub
                     var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
 
                     // Уведомляем всех участников чата о новом медиафайле
-                    await Clients.Group(parsedChatId.ToString()).SendAsync("MessageSent", 
+                    await Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent", 
                         new { 
                             messageId = result.MessageId,
                             senderId = userId.Value,
@@ -1014,7 +971,7 @@ public class GroupChatHub : Hub
         {
             try
             {
-                await Clients.Group(chatId.ToString()).SendAsync("CallStarted", chatId, callerId);
+                await Clients.Group(HubGroups.Chat(chatId)).SendAsync("CallStarted", chatId, callerId);
             }
             catch (Exception ex)
             {
@@ -1026,7 +983,7 @@ public class GroupChatHub : Hub
         {
             try
             {
-                await Clients.Group(chatId.ToString()).SendAsync("CallEnded", chatId);
+                await Clients.Group(HubGroups.Chat(chatId)).SendAsync("CallEnded", chatId);
             }
             catch (Exception ex)
             {
@@ -1050,7 +1007,7 @@ public class GroupChatHub : Hub
                 }
 
                 var displayName = string.IsNullOrWhiteSpace(username) ? "Пользователь" : username.Trim();
-                await Clients.OthersInGroup(parsedChatId.ToString()).SendAsync(
+                await Clients.OthersInGroup(HubGroups.Chat(parsedChatId)).SendAsync(
                     "UserTyping",
                     parsedChatId.ToString(),
                     userId.Value.ToString(),
@@ -1077,7 +1034,7 @@ public class GroupChatHub : Hub
                     return;
                 }
 
-                await Clients.OthersInGroup(parsedChatId.ToString()).SendAsync(
+                await Clients.OthersInGroup(HubGroups.Chat(parsedChatId)).SendAsync(
                     "UserStoppedTyping",
                     parsedChatId.ToString(),
                     userId.Value.ToString());
@@ -1112,7 +1069,7 @@ public class GroupChatHub : Hub
             };
             ScheduleCallRingTimeout(chatId);
 
-            await Clients.Group(chatId.ToString()).SendAsync("IncomingCall",
+            await Clients.Group(HubGroups.Chat(chatId)).SendAsync("IncomingCall",
                 new { chatId, caller = resolvedCallerName, callerId, roomId = chatId.ToString() });
 
             var callerProfile = await _mediator.Send(new GetUserProfileQuery(callerId));
@@ -1176,7 +1133,7 @@ public class GroupChatHub : Hub
             session.AnsweredAt = DateTimeOffset.UtcNow;
             CancelCallRingTimeout(chatId);
 
-            await Clients.Group(chatId.ToString()).SendAsync("CallAccepted", new
+            await Clients.Group(HubGroups.Chat(chatId)).SendAsync("CallAccepted", new
             {
                 chatId,
                 callerId = session.CallerId,
@@ -1230,7 +1187,7 @@ public class GroupChatHub : Hub
 
             var participantIds = await _chatRepository.GetChatMembersAsync(chatId);
             ClearCallSession(chatId);
-            await Clients.Group(chatId.ToString()).SendAsync("CallCancelled", new { chatId, callerId = session.CallerId });
+            await Clients.Group(HubGroups.Chat(chatId)).SendAsync("CallCancelled", new { chatId, callerId = session.CallerId });
 
             foreach (var participantId in participantIds.Where(id => id != session.CallerId))
             {
@@ -1404,7 +1361,7 @@ public class GroupChatHub : Hub
             await BroadcastCallLogMessageAsync(session, "missed", ringDuration);
         }
 
-        await Clients.Group(chatId.ToString()).SendAsync("CallMissed", new
+        await Clients.Group(HubGroups.Chat(chatId)).SendAsync("CallMissed", new
         {
             chatId,
             callerId = session.CallerId,
@@ -1438,9 +1395,7 @@ public class GroupChatHub : Hub
             actorUserId,
         };
 
-        var userKey = userId.ToString();
-        await Clients.User(userKey).SendAsync("IncomingCallDismissed", payload);
-        await _notificationHubContext.Clients.User(userKey).SendAsync("IncomingCallDismissed", payload);
+        await Clients.User(userId.ToString()).SendAsync("IncomingCallDismissed", payload);
 
         try
         {
@@ -1477,7 +1432,7 @@ public class GroupChatHub : Hub
         var userProfile = await _mediator.Send(new GetUserProfileQuery(session.CallerId));
         var senderIdentity = await ResolveChatSenderIdentityAsync(session.ChatId, session.CallerId);
 
-        await Clients.Group(session.ChatId.ToString()).SendAsync("MessageSent", new
+        await Clients.Group(HubGroups.Chat(session.ChatId)).SendAsync("MessageSent", new
         {
             messageId = message.Id,
             senderId = session.CallerId,
@@ -1499,91 +1454,6 @@ public class GroupChatHub : Hub
             message.Id,
             session.CallerId);
     }
-
-        // Вспомогательный метод для получения текущего пользователя
-        private Guid? GetCurrentUserId()
-        {
-            try
-            {
-                // Сначала пробуем получить из JWT claims
-                if (Context.User?.Identity?.IsAuthenticated == true)
-                {
-                    var userIdClaim = Context.User.FindFirst("UserId")?.Value;
-                    if (Guid.TryParse(userIdClaim, out var userId))
-                    {
-                        _logger.LogInformation($"GetCurrentUserId: Found UserId from JWT: {userId}");
-                        return userId;
-                    }
-                }
-                
-                // Fallback на query parameter (для совместимости)
-                var httpContextFromSignalR = Context.GetHttpContext();
-                if (httpContextFromSignalR != null)
-                {
-                    var userIdString = httpContextFromSignalR.Request.Query["userId"].ToString();
-                    if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out Guid userId))
-                    {
-                        _logger.LogInformation($"GetCurrentUserId: Found userId from query: {userId}");
-                        return userId;
-                    }
-                }
-                
-                _logger.LogWarning($"GetCurrentUserId: No UserId found in JWT claims or query");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"GetCurrentUserId: Exception occurred");
-                return null;
-            }
-        }
-
-        public override async Task OnConnectedAsync()
-        {
-            var userId = GetCurrentUserId();
-            if (userId.HasValue)
-            {
-                ActiveConnections.AddOrUpdate(userId.Value, 1, (_, current) => current + 1);
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
-
-                try
-                {
-                    await _messageReceiptService.AcknowledgePendingDeliveriesForUserAsync(userId.Value);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to acknowledge pending deliveries for user {UserId}", userId);
-                }
-            }
-            await base.OnConnectedAsync();
-        }
-
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            var userId = GetCurrentUserId();
-            if (userId.HasValue)
-            {
-                DecrementConnectionCount(userId.Value);
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user-{userId}");
-            }
-            await base.OnDisconnectedAsync(exception);
-        }
-
-        private static void DecrementConnectionCount(Guid userId)
-        {
-            if (!ActiveConnections.TryGetValue(userId, out var current))
-            {
-                return;
-            }
-
-            if (current <= 1)
-            {
-                ActiveConnections.TryRemove(userId, out _);
-                return;
-            }
-
-            ActiveConnections.TryUpdate(userId, current - 1, current);
-        }
 
         public async Task GetChatInfo(Guid chatId)
         {
@@ -1646,7 +1516,7 @@ public class GroupChatHub : Hub
                     deletedBy = userId.Value
                 });
 
-                await Clients.Group(chatId.ToString()).SendAsync("GroupUpdated", "user_left", userId.Value);
+                await Clients.Group(HubGroups.Chat(chatId)).SendAsync("GroupUpdated", "user_left", userId.Value);
             }
             catch (Exception ex)
             {
@@ -1665,6 +1535,9 @@ public class GroupChatHub : Hub
                     return;
                 }
 
+                // Список участников снимаем до удаления — после команды членства уже нет.
+                var memberIds = await _chatRepository.GetChatMembersAsync(chatId);
+
                 var result = await _mediator.Send(new DeleteGroupChatCommand(chatId, userId.Value));
                 if (!result.Success)
                 {
@@ -1678,8 +1551,7 @@ public class GroupChatHub : Hub
                     deletedBy = userId.Value
                 };
 
-                await Clients.Group(chatId.ToString()).SendAsync("chatdeleted", payload);
-                await _chatListHubContext.Clients.All.SendAsync("chatdeleted", payload);
+                await NotifyChatDeletedAsync(chatId, memberIds, payload);
             }
             catch (Exception ex)
             {
@@ -1698,18 +1570,14 @@ public class GroupChatHub : Hub
                     return;
                 }
 
+                var memberIds = await _chatRepository.GetChatMembersAsync(chatId);
+
                 var command = new DeletePrivateChatCommand(chatId, userId.Value);
                 var result = await _mediator.Send(command);
 
                 if (result.Success)
                 {
-                    await Clients.Group(chatId.ToString()).SendAsync("chatdeleted", new
-                    {
-                        chatId = chatId,
-                        deletedBy = userId.Value
-                    });
-
-                    await _chatListHubContext.Clients.All.SendAsync("chatdeleted", new
+                    await NotifyChatDeletedAsync(chatId, memberIds, new
                     {
                         chatId = chatId,
                         deletedBy = userId.Value
@@ -1724,6 +1592,22 @@ public class GroupChatHub : Hub
             {
                 await Clients.Caller.SendAsync("Error", $"Ошибка при удалении чата: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// "chatdeleted" уходит всем участникам чата (все их вкладки/устройства) ровно один раз.
+        /// Раньше событие дублировалось: в группу чата + Clients.All через ChatListHub.
+        /// </summary>
+        private async Task NotifyChatDeletedAsync(Guid chatId, IReadOnlyCollection<Guid> memberIds, object payload)
+        {
+            if (memberIds.Count > 0)
+            {
+                await Clients.Users(memberIds.Select(id => id.ToString()).ToList()).SendAsync("chatdeleted", payload);
+                return;
+            }
+
+            // Фолбэк, если участников уже нет в БД: хотя бы те, кто сейчас в комнате чата.
+            await Clients.Group(HubGroups.Chat(chatId)).SendAsync("chatdeleted", payload);
         }
 
         private static object? BuildForwardedMessagePayload(Domain.Models.Message? message)

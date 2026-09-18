@@ -23,8 +23,7 @@ public sealed class UserPresenceStartupService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        NotificationHub.ResetActiveConnections();
-        GroupChatHub.ResetActiveConnections();
+        AppHub.ResetActiveConnections();
 
         try
         {

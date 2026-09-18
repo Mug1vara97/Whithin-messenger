@@ -84,14 +84,34 @@ dotnet watch run
 
 **Документация:** https://localhost:5117/scalar/v1
 
-## SignalR Hubs
+## SignalR Hub
 
-| Hub | URL | Назначение |
-|-----|-----|------------|
-| GroupChatHub | `/groupchathub` | Сообщения в чатах |
-| ChatListHub | `/chatlisthub` | Список чатов |
-| ServerHub | `/serverhub` | События серверов |
-| ServerListHub | `/serverlisthub` | Список серверов |
+Единый хаб `AppHub` (`Hubs/AppHub*.cs`, partial-класс) обслуживает все realtime-домены.
+Клиент держит **одно** соединение на пользователя.
+
+| URL | Назначение |
+|-----|------------|
+| `/hub` | Основной маршрут для новых клиентов (веб) |
+| `/groupchathub`, `/chatlisthub`, `/serverhub`, `/serverlisthub`, `/notificationhub`, `/friendhub` | Legacy-маршруты, ведут в тот же `AppHub` (совместимость с установленными Android-клиентами) |
+
+Файлы хаба:
+
+| Файл | Домен |
+|------|-------|
+| `AppHub.cs` | Lifecycle (`OnConnected/Disconnected`), учёт активных соединений, `user:{id}` группа |
+| `AppHub.Chat.cs` | Сообщения, звонки, typing, опросы |
+| `AppHub.ChatList.cs` | Список чатов, создание чатов, пины |
+| `AppHub.Server.cs` | Каналы, категории, роли, участники сервера |
+| `AppHub.ServerList.cs` | Список серверов пользователя |
+| `AppHub.Friend.cs` | Друзья, блокировки |
+| `HubGroups.cs` | Единые имена групп: `user:{id}`, `chat:{id}`, `server:{id}`, `serverlist:{id}` |
+| `HubRoutes.cs` | Список маршрутов (используется в `MapHub` и JWT `OnMessageReceived`) |
+
+Серверные сервисы/контроллеры используют `IHubContext<AppHub>` + `HubGroups`.
+
+Важно: JS-клиент SignalR сравнивает имена событий без учёта регистра, поэтому события
+каналов сервера называются `ChannelCreated/ChannelUpdated/ChannelDeleted` (метод `DeleteChannel`),
+чтобы не пересекаться с событиями списка чатов `chatcreated/chatupdated/chatdeleted`.
 
 ### Пример использования
 

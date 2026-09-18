@@ -9,7 +9,7 @@ import React, {
 import { chatApi } from '../../../entities/chat/api/chatApi';
 import { serverApi } from '../../../entities/server/api/serverApi';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
-import { ensureE2eIdentity, syncSessionE2eKeys } from '../e2e';
+import { E2E_ENABLED, ensureE2eIdentity, syncSessionE2eKeys } from '../e2e';
 import { useAuthContext } from './AuthContext';
 import { useServerContext } from './useServerContext';
 
@@ -44,7 +44,7 @@ export const StartupBootProvider = ({ children }) => {
   }, [initialServersLoaded]);
 
   useEffect(() => {
-    if (isLoading || !isAuthenticated || !user?.id) {
+    if (!E2E_ENABLED || isLoading || !isAuthenticated || !user?.id) {
       return undefined;
     }
 

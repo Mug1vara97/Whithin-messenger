@@ -3,6 +3,7 @@ import {
   E2E_DECRYPT_FAILED_TEXT,
   E2E_ENCRYPTION_VERSION,
 } from './e2eCrypto';
+import { E2E_ENABLED } from './e2eConfig';
 
 const pick = (notification, ...keys) => {
   for (const key of keys) {
@@ -74,6 +75,9 @@ const patchContentPreview = (notification, decrypted) => {
 };
 
 export const needsE2eDecrypt = (notification) => {
+  if (!E2E_ENABLED) {
+    return false;
+  }
   if (!notification || notification._e2eDecrypted || notification.e2eDecrypted) {
     return false;
   }
@@ -86,7 +90,7 @@ export const needsE2eDecrypt = (notification) => {
 };
 
 export const decryptNotificationPreview = async (notification, userId) => {
-  if (!notification || !userId) return notification;
+  if (!E2E_ENABLED || !notification || !userId) return notification;
 
   const encryptionVersion = resolveEncryptionVersion(notification);
   const ciphertext = resolveEncryptedPayload(notification);
