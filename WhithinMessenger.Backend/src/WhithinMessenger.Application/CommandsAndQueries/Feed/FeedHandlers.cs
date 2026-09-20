@@ -414,7 +414,7 @@ public class GetUserFeedPostsQueryHandler : IRequestHandler<GetUserFeedPostsQuer
         var take = Math.Clamp(request.Take, 1, 100);
         var posts = await _feedPostRepository.GetByAuthorAsync(
             request.AuthorUserId,
-            FeedPostScope.Friend,
+            scope: null,
             take,
             cancellationToken);
 

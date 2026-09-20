@@ -9,7 +9,7 @@ import {
   MdImage,
   MdRefresh
 } from 'react-icons/md';
-import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 import './ImagePreview.css';
 
 const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
@@ -53,7 +53,7 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
   const handleDownload = () => {
     if (mediaFile) {
       const link = document.createElement('a');
-      link.href = `${MEDIA_BASE_URL}/${mediaFile.filePath}`;
+      link.href = buildMediaUrl(mediaFile.filePath);
       link.download = mediaFile.originalFileName;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -140,7 +140,7 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
 
   if (!isOpen || !mediaFile) return null;
 
-  const imageUrl = `${MEDIA_BASE_URL}/${mediaFile.filePath}`;
+  const imageUrl = buildMediaUrl(mediaFile.filePath);
 
   return createPortal(
     <div className="image-preview-overlay" role="dialog" aria-modal="true" aria-label="Просмотр изображения">

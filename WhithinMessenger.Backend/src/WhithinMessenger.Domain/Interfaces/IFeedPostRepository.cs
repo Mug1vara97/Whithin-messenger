@@ -10,7 +10,7 @@ public interface IFeedPostRepository
 
     Task<List<FeedPost>> GetByAuthorAsync(
         Guid authorUserId,
-        FeedPostScope scope,
+        FeedPostScope? scope,
         int take,
         CancellationToken cancellationToken = default);
 

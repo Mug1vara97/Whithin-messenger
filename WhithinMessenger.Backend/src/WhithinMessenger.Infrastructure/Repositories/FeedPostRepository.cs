@@ -43,12 +43,17 @@ public class FeedPostRepository : IFeedPostRepository
 
     public async Task<List<FeedPost>> GetByAuthorAsync(
         Guid authorUserId,
-        FeedPostScope scope,
+        FeedPostScope? scope,
         int take,
         CancellationToken cancellationToken = default)
     {
-        return await QueryWithAuthors()
-            .Where(p => p.AuthorUserId == authorUserId && p.Scope == scope)
+        var query = QueryWithAuthors().Where(p => p.AuthorUserId == authorUserId);
+        if (scope.HasValue)
+        {
+            query = query.Where(p => p.Scope == scope.Value);
+        }
+
+        return await query
             .OrderByDescending(p => p.CreatedAt)
             .Take(take)
             .ToListAsync(cancellationToken);

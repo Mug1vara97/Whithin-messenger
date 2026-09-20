@@ -14,6 +14,7 @@ import { buildMediaUrl, downloadMediaFile } from '../../../shared/lib/utils/urlH
 import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContext';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { UserAvatar } from '../../../shared/ui';
+import ImagePreview from '../../../shared/ui/molecules/ImagePreview/ImagePreview';
 import CreateFeedPostModal from './CreateFeedPostModal';
 import './FeedPanel.css';
 
@@ -66,6 +67,7 @@ const FeedPanel = () => {
   const [commentSubmitting, setCommentSubmitting] = useState({});
   const [reactionBusy, setReactionBusy] = useState({});
   const [shareToast, setShareToast] = useState('');
+  const [previewMedia, setPreviewMedia] = useState(null);
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -222,15 +224,14 @@ const FeedPanel = () => {
         {images.length > 0 && (
           <div className={`feed-panel__media-grid feed-panel__media-grid--${Math.min(images.length, 4)}`}>
             {images.map((item) => (
-              <a
+              <button
                 key={item.id}
-                href={buildMediaUrl(item.filePath)}
-                target="_blank"
-                rel="noreferrer"
+                type="button"
                 className="feed-panel__media-item"
+                onClick={() => setPreviewMedia(item)}
               >
                 <img src={buildMediaUrl(item.filePath)} alt={item.originalFileName} />
-              </a>
+              </button>
             ))}
           </div>
         )}
@@ -493,6 +494,12 @@ const FeedPanel = () => {
       </div>
 
       {shareToast ? <div className="feed-panel__toast">{shareToast}</div> : null}
+
+      <ImagePreview
+        mediaFile={previewMedia}
+        isOpen={Boolean(previewMedia)}
+        onClose={() => setPreviewMedia(null)}
+      />
 
       <CreateFeedPostModal
         isOpen={composerOpen}

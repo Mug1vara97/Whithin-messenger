@@ -14,6 +14,8 @@ import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import AvatarDecorationMedia from '../../atoms/UserAvatar/AvatarDecorationMedia';
+import ImagePreview from '../../molecules/ImagePreview/ImagePreview';
+import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
 import './ProfileModal.css';
 
 const MAX_BIO_LENGTH = 190;
@@ -26,6 +28,13 @@ const resolveMediaUrl = (path) => {
 
 const isBannerImage = (banner) =>
   banner && (banner.startsWith('/uploads/') || banner.startsWith('http'));
+
+const formatFileSize = (bytes) => {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size} Б`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} КБ`;
+  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+};
 
 const ProfileModal = ({
   isOpen,
@@ -48,6 +57,7 @@ const ProfileModal = ({
   const [profilePosts, setProfilePosts] = useState([]);
   const [postsError, setPostsError] = useState('');
   const [postsLoading, setPostsLoading] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState(null);
   const { user } = useAuthContext();
 
   const profileUserId = profile?.userId ?? profile?.UserId;
@@ -152,6 +162,8 @@ const ProfileModal = ({
     setIsEditingBio(false);
     setBioError('');
     setPostDraft('');
+    setProfilePosts([]);
+    setPreviewMedia(null);
   }, [isOpen]);
 
   useEffect(() => {
@@ -476,25 +488,91 @@ const ProfileModal = ({
                 </p>
               ) : (
                 <div className="profile-modal__posts-list">
-                  {profilePosts.map((post) => (
-                    <article key={post.id} className="profile-modal__post">
-                      <div className="profile-modal__post-head">
-                        <span className="profile-modal__post-time">
-                          {formatFeedTime(post.createdAt)}
-                        </span>
-                        {isOwnProfile && (
-                          <button
-                            type="button"
-                            className="profile-modal__text-btn"
-                            onClick={() => handleDeletePost(post.id)}
+                  {profilePosts.map((post) => {
+                    const attachments = post.attachments || [];
+                    const images = attachments.filter((item) =>
+                      item.contentType?.startsWith('image/'),
+                    );
+                    const videos = attachments.filter((item) =>
+                      item.contentType?.startsWith('video/'),
+                    );
+                    const files = attachments.filter(
+                      (item) =>
+                        !item.contentType?.startsWith('image/') &&
+                        !item.contentType?.startsWith('video/'),
+                    );
+
+                    return (
+                      <article key={post.id} className="profile-modal__post">
+                        <div className="profile-modal__post-head">
+                          <span className="profile-modal__post-time">
+                            {formatFeedTime(post.createdAt)}
+                            {post.scope === 'server' ? ' · сервер' : ''}
+                          </span>
+                          {isOwnProfile && (
+                            <button
+                              type="button"
+                              className="profile-modal__text-btn"
+                              onClick={() => handleDeletePost(post.id)}
+                            >
+                              Удалить
+                            </button>
+                          )}
+                        </div>
+                        {post.text ? (
+                          <p className="profile-modal__post-text">{post.text}</p>
+                        ) : null}
+
+                        {images.length > 0 ? (
+                          <div
+                            className={`profile-modal__post-media profile-modal__post-media--${Math.min(images.length, 4)}`}
                           >
-                            Удалить
+                            {images.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className="profile-modal__post-image"
+                                onClick={() => setPreviewMedia(item)}
+                              >
+                                <img
+                                  src={buildMediaUrl(item.filePath)}
+                                  alt={item.originalFileName}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {videos.map((item) => (
+                          <video
+                            key={item.id}
+                            className="profile-modal__post-video"
+                            src={buildMediaUrl(item.filePath)}
+                            controls
+                            preload="metadata"
+                          />
+                        ))}
+
+                        {files.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="profile-modal__post-file"
+                            onClick={() =>
+                              downloadMediaFile(item.filePath, item.originalFileName)
+                            }
+                          >
+                            <span className="profile-modal__post-file-name">
+                              {item.originalFileName}
+                            </span>
+                            <span className="profile-modal__post-file-size">
+                              {formatFileSize(item.fileSize)}
+                            </span>
                           </button>
-                        )}
-                      </div>
-                      <p className="profile-modal__post-text">{post.text}</p>
-                    </article>
-                  ))}
+                        ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -521,6 +599,12 @@ const ProfileModal = ({
           </div>
         </div>
       </div>
+
+      <ImagePreview
+        mediaFile={previewMedia}
+        isOpen={Boolean(previewMedia)}
+        onClose={() => setPreviewMedia(null)}
+      />
     </div>
   );
 };
