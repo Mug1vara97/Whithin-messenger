@@ -60,12 +60,12 @@ public static class NewsChannelDataFix
                 .Select(c => (Guid?)c.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var maxOrder = await context.Chats
+            var orders = await context.Chats
                 .AsNoTracking()
                 .Where(c => c.ServerId == serverId && c.CategoryId == textCategoryId)
-                .Select(c => c.ChatOrder ?? 0)
-                .DefaultIfEmpty(0)
-                .MaxAsync(cancellationToken);
+                .Select(c => c.ChatOrder)
+                .ToListAsync(cancellationToken);
+            var maxOrder = orders.Where(o => o.HasValue).Select(o => o!.Value).DefaultIfEmpty(0).Max();
 
             var newsChat = new Chat
             {

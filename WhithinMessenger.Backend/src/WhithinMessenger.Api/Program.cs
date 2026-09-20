@@ -162,7 +162,15 @@ using (var scope = app.Services.CreateScope())
         
         await context.Database.MigrateAsync();
         await SavedMessagesChatTypeDataFix.ApplyAsync(context);
-        await NewsChannelDataFix.ApplyAsync(context);
+        try
+        {
+            await NewsChannelDataFix.ApplyAsync(context);
+        }
+        catch (Exception newsEx)
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogError(newsEx, "NewsChannelDataFix failed; continuing startup");
+        }
         
         Console.WriteLine("Database migrations applied successfully");
     }
