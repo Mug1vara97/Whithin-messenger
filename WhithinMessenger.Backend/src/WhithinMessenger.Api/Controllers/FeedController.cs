@@ -111,4 +111,80 @@ public class FeedController : ControllerBase
 
         return Ok(new { success = true });
     }
+
+    [HttpPut("{postId:guid}/reaction")]
+    public async Task<IActionResult> SetReaction(Guid postId, [FromBody] SetFeedReactionRequest request)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        FeedReactionValue? value = null;
+        if (!string.IsNullOrWhiteSpace(request?.Value))
+        {
+            value = request.Value.Trim().ToLowerInvariant() switch
+            {
+                "like" => FeedReactionValue.Like,
+                "dislike" => FeedReactionValue.Dislike,
+                _ => null,
+            };
+            if (value == null && !string.Equals(request.Value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { error = "value должен быть like, dislike или null" });
+            }
+        }
+
+        var result = await _mediator.Send(new SetFeedReactionCommand(userId, postId, value));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Post);
+    }
+
+    [HttpGet("{postId:guid}/comments")]
+    public async Task<IActionResult> GetComments(Guid postId, [FromQuery] int take = 100)
+    {
+        var result = await _mediator.Send(new GetFeedCommentsQuery(postId, take));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Comments);
+    }
+
+    [HttpPost("{postId:guid}/comments")]
+    public async Task<IActionResult> AddComment(Guid postId, [FromBody] AddFeedCommentRequest request)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new AddFeedCommentCommand(userId, postId, request?.Text ?? string.Empty));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Comment);
+    }
+
+    [HttpDelete("comments/{commentId:guid}")]
+    public async Task<IActionResult> DeleteComment(Guid commentId)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new DeleteFeedCommentCommand(userId, commentId));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(new { success = true });
+    }
+}
+
+public class SetFeedReactionRequest
+{
+    public string? Value { get; set; }
+}
+
+public class AddFeedCommentRequest
+{
+    public string? Text { get; set; }
 }

@@ -15,9 +15,25 @@ const normalizeAttachment = (item) => {
   };
 };
 
+const normalizeComment = (comment) => {
+  if (!comment) return null;
+  return {
+    id: String(comment.id ?? comment.Id ?? ''),
+    postId: String(comment.postId ?? comment.PostId ?? ''),
+    text: comment.text ?? comment.Text ?? '',
+    createdAt: comment.createdAt ?? comment.CreatedAt ?? null,
+    authorId: String(comment.authorId ?? comment.AuthorId ?? ''),
+    authorName: comment.authorName ?? comment.AuthorName ?? 'Пользователь',
+    authorUsername: comment.authorUsername ?? comment.AuthorUsername ?? null,
+    authorAvatar: comment.authorAvatar ?? comment.AuthorAvatar ?? null,
+    authorAvatarColor: comment.authorAvatarColor ?? comment.AuthorAvatarColor ?? '#5865f2',
+  };
+};
+
 const normalizePost = (post) => {
   if (!post) return null;
   const attachmentsRaw = post.attachments ?? post.Attachments ?? [];
+  const myReactionRaw = post.myReaction ?? post.MyReaction ?? null;
   return {
     id: String(post.id ?? post.Id ?? ''),
     scope: post.scope === 'server' || post.Scope === 'server' || post.scope === 1 ? 'server' : 'friend',
@@ -34,6 +50,10 @@ const normalizePost = (post) => {
     attachments: (Array.isArray(attachmentsRaw) ? attachmentsRaw : [])
       .map(normalizeAttachment)
       .filter(Boolean),
+    likesCount: Number(post.likesCount ?? post.LikesCount ?? 0),
+    dislikesCount: Number(post.dislikesCount ?? post.DislikesCount ?? 0),
+    commentsCount: Number(post.commentsCount ?? post.CommentsCount ?? 0),
+    myReaction: myReactionRaw === 'like' || myReactionRaw === 'dislike' ? myReactionRaw : null,
     isStub: false,
   };
 };
@@ -102,6 +122,28 @@ export const feedApi = {
   async deletePost(postId) {
     if (!postId) return false;
     await apiClient.delete(`/feed/${postId}`);
+    return true;
+  },
+
+  async setReaction(postId, value) {
+    const response = await apiClient.put(`/feed/${postId}/reaction`, {
+      value: value || null,
+    });
+    return normalizePost(response.data);
+  },
+
+  async getComments(postId, take = 100) {
+    const response = await apiClient.get(`/feed/${postId}/comments`, { params: { take } });
+    return (Array.isArray(response.data) ? response.data : []).map(normalizeComment).filter(Boolean);
+  },
+
+  async addComment(postId, text) {
+    const response = await apiClient.post(`/feed/${postId}/comments`, { text });
+    return normalizeComment(response.data);
+  },
+
+  async deleteComment(commentId) {
+    await apiClient.delete(`/feed/comments/${commentId}`);
     return true;
   },
 };

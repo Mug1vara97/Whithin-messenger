@@ -28,4 +28,8 @@ public class FeedPost
     public Server? Server { get; set; }
 
     public ICollection<FeedPostAttachment> Attachments { get; set; } = new List<FeedPostAttachment>();
+
+    public ICollection<FeedPostReaction> Reactions { get; set; } = new List<FeedPostReaction>();
+
+    public ICollection<FeedPostComment> Comments { get; set; } = new List<FeedPostComment>();
 }

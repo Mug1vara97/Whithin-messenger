@@ -23,7 +23,7 @@ public static class FeedPostMapper
                 : $"/{attachment.ThumbnailPath}"),
     };
 
-    public static object Map(FeedPost post)
+    public static object Map(FeedPost post, Guid? viewerUserId = null)
     {
         var profile = post.Author?.UserProfile;
         var username = post.Author?.UserName ?? "Пользователь";
@@ -36,6 +36,19 @@ public static class FeedPostMapper
             .Select(MapAttachment)
             .Cast<object>()
             .ToList();
+
+        var reactions = post.Reactions ?? [];
+        var likesCount = reactions.Count(r => r.Value == FeedReactionValue.Like);
+        var dislikesCount = reactions.Count(r => r.Value == FeedReactionValue.Dislike);
+        string? myReaction = null;
+        if (viewerUserId.HasValue)
+        {
+            var mine = reactions.FirstOrDefault(r => r.UserId == viewerUserId.Value);
+            if (mine != null)
+            {
+                myReaction = mine.Value == FeedReactionValue.Like ? "like" : "dislike";
+            }
+        }
 
         return new
         {
@@ -52,6 +65,32 @@ public static class FeedPostMapper
             serverName = post.Server?.Name,
             serverAvatar = post.Server?.Avatar,
             attachments,
+            likesCount,
+            dislikesCount,
+            commentsCount = (post.Comments ?? []).Count,
+            myReaction,
+        };
+    }
+
+    public static object MapComment(FeedPostComment comment)
+    {
+        var profile = comment.Author?.UserProfile;
+        var username = comment.Author?.UserName ?? "Пользователь";
+        var displayName = string.IsNullOrWhiteSpace(profile?.DisplayName)
+            ? username
+            : profile!.DisplayName!;
+
+        return new
+        {
+            id = comment.Id,
+            postId = comment.FeedPostId,
+            text = comment.Text,
+            createdAt = comment.CreatedAt,
+            authorId = comment.AuthorUserId,
+            authorName = displayName,
+            authorUsername = username,
+            authorAvatar = profile?.Avatar,
+            authorAvatarColor = profile?.AvatarColor ?? "#5865f2",
         };
     }
 }
@@ -198,7 +237,7 @@ public class CreateFeedPostCommandHandler : IRequestHandler<CreateFeedPostComman
         return new FeedPostMutationResult
         {
             Success = true,
-            Post = saved == null ? null : FeedPostMapper.Map(saved),
+            Post = saved == null ? null : FeedPostMapper.Map(saved, request.AuthorUserId),
         };
     }
 }
@@ -258,7 +297,7 @@ public class GetFriendsFeedQueryHandler : IRequestHandler<GetFriendsFeedQuery, F
         return new FeedPostsResult
         {
             Success = true,
-            Posts = posts.Select(FeedPostMapper.Map).Cast<object>().ToList(),
+            Posts = posts.Select(p => FeedPostMapper.Map(p, request.UserId)).Cast<object>().ToList(),
         };
     }
 }
@@ -286,7 +325,7 @@ public class GetServerFeedQueryHandler : IRequestHandler<GetServerFeedQuery, Fee
         return new FeedPostsResult
         {
             Success = true,
-            Posts = posts.Select(FeedPostMapper.Map).Cast<object>().ToList(),
+            Posts = posts.Select(p => FeedPostMapper.Map(p, request.UserId)).Cast<object>().ToList(),
         };
     }
 }
@@ -328,7 +367,7 @@ public class GetUnifiedFeedQueryHandler : IRequestHandler<GetUnifiedFeedQuery, F
             .Concat(serverPosts)
             .OrderByDescending(p => p.CreatedAt)
             .Take(take)
-            .Select(FeedPostMapper.Map)
+            .Select(p => FeedPostMapper.Map(p, request.UserId))
             .Cast<object>()
             .ToList();
 
@@ -382,7 +421,179 @@ public class GetUserFeedPostsQueryHandler : IRequestHandler<GetUserFeedPostsQuer
         return new FeedPostsResult
         {
             Success = true,
-            Posts = posts.Select(FeedPostMapper.Map).Cast<object>().ToList(),
+            Posts = posts.Select(p => FeedPostMapper.Map(p, request.ViewerUserId)).Cast<object>().ToList(),
         };
+    }
+}
+
+public class SetFeedReactionCommandHandler : IRequestHandler<SetFeedReactionCommand, FeedEngagementResult>
+{
+    private readonly IFeedPostRepository _feedPostRepository;
+
+    public SetFeedReactionCommandHandler(IFeedPostRepository feedPostRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+    }
+
+    public async Task<FeedEngagementResult> Handle(SetFeedReactionCommand request, CancellationToken cancellationToken)
+    {
+        var post = await _feedPostRepository.GetByIdWithEngagementAsync(request.PostId, cancellationToken);
+        if (post == null)
+        {
+            return new FeedEngagementResult { Success = false, ErrorMessage = "Пост не найден" };
+        }
+
+        var existing = await _feedPostRepository.GetReactionAsync(request.PostId, request.UserId, cancellationToken);
+
+        if (request.Value == null)
+        {
+            if (existing != null)
+            {
+                await _feedPostRepository.RemoveReactionAsync(existing, cancellationToken);
+            }
+        }
+        else
+        {
+            var value = request.Value == FeedReactionValue.Like
+                ? FeedReactionValue.Like
+                : FeedReactionValue.Dislike;
+
+            if (existing != null && existing.Value == value)
+            {
+                await _feedPostRepository.RemoveReactionAsync(existing, cancellationToken);
+            }
+            else
+            {
+                await _feedPostRepository.UpsertReactionAsync(
+                    new FeedPostReaction
+                    {
+                        Id = existing?.Id ?? Guid.NewGuid(),
+                        FeedPostId = request.PostId,
+                        UserId = request.UserId,
+                        Value = value,
+                        CreatedAt = existing?.CreatedAt ?? DateTimeOffset.UtcNow,
+                        UpdatedAt = DateTimeOffset.UtcNow,
+                    },
+                    cancellationToken);
+            }
+        }
+
+        var refreshed = await _feedPostRepository.GetByIdWithEngagementAsync(request.PostId, cancellationToken);
+        return new FeedEngagementResult
+        {
+            Success = true,
+            Post = refreshed == null ? null : FeedPostMapper.Map(refreshed, request.UserId),
+        };
+    }
+}
+
+public class GetFeedCommentsQueryHandler : IRequestHandler<GetFeedCommentsQuery, FeedCommentsResult>
+{
+    private readonly IFeedPostRepository _feedPostRepository;
+
+    public GetFeedCommentsQueryHandler(IFeedPostRepository feedPostRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+    }
+
+    public async Task<FeedCommentsResult> Handle(GetFeedCommentsQuery request, CancellationToken cancellationToken)
+    {
+        var post = await _feedPostRepository.GetByIdAsync(request.PostId, cancellationToken);
+        if (post == null)
+        {
+            return new FeedCommentsResult { Success = false, ErrorMessage = "Пост не найден" };
+        }
+
+        var take = Math.Clamp(request.Take, 1, 200);
+        var comments = await _feedPostRepository.GetCommentsAsync(request.PostId, take, cancellationToken);
+        return new FeedCommentsResult
+        {
+            Success = true,
+            Comments = comments.Select(FeedPostMapper.MapComment).Cast<object>().ToList(),
+        };
+    }
+}
+
+public class AddFeedCommentCommandHandler : IRequestHandler<AddFeedCommentCommand, FeedCommentMutationResult>
+{
+    private const int MaxTextLength = 2000;
+    private readonly IFeedPostRepository _feedPostRepository;
+
+    public AddFeedCommentCommandHandler(IFeedPostRepository feedPostRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+    }
+
+    public async Task<FeedCommentMutationResult> Handle(AddFeedCommentCommand request, CancellationToken cancellationToken)
+    {
+        var text = (request.Text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return new FeedCommentMutationResult { Success = false, ErrorMessage = "Комментарий пуст" };
+        }
+
+        if (text.Length > MaxTextLength)
+        {
+            return new FeedCommentMutationResult
+            {
+                Success = false,
+                ErrorMessage = $"Комментарий не должен превышать {MaxTextLength} символов",
+            };
+        }
+
+        var post = await _feedPostRepository.GetByIdAsync(request.PostId, cancellationToken);
+        if (post == null)
+        {
+            return new FeedCommentMutationResult { Success = false, ErrorMessage = "Пост не найден" };
+        }
+
+        var comment = new FeedPostComment
+        {
+            Id = Guid.NewGuid(),
+            FeedPostId = request.PostId,
+            AuthorUserId = request.AuthorUserId,
+            Text = text,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await _feedPostRepository.AddCommentAsync(comment, cancellationToken);
+        var saved = await _feedPostRepository.GetCommentByIdAsync(comment.Id, cancellationToken);
+
+        return new FeedCommentMutationResult
+        {
+            Success = true,
+            Comment = saved == null ? null : FeedPostMapper.MapComment(saved),
+        };
+    }
+}
+
+public class DeleteFeedCommentCommandHandler : IRequestHandler<DeleteFeedCommentCommand, FeedCommentMutationResult>
+{
+    private readonly IFeedPostRepository _feedPostRepository;
+
+    public DeleteFeedCommentCommandHandler(IFeedPostRepository feedPostRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+    }
+
+    public async Task<FeedCommentMutationResult> Handle(DeleteFeedCommentCommand request, CancellationToken cancellationToken)
+    {
+        var comment = await _feedPostRepository.GetCommentByIdAsync(request.CommentId, cancellationToken);
+        if (comment == null)
+        {
+            return new FeedCommentMutationResult { Success = false, ErrorMessage = "Комментарий не найден" };
+        }
+
+        if (comment.AuthorUserId != request.UserId)
+        {
+            return new FeedCommentMutationResult
+            {
+                Success = false,
+                ErrorMessage = "Можно удалять только свои комментарии",
+            };
+        }
+
+        await _feedPostRepository.DeleteCommentAsync(comment, cancellationToken);
+        return new FeedCommentMutationResult { Success = true };
     }
 }
