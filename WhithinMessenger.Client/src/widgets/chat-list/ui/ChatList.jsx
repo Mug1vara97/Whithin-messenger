@@ -1,7 +1,7 @@
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { People, BookmarkBorder, PushPin } from '@mui/icons-material';
+import { People, BookmarkBorder, PushPin, DynamicFeedOutlined } from '@mui/icons-material';
 import { SearchBar, UserAvatar, UserAvatarPresenceDot, CreateGroupChatModal } from '../../../shared/ui';
 import ContextMenu from '../../../shared/ui/molecules/ContextMenu/ContextMenu';
 import { useChatList } from '../../../entities/chat';
@@ -25,6 +25,7 @@ import './ChatList.css';
 const ChatList = ({
   onChatSelected,
   onFriendsSelected,
+  onFeedSelected,
   unreadCountByChat = {},
   chats: chatsProp,
   searchResults: searchResultsProp,
@@ -465,7 +466,23 @@ const ChatList = ({
     return (
       <div className="chat-list-container">
         <div className="friends-section">
-          <button 
+          <button
+            type="button"
+            className={`friends-button ${
+              location.pathname === '/channels/@me/feed' || location.pathname === '/channels/@me'
+                ? 'active'
+                : ''
+            }`}
+            onClick={onFeedSelected}
+            title="Лента"
+          >
+            <div className="friends-button__icon">
+              <DynamicFeedOutlined />
+            </div>
+            <span className="friends-button__text">Лента</span>
+          </button>
+          <button
+            type="button"
             className={`friends-button ${location.pathname === '/channels/@me/friends' ? 'active' : ''}`}
             onClick={onFriendsSelected}
             title="Друзья"

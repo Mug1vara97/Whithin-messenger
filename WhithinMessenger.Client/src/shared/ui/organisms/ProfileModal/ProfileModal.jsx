@@ -3,6 +3,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { userApi } from '../../../../entities/user/api';
+import { feedApi, formatFeedTime } from '../../../../entities/feed';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
@@ -42,6 +43,11 @@ const ProfileModal = ({
   const [isSavingBio, setIsSavingBio] = useState(false);
   const [bioError, setBioError] = useState('');
   const [copyHint, setCopyHint] = useState('');
+  const [postDraft, setPostDraft] = useState('');
+  const [isPublishingPost, setIsPublishingPost] = useState(false);
+  const [profilePosts, setProfilePosts] = useState([]);
+  const [postsError, setPostsError] = useState('');
+  const [postsLoading, setPostsLoading] = useState(false);
   const { user } = useAuthContext();
 
   const profileUserId = profile?.userId ?? profile?.UserId;
@@ -132,6 +138,7 @@ const ProfileModal = ({
     setCopyHint('');
     setIsEditingBio(false);
     setBioError('');
+    setPostDraft('');
     loadProfile();
   }, [isOpen, userId, loadProfile, initialStatus]);
 
@@ -142,6 +149,7 @@ const ProfileModal = ({
     setCopyHint('');
     setIsEditingBio(false);
     setBioError('');
+    setPostDraft('');
   }, [isOpen]);
 
   useEffect(() => {
@@ -163,6 +171,41 @@ const ProfileModal = ({
 
     window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+  }, [isOpen, userId]);
+
+  useEffect(() => {
+    if (!isOpen || !userId) {
+      setProfilePosts([]);
+      setPostsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    const loadPosts = async () => {
+      setPostsLoading(true);
+      setPostsError('');
+      try {
+        const posts = await feedApi.getUserPosts(userId);
+        if (!cancelled) setProfilePosts(posts);
+      } catch (error) {
+        if (!cancelled) {
+          setProfilePosts([]);
+          setPostsError(
+            error?.response?.data?.error ||
+              (error?.response?.status === 403
+                ? 'Публикации видны только друзьям'
+                : 'Не удалось загрузить публикации'),
+          );
+        }
+      } finally {
+        if (!cancelled) setPostsLoading(false);
+      }
+    };
+
+    void loadPosts();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, userId]);
 
   useEffect(() => {
@@ -199,6 +242,37 @@ const ProfileModal = ({
       window.setTimeout(() => setCopyHint(''), 2000);
     } catch {
       setCopyHint('Ошибка');
+    }
+  };
+
+  const handlePublishPost = async () => {
+    if (!isOwnProfile || !userId || !postDraft.trim() || isPublishingPost) return;
+    setIsPublishingPost(true);
+    setPostsError('');
+    try {
+      const created = await feedApi.createPost({
+        text: postDraft,
+        scope: 'friend',
+      });
+      setPostDraft('');
+      if (created) {
+        setProfilePosts((prev) => [created, ...prev]);
+      }
+    } catch (error) {
+      setPostsError(error?.response?.data?.error || 'Не удалось опубликовать пост');
+    } finally {
+      setIsPublishingPost(false);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!isOwnProfile || !userId || !postId) return;
+    if (!window.confirm('Удалить этот пост?')) return;
+    try {
+      await feedApi.deletePost(postId);
+      setProfilePosts((prev) => prev.filter((post) => post.id !== postId));
+    } catch (error) {
+      setPostsError(error?.response?.data?.error || 'Не удалось удалить пост');
     }
   };
 
@@ -351,6 +425,74 @@ const ProfileModal = ({
                       ? 'Добавьте описание, чтобы друзья знали вас лучше.'
                       : 'Нет описания')}
                 </p>
+              )}
+            </section>
+
+            <section className="profile-modal__section">
+              <div className="profile-modal__section-head">
+                <h3 className="profile-modal__section-title">Публикации</h3>
+              </div>
+
+              {isOwnProfile && (
+                <div className="profile-modal__posts-composer">
+                  <textarea
+                    className="profile-modal__bio-input"
+                    value={postDraft}
+                    maxLength={2000}
+                    rows={3}
+                    placeholder="Напишите пост для ленты друзей…"
+                    onChange={(event) => setPostDraft(event.target.value)}
+                  />
+                  <div className="profile-modal__posts-composer-footer">
+                    <span className="profile-modal__bio-count">
+                      {postDraft.length}/2000
+                    </span>
+                    <button
+                      type="button"
+                      className="profile-modal__btn profile-modal__btn--primary"
+                      disabled={!postDraft.trim() || isPublishingPost}
+                      onClick={handlePublishPost}
+                    >
+                      {isPublishingPost ? 'Публикация…' : 'Опубликовать'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {postsError ? <p className="profile-modal__error">{postsError}</p> : null}
+
+              {postsLoading ? (
+                <p className="profile-modal__bio is-empty">Загрузка…</p>
+              ) : profilePosts.length === 0 ? (
+                <p className="profile-modal__bio is-empty">
+                  {isOwnProfile
+                    ? 'Постов пока нет. Опубликуйте первый — его увидят друзья в ленте.'
+                    : postsError
+                      ? ''
+                      : 'У пользователя пока нет публикаций'}
+                </p>
+              ) : (
+                <div className="profile-modal__posts-list">
+                  {profilePosts.map((post) => (
+                    <article key={post.id} className="profile-modal__post">
+                      <div className="profile-modal__post-head">
+                        <span className="profile-modal__post-time">
+                          {formatFeedTime(post.createdAt)}
+                        </span>
+                        {isOwnProfile && (
+                          <button
+                            type="button"
+                            className="profile-modal__text-btn"
+                            onClick={() => handleDeletePost(post.id)}
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </div>
+                      <p className="profile-modal__post-text">{post.text}</p>
+                    </article>
+                  ))}
+                </div>
               )}
             </section>
 

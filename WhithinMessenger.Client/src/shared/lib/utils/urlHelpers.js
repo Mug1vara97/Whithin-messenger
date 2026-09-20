@@ -103,25 +103,10 @@ export const splitTextWithLinks = (text) => {
 };
 
 export const fetchMediaBlob = async (rawUrl) => {
-  const directUrl = buildMediaUrl(rawUrl);
-  if (!directUrl) {
+  const { directUrl, apiUrl, headers } = resolveMediaDownloadRequest(rawUrl);
+  if (!directUrl && !apiUrl) {
     throw new Error('Invalid file URL');
   }
-
-  const headers = {};
-  const token = tokenManager.getToken();
-  if (token && tokenManager.isTokenValid()) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const normalizedPath = typeof rawUrl === 'string' ? rawUrl.trim() : '';
-  const cleanedPath = normalizedPath
-    .replace(/^https?:\/\/[^/]+/i, '')
-    .replace(/^\/+/, '');
-
-  const fallbackApiUrl = cleanedPath
-    ? `${BASE_URL}/api/media/download?filePath=${encodeURIComponent(cleanedPath)}`
-    : '';
 
   const tryDownload = async (url) => {
     const response = await fetch(url, {
@@ -137,28 +122,139 @@ export const fetchMediaBlob = async (rawUrl) => {
     return response.blob();
   };
 
+  // Для буфера обмена по-прежнему нужен полный blob.
   try {
-    if (fallbackApiUrl) {
-      return await tryDownload(fallbackApiUrl);
+    if (apiUrl) {
+      return await tryDownload(apiUrl);
     }
     return await tryDownload(directUrl);
   } catch (primaryError) {
-    if (!fallbackApiUrl) {
+    if (!apiUrl || !directUrl) {
       throw primaryError;
     }
     return await tryDownload(directUrl);
   }
 };
 
-export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
-  const blob = await fetchMediaBlob(rawUrl);
-
-  const objectUrl = window.URL.createObjectURL(blob);
+const triggerAnchorDownload = (url, fileName) => {
   const link = document.createElement('a');
-  link.href = objectUrl;
+  link.href = url;
   link.download = fileName || 'download';
+  link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.URL.revokeObjectURL(objectUrl);
 };
+
+const downloadViaSaveFilePicker = async (urls, fileName, headers) => {
+  const handle = await window.showSaveFilePicker({
+    suggestedName: fileName || 'download',
+  });
+
+  let lastError = null;
+  for (const url of urls) {
+    let writable = null;
+    try {
+      writable = await handle.createWritable();
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      if (response.body?.pipeTo) {
+        await response.body.pipeTo(writable);
+        writable = null;
+      } else {
+        const buffer = await response.arrayBuffer();
+        await writable.write(buffer);
+        await writable.close();
+        writable = null;
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      if (writable) {
+        try {
+          await writable.abort();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error('Download failed');
+};
+
+/**
+ * Скачивание файла: сначала выбор пути, затем загрузка.
+ * Раньше ждали полный blob в памяти — диалог «куда сохранить» открывался только после минутной загрузки.
+ */
+export const downloadMediaFile = async (rawUrl, fileName = 'download') => {
+  const safeName = String(fileName || 'download').trim() || 'download';
+  const { directUrl, apiUrl, headers } = resolveMediaDownloadRequest(rawUrl);
+  const urls = [directUrl, apiUrl].filter(Boolean);
+
+  if (urls.length === 0) {
+    throw new Error('Invalid file URL');
+  }
+
+  // Electron: native Save dialog сразу, стрим в main process.
+  if (typeof window !== 'undefined' && window.electronAPI?.saveMediaFile) {
+    const result = await window.electronAPI.saveMediaFile({
+      url: urls[0],
+      fallbackUrl: urls[1] || '',
+      fileName: safeName,
+      headers,
+    });
+    if (result?.canceled) {
+      return { canceled: true };
+    }
+    return result || { canceled: false };
+  }
+
+  // Chromium File System Access: picker сразу, затем stream.
+  if (typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function') {
+    try {
+      await downloadViaSaveFilePicker(urls, safeName, headers);
+      return { canceled: false };
+    } catch (error) {
+      // Пользователь отменил picker.
+      if (error?.name === 'AbortError') {
+        return { canceled: true };
+      }
+      // Если picker недоступен в контексте (iframe и т.п.) — fallback ниже.
+      if (error?.name !== 'SecurityError' && error?.name !== 'NotAllowedError') {
+        throw error;
+      }
+    }
+  }
+
+  // Web fallback: сразу клик по прямой ссылке (без предварительного fetch всего файла).
+  triggerAnchorDownload(directUrl || apiUrl, safeName);
+  return { canceled: false };
+};
+
+function resolveMediaDownloadRequest(rawUrl) {
+  const directUrl = buildMediaUrl(rawUrl);
+  const headers = {};
+  const token = tokenManager.getToken();
+  if (token && tokenManager.isTokenValid()) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const normalizedPath = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  const cleanedPath = normalizedPath
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .replace(/^\/+/, '');
+
+  const apiUrl = cleanedPath
+    ? `${BASE_URL}/api/media/download?filePath=${encodeURIComponent(cleanedPath)}`
+    : '';
+
+  return { directUrl, apiUrl, headers };
+}

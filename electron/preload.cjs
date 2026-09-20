@@ -105,6 +105,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadBackgroundImage: (filePath) => ipcRenderer.invoke('electron:load-background-image', filePath),
   clearBackgroundImage: () => ipcRenderer.invoke('electron:clear-background-image'),
 
+  /** Сначала диалог пути, затем стрим файла на диск (без буферизации в renderer). */
+  saveMediaFile: (payload) => ipcRenderer.invoke('electron:save-media-file', payload),
+
   /*
   setVideoOverlayFullscreen: (active) =>
     ipcRenderer.send('electron:video-overlay-fullscreen', Boolean(active)),

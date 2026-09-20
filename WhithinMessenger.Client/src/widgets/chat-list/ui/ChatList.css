@@ -65,6 +65,7 @@
 .friends-section {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   height: 52px;
   min-height: 52px;
@@ -78,13 +79,14 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 4px;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   font-size: 14px;
   font-weight: 500;

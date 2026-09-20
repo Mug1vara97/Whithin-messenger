@@ -146,6 +146,12 @@ const AppRouter = () => {
               isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
             } 
           />
+          <Route
+            path="/channels/@me/feed"
+            element={
+              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+            }
+          />
           <Route 
             path="/channels/@me/:chatId" 
             element={

@@ -16,6 +16,7 @@ import {
 import { ChatRoom } from '../../../widgets/chat-room';
 import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
+import { FeedPanel } from '../../../widgets/feed-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
 import IdeasBoardView from '../../../widgets/ideas-board/ui/IdeasBoardView';
 import { isVoiceChannel, isIdeasBoardChannel } from '../../../shared/lib/constants/chatChannelTypes';
@@ -68,6 +69,8 @@ const HomePage = () => {
   const [markingAllNotificationsAsRead, setMarkingAllNotificationsAsRead] = useState(false);
   
   const showFriends = location.pathname === '/channels/@me/friends';
+  const showFeed =
+    location.pathname === '/channels/@me/feed' || location.pathname === '/channels/@me';
   const showDiscovery = isDiscoveryPath(location.pathname);
   const discoveryTab = parseDiscoveryTab(location.pathname) ?? DISCOVERY_TAB.SERVERS;
 
@@ -1028,6 +1031,10 @@ const HomePage = () => {
     navigate('/channels/@me/friends');
   }, [navigate]);
 
+  const handleFeedSelected = useCallback(() => {
+    navigate('/channels/@me/feed');
+  }, [navigate]);
+
   const handleCreateServerClick = useCallback(() => {
     setShowCreateServerModal(true);
   }, []);
@@ -1121,7 +1128,7 @@ const HomePage = () => {
       const targetId = explicitChatId || selectedChat?.chatId || selectedChat?.chat_id;
       if (!targetId) return;
       if (document.visibilityState !== 'visible') return;
-      if (showFriends || showDiscovery || showNotificationsModal) return;
+      if (showFriends || showFeed || showDiscovery || showNotificationsModal) return;
 
       window.clearTimeout(markReadTimerRef.current);
       markReadTimerRef.current = window.setTimeout(async () => {
@@ -1132,7 +1139,7 @@ const HomePage = () => {
         }
       }, 400);
     },
-    [selectedChat, showFriends, showDiscovery, showNotificationsModal, markChatAsRead]
+    [selectedChat, showFriends, showFeed, showDiscovery, showNotificationsModal, markChatAsRead]
   );
 
   useEffect(() => {
@@ -1185,7 +1192,7 @@ const HomePage = () => {
         return;
       }
 
-      if (selectedChat && !showFriends && !showDiscovery) {
+      if (selectedChat && !showFriends && !showFeed && !showDiscovery) {
         e.preventDefault();
         handleCloseSelectedChat();
       }
@@ -1200,6 +1207,7 @@ const HomePage = () => {
     showNotificationsModal,
     selectedChat,
     showFriends,
+    showFeed,
     showDiscovery,
     handleCloseSelectedChat,
   ]);
@@ -1252,6 +1260,7 @@ const HomePage = () => {
                     <ChatList
                       onChatSelected={handleChatSelected}
                       onFriendsSelected={handleFriendsSelected}
+                      onFeedSelected={handleFeedSelected}
                       selectedChatId={selectedChat?.chatId || selectedChat?.chat_id}
                       unreadCountByChat={messageUnreadCountByChat}
                       chats={chats}
@@ -1284,6 +1293,8 @@ const HomePage = () => {
                     }
                   }}
                 />
+              ) : showFeed ? (
+                <FeedPanel />
               ) : showDiscovery ? (
                 <DiscoveryMainPanel
                   activeSection={discoveryTab}

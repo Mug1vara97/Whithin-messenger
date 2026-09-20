@@ -2040,6 +2040,82 @@ ipcMain.handle('electron:clear-background-image', async () => {
   return true;
 });
 
+function sanitizeDownloadFileName(fileName) {
+  const cleaned = String(fileName || 'download')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .trim();
+  const base = path.basename(cleaned || 'download');
+  return base || 'download';
+}
+
+async function streamHttpUrlToFile(url, filePath, headers = {}) {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: headers && typeof headers === 'object' ? headers : {},
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+
+  if (!response.body) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.promises.writeFile(filePath, buffer);
+    return;
+  }
+
+  const { pipeline } = require('node:stream/promises');
+  const { Readable } = require('node:stream');
+  await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(filePath));
+}
+
+ipcMain.handle('electron:save-media-file', async (event, payload = {}) => {
+  const { dialog } = require('electron');
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const fileName = sanitizeDownloadFileName(payload.fileName);
+  const primaryUrl = typeof payload.url === 'string' ? payload.url.trim() : '';
+  const fallbackUrl =
+    typeof payload.fallbackUrl === 'string' ? payload.fallbackUrl.trim() : '';
+  const headers =
+    payload.headers && typeof payload.headers === 'object' ? payload.headers : {};
+
+  if (!primaryUrl && !fallbackUrl) {
+    throw new Error('Invalid file URL');
+  }
+
+  // Диалог пути сразу — до сетевой загрузки.
+  const result = await dialog.showSaveDialog(win || undefined, {
+    defaultPath: fileName,
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return { canceled: true };
+  }
+
+  const targetPath = result.filePath;
+  const urls = [primaryUrl, fallbackUrl].filter(Boolean);
+
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      await streamHttpUrlToFile(url, targetPath, headers);
+      return { canceled: false, filePath: targetPath };
+    } catch (error) {
+      lastError = error;
+      try {
+        if (fs.existsSync(targetPath)) {
+          fs.unlinkSync(targetPath);
+        }
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  }
+
+  throw lastError || new Error('Download failed');
+});
+
 app.on('window-all-closed', () => {
   if (isQuitting) {
     return;
