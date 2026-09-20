@@ -25,7 +25,6 @@ import CreateFeedPostModal from '../../../../widgets/feed-panel/ui/CreateFeedPos
 import './ProfileModal.css';
 
 const MAX_BIO_LENGTH = 190;
-const MEDIA_PREVIEW_LIMIT = 6;
 
 const resolveMediaUrl = (path) => {
   if (!path) return null;
@@ -58,18 +57,6 @@ const formatRelativeTime = (timestamp) => {
   return formatFeedTime(timestamp);
 };
 
-const collectPostImages = (posts) => {
-  const images = [];
-  for (const post of posts || []) {
-    for (const item of post.attachments || []) {
-      if (item?.contentType?.startsWith('image/')) {
-        images.push(item);
-      }
-    }
-  }
-  return images;
-};
-
 const ProfileModal = ({
   isOpen,
   onClose,
@@ -91,7 +78,6 @@ const ProfileModal = ({
   const [postsLoading, setPostsLoading] = useState(false);
   const [previewMedia, setPreviewMedia] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [showAllMedia, setShowAllMedia] = useState(false);
   const { user } = useAuthContext();
 
   const profileUserId = profile?.userId ?? profile?.UserId;
@@ -162,9 +148,6 @@ const ProfileModal = ({
     };
   }, [activeProfile?.banner, accentColor]);
 
-  const allMedia = useMemo(() => collectPostImages(profilePosts), [profilePosts]);
-  const visibleMedia = showAllMedia ? allMedia : allMedia.slice(0, MEDIA_PREVIEW_LIMIT);
-
   const loadProfile = useCallback(async () => {
     if (!userId) return;
     try {
@@ -208,7 +191,6 @@ const ProfileModal = ({
     setIsEditingBio(false);
     setBioError('');
     setComposerOpen(false);
-    setShowAllMedia(false);
     loadProfile();
   }, [isOpen, userId, loadProfile, initialStatus]);
 
@@ -222,7 +204,6 @@ const ProfileModal = ({
     setProfilePosts([]);
     setPreviewMedia(null);
     setComposerOpen(false);
-    setShowAllMedia(false);
   }, [isOpen]);
 
   useEffect(() => {
@@ -441,47 +422,13 @@ const ProfileModal = ({
             <UserNameplate nameplate={activeProfile?.nameplate} className="profile-modal__nameplate">
               <h2 className="profile-modal__name">{visibleName}</h2>
             </UserNameplate>
-            <div className="profile-modal__meta-row">
-              <span className="profile-modal__status-text">{presenceLabel}</span>
-              {login ? <span className="profile-modal__meta-sep">·</span> : null}
-              {login ? <span className="profile-modal__login">@{login}</span> : null}
-            </div>
+            {login ? <p className="profile-modal__login">@{login}</p> : null}
           </div>
         </div>
 
         <div className="profile-modal__body profile-modal__body--wall">
           <div className="profile-wall">
             <div className="profile-wall__main">
-              {allMedia.length > 0 ? (
-                <section className="profile-wall__card">
-                  <div className="profile-wall__card-head">
-                    <h3 className="profile-wall__card-title">Медиа</h3>
-                    <span className="profile-wall__card-count">{allMedia.length}</span>
-                  </div>
-                  <div className="profile-wall__gallery">
-                    {visibleMedia.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="profile-wall__gallery-item"
-                        onClick={() => setPreviewMedia(item)}
-                      >
-                        <img src={buildMediaUrl(item.filePath)} alt={item.originalFileName} />
-                      </button>
-                    ))}
-                  </div>
-                  {allMedia.length > MEDIA_PREVIEW_LIMIT ? (
-                    <button
-                      type="button"
-                      className="profile-wall__show-all"
-                      onClick={() => setShowAllMedia((prev) => !prev)}
-                    >
-                      {showAllMedia ? 'Свернуть' : 'Показать все'}
-                    </button>
-                  ) : null}
-                </section>
-              ) : null}
-
               {isOwnProfile ? (
                 <button
                   type="button"
