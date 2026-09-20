@@ -118,13 +118,13 @@ module.exports = {
             },
             turnServers: [
                 {
-                    urls: ['turn:185.119.59.23:3478'],
+                    urls: ['turn:213.171.12.49:3478'],
                     username: 'test',
                     credential: 'test123',
                     preferUdp: true
                 },
                 {
-                    urls: ['turn:185.119.59.23:3478?transport=tcp'],
+                    urls: ['turn:213.171.12.49:3478?transport=tcp'],
                     username: 'test',
                     credential: 'test123',
                     preferTcp: true
@@ -147,8 +147,8 @@ module.exports = {
     turnServer: {
         enabled: true,
         urls: [
-            'turn:185.119.59.23:3478',
-            'turn:185.119.59.23:3478?transport=tcp'
+            'turn:213.171.12.49:3478',
+            'turn:213.171.12.49:3478?transport=tcp'
         ],
         username: 'test',
         credential: 'test123'

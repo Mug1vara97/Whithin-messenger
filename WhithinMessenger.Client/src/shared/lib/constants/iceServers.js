@@ -1,15 +1,15 @@
 // ICE серверы для WebRTC соединений
 export const ICE_SERVERS = [
   {
-    urls: ['stun:185.119.59.23:3478']
+    urls: ['stun:213.171.12.49:3478']
   },
   {
-    urls: ['turn:185.119.59.23:3478?transport=udp'],
+    urls: ['turn:213.171.12.49:3478?transport=udp'],
     username: 'test',
     credential: 'test123'
   },
   {
-    urls: ['turn:185.119.59.23:3478?transport=tcp'],
+    urls: ['turn:213.171.12.49:3478?transport=tcp'],
     username: 'test',
     credential: 'test123'
   }

@@ -327,16 +327,16 @@ const unpublishLegacySoundpadTracks = async (localParticipant) => {
 
 // ICE серверы для WebRTC
 const ICE_SERVERS = [
-  { urls: ['stun:185.119.59.23:3478'] },
+  { urls: ['stun:213.171.12.49:3478'] },
   { urls: ['stun:stun.l.google.com:19302'] },
   { urls: ['stun:stun1.l.google.com:19302'] },
   {
-    urls: ['turn:185.119.59.23:3478?transport=udp'],
+    urls: ['turn:213.171.12.49:3478?transport=udp'],
     username: 'test',
     credential: 'test123'
   },
   {
-    urls: ['turn:185.119.59.23:3478?transport=tcp'],
+    urls: ['turn:213.171.12.49:3478?transport=tcp'],
     username: 'test',
     credential: 'test123'
   }

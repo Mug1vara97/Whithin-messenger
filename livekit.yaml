@@ -9,18 +9,18 @@ rtc:
   
   # STUN серверы для NAT traversal
   stun_servers:
-    - stun:185.119.59.23:3478
+    - stun:213.171.12.49:3478
     - stun:stun.l.google.com:19302
     - stun:stun1.l.google.com:19302
   
   # TURN серверы для надежного соединения
   turn_servers:
-    - host: 185.119.59.23
+    - host: 213.171.12.49
       port: 3478
       protocol: udp
       username: test
       password: test123
-    - host: 185.119.59.23
+    - host: 213.171.12.49
       port: 3478
       protocol: tcp
       username: test

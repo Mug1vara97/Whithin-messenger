@@ -73,16 +73,16 @@ public sealed class MusicRelayController : ControllerBase
         {
             iceServers = new object[]
             {
-                new { urls = new[] { "stun:185.119.59.23:3478" } },
+                new { urls = new[] { "stun:213.171.12.49:3478" } },
                 new
                 {
-                    urls = new[] { "turn:185.119.59.23:3478?transport=udp" },
+                    urls = new[] { "turn:213.171.12.49:3478?transport=udp" },
                     username = "test",
                     credential = "test123"
                 },
                 new
                 {
-                    urls = new[] { "turn:185.119.59.23:3478?transport=tcp" },
+                    urls = new[] { "turn:213.171.12.49:3478?transport=tcp" },
                     username = "test",
                     credential = "test123"
                 }
