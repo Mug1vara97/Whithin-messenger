@@ -72,6 +72,16 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
                 };
             }
 
+            if (chat.TypeId == ChatTypeIds.News
+                || string.Equals(chat.Type?.TypeName, ChatTypeNames.News, StringComparison.OrdinalIgnoreCase))
+            {
+                return new UploadMediaBatchResult
+                {
+                    Success = false,
+                    ErrorMessage = "В канал новостей публикуйте посты через ленту",
+                };
+            }
+
             foreach (var file in files)
             {
                 var uploadCheck = await _permissionChecker.ValidateMediaUploadAsync(

@@ -54,6 +54,16 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 };
             }
 
+            if (chat.TypeId == ChatTypeIds.News
+                || string.Equals(chat.Type?.TypeName, ChatTypeNames.News, StringComparison.OrdinalIgnoreCase))
+            {
+                return new UploadMediaResult
+                {
+                    Success = false,
+                    ErrorMessage = "В канал новостей публикуйте посты через ленту",
+                };
+            }
+
             var contentType = request.File.ContentType;
             var uploadCheck = await _permissionChecker.ValidateMediaUploadAsync(
                 chat.ServerId,

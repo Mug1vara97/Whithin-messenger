@@ -51,10 +51,16 @@ const formatRelativeTime = (timestamp) => {
   return formatFeedTime(timestamp);
 };
 
-const FeedPanel = () => {
+const FeedPanel = ({
+  serverId = null,
+  channelName = 'Новости',
+  canCreate = true,
+  embedded = false,
+} = {}) => {
   const { openProfile } = useProfileModal();
   const { user } = useAuthContext();
   const currentUserId = String(user?.id || user?.userId || user?.Id || '');
+  const isServerNews = Boolean(serverId);
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,16 +79,21 @@ const FeedPanel = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await feedApi.getFeed();
+      const data = isServerNews
+        ? await feedApi.getServerPosts(serverId)
+        : await feedApi.getFeed();
       setPosts(data);
     } catch (err) {
       console.error('FeedPanel: failed to load feed', err);
       setPosts([]);
-      setError(err?.response?.data?.error || 'Не удалось загрузить ленту');
+      setError(
+        err?.response?.data?.error ||
+          (isServerNews ? 'Не удалось загрузить новости сервера' : 'Не удалось загрузить ленту'),
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isServerNews, serverId]);
 
   useEffect(() => {
     void loadPosts();
@@ -360,8 +371,16 @@ const FeedPanel = () => {
     const liked = post.myReaction === 'like';
     const disliked = post.myReaction === 'dislike';
     const busy = reactionBusy[post.id];
-    const displayName =
-      post.scope === 'server' ? post.serverName || post.authorName : post.authorName;
+    const displayName = isServerNews
+      ? post.authorName
+      : post.scope === 'server'
+        ? post.serverName || post.authorName
+        : post.authorName;
+    const avatarUrl = isServerNews
+      ? post.authorAvatar
+      : post.scope === 'server'
+        ? post.serverAvatar || post.authorAvatar
+        : post.authorAvatar;
     const score = formatScore(post.likesCount, post.dislikesCount);
 
     return (
@@ -371,15 +390,13 @@ const FeedPanel = () => {
             type="button"
             className="feed-panel__author"
             onClick={() => {
-              if (post.scope === 'server') return;
+              if (!isServerNews && post.scope === 'server') return;
               openProfile(post.authorId, post.authorName);
             }}
           >
             <UserAvatar
               username={post.authorName}
-              avatarUrl={
-                post.scope === 'server' ? post.serverAvatar || post.authorAvatar : post.authorAvatar
-              }
+              avatarUrl={avatarUrl}
               avatarColor={post.authorAvatarColor}
               size={32}
             />
@@ -387,7 +404,7 @@ const FeedPanel = () => {
               <span className="feed-panel__author-name">{displayName}</span>
               <span className="feed-panel__meta-dot">•</span>
               <span className="feed-panel__author-time">{formatRelativeTime(post.createdAt)}</span>
-              {post.scope === 'server' ? (
+              {!isServerNews && post.scope === 'server' ? (
                 <>
                   <span className="feed-panel__meta-dot">•</span>
                   <span className="feed-panel__author-time">сервер</span>
@@ -463,20 +480,22 @@ const FeedPanel = () => {
   };
 
   return (
-    <div className="feed-panel">
+    <div className={`feed-panel ${embedded ? 'feed-panel--embedded' : ''}`}>
       <div className="feed-panel__header">
         <div className="feed-panel__title">
           <DynamicFeedOutlinedIcon sx={{ fontSize: 20 }} />
-          <h2>Лента</h2>
+          <h2>{isServerNews ? channelName || 'Новости' : 'Лента'}</h2>
         </div>
-        <button
-          type="button"
-          className="feed-panel__add"
-          title="Создать пост"
-          onClick={() => setComposerOpen(true)}
-        >
-          <AddIcon sx={{ fontSize: 22 }} />
-        </button>
+        {canCreate ? (
+          <button
+            type="button"
+            className="feed-panel__add"
+            title="Создать пост"
+            onClick={() => setComposerOpen(true)}
+          >
+            <AddIcon sx={{ fontSize: 22 }} />
+          </button>
+        ) : null}
       </div>
 
       <div className="feed-panel__scroll">
@@ -486,7 +505,11 @@ const FeedPanel = () => {
           <div className="feed-panel__empty">Загрузка…</div>
         ) : posts.length === 0 ? (
           <div className="feed-panel__empty">
-            Пока нет постов. Нажмите «+», чтобы создать первый — его увидят друзья.
+            {isServerNews
+              ? canCreate
+                ? 'Пока нет новостей. Нажмите «+», чтобы опубликовать первую.'
+                : 'Пока нет новостей на этом сервере.'
+              : 'Пока нет постов. Нажмите «+», чтобы создать первый — его увидят друзья.'}
           </div>
         ) : (
           <div className="feed-panel__list">{posts.map(renderPost)}</div>
@@ -504,6 +527,14 @@ const FeedPanel = () => {
       <CreateFeedPostModal
         isOpen={composerOpen}
         onClose={() => setComposerOpen(false)}
+        scope={isServerNews ? 'server' : 'friend'}
+        serverId={isServerNews ? serverId : null}
+        title={isServerNews ? 'Новость сервера' : 'Новый пост'}
+        placeholder={
+          isServerNews
+            ? 'Напишите новость — её увидят все участники сервера.'
+            : 'Что нового? Пост увидят только друзья.'
+        }
         onCreated={() => {
           void loadPosts();
         }}

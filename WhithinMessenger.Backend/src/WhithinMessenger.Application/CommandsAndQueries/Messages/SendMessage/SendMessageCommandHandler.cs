@@ -69,6 +69,16 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
                 };
             }
 
+            if (chat.TypeId == ChatTypeIds.News
+                || string.Equals(chat.Type?.TypeName, ChatTypeNames.News, StringComparison.OrdinalIgnoreCase))
+            {
+                return new SendMessageResult
+                {
+                    Success = false,
+                    ErrorMessage = "В канал новостей публикуйте посты через ленту",
+                };
+            }
+
             if (chat.ServerId.HasValue)
             {
                 if (!await _permissionChecker.HasPermissionAsync(

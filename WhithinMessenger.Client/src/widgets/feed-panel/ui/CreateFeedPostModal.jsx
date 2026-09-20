@@ -10,7 +10,15 @@ import './CreateFeedPostModal.css';
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
-const CreateFeedPostModal = ({ isOpen, onClose, onCreated }) => {
+const CreateFeedPostModal = ({
+  isOpen,
+  onClose,
+  onCreated,
+  scope = 'friend',
+  serverId = null,
+  title = 'Новый пост',
+  placeholder = 'Что нового? Пост увидят только друзья.',
+}) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
@@ -95,7 +103,8 @@ const CreateFeedPostModal = ({ isOpen, onClose, onCreated }) => {
     try {
       const created = await feedApi.createPost({
         text,
-        scope: 'friend',
+        scope: scope === 'server' ? 'server' : 'friend',
+        serverId: scope === 'server' ? serverId : null,
         files,
       });
       onCreated?.(created);
@@ -105,7 +114,7 @@ const CreateFeedPostModal = ({ isOpen, onClose, onCreated }) => {
     } finally {
       setPublishing(false);
     }
-  }, [publishing, text, files, onCreated, onClose]);
+  }, [publishing, text, files, onCreated, onClose, scope, serverId]);
 
   if (!isOpen) return null;
 
@@ -119,7 +128,7 @@ const CreateFeedPostModal = ({ isOpen, onClose, onCreated }) => {
       />
       <div className="create-feed-post-modal__dialog">
         <div className="create-feed-post-modal__header">
-          <h2>Новый пост</h2>
+          <h2>{title}</h2>
           <button type="button" className="create-feed-post-modal__close" onClick={onClose} aria-label="Закрыть">
             <CloseIcon fontSize="small" />
           </button>
@@ -131,7 +140,7 @@ const CreateFeedPostModal = ({ isOpen, onClose, onCreated }) => {
             value={text}
             maxLength={2000}
             rows={5}
-            placeholder="Что нового? Пост увидят только друзья."
+            placeholder={placeholder}
             onChange={(event) => setText(event.target.value)}
             autoFocus
           />

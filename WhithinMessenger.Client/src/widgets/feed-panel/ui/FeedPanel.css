@@ -9,6 +9,10 @@
   position: relative;
 }
 
+.feed-panel--embedded {
+  background: var(--background);
+}
+
 .feed-panel__header {
   display: flex;
   align-items: center;

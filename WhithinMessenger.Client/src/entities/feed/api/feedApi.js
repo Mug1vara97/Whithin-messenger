@@ -74,6 +74,12 @@ export const feedApi = {
     return (Array.isArray(response.data) ? response.data : []).map(normalizePost).filter(Boolean);
   },
 
+  async getServerPosts(serverId, take = 50) {
+    if (!serverId) return [];
+    const response = await apiClient.get(`/feed/servers/${serverId}`, { params: { take } });
+    return (Array.isArray(response.data) ? response.data : []).map(normalizePost).filter(Boolean);
+  },
+
   async getUserPosts(userId, take = 50) {
     if (!userId) return [];
     const response = await apiClient.get(`/feed/user/${userId}`, { params: { take } });

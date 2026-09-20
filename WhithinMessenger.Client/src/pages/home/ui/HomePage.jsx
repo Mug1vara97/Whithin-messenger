@@ -19,7 +19,8 @@ import { FriendsPanel } from '../../../widgets/friends-panel';
 import { FeedPanel } from '../../../widgets/feed-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
 import IdeasBoardView from '../../../widgets/ideas-board/ui/IdeasBoardView';
-import { isVoiceChannel, isIdeasBoardChannel } from '../../../shared/lib/constants/chatChannelTypes';
+import NewsChannelView from '../../../widgets/news-channel/ui/NewsChannelView';
+import { isVoiceChannel, isIdeasBoardChannel, isNewsChannel } from '../../../shared/lib/constants/chatChannelTypes';
 import { useServer } from '../../../entities/server/hooks';
 import { serverApi } from '../../../entities/server/api/serverApi';
 import { useChatList } from '../../../entities/chat';
@@ -1330,6 +1331,12 @@ const HomePage = () => {
                       userId={user?.id || user?.userId}
                       canCreate={canSendMessages(serverChannelPermissions, isActiveServerOwner)}
                       canModerate={canManageMessages(serverChannelPermissions, isActiveServerOwner)}
+                    />
+                  ) : isNewsChannel(selectedChat) ? (
+                    <NewsChannelView
+                      serverId={selectedServer?.serverId}
+                      channelName={selectedChat.groupName || selectedChat.name || selectedChat.Name || 'Новости'}
+                      canCreate={canSendMessages(serverChannelPermissions, isActiveServerOwner)}
                     />
                   ) : (
                     <ChatRoom

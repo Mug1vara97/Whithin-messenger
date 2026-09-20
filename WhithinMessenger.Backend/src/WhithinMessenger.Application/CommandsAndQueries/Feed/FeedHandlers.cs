@@ -330,6 +330,55 @@ public class GetServerFeedQueryHandler : IRequestHandler<GetServerFeedQuery, Fee
     }
 }
 
+public class GetServerFeedByServerQueryHandler : IRequestHandler<GetServerFeedByServerQuery, FeedPostsResult>
+{
+    private readonly IFeedPostRepository _feedPostRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
+    private readonly IServerRepository _serverRepository;
+
+    public GetServerFeedByServerQueryHandler(
+        IFeedPostRepository feedPostRepository,
+        IServerMemberRepository serverMemberRepository,
+        IServerRepository serverRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+        _serverMemberRepository = serverMemberRepository;
+        _serverRepository = serverRepository;
+    }
+
+    public async Task<FeedPostsResult> Handle(GetServerFeedByServerQuery request, CancellationToken cancellationToken)
+    {
+        var isMember = await _serverMemberRepository.IsUserMemberAsync(
+            request.ServerId,
+            request.UserId,
+            cancellationToken);
+        if (!isMember)
+        {
+            var server = await _serverRepository.GetByIdAsync(request.ServerId, cancellationToken);
+            if (server == null || server.OwnerId != request.UserId)
+            {
+                return new FeedPostsResult
+                {
+                    Success = false,
+                    ErrorMessage = "Нет доступа к новостям сервера",
+                };
+            }
+        }
+
+        var take = Math.Clamp(request.Take, 1, 100);
+        var posts = await _feedPostRepository.GetServerFeedAsync(
+            [request.ServerId],
+            take,
+            cancellationToken);
+
+        return new FeedPostsResult
+        {
+            Success = true,
+            Posts = posts.Select(p => FeedPostMapper.Map(p, request.UserId)).Cast<object>().ToList(),
+        };
+    }
+}
+
 public class GetUnifiedFeedQueryHandler : IRequestHandler<GetUnifiedFeedQuery, FeedPostsResult>
 {
     private readonly IFeedPostRepository _feedPostRepository;

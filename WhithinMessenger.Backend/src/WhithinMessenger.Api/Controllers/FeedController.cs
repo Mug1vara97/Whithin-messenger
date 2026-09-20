@@ -57,6 +57,19 @@ public class FeedController : ControllerBase
         return Ok(result.Posts);
     }
 
+    [HttpGet("servers/{serverId:guid}")]
+    public async Task<IActionResult> GetServerFeedByServer(Guid serverId, [FromQuery] int take = 50)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new GetServerFeedByServerQuery(userId, serverId, take));
+        if (!result.Success)
+        {
+            return StatusCode(403, new { error = result.ErrorMessage ?? "Нет доступа" });
+        }
+
+        return Ok(result.Posts);
+    }
+
     [HttpGet("user/{authorUserId:guid}")]
     public async Task<IActionResult> GetUserPosts(Guid authorUserId, [FromQuery] int take = 50)
     {

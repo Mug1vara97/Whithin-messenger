@@ -18,6 +18,9 @@ public record GetFriendsFeedQuery(Guid UserId, int Take = 50) : IRequest<FeedPos
 
 public record GetServerFeedQuery(Guid UserId, int Take = 50) : IRequest<FeedPostsResult>;
 
+public record GetServerFeedByServerQuery(Guid UserId, Guid ServerId, int Take = 50)
+    : IRequest<FeedPostsResult>;
+
 public record GetUnifiedFeedQuery(Guid UserId, int Take = 50) : IRequest<FeedPostsResult>;
 
 public record GetUserFeedPostsQuery(Guid ViewerUserId, Guid AuthorUserId, int Take = 50)
