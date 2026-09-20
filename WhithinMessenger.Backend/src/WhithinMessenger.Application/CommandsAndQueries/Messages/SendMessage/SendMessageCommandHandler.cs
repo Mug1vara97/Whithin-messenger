@@ -15,6 +15,7 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IUserListCacheService _userListCache;
     private readonly IUserBlockService _userBlockService;
+    private readonly INewsChannelFeedSyncService _newsChannelFeedSync;
 
     public SendMessageCommandHandler(
         IMessageRepository messageRepository,
@@ -22,7 +23,8 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
         IUserListCacheService userListCache,
-        IUserBlockService userBlockService)
+        IUserBlockService userBlockService,
+        INewsChannelFeedSyncService newsChannelFeedSync)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
@@ -30,6 +32,7 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
         _permissionChecker = permissionChecker;
         _userListCache = userListCache;
         _userBlockService = userBlockService;
+        _newsChannelFeedSync = newsChannelFeedSync;
     }
 
     public async Task<SendMessageResult> Handle(SendMessageCommand request, CancellationToken cancellationToken)
@@ -132,6 +135,8 @@ public class SendMessageCommandHandler : IRequestHandler<SendMessageCommand, Sen
             {
                 await _userListCache.InvalidateChatListForChatAsync(request.ChatId, cancellationToken);
             }
+
+            await _newsChannelFeedSync.PublishFromMessageAsync(newMessage.Id, cancellationToken);
 
             return new SendMessageResult
             {

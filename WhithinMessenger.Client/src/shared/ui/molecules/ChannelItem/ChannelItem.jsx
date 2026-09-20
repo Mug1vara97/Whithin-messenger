@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { FaCog, FaLock } from 'react-icons/fa';
 import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined';
+import NewspaperOutlinedIcon from '@mui/icons-material/NewspaperOutlined';
 import { VolumeUp } from '@mui/icons-material';
 import { useCallStore } from '../../../lib/stores/callStore';
 import { VoiceParticipantStatusIcons } from '../../atoms/VoiceParticipantStatusIcons';
@@ -16,6 +17,7 @@ import {
   useParticipantSpeakingStates,
 } from '../../../lib/hooks/useParticipantSpeakingStates';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
+import { isNewsChannel as checkIsNewsChannel } from '../../../lib/constants/chatChannelTypes';
 import './ChannelItem.css';
 
 const EMPTY_VOICE_PARTICIPANTS = [];
@@ -93,6 +95,7 @@ const ChannelItem = ({
     channel.typeId === 5 ||
     channel.TypeId === 5 ||
     channel.typeId === '55555555-5555-5555-5555-555555555555';
+  const isNewsChannel = checkIsNewsChannel(channel);
   const isPrivate = channel.isPrivate === true || channel.IsPrivate === true;
   const isCallOnlyChannel = channel.isCallOnlyChannel === true;
   const channelId = channel.chatId || channel.ChatId;
@@ -150,6 +153,9 @@ const ChannelItem = ({
     }
     if (isIdeasBoardChannel) {
       return <ContentPasteOutlinedIcon sx={{ fontSize: 16, width: 16, height: 16 }} />;
+    }
+    if (isNewsChannel) {
+      return <NewspaperOutlinedIcon sx={{ fontSize: 16, width: 16, height: 16 }} />;
     }
     return '#';
   };

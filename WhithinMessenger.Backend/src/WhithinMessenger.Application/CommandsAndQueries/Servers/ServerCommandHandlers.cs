@@ -339,6 +339,7 @@ public class CreateChatCommandHandler : IRequestHandler<CreateChatCommand, Creat
                 3 => Guid.Parse("33333333-3333-3333-3333-333333333333"), // TextChannel
                 4 => Guid.Parse("44444444-4444-4444-4444-444444444444"), // VoiceChannel
                 5 => Guid.Parse("55555555-5555-5555-5555-555555555555"), // IdeasBoard
+                6 => ChatTypeIds.News, // News
                 _ => Guid.Parse("33333333-3333-3333-3333-333333333333")  // По умолчанию TextChannel
             };
 

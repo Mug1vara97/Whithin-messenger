@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Person, PersonOff, MoreVert, Check, Close, Block } from '@mui/icons-material';
+import { PersonOff, MoreVert, Check, Close, Block, ChatBubbleOutline } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
@@ -129,7 +129,7 @@ const FriendItem = ({
                 title="Написать сообщение"
                 type="button"
               >
-                <Person />
+                <ChatBubbleOutline />
               </button>
               <button
                 className="friend-item__action-button friend-item__action-button--more"

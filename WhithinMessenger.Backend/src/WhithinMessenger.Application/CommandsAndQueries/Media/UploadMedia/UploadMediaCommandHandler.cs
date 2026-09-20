@@ -15,6 +15,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IVideoHlsBackgroundService _videoHlsBackgroundService;
+    private readonly INewsChannelFeedSyncService _newsChannelFeedSync;
     private readonly ILogger<UploadMediaCommandHandler> _logger;
 
     public UploadMediaCommandHandler(
@@ -25,6 +26,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
         IVideoHlsBackgroundService videoHlsBackgroundService,
+        INewsChannelFeedSyncService newsChannelFeedSync,
         ILogger<UploadMediaCommandHandler> logger)
     {
         _fileService = fileService;
@@ -34,6 +36,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
         _videoHlsBackgroundService = videoHlsBackgroundService;
+        _newsChannelFeedSync = newsChannelFeedSync;
         _logger = logger;
     }
 
@@ -136,6 +139,8 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
             {
                 _videoHlsBackgroundService.QueueGeneration(savedMediaFile.Id, finalFilePath);
             }
+
+            await _newsChannelFeedSync.PublishFromMessageAsync(savedMessage.Id, cancellationToken);
 
             return new UploadMediaResult
             {

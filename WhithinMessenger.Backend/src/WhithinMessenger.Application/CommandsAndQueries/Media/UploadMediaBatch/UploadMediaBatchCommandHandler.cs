@@ -16,6 +16,7 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
     private readonly IMessageRepository _messageRepository;
     private readonly IChatRepository _chatRepository;
     private readonly ServerPermissionChecker _permissionChecker;
+    private readonly INewsChannelFeedSyncService _newsChannelFeedSync;
     private readonly ILogger<UploadMediaBatchCommandHandler> _logger;
 
     public UploadMediaBatchCommandHandler(
@@ -25,6 +26,7 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
         IMessageRepository messageRepository,
         IChatRepository chatRepository,
         ServerPermissionChecker permissionChecker,
+        INewsChannelFeedSyncService newsChannelFeedSync,
         ILogger<UploadMediaBatchCommandHandler> logger)
     {
         _fileService = fileService;
@@ -33,6 +35,7 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
         _messageRepository = messageRepository;
         _chatRepository = chatRepository;
         _permissionChecker = permissionChecker;
+        _newsChannelFeedSync = newsChannelFeedSync;
         _logger = logger;
     }
 
@@ -105,6 +108,8 @@ public class UploadMediaBatchCommandHandler : IRequestHandler<UploadMediaBatchCo
                 var mediaItem = await SaveMediaFileAsync(savedMessage.Id, file, cancellationToken);
                 uploadedItems.Add(mediaItem);
             }
+
+            await _newsChannelFeedSync.PublishFromMessageAsync(savedMessage.Id, cancellationToken);
 
             return new UploadMediaBatchResult
             {

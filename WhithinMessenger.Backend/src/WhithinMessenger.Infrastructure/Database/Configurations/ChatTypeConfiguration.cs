@@ -51,6 +51,11 @@ public class ChatTypeConfiguration : IEntityTypeConfiguration<ChatType>
             {
                 Id = Guid.Parse("66666666-6666-6666-6666-666666666666"),
                 TypeName = "Saved"
+            },
+            new ChatType
+            {
+                Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+                TypeName = "News"
             }
         );
     }

@@ -71,7 +71,8 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             var textChatType = await _chatRepository.GetChatTypeByNameAsync("TextChannel", cancellationToken);
             var voiceChatType = await _chatRepository.GetChatTypeByNameAsync("VoiceChannel", cancellationToken);
-            if (textChatType == null || voiceChatType == null)
+            var newsChatType = await _chatRepository.GetChatTypeByNameAsync(ChatTypeNames.News, cancellationToken);
+            if (textChatType == null || voiceChatType == null || newsChatType == null)
             {
                 return new CreateServerResult
                 {
@@ -128,6 +129,19 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
 
             await _chatRepository.CreateAsync(voiceChat, cancellationToken);
 
+            var newsChat = new Chat
+            {
+                Id = Guid.NewGuid(),
+                Name = "Новости",
+                TypeId = newsChatType.Id,
+                CategoryId = createdTextCategory.Id,
+                ServerId = createdServer.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ChatOrder = 1
+            };
+
+            await _chatRepository.CreateAsync(newsChat, cancellationToken);
+
             var textChatMember = new Member
             {
                 Id = Guid.NewGuid(),
@@ -151,6 +165,18 @@ public class CreateServerCommandHandler : IRequestHandler<CreateServerCommand, C
             };
 
             await _chatMemberRepository.CreateAsync(voiceChatMember, cancellationToken);
+
+            var newsChatMember = new Member
+            {
+                Id = Guid.NewGuid(),
+                ChatId = newsChat.Id,
+                UserId = request.OwnerId,
+                JoinedAt = DateTimeOffset.UtcNow,
+                Chat = newsChat,
+                User = owner
+            };
+
+            await _chatMemberRepository.CreateAsync(newsChatMember, cancellationToken);
 
             await _userListCache.InvalidateUserServersAsync(request.OwnerId, cancellationToken);
 

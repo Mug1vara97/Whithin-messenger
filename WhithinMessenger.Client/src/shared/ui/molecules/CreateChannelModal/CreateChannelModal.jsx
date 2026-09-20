@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined';
+import NewspaperOutlinedIcon from '@mui/icons-material/NewspaperOutlined';
 import { FaTimes, FaVolumeUp, FaLock, FaHashtag } from 'react-icons/fa';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
@@ -35,6 +36,14 @@ const CHANNEL_TYPE_OPTIONS = [
     placeholder: 'идеи-команды',
     renderIcon: () => <ContentPasteOutlinedIcon fontSize="small" aria-hidden />,
     renderPrefix: () => <ContentPasteOutlinedIcon fontSize="small" aria-hidden />,
+  },
+  {
+    value: 6,
+    label: 'Новости',
+    description: 'Публикации из этого канала попадают в ленту всех участников сервера',
+    placeholder: 'новости',
+    renderIcon: () => <NewspaperOutlinedIcon fontSize="small" aria-hidden />,
+    renderPrefix: () => <NewspaperOutlinedIcon fontSize="small" aria-hidden />,
   },
 ];
 
