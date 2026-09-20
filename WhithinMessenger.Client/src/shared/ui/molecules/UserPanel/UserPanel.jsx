@@ -9,6 +9,7 @@ import {
   selectActiveServerMuted,
 } from '../../../lib/voice/serverVoiceModerationState';
 import {
+  getOwnStatusLabel,
   getUserStatusLabel,
   getUserStatusOptions,
   normalizeUserStatus,
@@ -36,7 +37,7 @@ const UserPanel = ({
   serverId = null,
 }) => {
   const { user, updateUser } = useAuthContext();
-  const { applyLocalStatus, statusOverrides } = usePresence();
+  const { applyLocalStatus, statusOverrides, resolvePresence } = usePresence();
   const { toggleMute, toggleGlobalAudio, isInCall } = useGlobalCall();
   const isMuted = useCallStore((state) => state.isMuted);
   const isGlobalAudioMuted = useCallStore((state) => state.isGlobalAudioMuted);
@@ -48,7 +49,10 @@ const UserPanel = ({
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [, setIsStatusUpdating] = useState(false);
   const { openOwnProfile, openSettings } = useProfileModal();
-  const handleOpenOwnProfile = () => openOwnProfile(currentStatus);
+  const handleOpenOwnProfile = () => {
+    const status = normalizeUserStatus(resolvePresence(userId, currentStatusRef.current));
+    openOwnProfile(status);
+  };
   const manualStatusRef = useRef(PRESENCE_STATUS.ONLINE);
   const currentStatusRef = useRef(PRESENCE_STATUS.ONLINE);
   const statusMenuRef = useRef(null);
@@ -146,7 +150,7 @@ const UserPanel = ({
   }, [userId, applyLocalStatus]);
 
   // Sync own status from PresenceContext (other sessions / server broadcasts).
-  // Do not overwrite manualStatusRef — auto-Inactive must still return to Online on activity.
+  // Do not overwrite manual Invisible/Offline with a spurious Online from connect races.
   useEffect(() => {
     if (!userId) return;
     const key = String(userId);
@@ -156,10 +160,27 @@ const UserPanel = ({
     const normalized = normalizeUserStatus(remoteStatus);
     if (normalized === currentStatusRef.current) return;
 
+    if (
+      manualStatusRef.current === PRESENCE_STATUS.OFFLINE &&
+      normalized === PRESENCE_STATUS.ONLINE
+    ) {
+      // Keep Invisible locally and push preferred offline back to the server.
+      setCurrentStatus(PRESENCE_STATUS.OFFLINE);
+      currentStatusRef.current = PRESENCE_STATUS.OFFLINE;
+      localStorage.setItem(getStorageKey(), PRESENCE_STATUS.OFFLINE);
+      applyLocalStatus(userId, PRESENCE_STATUS.OFFLINE);
+      void userApi
+        .updateStatus(userId, toBackendUserStatus(PRESENCE_STATUS.OFFLINE))
+        .catch((error) => {
+          console.error('Error re-asserting offline status:', error);
+        });
+      return;
+    }
+
     setCurrentStatus(normalized);
     currentStatusRef.current = normalized;
     localStorage.setItem(getStorageKey(), normalized);
-  }, [userId, statusOverrides]);
+  }, [userId, statusOverrides, applyLocalStatus]);
 
   useEffect(() => {
     if (!isStatusMenuOpen) return undefined;
@@ -316,6 +337,12 @@ const UserPanel = ({
 
   if (!userId) return null;
 
+  // One source for label + dot (PresenceContext override wins over local state).
+  const displayStatus = normalizeUserStatus(
+    resolvePresence(userId, currentStatus),
+  );
+  const displayStatusLabel = getOwnStatusLabel(displayStatus);
+
   const avatarColor = userProfile?.avatarColor || '#5865F2';
   const profileDisplayName =
     resolveProfileDisplayName(userProfile) ??
@@ -346,10 +373,10 @@ const UserPanel = ({
                 <button
                   className="user-avatar-status-button"
                   onClick={() => setIsStatusMenuOpen((prev) => !prev)}
-                  title={getUserStatusLabel(currentStatus)}
+                  title={displayStatusLabel}
                   type="button"
                 >
-                  <UserAvatarPresenceDot status={currentStatus} />
+                  <UserAvatarPresenceDot userId={userId} status={displayStatus} />
                 </button>
               }
             />
@@ -363,7 +390,7 @@ const UserPanel = ({
               type="button"
             >
               <span className={styles.username}>{visibleName || 'Пользователь'}</span>
-              <span className={styles['user-status-text']}>{getUserStatusLabel(currentStatus)}</span>
+              <span className={styles['user-status-text']}>{displayStatusLabel}</span>
             </button>
 
             {isStatusMenuOpen && (
@@ -371,7 +398,7 @@ const UserPanel = ({
                 {getUserStatusOptions().map((statusOption) => (
                   <button
                     key={statusOption.value}
-                    className={`${styles['status-menu-item']} ${currentStatus === statusOption.value ? styles['status-menu-item-active'] : ''}`}
+                    className={`${styles['status-menu-item']} ${displayStatus === statusOption.value ? styles['status-menu-item-active'] : ''}`}
                     onClick={() => handleStatusChange(statusOption.value)}
                     type="button"
                   >
@@ -379,7 +406,11 @@ const UserPanel = ({
                       className={styles['status-dot']}
                       style={{ backgroundColor: statusOption.color }}
                     />
-                    <span>{statusOption.label}</span>
+                    <span>
+                      {statusOption.value === PRESENCE_STATUS.OFFLINE
+                        ? 'Невидимый'
+                        : statusOption.label}
+                    </span>
                   </button>
                 ))}
               </div>

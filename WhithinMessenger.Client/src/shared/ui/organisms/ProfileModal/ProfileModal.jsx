@@ -8,8 +8,8 @@ import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
 import { useResolvedPresence } from '../../../lib/contexts/PresenceContext';
+import { getOwnStatusLabel, normalizeUserStatus } from '../../../lib/utils/userStatus';
 import { mergeProfileState } from '../../../lib/utils/profilePatchHelpers';
-import { normalizeUserStatus } from '../../../lib/utils/userStatus';
 import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
@@ -93,7 +93,9 @@ const ProfileModal = ({
   });
   const accentColor = activeProfile?.avatarColor || '#5865f2';
   const presence = useResolvedPresence(userId, activeProfile?.status ?? initialStatus);
-  const presenceLabel = presence.label;
+  const presenceLabel = isOwnProfile
+    ? getOwnStatusLabel(presence.normalized)
+    : presence.label;
   const presenceColor = presence.color;
 
   const bannerStyle = useMemo(() => {
@@ -343,8 +345,8 @@ const ProfileModal = ({
                 </div>
               )}
               <span
-                className="profile-modal__avatar-status"
-                style={{ backgroundColor: presenceColor }}
+                className={`profile-modal__avatar-status profile-modal__avatar-status--${presence.normalized}`}
+                style={{ ['--presence-color']: presenceColor }}
                 title={presenceLabel}
                 aria-label={presenceLabel}
               />
@@ -355,6 +357,7 @@ const ProfileModal = ({
             <UserNameplate nameplate={activeProfile?.nameplate} className="profile-modal__nameplate">
               <h2 className="profile-modal__name">{visibleName}</h2>
             </UserNameplate>
+            <p className="profile-modal__status-text">{presenceLabel}</p>
             {login && (
               <p className="profile-modal__login">@{login}</p>
             )}

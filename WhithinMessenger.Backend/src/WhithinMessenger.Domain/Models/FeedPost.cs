@@ -26,4 +26,6 @@ public class FeedPost
     public ApplicationUser Author { get; set; } = null!;
 
     public Server? Server { get; set; }
+
+    public ICollection<FeedPostAttachment> Attachments { get; set; } = new List<FeedPostAttachment>();
 }

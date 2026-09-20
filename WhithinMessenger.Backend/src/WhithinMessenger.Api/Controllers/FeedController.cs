@@ -18,6 +18,19 @@ public class FeedController : ControllerBase
         _mediator = mediator;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetFeed([FromQuery] int take = 50)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new GetUnifiedFeedQuery(userId, take));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Posts);
+    }
+
     [HttpGet("friends")]
     public async Task<IActionResult> GetFriendsFeed([FromQuery] int take = 50)
     {
@@ -58,18 +71,25 @@ public class FeedController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreatePost([FromBody] CreateFeedPostRequest request)
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = 524_288_000)]
+    public async Task<IActionResult> CreatePost(
+        [FromForm] string? text,
+        [FromForm] string? scope,
+        [FromForm] Guid? serverId,
+        [FromForm] List<IFormFile>? files)
     {
         var userId = (Guid)HttpContext.Items["UserId"]!;
-        var scope = string.Equals(request.Scope, "server", StringComparison.OrdinalIgnoreCase)
+        var resolvedScope = string.Equals(scope, "server", StringComparison.OrdinalIgnoreCase)
             ? FeedPostScope.Server
             : FeedPostScope.Friend;
 
         var result = await _mediator.Send(new CreateFeedPostCommand(
             userId,
-            request.Text ?? string.Empty,
-            scope,
-            request.ServerId));
+            text ?? string.Empty,
+            resolvedScope,
+            serverId,
+            files));
 
         if (!result.Success)
         {
@@ -91,11 +111,4 @@ public class FeedController : ControllerBase
 
         return Ok(new { success = true });
     }
-}
-
-public class CreateFeedPostRequest
-{
-    public string? Text { get; set; }
-    public string? Scope { get; set; }
-    public Guid? ServerId { get; set; }
 }

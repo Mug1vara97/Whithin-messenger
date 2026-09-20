@@ -77,6 +77,15 @@ export const isUserActiveInFriendsList = (status) => {
 
 export const getUserStatusLabel = (status) => STATUS_LABELS[normalizeUserStatus(status)];
 
+/** Подпись статуса для себя (Discord: Offline → Invisible). */
+export const getOwnStatusLabel = (status) => {
+  const normalized = normalizeUserStatus(status);
+  if (normalized === PRESENCE_STATUS.OFFLINE) {
+    return 'Невидимый';
+  }
+  return STATUS_LABELS[normalized];
+};
+
 export const getUserStatusColor = (status) => STATUS_COLORS[normalizeUserStatus(status)];
 
 export const getPresenceSnapshot = (status) => {

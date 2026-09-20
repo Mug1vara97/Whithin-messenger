@@ -101,6 +101,41 @@
   border-radius: 50%;
   border: 2px solid var(--avatar-presence-ring, var(--surface, #2f3136));
   box-sizing: border-box;
+  background-color: var(--presence-color, #80848e);
+  position: relative;
+}
+
+/* Online — filled green */
+.user-avatar-presence-dot--online {
+  background-color: var(--presence-color, #43b581);
+}
+
+/* Idle — filled yellow */
+.user-avatar-presence-dot--inactive {
+  background-color: var(--presence-color, #f0b232);
+}
+
+/* DND — filled red with cutout bar */
+.user-avatar-presence-dot--do_not_disturb {
+  background-color: var(--presence-color, #f23f43);
+}
+
+.user-avatar-presence-dot--do_not_disturb::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--avatar-presence-ring, var(--surface, #2f3136));
+  transform: translate(-50%, -50%);
+}
+
+/* Offline / Invisible — grey ring (Discord-like) */
+.user-avatar-presence-dot--offline {
+  background-color: var(--avatar-presence-ring, var(--surface, #2f3136));
+  box-shadow: inset 0 0 0 2px var(--presence-color, #80848e);
 }
 
 /* Shared avatar slot — same layout as chat list (.chat-avatar-wrap) */

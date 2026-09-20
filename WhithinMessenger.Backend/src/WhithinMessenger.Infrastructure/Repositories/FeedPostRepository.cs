@@ -19,7 +19,8 @@ public class FeedPostRepository : IFeedPostRepository
             .AsNoTracking()
             .Include(p => p.Author)
             .ThenInclude(u => u.UserProfile)
-            .Include(p => p.Server);
+            .Include(p => p.Server)
+            .Include(p => p.Attachments);
 
     public async Task<FeedPost?> GetByIdAsync(Guid postId, CancellationToken cancellationToken = default)
     {
@@ -27,6 +28,7 @@ public class FeedPostRepository : IFeedPostRepository
             .Include(p => p.Author)
             .ThenInclude(u => u.UserProfile)
             .Include(p => p.Server)
+            .Include(p => p.Attachments)
             .FirstOrDefaultAsync(p => p.Id == postId, cancellationToken);
     }
 

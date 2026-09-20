@@ -1,4 +1,6 @@
 using MediatR;
+using Microsoft.AspNetCore.Http;
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
 using WhithinMessenger.Domain.Models;
 
@@ -6,6 +8,21 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Feed;
 
 public static class FeedPostMapper
 {
+    public static object MapAttachment(FeedPostAttachment attachment) => new
+    {
+        id = attachment.Id,
+        fileName = attachment.FileName,
+        originalFileName = attachment.OriginalFileName,
+        filePath = attachment.FilePath.StartsWith('/') ? attachment.FilePath : $"/{attachment.FilePath}",
+        contentType = attachment.ContentType,
+        fileSize = attachment.FileSize,
+        thumbnailPath = string.IsNullOrWhiteSpace(attachment.ThumbnailPath)
+            ? null
+            : (attachment.ThumbnailPath.StartsWith('/')
+                ? attachment.ThumbnailPath
+                : $"/{attachment.ThumbnailPath}"),
+    };
+
     public static object Map(FeedPost post)
     {
         var profile = post.Author?.UserProfile;
@@ -13,6 +30,12 @@ public static class FeedPostMapper
         var displayName = string.IsNullOrWhiteSpace(profile?.DisplayName)
             ? username
             : profile!.DisplayName!;
+
+        var attachments = (post.Attachments ?? [])
+            .OrderBy(a => a.CreatedAt)
+            .Select(MapAttachment)
+            .Cast<object>()
+            .ToList();
 
         return new
         {
@@ -28,6 +51,7 @@ public static class FeedPostMapper
             serverId = post.ServerId,
             serverName = post.Server?.Name,
             serverAvatar = post.Server?.Avatar,
+            attachments,
         };
     }
 }
@@ -35,27 +59,40 @@ public static class FeedPostMapper
 public class CreateFeedPostCommandHandler : IRequestHandler<CreateFeedPostCommand, FeedPostMutationResult>
 {
     private const int MaxTextLength = 2000;
+    private const int MaxAttachments = 10;
+    private const long MaxFileBytes = 50L * 1024 * 1024;
 
     private readonly IFeedPostRepository _feedPostRepository;
     private readonly IServerMemberRepository _serverMemberRepository;
     private readonly IServerRepository _serverRepository;
+    private readonly IFileService _fileService;
 
     public CreateFeedPostCommandHandler(
         IFeedPostRepository feedPostRepository,
         IServerMemberRepository serverMemberRepository,
-        IServerRepository serverRepository)
+        IServerRepository serverRepository,
+        IFileService fileService)
     {
         _feedPostRepository = feedPostRepository;
         _serverMemberRepository = serverMemberRepository;
         _serverRepository = serverRepository;
+        _fileService = fileService;
     }
 
     public async Task<FeedPostMutationResult> Handle(CreateFeedPostCommand request, CancellationToken cancellationToken)
     {
         var text = (request.Text ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(text))
+        var files = (request.Files ?? Array.Empty<IFormFile>())
+            .Where(f => f != null && f.Length > 0)
+            .ToList();
+
+        if (string.IsNullOrWhiteSpace(text) && files.Count == 0)
         {
-            return new FeedPostMutationResult { Success = false, ErrorMessage = "Текст поста пуст" };
+            return new FeedPostMutationResult
+            {
+                Success = false,
+                ErrorMessage = "Добавьте текст или вложение",
+            };
         }
 
         if (text.Length > MaxTextLength)
@@ -65,6 +102,27 @@ public class CreateFeedPostCommandHandler : IRequestHandler<CreateFeedPostComman
                 Success = false,
                 ErrorMessage = $"Текст поста не должен превышать {MaxTextLength} символов",
             };
+        }
+
+        if (files.Count > MaxAttachments)
+        {
+            return new FeedPostMutationResult
+            {
+                Success = false,
+                ErrorMessage = $"Можно прикрепить не больше {MaxAttachments} файлов",
+            };
+        }
+
+        foreach (var file in files)
+        {
+            if (file.Length > MaxFileBytes)
+            {
+                return new FeedPostMutationResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Файл «{file.FileName}» слишком большой (макс. 50 МБ)",
+                };
+            }
         }
 
         Guid? serverId = null;
@@ -99,6 +157,7 @@ public class CreateFeedPostCommandHandler : IRequestHandler<CreateFeedPostComman
             serverId = request.ServerId;
         }
 
+        var now = DateTimeOffset.UtcNow;
         var post = new FeedPost
         {
             Id = Guid.NewGuid(),
@@ -106,8 +165,32 @@ public class CreateFeedPostCommandHandler : IRequestHandler<CreateFeedPostComman
             Text = text,
             Scope = request.Scope,
             ServerId = serverId,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = now,
         };
+
+        foreach (var file in files)
+        {
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType;
+            var folder = _fileService.GetMediaFolderPath(contentType);
+            var relativePath = await _fileService.SaveFileAsync(file, Path.Combine("feed", folder));
+            var normalizedPath = relativePath.StartsWith('/') ? relativePath : $"/{relativePath}";
+
+            post.Attachments.Add(new FeedPostAttachment
+            {
+                Id = Guid.NewGuid(),
+                FeedPostId = post.Id,
+                FileName = Path.GetFileName(normalizedPath),
+                OriginalFileName = string.IsNullOrWhiteSpace(Path.GetFileName(file.FileName))
+                    ? "file"
+                    : Path.GetFileName(file.FileName),
+                FilePath = normalizedPath,
+                ContentType = contentType,
+                FileSize = file.Length,
+                CreatedAt = now,
+            });
+        }
 
         await _feedPostRepository.CreateAsync(post, cancellationToken);
 
@@ -204,6 +287,55 @@ public class GetServerFeedQueryHandler : IRequestHandler<GetServerFeedQuery, Fee
         {
             Success = true,
             Posts = posts.Select(FeedPostMapper.Map).Cast<object>().ToList(),
+        };
+    }
+}
+
+public class GetUnifiedFeedQueryHandler : IRequestHandler<GetUnifiedFeedQuery, FeedPostsResult>
+{
+    private readonly IFeedPostRepository _feedPostRepository;
+    private readonly IFriendshipRepository _friendshipRepository;
+    private readonly IServerMemberRepository _serverMemberRepository;
+
+    public GetUnifiedFeedQueryHandler(
+        IFeedPostRepository feedPostRepository,
+        IFriendshipRepository friendshipRepository,
+        IServerMemberRepository serverMemberRepository)
+    {
+        _feedPostRepository = feedPostRepository;
+        _friendshipRepository = friendshipRepository;
+        _serverMemberRepository = serverMemberRepository;
+    }
+
+    public async Task<FeedPostsResult> Handle(GetUnifiedFeedQuery request, CancellationToken cancellationToken)
+    {
+        var take = Math.Clamp(request.Take, 1, 100);
+
+        var friendships = await _friendshipRepository.GetFriendsAsync(request.UserId, cancellationToken);
+        var authorIds = friendships
+            .Select(f => f.RequesterId == request.UserId ? f.AddresseeId : f.RequesterId)
+            .Append(request.UserId)
+            .Distinct()
+            .ToList();
+
+        var memberships = await _serverMemberRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        var serverIds = memberships.Select(m => m.ServerId).Distinct().ToList();
+
+        var friendPosts = await _feedPostRepository.GetFriendFeedAsync(authorIds, take, cancellationToken);
+        var serverPosts = await _feedPostRepository.GetServerFeedAsync(serverIds, take, cancellationToken);
+
+        var merged = friendPosts
+            .Concat(serverPosts)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(take)
+            .Select(FeedPostMapper.Map)
+            .Cast<object>()
+            .ToList();
+
+        return new FeedPostsResult
+        {
+            Success = true,
+            Posts = merged,
         };
     }
 }

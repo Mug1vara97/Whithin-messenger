@@ -206,12 +206,47 @@
   border-radius: 50%;
   border: 4px solid var(--avatar-cutout-ring, var(--background, #1e1f22));
   box-sizing: border-box;
-  z-index: 2;
   pointer-events: none;
+  background-color: var(--presence-color, #80848e);
+}
+
+.profile-modal__avatar-status--online {
+  background-color: var(--presence-color, #43b581);
+}
+
+.profile-modal__avatar-status--inactive {
+  background-color: var(--presence-color, #f0b232);
+}
+
+.profile-modal__avatar-status--do_not_disturb {
+  background-color: var(--presence-color, #f23f43);
+}
+
+.profile-modal__avatar-status--do_not_disturb::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--avatar-cutout-ring, var(--background, #1e1f22));
+  transform: translate(-50%, -50%);
+}
+
+.profile-modal__avatar-status--offline {
+  background-color: var(--avatar-cutout-ring, var(--background, #1e1f22));
+  box-shadow: inset 0 0 0 3px var(--presence-color, #80848e);
 }
 
 .profile-modal__identity {
   margin-top: 12px;
+}
+
+.profile-modal__status-text {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted, #949ba4);
 }
 
 .profile-modal__nameplate {
