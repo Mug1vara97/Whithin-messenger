@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import "./BirthdayCardPage.css";
 import TextType from "./TextType.jsx";
 import { CARDS, HEADINGS } from "./words.js";
@@ -14,15 +13,12 @@ const CONFIG = {
   starCount: 150,
 };
 
-const DEFAULT_NAME = "Алиса";
-
-function recipientNameFromQuery(raw) {
-  const value = (raw || DEFAULT_NAME).trim() || DEFAULT_NAME;
-  return value.toUpperCase();
-}
-
 function useBirthdayPageChrome() {
   useEffect(() => {
+    if (window.location.search || window.location.hash) {
+      window.history.replaceState(null, "", "/birthday");
+    }
+
     document.body.classList.add("birthday-card-open");
     const previousTitle = document.title;
     document.title = "С днём рождения";
@@ -47,24 +43,15 @@ function isPhoneViewport() {
     || window.matchMedia("(pointer: coarse) and (max-width: 932px)").matches;
 }
 
-function withName(text, name) {
-  return text.replaceAll("{name}", name);
-}
-
-function buildSequence(name) {
-  const cards = CARDS.map((card) => ({
-    ...card,
-    word: withName(card.word, name),
-  }));
-  const headings = HEADINGS.map((word) => withName(word, name));
+function buildSequence() {
   const items = [];
 
-  cards.forEach((card, index) => {
+  CARDS.forEach((card, index) => {
     if (index % 4 === 0) {
       items.push({
         id: `text-${index}`,
         type: "text",
-        word: headings[Math.floor(index / 4) % headings.length],
+        word: HEADINGS[Math.floor(index / 4) % HEADINGS.length],
         note: "",
       });
     }
@@ -74,7 +61,7 @@ function buildSequence(name) {
       word: card.word,
       note: card.note,
       number: index + 1,
-      total: cards.length,
+      total: CARDS.length,
     });
   });
   return items;
@@ -322,12 +309,7 @@ function HyperTunnel({ sequence }) {
 }
 
 export default function BirthdayCardPage() {
-  const [searchParams] = useSearchParams();
-  const name = useMemo(
-    () => recipientNameFromQuery(searchParams.get("name")),
-    [searchParams],
-  );
-  const sequence = useMemo(() => buildSequence(name), [name]);
+  const sequence = useMemo(() => buildSequence(), []);
   useBirthdayPageChrome();
   const [stage, setStage] = useState("intro");
   const greeting = useMemo(
