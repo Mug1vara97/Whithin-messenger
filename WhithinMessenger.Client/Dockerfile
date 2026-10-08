@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 
 # Install build dependencies and clean up cache in the same layer
 RUN apk add --no-cache python3 make g++ && \
@@ -32,7 +32,7 @@ RUN npm run build && \
     rm -rf node_modules
 
 # Install serve globally in a separate stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
