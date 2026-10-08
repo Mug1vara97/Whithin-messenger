@@ -10,6 +10,7 @@ import { ConfirmEmailChangePage } from '../../pages/confirm-email-change/ui';
 import { ConfirmPasswordChangePage } from '../../pages/confirm-password-change/ui';
 import { ForgotPasswordPage } from '../../pages/forgot-password/ui';
 import { ResetPasswordPage } from '../../pages/reset-password/ui';
+import { BirthdayCardPage } from '../../pages/birthday-card/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
@@ -109,6 +110,10 @@ const AppRouter = () => {
             element={
               isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />
             }
+          />
+          <Route
+            path="/birthday"
+            element={<BirthdayCardPage />}
           />
           <Route 
             path="/" 

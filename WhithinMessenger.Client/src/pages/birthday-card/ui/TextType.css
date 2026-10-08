@@ -1,0 +1,16 @@
+.hyper .text-type {
+  display: inline-block;
+  white-space: pre-wrap;
+}
+
+.hyper .text-type__cursor {
+  margin-left: 0.12em;
+  display: inline-block;
+  animation: text-type-blink 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes text-type-blink {
+  to {
+    opacity: 0;
+  }
+}

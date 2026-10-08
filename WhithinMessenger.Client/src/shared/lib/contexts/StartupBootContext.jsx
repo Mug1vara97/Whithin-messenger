@@ -9,6 +9,7 @@ import React, {
 import { chatApi } from '../../../entities/chat/api/chatApi';
 import { serverApi } from '../../../entities/server/api/serverApi';
 import { hasStartupBootCompleted } from '../startup/startupBoot';
+import { isPublicOpenRoute } from '../utils/authRoutes';
 import { E2E_ENABLED, ensureE2eIdentity, syncSessionE2eKeys } from '../e2e';
 import { useAuthContext } from './AuthContext';
 import { useServerContext } from './useServerContext';
@@ -20,7 +21,9 @@ export const StartupBootProvider = ({ children }) => {
   const { initialServersLoaded } = useServerContext();
   const [isChatsReady, setIsChatsReady] = useState(() => hasStartupBootCompleted());
   const [isServersReady, setIsServersReady] = useState(() => hasStartupBootCompleted());
-  const [skipBootAnimation] = useState(() => hasStartupBootCompleted());
+  const [skipBootAnimation] = useState(
+    () => hasStartupBootCompleted() || isPublicOpenRoute(),
+  );
 
   const markChatsReady = useCallback(() => {
     setIsChatsReady(true);
