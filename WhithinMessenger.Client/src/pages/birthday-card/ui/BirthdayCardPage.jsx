@@ -328,7 +328,7 @@ export default function BirthdayCardPage() {
   };
 
   return (
-    <main className="hyper">
+    <main className="hyper" data-no-scramble="true">
       {stage === "cards" && (
         <>
           <div className="stars" />

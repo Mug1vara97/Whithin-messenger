@@ -20,6 +20,7 @@ const shouldSkipNode = (textNode) => {
   if (SKIP_TAGS.has(parent.tagName)) return true;
   if (parent.closest('[contenteditable="true"]')) return true;
   if (parent.closest('[data-no-scramble="true"]')) return true;
+  if (parent.closest('.hyper')) return true;
 
   return false;
 };

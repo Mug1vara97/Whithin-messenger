@@ -106,10 +106,13 @@
 
 .hyper .intro-copy {
   width: min(42rem, 92vw);
-  text-align: center;
+  text-align: left;
 }
 
 .hyper .intro-type {
+  display: block;
+  width: 100%;
+  min-height: calc(1.25em * 4);
   font-family: "Unbounded", sans-serif;
   font-size: clamp(1.35rem, 5.4vw, 2.6rem);
   font-weight: 700;

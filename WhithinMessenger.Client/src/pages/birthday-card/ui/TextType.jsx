@@ -14,7 +14,6 @@ export default function TextType({
   onComplete,
 }) {
   const textArray = useMemo(() => (Array.isArray(text) ? text : [text]), [text]);
-  const [displayedText, setDisplayedText] = useState("");
   const [charIndex, setCharIndex] = useState(0);
   const [textIndex, setTextIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -22,21 +21,15 @@ export default function TextType({
     onComplete?.();
   }, [onComplete]);
 
+  const current = textArray[textIndex] ?? "";
+  const displayedText = current.slice(0, charIndex);
+
   useEffect(() => {
-    const current = textArray[textIndex] ?? "";
+    const active = textArray[textIndex] ?? "";
     let timeout;
 
-    if (!isDeleting && charIndex === 0 && displayedText === "") {
-      timeout = window.setTimeout(() => {
-        if (current.length === 0) {
-          finish();
-          return;
-        }
-        setDisplayedText(current[0]);
-        setCharIndex(1);
-      }, initialDelay);
-    } else if (isDeleting) {
-      if (displayedText === "") {
+    if (isDeleting) {
+      if (charIndex === 0) {
         if (textIndex === textArray.length - 1 && !loop) {
           finish();
           return undefined;
@@ -44,18 +37,16 @@ export default function TextType({
         timeout = window.setTimeout(() => {
           setIsDeleting(false);
           setTextIndex((prev) => (prev + 1) % textArray.length);
-          setCharIndex(0);
         }, pauseDuration);
       } else {
         timeout = window.setTimeout(() => {
-          setDisplayedText((prev) => prev.slice(0, -1));
+          setCharIndex((prev) => Math.max(0, prev - 1));
         }, deletingSpeed);
       }
-    } else if (charIndex < current.length) {
+    } else if (charIndex < active.length) {
       timeout = window.setTimeout(() => {
-        setDisplayedText((prev) => prev + current[charIndex]);
         setCharIndex((prev) => prev + 1);
-      }, typingSpeed);
+      }, charIndex === 0 ? initialDelay : typingSpeed);
     } else if (loop || textIndex < textArray.length - 1) {
       timeout = window.setTimeout(() => setIsDeleting(true), pauseDuration);
     } else {
@@ -66,7 +57,6 @@ export default function TextType({
   }, [
     charIndex,
     deletingSpeed,
-    displayedText,
     finish,
     initialDelay,
     isDeleting,
