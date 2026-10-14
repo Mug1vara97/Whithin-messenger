@@ -25,9 +25,9 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import { Slider } from '@mui/material';
 import { useVoiceParticipantModeration } from '../../molecules/VoiceParticipantModerationMenu';
 import UserAvatar from '../UserAvatar/UserAvatar';
+import CometDial from '../CometDial/CometDial';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import { colorsMatchForTileAvatarOutline } from '../../../lib/utils/colorMatchHelpers';
 import './VideoCallGrid.css';
@@ -763,8 +763,7 @@ const VideoCallGrid = ({
       }
     };
 
-    const handleSliderChange = (e, newValue) => {
-      e.stopPropagation();
+    const handleSliderChange = (newValue) => {
       if (isScreenShare) {
         if (showScreenShareVolumeControls && onChangeScreenShareVolume) {
           onChangeScreenShareVolume(ownerUserId, newValue);
@@ -775,6 +774,59 @@ const VideoCallGrid = ({
         onChangeUserVolume(participant.id, newValue);
       }
     };
+
+    const dialSize = isSmall ? 140 : 190;
+    const volumeBtnClass = `tile-volume-btn ${
+      isAudioMuted || volume === 0
+        ? 'muted'
+        : !isScreenShare && isSpeaking
+          ? 'speaking'
+          : 'silent'
+    }`;
+    const volumeBtnTitle = isScreenShare
+      ? 'ЛКМ - мут звука демонстрации, ПКМ - слайдер'
+      : 'ЛКМ - мут, ПКМ - слайдер';
+    const volumeButton = (
+      <button
+        type="button"
+        className={volumeBtnClass}
+        onClick={handleVolumeClick}
+        onContextMenu={handleVolumeRightClick}
+        title={volumeBtnTitle}
+      >
+        {isAudioMuted || volume === 0 ? (
+          <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+        ) : (
+          <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+        )}
+      </button>
+    );
+    const volumeControl = (
+      <div className={`tile-volume-anchor${showSlider ? ' dial-open' : ''}`}>
+        {showSlider ? (
+          <CometDial
+            className="tile-volume-comet-dial"
+            value={volume}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            label="Громкость"
+            accent="#5865f2"
+            ink="#B5BAC1"
+            size={dialSize}
+            sweep={340}
+            thickness={3.5}
+            speed={8}
+            onChange={handleSliderChange}
+          >
+            {volumeButton}
+          </CometDial>
+        ) : (
+          volumeButton
+        )}
+      </div>
+    );
     
     const onTileContextMenu = canMuteMembers && !participant.isCurrentUser
       ? (event) => handleParticipantContextMenu(event, participant, channelParticipant)
@@ -905,57 +957,7 @@ const VideoCallGrid = ({
             <div className="tile-volume-controls">
               {isScreenShare ? (
                 <>
-                  {showScreenShareVolumeControls && (
-                    <>
-                      <button
-                        type="button"
-                        className={`tile-volume-btn ${
-                          isAudioMuted || volume === 0
-                            ? 'muted'
-                            : 'silent'
-                        }`}
-                        onClick={handleVolumeClick}
-                        onContextMenu={handleVolumeRightClick}
-                        title="ЛКМ - мут звука демонстрации, ПКМ - слайдер"
-                      >
-                        {isAudioMuted || volume === 0 ? (
-                          <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                        ) : (
-                          <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                        )}
-                      </button>
-
-                      {showSlider && (
-                        <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
-                          <Slider
-                            value={volume}
-                            onChange={handleSliderChange}
-                            orientation="vertical"
-                            min={0}
-                            max={100}
-                            step={1}
-                            size="small"
-                            sx={{
-                              color: '#5865f2',
-                              height: '80px',
-                              '& .MuiSlider-track': {
-                                backgroundColor: '#5865f2',
-                              },
-                              '& .MuiSlider-thumb': {
-                                backgroundColor: '#fff',
-                                width: 12,
-                                height: 12,
-                                '&:hover': {
-                                  boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
-                                },
-                              },
-                            }}
-                          />
-                          <span className="volume-percentage">{volume}%</span>
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {showScreenShareVolumeControls && volumeControl}
                   <button
                     type="button"
                     className="screen-share-fullscreen-btn"
@@ -971,57 +973,7 @@ const VideoCallGrid = ({
                   </button>
                 </>
               ) : (
-                <>
-                  <button 
-                    className={`tile-volume-btn ${
-                      isAudioMuted || volume === 0
-                        ? 'muted'
-                        : isSpeaking
-                        ? 'speaking'
-                        : 'silent'
-                    }`}
-                    onClick={handleVolumeClick}
-                    onContextMenu={handleVolumeRightClick}
-                    title="ЛКМ - мут, ПКМ - слайдер"
-                  >
-                    {isAudioMuted || volume === 0 ? (
-                      <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                    ) : (
-                      <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-                    )}
-                  </button>
-
-                  {/* Volume slider */}
-                  {showSlider && (
-                    <div className="volume-slider-container" onClick={(e) => e.stopPropagation()}>
-                      <Slider
-                        value={volume}
-                        onChange={handleSliderChange}
-                        orientation="vertical"
-                        min={0}
-                        max={100}
-                        step={1}
-                        size="small"
-                        sx={{
-                          color: '#5865f2',
-                          height: '80px',
-                          '& .MuiSlider-track': {
-                            backgroundColor: '#5865f2',
-                          },
-                          '& .MuiSlider-thumb': {
-                            backgroundColor: '#fff',
-                            width: 12,
-                            height: 12,
-                            '&:hover': {
-                              boxShadow: '0 0 0 8px rgba(88, 101, 242, 0.16)',
-                            },
-                          },
-                        }}
-                      />
-                      <span className="volume-percentage">{volume}%</span>
-                    </div>
-                  )}
-                </>
+                volumeControl
               )}
             </div>
             )}
