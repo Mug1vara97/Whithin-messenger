@@ -775,8 +775,8 @@ const VideoCallGrid = ({
       }
     };
 
-    // Compact dial: arc ends sit left/right of the 35px speaker; center shows % like original.
-    const dialSize = isSmall ? 56 : 64;
+    // Dial wraps the speaker slot: near-full ring (original sweep), mid size, % in center.
+    const dialSize = isSmall ? 96 : 112;
     const volumeBtnClass = `tile-volume-btn ${
       isAudioMuted || volume === 0
         ? 'muted'
@@ -816,8 +816,8 @@ const VideoCallGrid = ({
             accent="#5865f2"
             ink="#B5BAC1"
             size={dialSize}
-            sweep={200}
-            thickness={2.5}
+            sweep={340}
+            thickness={3}
             speed={8}
             onChange={handleSliderChange}
             onContextMenu={handleVolumeRightClick}
