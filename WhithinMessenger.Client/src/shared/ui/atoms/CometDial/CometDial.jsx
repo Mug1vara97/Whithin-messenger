@@ -58,6 +58,7 @@ export default function CometDial({
   disabled = false,
   onChange,
   onChangeEnd,
+  onContextMenu,
   className = '',
   children = null,
 }) {
@@ -352,12 +353,13 @@ export default function CometDial({
         '--cd-accent': accent,
         '--cd-ink': ink,
         '--cd-size': `${size}px`,
-        '--cd-figure': `${Math.round(size * 0.16)}px`,
+        '--cd-figure': `${Math.max(13, Math.round(size * 0.26))}px`,
       }}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        onContextMenu?.(e);
       }}
     >
       <svg

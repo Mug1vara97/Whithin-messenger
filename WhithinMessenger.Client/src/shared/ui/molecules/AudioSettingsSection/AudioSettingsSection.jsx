@@ -25,14 +25,11 @@ import {
   micThresholdToSensitivity,
   sensitivityToMicThreshold,
 } from '../../../lib/utils/voiceCallAudioSettings';
+import SettingsWakeSlider from '../../atoms/WakeSlider/SettingsWakeSlider';
 import './AudioSettingsSection.css';
 
 const LEVEL_BAR_COUNT = 42;
 const MIC_LEVEL_MAX = 200;
-
-function formatPercent(value) {
-  return `${Math.round(Number(value) * 100)}%`;
-}
 
 function getDeviceLabel(device, fallback) {
   const label = device?.label?.trim();
@@ -410,19 +407,15 @@ export function AudioSettingsSection({ active = true }) {
               <span>Громкость микрофона</span>
             </div>
             <div className="settings-volume-control">
-              <input
-                type="range"
-                min="0"
-                max="100"
+              <SettingsWakeSlider
+                ariaLabel="Громкость микрофона"
                 value={Math.round(inputVolume * 100)}
-                className="settings-volume-control__range"
-                onChange={(event) => {
-                  const next = Number(event.target.value) / 100;
+                onChange={(nextPercent) => {
+                  const next = Number(nextPercent) / 100;
                   setInputVolume(next);
                   volumeStorage.setInputVolume(next);
                 }}
               />
-              <span className="settings-volume-control__value">{formatPercent(inputVolume)}</span>
             </div>
           </div>
         </div>
@@ -458,19 +451,17 @@ export function AudioSettingsSection({ active = true }) {
               <span>Громкость динамика</span>
             </div>
             <div className="settings-volume-control">
-              <input
-                type="range"
-                min="0"
+              <SettingsWakeSlider
+                ariaLabel="Громкость динамика"
+                min={0}
                 max={OUTPUT_VOLUME_PERCENT_MAX}
                 value={outputVolumePercent}
-                className="settings-volume-control__range"
-                onChange={(event) => {
-                  const next = percentToOutputGain(event.target.value);
+                onChange={(nextPercent) => {
+                  const next = percentToOutputGain(nextPercent);
                   setOutputVolume(next);
                   volumeStorage.setOutputVolume(next);
                 }}
               />
-              <span className="settings-volume-control__value">{outputVolumePercent}%</span>
             </div>
           </div>
         </div>

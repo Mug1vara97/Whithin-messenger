@@ -17,6 +17,7 @@ import SoundpadSoundsContent from '../SoundpadSoundsModal/SoundpadSoundsContent'
 import { SoundpadRemotePlaybackSetting } from '../../molecules/SoundpadRemotePlaybackSetting';
 import { ParticipantVolumeSettings } from '../../molecules/ParticipantVolumeSettings';
 import { ProfileCustomizeSection } from '../../molecules/ProfileCustomizeSection';
+import SettingsWakeSlider from '../../atoms/WakeSlider/SettingsWakeSlider';
 import {
   getThemePresetId,
   persistThemePreset,
@@ -952,18 +953,16 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
               description="Насколько громко воспроизводить звук нового сообщения."
             >
               <div className="settings-volume-control">
-                <input
+                <SettingsWakeSlider
                   id="settings-notification-sound-volume"
-                  className="settings-volume-control__range"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
+                  ariaLabel="Громкость уведомлений"
+                  min={0}
+                  max={100}
+                  step={1}
                   value={notificationSoundVolume}
                   disabled={!inAppNotificationsEnabled || !soundNotificationsEnabled}
-                  onChange={(e) => setNotificationSoundVolumeState(Number(e.target.value))}
+                  onChange={(next) => setNotificationSoundVolumeState(Number(next))}
                 />
-                <span className="settings-volume-control__value">{notificationSoundVolume}%</span>
               </div>
             </SettingsRow>
           </SettingsPanel>

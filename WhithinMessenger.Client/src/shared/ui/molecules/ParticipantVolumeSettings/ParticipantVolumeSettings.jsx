@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import Slider from '@mui/material/Slider';
 import { participantVolumeStorage } from '../../../lib/utils/participantVolumeStorage';
 import { useCallStore } from '../../../lib/stores/callStore';
+import SettingsWakeSlider from '../../atoms/WakeSlider/SettingsWakeSlider';
 import './ParticipantVolumeSettings.css';
 
 const ParticipantVolumeSettings = () => {
@@ -63,15 +63,15 @@ const ParticipantVolumeSettings = () => {
               </span>
               <span className="participant-volume-row__percent">{entry.volume}%</span>
             </div>
-            <Slider
+            <SettingsWakeSlider
               className="participant-volume-row__slider"
               value={entry.volume}
               min={0}
               max={100}
               step={1}
-              size="small"
-              onChange={(_, value) => handleVolumeChange(entry.userId, value)}
-              aria-label={`Громкость ${entry.userName || entry.userId}`}
+              showValue={false}
+              onChange={(value) => handleVolumeChange(entry.userId, value)}
+              ariaLabel={`Громкость ${entry.userName || entry.userId}`}
             />
             <button
               type="button"

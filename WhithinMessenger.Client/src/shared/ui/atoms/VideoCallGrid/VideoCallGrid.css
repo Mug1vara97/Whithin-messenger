@@ -447,12 +447,16 @@
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 1100;
-  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
 }
 
-.tile-volume-comet-dial .tile-volume-btn {
-  width: 35px;
-  height: 35px;
+.tile-volume-comet-dial .comet-dial__value {
+  color: #f2f3f5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.tile-volume-comet-dial .comet-dial__unit {
+  opacity: 0.7;
 }
 
 /* ===== GRID LAYOUTS ===== */

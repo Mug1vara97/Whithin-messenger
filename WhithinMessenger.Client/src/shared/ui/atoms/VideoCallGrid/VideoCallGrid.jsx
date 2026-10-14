@@ -775,7 +775,8 @@ const VideoCallGrid = ({
       }
     };
 
-    const dialSize = isSmall ? 140 : 190;
+    // Compact dial: arc ends sit left/right of the 35px speaker; center shows % like original.
+    const dialSize = isSmall ? 56 : 64;
     const volumeBtnClass = `tile-volume-btn ${
       isAudioMuted || volume === 0
         ? 'muted'
@@ -815,13 +816,12 @@ const VideoCallGrid = ({
             accent="#5865f2"
             ink="#B5BAC1"
             size={dialSize}
-            sweep={340}
-            thickness={3.5}
+            sweep={200}
+            thickness={2.5}
             speed={8}
             onChange={handleSliderChange}
-          >
-            {volumeButton}
-          </CometDial>
+            onContextMenu={handleVolumeRightClick}
+          />
         ) : (
           volumeButton
         )}

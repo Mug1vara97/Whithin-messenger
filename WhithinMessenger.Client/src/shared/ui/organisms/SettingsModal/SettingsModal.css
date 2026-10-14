@@ -684,6 +684,17 @@
   align-items: center;
   gap: 12px;
   min-width: 180px;
+  width: 100%;
+}
+
+.settings-volume-control .settings-wake-slider {
+  width: 100%;
+}
+
+.settings-volume-control .wake-slider__value {
+  min-width: 42px;
+  color: var(--text-muted, #b5bac1);
+  opacity: 1;
 }
 
 .settings-volume-control__range {

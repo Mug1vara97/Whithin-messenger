@@ -48,7 +48,7 @@
 
 .participant-volume-row__slider {
   grid-column: 1 / 2;
-  color: var(--primary, #5865f2) !important;
+  width: 100%;
 }
 
 .participant-volume-row__remove {
