@@ -775,8 +775,8 @@ const VideoCallGrid = ({
       }
     };
 
-    // Dial wraps the speaker slot: near-full ring (original sweep), mid size, % in center.
-    const dialSize = isSmall ? 96 : 112;
+    // Halo arc over the speaker: ends at left/right of the button (top semicircle).
+    const dialSize = isSmall ? 58 : 66;
     const volumeBtnClass = `tile-volume-btn ${
       isAudioMuted || volume === 0
         ? 'muted'
@@ -805,23 +805,30 @@ const VideoCallGrid = ({
     const volumeControl = (
       <div className={`tile-volume-anchor${showSlider ? ' dial-open' : ''}`}>
         {showSlider ? (
-          <CometDial
-            className="tile-volume-comet-dial"
-            value={volume}
-            min={0}
-            max={100}
-            step={1}
-            unit="%"
-            label="Громкость"
-            accent="#5865f2"
-            ink="#B5BAC1"
-            size={dialSize}
-            sweep={340}
-            thickness={3}
-            speed={8}
-            onChange={handleSliderChange}
-            onContextMenu={handleVolumeRightClick}
-          />
+          <>
+            <CometDial
+              className="tile-volume-comet-dial"
+              value={volume}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              label="Громкость"
+              accent="#5865f2"
+              ink="rgba(181, 186, 193, 0.55)"
+              size={dialSize}
+              sweep={180}
+              thickness={3}
+              speed={8}
+              onChange={handleSliderChange}
+              onContextMenu={handleVolumeRightClick}
+            >
+              {volumeButton}
+            </CometDial>
+            <span className="tile-volume-dial-value" aria-hidden="true">
+              {volume}%
+            </span>
+          </>
         ) : (
           volumeButton
         )}

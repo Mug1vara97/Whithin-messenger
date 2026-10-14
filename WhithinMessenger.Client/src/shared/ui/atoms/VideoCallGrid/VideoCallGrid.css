@@ -447,16 +447,27 @@
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 1100;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
 }
 
-.tile-volume-comet-dial .comet-dial__value {
+.tile-volume-comet-dial .tile-volume-btn {
+  width: 35px;
+  height: 35px;
+}
+
+.tile-volume-dial-value {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 1101;
+  pointer-events: none;
   color: #f2f3f5;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
-}
-
-.tile-volume-comet-dial .comet-dial__unit {
-  opacity: 0.7;
+  white-space: nowrap;
 }
 
 /* ===== GRID LAYOUTS ===== */
