@@ -631,7 +631,11 @@ const VideoCallGrid = ({
     }
   }, [clearFullscreenUiTimer, fullscreenScreenShareId, focusedParticipantId]);
 
-  const renderTileAvatar = (participant, isSmall, { overlay = false, tileBackgroundColor = null } = {}) => {
+  const renderTileAvatar = (
+    participant,
+    isSmall,
+    { overlay = false, tileBackgroundColor = null, volumeDial = null } = {},
+  ) => {
     const avatarSize = isSmall ? 60 : 100;
     const avatarColor = participant.avatarColor || getAvatarColor(participant.name);
     const hasAvatarDecoration = Boolean(resolveAvatarDecorationUrl(participant.avatarDecoration));
@@ -640,19 +644,52 @@ const VideoCallGrid = ({
       tileBackgroundColor &&
       colorsMatchForTileAvatarOutline(tileBackgroundColor, avatarColor);
 
-    const avatarNode = (
+    const avatar = (
+      <UserAvatar
+        username={participant.name || 'U'}
+        avatarUrl={participant.avatar}
+        avatarColor={avatarColor}
+        avatarDecoration={participant.avatarDecoration}
+        size={avatarSize}
+      />
+    );
+
+    const avatarNode = volumeDial ? (
+      <div
+        className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
+          needsContrastOutline ? ' tile-avatar-wrap--contrast-outline' : ''
+        }`}
+      >
+        <span className="tile-avatar-volume-value" aria-hidden="true">
+          {volumeDial.value}%
+        </span>
+        <CometDial
+          className="tile-avatar-comet-dial"
+          value={volumeDial.value}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          label="Громкость"
+          accent="#5865f2"
+          ink="#B5BAC1"
+          size={isSmall ? 130 : 190}
+          sweep={340}
+          thickness={3.5}
+          speed={8}
+          onChange={volumeDial.onChange}
+          onContextMenu={volumeDial.onContextMenu}
+        >
+          {avatar}
+        </CometDial>
+      </div>
+    ) : (
       <div
         className={`tile-avatar-wrap${overlay ? ' tile-avatar-wrap--overlay' : ''}${
           needsContrastOutline ? ' tile-avatar-wrap--contrast-outline' : ''
         }`}
       >
-        <UserAvatar
-          username={participant.name || 'U'}
-          avatarUrl={participant.avatar}
-          avatarColor={avatarColor}
-          avatarDecoration={participant.avatarDecoration}
-          size={avatarSize}
-        />
+        {avatar}
       </div>
     );
 
@@ -775,65 +812,57 @@ const VideoCallGrid = ({
       }
     };
 
-    // Halo arc over the speaker: ends at left/right of the button (top semicircle).
-    const dialSize = isSmall ? 58 : 66;
-    const volumeBtnClass = `tile-volume-btn ${
-      isAudioMuted || volume === 0
-        ? 'muted'
-        : !isScreenShare && isSpeaking
-          ? 'speaking'
-          : 'silent'
-    }`;
-    const volumeBtnTitle = isScreenShare
-      ? 'ЛКМ - мут звука демонстрации, ПКМ - слайдер'
-      : 'ЛКМ - мут, ПКМ - слайдер';
-    const volumeButton = (
-      <button
-        type="button"
-        className={volumeBtnClass}
-        onClick={handleVolumeClick}
-        onContextMenu={handleVolumeRightClick}
-        title={volumeBtnTitle}
-      >
-        {isAudioMuted || volume === 0 ? (
-          <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-        ) : (
-          <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
-        )}
-      </button>
-    );
+    const showsCenteredAvatar =
+      !isScreenShare &&
+      !(participant.isVideoEnabled && participant.videoStream && participant.videoStream.active);
+    const canShowVolumeDial =
+      showSlider &&
+      (isScreenShare ? showScreenShareVolumeControls : !participant.isCurrentUser);
+    const volumeDialProps = canShowVolumeDial
+      ? {
+          value: volume,
+          onChange: handleSliderChange,
+          onContextMenu: handleVolumeRightClick,
+        }
+      : null;
+
     const volumeControl = (
-      <div className={`tile-volume-anchor${showSlider ? ' dial-open' : ''}`}>
-        {showSlider ? (
-          <>
-            <CometDial
-              className="tile-volume-comet-dial"
-              value={volume}
-              min={0}
-              max={100}
-              step={1}
-              unit="%"
-              label="Громкость"
-              accent="#5865f2"
-              ink="rgba(181, 186, 193, 0.55)"
-              size={dialSize}
-              sweep={180}
-              thickness={3}
-              speed={8}
-              onChange={handleSliderChange}
-              onContextMenu={handleVolumeRightClick}
-            >
-              {volumeButton}
-            </CometDial>
-            <span className="tile-volume-dial-value" aria-hidden="true">
-              {volume}%
-            </span>
-          </>
-        ) : (
-          volumeButton
-        )}
+      <div className="tile-volume-anchor">
+        <button
+          type="button"
+          className={`tile-volume-btn ${
+            isAudioMuted || volume === 0
+              ? 'muted'
+              : !isScreenShare && isSpeaking
+                ? 'speaking'
+                : 'silent'
+          }`}
+          onClick={handleVolumeClick}
+          onContextMenu={handleVolumeRightClick}
+          title={
+            isScreenShare
+              ? 'ЛКМ - мут звука демонстрации, ПКМ - громкость'
+              : 'ЛКМ - мут, ПКМ - громкость'
+          }
+        >
+          {isAudioMuted || volume === 0 ? (
+            <VolumeOffIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+          ) : (
+            <VolumeUpIcon sx={{ fontSize: isSmall ? 14 : 16 }} />
+          )}
+        </button>
       </div>
     );
+
+    const avatarVolumeOverlay =
+      volumeDialProps && !showsCenteredAvatar ? (
+        <div className="tile-avatar-volume-layer">
+          {renderTileAvatar(participant, isSmall, {
+            overlay: true,
+            volumeDial: volumeDialProps,
+          })}
+        </div>
+      ) : null;
     
     const onTileContextMenu = canMuteMembers && !participant.isCurrentUser
       ? (event) => handleParticipantContextMenu(event, participant, channelParticipant)
@@ -844,7 +873,7 @@ const VideoCallGrid = ({
     return (
       <div
         key={participant.id}
-        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${isServerMuted ? 'server-muted' : ''} ${isServerDeafened ? 'server-deafened' : ''}${showFullscreenChrome ? ' screen-share-fullscreen-ui-visible' : ''}${isScreenSharePipDragging && isFullscreenTile ? ' screen-share-pip-dragging' : ''}`}
+        className={`video-tile ${isScreenShare ? 'screen-share-tile' : ''} ${isFocused ? 'focused-tile' : ''} ${isSmall ? 'small-tile' : ''} ${isSpeaking ? 'speaking' : ''} ${isServerMuted ? 'server-muted' : ''} ${isServerDeafened ? 'server-deafened' : ''}${showFullscreenChrome ? ' screen-share-fullscreen-ui-visible' : ''}${isScreenSharePipDragging && isFullscreenTile ? ' screen-share-pip-dragging' : ''}${canShowVolumeDial ? ' volume-dial-open' : ''}`}
         onClick={() => handleParticipantClick(participant)}
         onContextMenu={onTileContextMenu}
       >
@@ -877,13 +906,17 @@ const VideoCallGrid = ({
                     }}
                   />
                 ) : null}
+                {avatarVolumeOverlay}
               </>
             ) : participant.isVideoEnabled && participant.videoStream && participant.videoStream.active ? (
-              <VideoElement 
-                stream={participant.videoStream}
-                participantId={participant.id}
-                isLocal={participant.isCurrentUser || false}
-              />
+              <>
+                <VideoElement 
+                  stream={participant.videoStream}
+                  participantId={participant.id}
+                  isLocal={participant.isCurrentUser || false}
+                />
+                {avatarVolumeOverlay}
+              </>
             ) : participant.banner || participant.avatarColor ? (
               // Если есть баннер или цвет аватара, показываем фон
               (() => {
@@ -907,12 +940,15 @@ const VideoCallGrid = ({
                 {renderTileAvatar(participant, isSmall, {
                   overlay: true,
                   tileBackgroundColor: isSolidColorTile ? backgroundColor : null,
+                  volumeDial: showsCenteredAvatar ? volumeDialProps : null,
                 })}
                   </div>
                 );
               })()
             ) : (
-              renderTileAvatar(participant, isSmall)
+              renderTileAvatar(participant, isSmall, {
+                volumeDial: showsCenteredAvatar ? volumeDialProps : null,
+              })
             )}
           </div>
 

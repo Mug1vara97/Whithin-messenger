@@ -421,7 +421,7 @@
   }
 }
 
-/* Comet Dial volume control around speaker */
+/* Volume mute button (dial opens around avatar) */
 .tile-volume-anchor {
   position: relative;
   width: 35px;
@@ -432,42 +432,56 @@
   justify-content: center;
 }
 
-.tile-volume-anchor.dial-open {
-  z-index: 1100;
-}
-
-.video-tile:has(.tile-volume-anchor.dial-open) {
+.video-tile.volume-dial-open {
   overflow: visible;
   z-index: 30;
 }
 
-.tile-volume-comet-dial {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1100;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+.tile-avatar-wrap--volume-dial {
+  position: relative;
+  z-index: 20;
 }
 
-.tile-volume-comet-dial .tile-volume-btn {
-  width: 35px;
-  height: 35px;
+.tile-avatar-wrap--volume-dial.tile-avatar-wrap--overlay {
+  z-index: 20;
 }
 
-.tile-volume-dial-value {
+.tile-avatar-volume-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.tile-avatar-volume-layer .tile-avatar-wrap {
+  pointer-events: auto;
+}
+
+.tile-avatar-comet-dial {
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
+}
+
+.tile-avatar-volume-value {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 10px);
   transform: translateX(-50%);
-  z-index: 1101;
+  z-index: 2;
   pointer-events: none;
   color: #f2f3f5;
-  font-size: 11px;
+  font-size: 22px;
   font-weight: 600;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
   white-space: nowrap;
+}
+
+.small-tile .tile-avatar-volume-value {
+  font-size: 16px;
+  bottom: calc(100% + 6px);
 }
 
 /* ===== GRID LAYOUTS ===== */
