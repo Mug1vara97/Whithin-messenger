@@ -23,17 +23,26 @@ export const normalizeProfilePayload = (payload) => {
     ? undefined
     : (avatar ? (buildMediaUrl(avatar) || avatar) : null);
 
-  return {
-    userId,
-    username: pick(payload, 'username', 'Username'),
-    displayName: pick(payload, 'displayName', 'DisplayName'),
-    avatar: normalizedAvatar,
-    avatarColor: pick(payload, 'avatarColor', 'AvatarColor'),
-    description: pick(payload, 'description', 'Description'),
-    banner: pick(payload, 'banner', 'Banner'),
-    nameplate: pick(payload, 'nameplate', 'Nameplate'),
-    avatarDecoration: pick(payload, 'avatarDecoration', 'AvatarDecoration'),
+  const next = { userId };
+  const assign = (key, value) => {
+    if (value !== undefined) {
+      next[key] = value;
+    }
   };
+
+  assign('username', pick(payload, 'username', 'Username'));
+  assign('displayName', pick(payload, 'displayName', 'DisplayName'));
+  assign('avatar', normalizedAvatar);
+  assign('avatarColor', pick(payload, 'avatarColor', 'AvatarColor'));
+  assign('description', pick(payload, 'description', 'Description'));
+  assign('banner', pick(payload, 'banner', 'Banner'));
+  assign('nameplate', pick(payload, 'nameplate', 'Nameplate'));
+  assign('avatarDecoration', pick(payload, 'avatarDecoration', 'AvatarDecoration'));
+  assign('status', pick(payload, 'status', 'Status'));
+  assign('createdAt', pick(payload, 'createdAt', 'CreatedAt'));
+  assign('changedFields', pick(payload, 'changedFields', 'ChangedFields'));
+
+  return next;
 };
 
 export const resolveProfileDisplayLabel = (patch) =>

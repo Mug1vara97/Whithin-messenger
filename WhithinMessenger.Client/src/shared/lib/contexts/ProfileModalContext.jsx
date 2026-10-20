@@ -22,21 +22,34 @@ export const ProfileModalProvider = ({ children }) => {
     userId: null,
     username: '',
     initialStatus: null,
+    initialDescription: null,
   });
   const [showSettings, setShowSettings] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('account');
 
   const closeProfile = useCallback(() => {
-    setProfileView({ isOpen: false, userId: null, username: '', initialStatus: null });
+    setProfileView({
+      isOpen: false,
+      userId: null,
+      username: '',
+      initialStatus: null,
+      initialDescription: null,
+    });
   }, []);
 
-  const openProfile = useCallback((userId, username, initialStatus = null) => {
+  const openProfile = useCallback((userId, username, initialStatus = null, extras = null) => {
     if (!userId) return;
+    const initialDescription =
+      extras?.description ?? extras?.Description ?? extras?.initialDescription ?? null;
     setProfileView({
       isOpen: true,
       userId,
       username: username || 'Пользователь',
       initialStatus,
+      initialDescription:
+        initialDescription != null && String(initialDescription).trim()
+          ? String(initialDescription)
+          : null,
     });
   }, []);
 
@@ -117,6 +130,7 @@ export const ProfileModalProvider = ({ children }) => {
         userId={profileView.userId}
         username={profileView.username}
         initialStatus={profileView.initialStatus}
+        initialDescription={profileView.initialDescription}
         isOwnProfile={isOwnProfile}
         onOpenSettings={isOwnProfile ? handleOpenSettingsFromProfile : undefined}
         onProfileUpdated={handleProfileUpdated}

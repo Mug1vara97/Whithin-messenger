@@ -63,6 +63,7 @@ const ProfileModal = ({
   username,
   isOwnProfile = true,
   initialStatus = null,
+  initialDescription = null,
   onOpenSettings,
   onProfileUpdated,
 }) => {
@@ -146,20 +147,24 @@ const ProfileModal = ({
     if (!userId) return;
     try {
       const data = await userApi.getProfile(userId);
-      const normalized = normalizeProfilePayload(data);
+      const normalized = normalizeProfilePayload(data) || {};
       const next = {
         ...data,
-        ...(normalized || {}),
-        status: data?.status ?? data?.Status,
-        createdAt: data?.createdAt ?? data?.CreatedAt,
+        ...normalized,
+        userId: normalized.userId ?? data?.userId ?? data?.UserId ?? userId,
+        status: normalized.status ?? data?.status ?? data?.Status,
+        createdAt: normalized.createdAt ?? data?.createdAt ?? data?.CreatedAt,
       };
+      const loadedDescription =
+        next.description ?? next.Description ?? initialDescription ?? '';
+      next.description = loadedDescription || null;
       setProfile(next);
-      setBioDraft(next.description || next.Description || '');
+      setBioDraft(loadedDescription || '');
       onProfileUpdated?.(next);
     } catch (error) {
       console.error('Error loading profile:', error);
     }
-  }, [userId, onProfileUpdated]);
+  }, [userId, initialDescription, onProfileUpdated]);
 
   const loadPosts = useCallback(async () => {
     if (!userId) return;
@@ -184,16 +189,23 @@ const ProfileModal = ({
   useEffect(() => {
     if (!isOpen || !userId) return;
 
-    setProfile(
-      initialStatus != null ? { status: normalizeUserStatus(initialStatus) } : null,
-    );
-    setBioDraft('');
+    const seededDescription =
+      initialDescription != null && String(initialDescription).trim()
+        ? String(initialDescription)
+        : '';
+
+    setProfile({
+      userId,
+      ...(initialStatus != null ? { status: normalizeUserStatus(initialStatus) } : {}),
+      ...(seededDescription ? { description: seededDescription } : {}),
+    });
+    setBioDraft(seededDescription);
     setCopyHint('');
     setIsEditingBio(false);
     setBioError('');
     setComposerOpen(false);
     loadProfile();
-  }, [isOpen, userId, loadProfile, initialStatus]);
+  }, [isOpen, userId, loadProfile, initialStatus, initialDescription]);
 
   useEffect(() => {
     if (isOpen) return;
@@ -218,8 +230,26 @@ const ProfileModal = ({
         return;
       }
 
-      setProfile((prev) => mergeProfileState(prev, patch));
-      if (patch.description !== undefined) {
+      const changedFields = Array.isArray(patch.changedFields)
+        ? patch.changedFields.map((field) => String(field).toLowerCase())
+        : null;
+      const descriptionChanged =
+        !changedFields ||
+        changedFields.length === 0 ||
+        changedFields.includes('description');
+
+      setProfile((prev) => {
+        const nextPatch = { ...patch };
+        // Don't wipe a known description with null unless description actually changed.
+        if (
+          !descriptionChanged &&
+          (nextPatch.description === null || nextPatch.description === undefined)
+        ) {
+          delete nextPatch.description;
+        }
+        return mergeProfileState(prev, nextPatch);
+      });
+      if (descriptionChanged && patch.description !== undefined) {
         setBioDraft(patch.description || '');
       }
     };
@@ -361,7 +391,12 @@ const ProfileModal = ({
   };
 
   const savedAboutText =
-    activeProfile?.description ?? activeProfile?.Description ?? '';
+    profile?.description ??
+    profile?.Description ??
+    activeProfile?.description ??
+    activeProfile?.Description ??
+    initialDescription ??
+    '';
   const aboutText = isEditingBio ? bioDraft : (savedAboutText || bioDraft || '');
   const hasAboutText = Boolean(String(aboutText).trim());
 

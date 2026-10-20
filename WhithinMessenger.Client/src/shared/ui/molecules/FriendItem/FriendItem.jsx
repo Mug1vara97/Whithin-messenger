@@ -29,7 +29,9 @@ const FriendItem = ({
 
   const handleOpenProfile = () => {
     if (!profileUserId) return;
-    openProfile(profileUserId, profileUsername, presence.normalized);
+    openProfile(profileUserId, profileUsername, presence.normalized, {
+      description: friend.description || friend.Description || null,
+    });
   };
 
   const formatLastSeen = (value) => {
