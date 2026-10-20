@@ -446,28 +446,31 @@ const ProfileModal = ({
 
           <div className="profile-hero__chip">
             <div className="profile-hero__chip-inner">
-              <div
-                className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
-                style={
-                  hasAvatarDecoration
-                    ? undefined
-                    : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
-                }
-              >
-                {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
-                {hasAvatarDecoration && (
-                  <div className="profile-hero__chip-decoration" aria-hidden="true">
-                    <AvatarDecorationMedia
-                      src={avatarDecorationUrl}
-                      className="profile-modal__avatar-decoration"
-                    />
-                  </div>
-                )}
-              </div>
-              <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+              <div className="profile-hero__chip-user">
+                <div
+                  className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
+                  style={
+                    hasAvatarDecoration
+                      ? undefined
+                      : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
+                  }
+                >
+                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
+                  {hasAvatarDecoration && (
+                    <div className="profile-hero__chip-decoration" aria-hidden="true">
+                      <AvatarDecorationMedia
+                        src={avatarDecorationUrl}
+                        className="profile-modal__avatar-decoration"
+                      />
+                    </div>
+                  )}
+                </div>
                 <h1 className="profile-hero__name">{visibleName}</h1>
+              </div>
+
+              <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+                <span className="profile-hero__nameplate-fill" aria-hidden="true" />
               </UserNameplate>
-              {login ? <p className="profile-hero__login">@{login}</p> : null}
             </div>
           </div>
 

@@ -135,12 +135,11 @@
   background: rgba(0, 0, 0, 0.65);
 }
 
-/* Top-right organic chip: avatar + nameplate under it */
+/* Top-right organic chip: user row + full-width rectangular nameplate */
 .profile-hero__chip {
   position: relative;
   z-index: 3;
-  width: fit-content;
-  max-width: min(420px, calc(100% - 48px));
+  width: min(360px, calc(100% - 48px));
   align-self: flex-end;
   margin-right: 10%;
   padding: 14px;
@@ -177,22 +176,32 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
-  padding: 14px 18px 16px;
+  width: 100%;
+  padding: 12px;
   background: var(--pm-panel);
-  border-radius: 32px;
+  border-radius: 14px;
   color: var(--pm-ink);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   min-width: 0;
+  box-sizing: border-box;
+}
+
+.profile-hero__chip-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .profile-hero__chip-avatar {
   --avatar-decoration-scale: 1.32;
 
   position: relative;
-  width: 88px;
-  height: 88px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   overflow: visible;
   flex-shrink: 0;
@@ -200,7 +209,7 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 32px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -230,45 +239,52 @@
   z-index: 2;
 }
 
+.profile-hero__name {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--pm-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
 .profile-hero__nameplate,
 .profile-hero__nameplate.user-nameplate {
-  width: fit-content;
-  max-width: 100%;
-  min-height: 0;
-  border-radius: 10px;
+  flex: none;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 72px;
+  border-radius: 8px;
+  align-self: stretch;
+}
+
+.profile-hero__nameplate.user-nameplate--empty {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #3f4147) 65%, transparent);
+}
+
+.profile-hero__nameplate.user-nameplate--decorated {
+  border-radius: 8px;
 }
 
 .profile-hero__nameplate .user-nameplate__content {
-  padding: 4px 10px;
-  width: auto;
+  width: 100%;
+  min-height: 72px;
+  padding: 0;
 }
 
-.profile-hero__name {
-  margin: 0;
-  text-align: center;
-  text-transform: uppercase;
-  font-family: 'Abril Fatface', Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-  font-size: clamp(1.35rem, 2.8vw, 1.85rem);
-  line-height: 1;
-  letter-spacing: 0.01em;
-  color: var(--pm-ink);
-  word-break: break-word;
-}
-
-.profile-hero__nameplate.user-nameplate--decorated .profile-hero__name {
-  color: inherit;
-  text-shadow: none;
-}
-
-.profile-hero__login {
-  margin: -4px 0 0;
-  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  color: var(--pm-muted);
-  text-align: center;
+.profile-hero__nameplate-fill {
+  display: block;
+  width: 100%;
+  min-height: 72px;
 }
 
 .profile-hero__titles {
