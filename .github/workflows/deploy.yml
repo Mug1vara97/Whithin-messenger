@@ -118,3 +118,53 @@ jobs:
           echo "Music signal health:"
           curl -sf http://127.0.0.1:8082/health || echo "music-signal health check failed"
 
+    - name: Notify Telegram on success
+      if: success()
+      continue-on-error: true
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+          echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skip notify"
+          exit 0
+        fi
+        COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+        TEXT=$(printf '%s\n' \
+          "✅ Whithin deploy OK" \
+          "" \
+          "Branch: ${{ github.ref_name }}" \
+          "Commit: ${GITHUB_SHA:0:7}" \
+          "Message: ${COMMIT_MSG}" \
+          "By: ${{ github.actor }}" \
+          "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+        curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+          --data-urlencode "text=${TEXT}" \
+          -d "disable_web_page_preview=true"
+
+    - name: Notify Telegram on failure
+      if: failure()
+      continue-on-error: true
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+          echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skip notify"
+          exit 0
+        fi
+        COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
+        TEXT=$(printf '%s\n' \
+          "❌ Whithin deploy FAILED" \
+          "" \
+          "Branch: ${{ github.ref_name }}" \
+          "Commit: ${GITHUB_SHA:0:7}" \
+          "Message: ${COMMIT_MSG}" \
+          "By: ${{ github.actor }}" \
+          "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+        curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+          --data-urlencode "text=${TEXT}" \
+          -d "disable_web_page_preview=true"
+
