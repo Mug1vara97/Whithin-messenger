@@ -490,10 +490,10 @@ const ProfileModal = ({
             </div>
 
             <div className="profile-hero__titles" aria-hidden="true" />
-          </div>
 
-          <div className="profile-hero__bio-dock">
-            <div className="profile-hero__bio-panel">{bioPanel}</div>
+            <div className="profile-hero__bio-dock">
+              <div className="profile-hero__bio-panel">{bioPanel}</div>
+            </div>
           </div>
         </header>
 

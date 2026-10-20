@@ -72,7 +72,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: min(42vh, 380px);
+  min-height: min(46vh, 420px);
   border-radius: var(--pm-radius);
   background-size: cover;
   background-position: center;
@@ -142,21 +142,47 @@
   background: rgba(0, 0, 0, 0.65);
 }
 
-/* Top-right identity: avatar + nameplate, no outer panel */
+/* Top-right organic cutout for avatar + nameplate */
 .profile-hero__chip {
   --profile-chip-nameplate-pull: 30px;
 
   position: relative;
   z-index: 3;
-  width: min(360px, calc(100% - 48px));
+  width: min(380px, calc(100% - 48px));
   align-self: flex-end;
-  margin: 14px 10% 0 0;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
+  margin-right: 10%;
+  padding: 14px;
+  padding-top: 0;
+  background: var(--pm-page);
+  border-radius: 0 0 36px 36px;
+}
+
+.profile-hero__chip::before,
+.profile-hero__chip::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  width: 48px;
+  height: 40px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.profile-hero__chip::before {
+  left: -48px;
+  box-shadow: 20px -19px 0 var(--pm-page);
+}
+
+.profile-hero__chip::after {
+  right: -48px;
+  height: 48px;
+  box-shadow: -19px -19px 0 var(--pm-page);
 }
 
 .profile-hero__chip-user {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   width: 100%;
@@ -283,14 +309,14 @@
   min-height: 48px;
 }
 
-/* Bottom-right organic bio dock — outside banner overflow so text is never clipped */
+/* Bottom-right organic bio cutout — inside banner */
 .profile-hero__bio-dock {
   position: relative;
   z-index: 3;
   display: flex;
   align-self: flex-end;
-  width: min(72%, 540px);
-  margin-top: -36px;
+  width: min(68%, 520px);
+  margin-top: 0;
   padding: 14px 0 0 14px;
   background: var(--pm-page);
   border-radius: 36px 0 0 0;
@@ -332,7 +358,7 @@
   border-radius: 28px;
   color: var(--pm-ink);
   min-width: 0;
-  max-height: 220px;
+  max-height: 180px;
   overflow: auto;
 }
 
@@ -901,13 +927,13 @@
   }
 
   .profile-hero__banner {
-    min-height: 320px;
+    min-height: 360px;
     border-radius: 0 0 28px 28px;
   }
 
   .profile-hero__chip {
     margin-right: 6%;
-    max-width: calc(100% - 28px);
+    width: min(100%, calc(100% - 28px));
   }
 
   .profile-hero__bio-dock {
