@@ -654,7 +654,7 @@ const VideoCallGrid = ({
       />
     );
 
-    // --cd-size: 150px (~10% smaller than the previous 190px ring).
+    // --cd-size: 150px; arc length ~10% shorter than a near-full ring (340° → 306°).
     const dialSize = isSmall ? 135 : 150;
     const avatarNode = volumeDial ? (
       <div
@@ -673,7 +673,7 @@ const VideoCallGrid = ({
           accent="#ffffff"
           ink="rgba(255, 255, 255, 0.32)"
           size={dialSize}
-          sweep={340}
+          sweep={306}
           thickness={6}
           speed={8}
           onChange={volumeDial.onChange}

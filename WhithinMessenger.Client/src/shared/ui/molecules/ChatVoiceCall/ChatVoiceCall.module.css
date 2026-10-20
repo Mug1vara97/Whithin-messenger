@@ -114,6 +114,48 @@
   overflow: visible;
 }
 
+.participantItem.volumeDialOpen {
+  z-index: 20;
+}
+
+.participantItem.volumeDialOpen .participantAvatarContainer {
+  width: 150px;
+  height: 150px;
+}
+
+.participantCometDial {
+  --cd-size: 150px;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
+}
+
+.participantVolumeCenter {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.participantVolumeValue {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+  pointer-events: none;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+.voiceCallContainer:has(.volumeDialOpen),
+.voiceCallWrapper:has(.volumeDialOpen),
+.participantsContainer:has(.volumeDialOpen) {
+  overflow: visible;
+}
+
 .participantAvatarContainer::after {
   content: '';
   position: absolute;

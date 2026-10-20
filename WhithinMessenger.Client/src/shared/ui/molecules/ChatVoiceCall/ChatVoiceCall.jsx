@@ -25,6 +25,7 @@ import { userApi } from '../../../../entities/user/api/userApi';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { VideoCallGrid } from '../../atoms';
 import UserAvatar from '../../atoms/UserAvatar';
+import CometDial from '../../atoms/CometDial/CometDial';
 import {
   useDismissibleCallBanners,
   VoiceCallChromeOverlay
@@ -391,21 +392,65 @@ const ChatVoiceCall = ({
                 isCurrentUser: participant.isCurrentUser,
                 localIsServerDeafened: isServerDeafened,
               });
+              const canAdjustVolume = !participant.isCurrentUser;
+              const showVolumeDial =
+                canAdjustVolume && Boolean(showVolumeSliders?.get?.(participant.id));
+              const volume = userVolumes?.get?.(participant.id) ?? 100;
+              const avatar = (
+                <UserAvatar
+                  username={participant.name || 'U'}
+                  avatarUrl={participant.avatar}
+                  avatarColor={participant.avatarColor}
+                  avatarDecoration={participant.avatarDecoration}
+                  size={72}
+                />
+              );
+              const handleAvatarContextMenu = (event) => {
+                if (!canAdjustVolume) return;
+                event.preventDefault();
+                event.stopPropagation();
+                toggleVolumeSlider?.(participant.id);
+              };
               return (
                 <div
                   key={participant.id}
                   className={`${styles.participantItem} ${participant.isCurrentUser ? styles.currentUserParticipant : ''} ${
                     isSpeakingLive ? styles.participantSpeaking : ''
-                  }`}
+                  }${showVolumeDial ? ` ${styles.volumeDialOpen}` : ''}`}
                 >
-                  <div className={styles.participantAvatarContainer}>
-                    <UserAvatar
-                      username={participant.name || 'U'}
-                      avatarUrl={participant.avatar}
-                      avatarColor={participant.avatarColor}
-                      avatarDecoration={participant.avatarDecoration}
-                      size={72}
-                    />
+                  <div
+                    className={styles.participantAvatarContainer}
+                    onContextMenu={handleAvatarContextMenu}
+                    title={canAdjustVolume ? 'ПКМ — громкость' : undefined}
+                  >
+                    {showVolumeDial ? (
+                      <CometDial
+                        className={styles.participantCometDial}
+                        value={volume}
+                        min={0}
+                        max={100}
+                        step={1}
+                        unit="%"
+                        label={`Громкость ${participant.name || ''}`}
+                        accent="#ffffff"
+                        ink="rgba(255, 255, 255, 0.32)"
+                        size={150}
+                        sweep={306}
+                        thickness={6}
+                        speed={8}
+                        onChange={(next) => changeUserVolume?.(participant.id, next)}
+                        onContextMenu={handleAvatarContextMenu}
+                      >
+                        <div className={styles.participantVolumeCenter}>
+                          {avatar}
+                          <span className={styles.participantVolumeValue} aria-hidden="true">
+                            {volume}%
+                          </span>
+                        </div>
+                      </CometDial>
+                    ) : (
+                      avatar
+                    )}
                   </div>
                   <span className={styles.participantName}>{participant.name || 'Unknown'}</span>
                   <div className={styles.participantStatusRow}>
