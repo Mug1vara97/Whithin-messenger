@@ -434,8 +434,8 @@ const ChatVoiceCall = ({
                         label={`Громкость ${participant.name || ''}`}
                         accent="#ffffff"
                         ink="rgba(255, 255, 255, 0.32)"
-                        size={150}
-                        sweep={306}
+                        size={120}
+                        sweep={289}
                         thickness={6}
                         speed={8}
                         onChange={(next) => changeUserVolume?.(participant.id, next)}

@@ -654,8 +654,8 @@ const VideoCallGrid = ({
       />
     );
 
-    // --cd-size: 150px; arc length ~10% shorter than a near-full ring (340° → 306°).
-    const dialSize = isSmall ? 135 : 150;
+    // --cd-size: 120px; arc ~15% shorter than a near-full ring (340° → 289°).
+    const dialSize = 120;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
@@ -673,7 +673,7 @@ const VideoCallGrid = ({
           accent="#ffffff"
           ink="rgba(255, 255, 255, 0.32)"
           size={dialSize}
-          sweep={306}
+          sweep={289}
           thickness={6}
           speed={8}
           onChange={volumeDial.onChange}

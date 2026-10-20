@@ -460,12 +460,8 @@
 }
 
 .tile-avatar-comet-dial {
-  --cd-size: 150px;
+  --cd-size: 120px;
   filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
-}
-
-.small-tile .tile-avatar-comet-dial {
-  --cd-size: 135px;
 }
 
 .tile-avatar-volume-center {
@@ -482,16 +478,12 @@
   z-index: 2;
   pointer-events: none;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
-}
-
-.small-tile .tile-avatar-volume-value {
-  font-size: 16px;
 }
 
 /* ===== GRID LAYOUTS ===== */

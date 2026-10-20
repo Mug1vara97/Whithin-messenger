@@ -118,13 +118,14 @@
   z-index: 20;
 }
 
-.participantItem.volumeDialOpen .participantAvatarContainer {
-  width: 150px;
-  height: 150px;
-}
-
+/* Dial overlays the avatar — do not grow the layout slot. */
 .participantCometDial {
-  --cd-size: 150px;
+  --cd-size: 120px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
   filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
 }
 
@@ -142,7 +143,7 @@
   z-index: 2;
   pointer-events: none;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
