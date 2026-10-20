@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PersonOff, MoreVert, Check, Close, Block, ChatBubbleOutline } from '@mui/icons-material';
 import UserAvatar from '../../atoms/UserAvatar';
 import { UserAvatarPresenceDot } from '../../atoms/UserAvatar';
 import { useProfileModal } from '../../../lib/contexts/ProfileModalContext';
 import { usePresence, useResolvedPresence } from '../../../lib/contexts/PresenceContext';
 import { PRESENCE_STATUS } from '../../../lib/utils/userStatus';
+import { setCachedProfileAbout } from '../../../lib/utils/profileAboutCache';
 import './FriendItem.css';
 
 const FriendItem = ({
@@ -26,11 +27,18 @@ const FriendItem = ({
   const profileUsername = friend.username || friend.requesterUsername;
   const presence = useResolvedPresence(profileUserId, friend.status);
   const lastSeen = getLastSeen(profileUserId, friend.lastSeen);
+  const friendAbout = friend.description || friend.Description || null;
+
+  useEffect(() => {
+    if (profileUserId && friendAbout) {
+      setCachedProfileAbout(profileUserId, friendAbout);
+    }
+  }, [profileUserId, friendAbout]);
 
   const handleOpenProfile = () => {
     if (!profileUserId) return;
     openProfile(profileUserId, profileUsername, presence.normalized, {
-      description: friend.description || friend.Description || null,
+      description: friendAbout,
     });
   };
 

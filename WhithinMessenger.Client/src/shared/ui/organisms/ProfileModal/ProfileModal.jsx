@@ -86,6 +86,8 @@ const ProfileModal = ({
   onProfileUpdated,
 }) => {
   const [profile, setProfile] = useState(null);
+  /** Canonical about-me shown in the profile viewer (not tied to editor draft races). */
+  const [aboutText, setAboutText] = useState('');
   const [bioDraft, setBioDraft] = useState('');
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isSavingBio, setIsSavingBio] = useState(false);
@@ -97,11 +99,15 @@ const ProfileModal = ({
   const [previewMedia, setPreviewMedia] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const { user } = useAuthContext();
-  const seedAboutRef = useRef('');
+  const aboutTextRef = useRef('');
+  const onProfileUpdatedRef = useRef(onProfileUpdated);
+  onProfileUpdatedRef.current = onProfileUpdated;
 
   const profileUserId = profile?.userId ?? profile?.UserId;
   const profileMatchesUser =
-    profileUserId != null && userId != null && String(profileUserId) === String(userId);
+    profileUserId != null &&
+    userId != null &&
+    String(profileUserId).toLowerCase() === String(userId).toLowerCase();
   const activeProfile = profileMatchesUser ? profile : null;
 
   const login = activeProfile?.username?.trim() || '';
@@ -162,52 +168,16 @@ const ProfileModal = ({
     };
   }, [activeProfile?.banner, accentColor]);
 
-  const loadProfile = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const data = await userApi.getProfile(userId);
-      const normalized = normalizeProfilePayload(data) || {};
-      const next = {
-        ...data,
-        ...normalized,
-        userId: normalized.userId ?? data?.userId ?? data?.UserId ?? userId,
-        status: normalized.status ?? data?.status ?? data?.Status,
-        createdAt: normalized.createdAt ?? data?.createdAt ?? data?.CreatedAt,
-      };
-      // Empty string from API must not beat a known seed/cache (?? treats "" as present).
-      const loadedDescription = pickAboutText(
-        next.description,
-        next.Description,
-        seedAboutRef.current,
-        initialDescription,
-        getCachedProfileAbout(userId),
-      );
-      next.description = loadedDescription || null;
-      if (loadedDescription) {
-        setCachedProfileAbout(userId, loadedDescription);
-      }
-      setProfile((prev) => ({
-        ...(prev || {}),
-        ...next,
-        description: pickAboutText(
-          loadedDescription,
-          prev?.description,
-          prev?.Description,
-          seedAboutRef.current,
-        ) || null,
-      }));
-      setBioDraft((prev) => pickAboutText(loadedDescription, prev, seedAboutRef.current));
-      // Soft sync — never advertise an empty description as a real change.
-      const syncPayload = { ...next, changedFields: ['profile-load'] };
-      if (!loadedDescription) {
-        delete syncPayload.description;
-        delete syncPayload.Description;
-      }
-      onProfileUpdated?.(syncPayload);
-    } catch (error) {
-      console.error('Error loading profile:', error);
+  const applyAboutText = useCallback((text, { cache = true } = {}) => {
+    const next = text == null ? '' : String(text).trim();
+    aboutTextRef.current = next;
+    setAboutText(next);
+    setBioDraft(next);
+    setProfile((prev) => (prev ? { ...prev, description: next || null } : prev));
+    if (cache && userId) {
+      setCachedProfileAbout(userId, next);
     }
-  }, [userId, initialDescription, onProfileUpdated]);
+  }, [userId]);
 
   const loadPosts = useCallback(async () => {
     if (!userId) return;
@@ -229,31 +199,82 @@ const ProfileModal = ({
     }
   }, [userId]);
 
+  // Load profile once per open/userId. Keep about-me on a dedicated state so
+  // callback identity changes / soft profile-load events cannot clear it.
   useEffect(() => {
-    if (!isOpen || !userId) return;
+    if (!isOpen || !userId) return undefined;
 
-    const seededDescription = pickAboutText(
-      initialDescription,
-      getCachedProfileAbout(userId),
-    );
-    seedAboutRef.current = seededDescription;
-
+    let cancelled = false;
+    const seeded = pickAboutText(initialDescription, getCachedProfileAbout(userId));
+    aboutTextRef.current = seeded;
+    setAboutText(seeded);
+    setBioDraft(seeded);
     setProfile({
       userId,
       ...(initialStatus != null ? { status: normalizeUserStatus(initialStatus) } : {}),
-      ...(seededDescription ? { description: seededDescription } : {}),
+      ...(seeded ? { description: seeded } : {}),
     });
-    setBioDraft(seededDescription);
     setCopyHint('');
     setIsEditingBio(false);
     setBioError('');
     setComposerOpen(false);
-    loadProfile();
-  }, [isOpen, userId, loadProfile, initialStatus, initialDescription]);
+
+    (async () => {
+      try {
+        const data = await userApi.getProfile(userId);
+        if (cancelled) return;
+
+        const normalized = normalizeProfilePayload(data) || {};
+        const next = {
+          ...data,
+          ...normalized,
+          userId: normalized.userId ?? data?.userId ?? data?.UserId ?? userId,
+          status: normalized.status ?? data?.status ?? data?.Status,
+          createdAt: normalized.createdAt ?? data?.createdAt ?? data?.CreatedAt,
+        };
+
+        const fromApi = pickAboutText(
+          data?.description,
+          data?.Description,
+          normalized.description,
+          normalized.Description,
+          next.description,
+          next.Description,
+        );
+        const resolved = pickAboutText(fromApi, aboutTextRef.current, seeded);
+        next.description = resolved || null;
+
+        setProfile(next);
+        aboutTextRef.current = resolved;
+        setAboutText(resolved);
+        setBioDraft(resolved);
+        if (resolved) {
+          setCachedProfileAbout(userId, resolved);
+        }
+
+        // Soft sync for avatars/names only — never push empty about-me.
+        const syncPayload = { ...next, changedFields: ['profile-load'] };
+        delete syncPayload.description;
+        delete syncPayload.Description;
+        if (resolved) {
+          syncPayload.description = resolved;
+        }
+        onProfileUpdatedRef.current?.(syncPayload);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, userId, initialStatus, initialDescription]);
 
   useEffect(() => {
     if (isOpen) return;
     setProfile(null);
+    setAboutText('');
+    aboutTextRef.current = '';
     setBioDraft('');
     setCopyHint('');
     setIsEditingBio(false);
@@ -270,7 +291,10 @@ const ProfileModal = ({
 
     const handleProfileUpdated = (event) => {
       const patch = event.detail;
-      if (!patch?.userId || String(patch.userId) !== String(userId)) {
+      if (
+        !patch?.userId ||
+        String(patch.userId).toLowerCase() !== String(userId).toLowerCase()
+      ) {
         return;
       }
 
@@ -291,27 +315,22 @@ const ProfileModal = ({
 
         const merged = mergeProfileState(prev, nextPatch);
         const nextDescription = applyDescriptionPatch(
-          prev?.description ?? prev?.Description ?? seedAboutRef.current,
+          prev?.description ?? prev?.Description ?? aboutTextRef.current,
           patch,
         );
         return { ...merged, description: nextDescription || null };
       });
 
       if (descriptionExplicitlyChanged) {
-        const nextDraft = pickAboutText(patch?.description, patch?.Description);
-        seedAboutRef.current = nextDraft;
-        setBioDraft(nextDraft);
-        setCachedProfileAbout(userId, nextDraft);
+        applyAboutText(incomingText);
       } else if (incomingText) {
-        seedAboutRef.current = pickAboutText(seedAboutRef.current, incomingText);
-        setBioDraft((prev) => pickAboutText(prev, incomingText));
-        setCachedProfileAbout(userId, incomingText);
+        applyAboutText(pickAboutText(aboutTextRef.current, incomingText));
       }
     };
 
     window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
-  }, [isOpen, userId]);
+  }, [isOpen, userId, applyAboutText]);
 
   useEffect(() => {
     if (!isOpen || !userId) {
@@ -345,13 +364,11 @@ const ProfileModal = ({
         result?.Description,
         bioDraft,
       );
-      setCachedProfileAbout(userId, nextDescription);
-      seedAboutRef.current = nextDescription;
-      setProfile((prev) => ({ ...prev, description: nextDescription || null }));
-      setBioDraft(nextDescription || '');
+      applyAboutText(nextDescription);
       setIsEditingBio(false);
       onProfileUpdated?.({
         ...profile,
+        userId,
         description: nextDescription || null,
         changedFields: ['description'],
       });
@@ -455,15 +472,12 @@ const ProfileModal = ({
     );
   };
 
-  const savedAboutText = pickAboutText(
-    profile?.description,
-    profile?.Description,
+  const displayAboutText = pickAboutText(
+    aboutText,
+    aboutTextRef.current,
     initialDescription,
     getCachedProfileAbout(userId),
-    seedAboutRef.current,
   );
-  // View uses the same draft that powers the editor — keeps them in sync.
-  const displayAboutText = pickAboutText(bioDraft, savedAboutText);
   const hasAboutText = Boolean(displayAboutText);
 
   const bioPanel = (
@@ -504,7 +518,7 @@ const ProfileModal = ({
                 className="profile-modal__btn profile-modal__btn--ghost"
                 onClick={() => {
                   setIsEditingBio(false);
-                  setBioDraft(savedAboutText);
+                  setBioDraft(displayAboutText);
                   setBioError('');
                 }}
               >
