@@ -481,12 +481,13 @@ const ProfileModal = ({
                       </div>
                     )}
                   </div>
-                  <h1 className="profile-hero__name">{visibleName}</h1>
-                </div>
 
-                <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
-                  <span className="profile-hero__nameplate-fill" aria-hidden="true" />
-                </UserNameplate>
+                  <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+                    <div className="profile-hero__nameplate-body">
+                      <h1 className="profile-hero__name">{visibleName}</h1>
+                    </div>
+                  </UserNameplate>
+                </div>
               </div>
             </div>
 

@@ -179,14 +179,15 @@
 }
 
 .profile-hero__chip-inner {
+  --profile-chip-nameplate-pull: 30px;
+
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
   width: 100%;
-  padding: 12px;
+  padding: 8px 10px;
   background: var(--pm-panel);
   border-radius: 14px;
   color: var(--pm-ink);
@@ -198,17 +199,18 @@
 .profile-hero__chip-user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 0;
   width: 100%;
+  min-width: 0;
+  min-height: 48px;
 }
 
 .profile-hero__chip-avatar {
   --avatar-decoration-scale: 1.32;
 
   position: relative;
-  width: 48px;
-  height: 48px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   overflow: visible;
   flex-shrink: 0;
@@ -216,7 +218,7 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
 }
 
@@ -246,13 +248,60 @@
   z-index: 2;
 }
 
+.profile-hero__nameplate,
+.profile-hero__nameplate.user-nameplate {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  overflow: visible;
+}
+
+.profile-hero__nameplate.user-nameplate--empty {
+  height: 44px;
+  margin-left: 10px;
+}
+
+.profile-hero__nameplate.user-nameplate--decorated {
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  margin-left: calc(-1 * var(--profile-chip-nameplate-pull));
+  padding-left: calc(var(--profile-chip-nameplate-pull) + 14px);
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.profile-hero__nameplate.user-nameplate--decorated .user-nameplate__content {
+  height: 100%;
+  padding: 0;
+}
+
+.profile-hero__nameplate.user-nameplate--decorated .user-nameplate__media {
+  object-position: center right;
+}
+
+.profile-hero__nameplate-body {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 4px;
+  box-sizing: border-box;
+}
+
+.profile-hero__nameplate.user-nameplate--decorated .profile-hero__nameplate-body {
+  height: 100%;
+  padding: 0 12px 0 0;
+}
+
 .profile-hero__name {
   margin: 0;
   min-width: 0;
   flex: 1;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--pm-ink);
   white-space: nowrap;
   overflow: hidden;
@@ -262,36 +311,9 @@
   letter-spacing: 0;
 }
 
-.profile-hero__nameplate,
-.profile-hero__nameplate.user-nameplate {
-  flex: none;
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  min-height: 72px;
-  border-radius: 8px;
-  align-self: stretch;
-}
-
-.profile-hero__nameplate.user-nameplate--empty {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border, #3f4147) 65%, transparent);
-}
-
-.profile-hero__nameplate.user-nameplate--decorated {
-  border-radius: 8px;
-}
-
-.profile-hero__nameplate .user-nameplate__content {
-  width: 100%;
-  min-height: 72px;
-  padding: 0;
-}
-
-.profile-hero__nameplate-fill {
-  display: block;
-  width: 100%;
-  min-height: 72px;
+.profile-hero__nameplate.user-nameplate--decorated .profile-hero__name {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
 }
 
 .profile-hero__titles {
