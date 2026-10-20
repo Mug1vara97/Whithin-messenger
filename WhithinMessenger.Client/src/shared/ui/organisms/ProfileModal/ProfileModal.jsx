@@ -13,7 +13,7 @@ import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
 import { normalizeUserStatus } from '../../../lib/utils/userStatus';
-import { mergeProfileState } from '../../../lib/utils/profilePatchHelpers';
+import { mergeProfileState, normalizeProfilePayload } from '../../../lib/utils/profilePatchHelpers';
 import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
@@ -146,9 +146,16 @@ const ProfileModal = ({
     if (!userId) return;
     try {
       const data = await userApi.getProfile(userId);
-      setProfile(data);
-      setBioDraft(data?.description || '');
-      onProfileUpdated?.(data);
+      const normalized = normalizeProfilePayload(data);
+      const next = {
+        ...data,
+        ...(normalized || {}),
+        status: data?.status ?? data?.Status,
+        createdAt: data?.createdAt ?? data?.CreatedAt,
+      };
+      setProfile(next);
+      setBioDraft(next.description || next.Description || '');
+      onProfileUpdated?.(next);
     } catch (error) {
       console.error('Error loading profile:', error);
     }
@@ -248,9 +255,11 @@ const ProfileModal = ({
     setBioError('');
     try {
       const result = await userApi.updateDescription(userId, bioDraft.trim());
-      setProfile((prev) => ({ ...prev, description: result.description }));
+      const nextDescription = result?.description ?? result?.Description ?? bioDraft.trim();
+      setProfile((prev) => ({ ...prev, description: nextDescription }));
+      setBioDraft(nextDescription || '');
       setIsEditingBio(false);
-      onProfileUpdated?.({ ...profile, description: result.description });
+      onProfileUpdated?.({ ...profile, description: nextDescription });
     } catch (error) {
       setBioError(error.message || 'Не удалось сохранить описание');
     } finally {
@@ -351,6 +360,11 @@ const ProfileModal = ({
     );
   };
 
+  const savedAboutText =
+    activeProfile?.description ?? activeProfile?.Description ?? '';
+  const aboutText = isEditingBio ? bioDraft : (savedAboutText || bioDraft || '');
+  const hasAboutText = Boolean(String(aboutText).trim());
+
   const bioPanel = (
     <>
       <div className="profile-hero__bio-head">
@@ -360,11 +374,11 @@ const ProfileModal = ({
             type="button"
             className="profile-modal__text-btn"
             onClick={() => {
-              setBioDraft(activeProfile?.description || '');
+              setBioDraft(savedAboutText || bioDraft || '');
               setIsEditingBio(true);
             }}
           >
-            {activeProfile?.description ? 'Изменить' : 'Добавить'}
+            {hasAboutText ? 'Изменить' : 'Добавить'}
           </button>
         ) : null}
       </div>
@@ -389,7 +403,7 @@ const ProfileModal = ({
                 className="profile-modal__btn profile-modal__btn--ghost"
                 onClick={() => {
                   setIsEditingBio(false);
-                  setBioDraft(activeProfile?.description || '');
+                  setBioDraft(savedAboutText);
                   setBioError('');
                 }}
               >
@@ -408,11 +422,12 @@ const ProfileModal = ({
           {bioError ? <p className="profile-modal__error">{bioError}</p> : null}
         </div>
       ) : (
-        <p className={`profile-modal__bio ${!activeProfile?.description ? 'is-empty' : ''}`}>
-          {activeProfile?.description ||
-            (isOwnProfile
+        <p className={`profile-modal__bio ${!hasAboutText ? 'is-empty' : ''}`}>
+          {hasAboutText
+            ? aboutText
+            : isOwnProfile
               ? 'Добавьте описание, чтобы друзья знали вас лучше.'
-              : 'Нет описания')}
+              : 'Нет описания'}
         </p>
       )}
     </>
@@ -422,59 +437,61 @@ const ProfileModal = ({
     <div className="profile-modal" role="dialog" aria-modal="true" aria-label="Профиль">
       <button type="button" className="profile-modal__backdrop" onClick={onClose} aria-label="Закрыть" />
       <div className="profile-modal__shell">
-        <header className="profile-hero" style={bannerStyle}>
-          <div className="profile-hero__shade" />
+        <header className="profile-hero">
+          <div className="profile-hero__banner" style={bannerStyle}>
+            <div className="profile-hero__shade" />
 
-          <div className="profile-hero__actions">
-            {isOwnProfile && onOpenSettings && (
-              <button
-                type="button"
-                className="profile-modal__edit-btn"
-                onClick={() => {
-                  onClose();
-                  onOpenSettings('appearance');
-                }}
-              >
-                <EditOutlinedIcon sx={{ fontSize: 16 }} />
-                <span className="profile-modal__edit-label">Редактировать</span>
-              </button>
-            )}
-            <button type="button" className="profile-modal__close" onClick={onClose} aria-label="Закрыть">
-              <CloseIcon fontSize="small" />
-            </button>
-          </div>
-
-          <div className="profile-hero__chip">
-            <div className="profile-hero__chip-inner">
-              <div className="profile-hero__chip-user">
-                <div
-                  className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
-                  style={
-                    hasAvatarDecoration
-                      ? undefined
-                      : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
-                  }
+            <div className="profile-hero__actions">
+              {isOwnProfile && onOpenSettings && (
+                <button
+                  type="button"
+                  className="profile-modal__edit-btn"
+                  onClick={() => {
+                    onClose();
+                    onOpenSettings('appearance');
+                  }}
                 >
-                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
-                  {hasAvatarDecoration && (
-                    <div className="profile-hero__chip-decoration" aria-hidden="true">
-                      <AvatarDecorationMedia
-                        src={avatarDecorationUrl}
-                        className="profile-modal__avatar-decoration"
-                      />
-                    </div>
-                  )}
-                </div>
-                <h1 className="profile-hero__name">{visibleName}</h1>
-              </div>
-
-              <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
-                <span className="profile-hero__nameplate-fill" aria-hidden="true" />
-              </UserNameplate>
+                  <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                  <span className="profile-modal__edit-label">Редактировать</span>
+                </button>
+              )}
+              <button type="button" className="profile-modal__close" onClick={onClose} aria-label="Закрыть">
+                <CloseIcon fontSize="small" />
+              </button>
             </div>
-          </div>
 
-          <div className="profile-hero__titles" aria-hidden="true" />
+            <div className="profile-hero__chip">
+              <div className="profile-hero__chip-inner">
+                <div className="profile-hero__chip-user">
+                  <div
+                    className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
+                    style={
+                      hasAvatarDecoration
+                        ? undefined
+                        : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
+                    }
+                  >
+                    {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
+                    {hasAvatarDecoration && (
+                      <div className="profile-hero__chip-decoration" aria-hidden="true">
+                        <AvatarDecorationMedia
+                          src={avatarDecorationUrl}
+                          className="profile-modal__avatar-decoration"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <h1 className="profile-hero__name">{visibleName}</h1>
+                </div>
+
+                <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+                  <span className="profile-hero__nameplate-fill" aria-hidden="true" />
+                </UserNameplate>
+              </div>
+            </div>
+
+            <div className="profile-hero__titles" aria-hidden="true" />
+          </div>
 
           <div className="profile-hero__bio-dock">
             <div className="profile-hero__bio-panel">{bioPanel}</div>

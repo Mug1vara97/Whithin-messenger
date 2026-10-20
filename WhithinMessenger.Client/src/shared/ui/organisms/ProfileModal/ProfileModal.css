@@ -64,13 +64,20 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: min(46vh, 420px);
+  flex-shrink: 0;
+  isolation: isolate;
+}
+
+.profile-hero__banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: min(42vh, 380px);
   border-radius: var(--pm-radius);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   overflow: hidden;
-  flex-shrink: 0;
   isolation: isolate;
 }
 
@@ -294,13 +301,14 @@
   min-height: 48px;
 }
 
-/* Bottom-right organic bio dock */
+/* Bottom-right organic bio dock — outside banner overflow so text is never clipped */
 .profile-hero__bio-dock {
   position: relative;
   z-index: 3;
   display: flex;
   align-self: flex-end;
-  width: min(68%, 520px);
+  width: min(72%, 540px);
+  margin-top: -36px;
   padding: 14px 0 0 14px;
   background: var(--pm-page);
   border-radius: 36px 0 0 0;
@@ -337,11 +345,13 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px 18px;
-  background: var(--pm-panel-deep);
+  background: var(--pm-panel-deep, #17181a);
   border: 1px solid color-mix(in srgb, var(--border, #3f4147) 80%, transparent);
   border-radius: 28px;
   color: var(--pm-ink);
   min-width: 0;
+  max-height: 220px;
+  overflow: auto;
 }
 
 .profile-hero__bio-head {
@@ -908,8 +918,8 @@
     gap: 10px;
   }
 
-  .profile-hero {
-    min-height: 380px;
+  .profile-hero__banner {
+    min-height: 320px;
     border-radius: 0 0 28px 28px;
   }
 
