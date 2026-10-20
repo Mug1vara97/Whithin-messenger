@@ -147,6 +147,12 @@
 
 /* —— Branched tree SVG —— */
 .category-branch-tree {
+  --cb-ink: var(--text, #f5f5f5);
+  --cb-accent: var(--accent, var(--primary, #f5f5f5));
+  --cb-line: color-mix(in srgb, var(--text-muted, #8e9297) 55%, transparent);
+  --cb-muted: color-mix(in srgb, var(--cb-ink) 55%, transparent);
+  --cb-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
   position: relative;
   padding: 4px 0 6px;
   box-sizing: border-box;
@@ -178,13 +184,13 @@
   transition: stroke-dashoffset var(--cb-draw, 400ms) var(--cb-ease-out);
 }
 
-/* Channels sit on the branch tips */
-.category-item.branched .channel-item-wrapper {
+/* Channels sit on the branch tips (categories + uncategorized) */
+.category-branch-tree .channel-item-wrapper {
   position: relative;
   z-index: 1;
 }
 
-.category-item.branched .channel-item {
+.category-branch-tree .channel-item {
   margin: 0;
   padding: 6px 8px 6px var(--cb-indent, 40px);
   border-radius: 0;
@@ -194,43 +200,43 @@
   box-sizing: border-box;
 }
 
-.category-item.branched .channel-item:hover:not(.active) {
+.category-branch-tree .channel-item:hover:not(.active) {
   background: transparent;
   color: var(--cb-ink);
 }
 
-.category-item.branched .channel-item.active {
+.category-branch-tree .channel-item.active {
   background: transparent;
   color: var(--cb-accent);
   font-weight: 500;
 }
 
-.category-item.branched .channel-item.active:hover {
+.category-branch-tree .channel-item.active:hover {
   background: transparent;
   color: var(--cb-accent);
 }
 
-.category-item.branched .channel-item.active .channel-icon,
-.category-item.branched .channel-item.active .channel-name,
-.category-item.branched .channel-item.active .private-channel-icon {
+.category-branch-tree .channel-item.active .channel-icon,
+.category-branch-tree .channel-item.active .channel-name,
+.category-branch-tree .channel-item.active .private-channel-icon {
   color: inherit;
 }
 
-.category-item.branched .channel-item.active .settings-button {
+.category-branch-tree .channel-item.active .settings-button {
   color: var(--cb-accent) !important;
   opacity: 0.85;
 }
 
-.category-item.branched .channel-item.active .settings-button:hover {
+.category-branch-tree .channel-item.active .settings-button:hover {
   background: var(--hover) !important;
   opacity: 1;
 }
 
-.category-item.branched .voice-channel-participants {
+.category-branch-tree .voice-channel-participants {
   padding-left: calc(var(--cb-indent, 40px) + 8px);
 }
 
-.category-item.branched .no-channels {
+.category-branch-tree .no-channels {
   padding-left: var(--cb-indent, 40px);
   margin: 0;
 }

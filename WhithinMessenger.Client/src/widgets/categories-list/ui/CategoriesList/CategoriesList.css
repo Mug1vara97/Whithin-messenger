@@ -68,14 +68,14 @@
 }
 
 .uncategorized-channels {
-  padding: 8px 0;
-  margin-bottom: 8px;
+  padding: 2px 0 8px;
+  margin-bottom: 4px;
 }
 
 .uncategorized-channels.dragging-over {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent, var(--primary)) 12%, transparent);
   border-radius: 4px;
-  border: 2px dashed var(--accent);
+  border: 1px dashed color-mix(in srgb, var(--accent, var(--primary)) 50%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

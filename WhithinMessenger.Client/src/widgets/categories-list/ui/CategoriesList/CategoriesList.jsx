@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
+import CategoryBranchTree from '../../../../shared/ui/molecules/CategoryItem/CategoryBranchTree';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
 import { useCallStore } from '../../../../shared/lib/stores/callStore';
@@ -324,13 +325,15 @@ const CategoriesList = ({
     if (!list || !marker) return undefined;
 
     const place = (animate) => {
-      const head = list.querySelector('.category-item[data-active-open] .category-header');
+      const head =
+        list.querySelector('.category-item[data-active-open] .category-header') ||
+        list.querySelector('.uncategorized-channels[data-active]');
       if (!animate) marker.style.transition = 'none';
       if (head) {
         const listRect = list.getBoundingClientRect();
         const headRect = head.getBoundingClientRect();
         const top =
-          headRect.top - listRect.top + list.scrollTop + (headRect.height - 16) / 2;
+          headRect.top - listRect.top + list.scrollTop + Math.max(0, (Math.min(headRect.height, 36) - 16) / 2);
         marker.style.top = `${top}px`;
         marker.setAttribute('data-on', '');
       } else {
@@ -568,30 +571,35 @@ const CategoriesList = ({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                  className={`uncategorized-channels branched ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                  data-active={
+                    uncategorizedChannels.some((ch) => isChannelActive(ch)) ? '' : undefined
+                  }
                 >
-                  {uncategorizedChannels.map((channel, index) => {
-                    const channelId = channel.chatId || channel.ChatId;
-                    const unreadCount = unreadCountByChat[channelId] || 0;
-                    return (
-                    <ChannelItem
-                      key={channel.chatId || channel.ChatId}
-                      channel={channel}
-                      index={index}
-                      unreadCount={unreadCount}
-                      isActive={isChannelActive(channel)}
-                      onClick={handleChatClick}
-                      onContextMenu={onChannelContextMenu
-                        ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
-                        : undefined}
-                      onSettings={onChannelSettings ? handleChannelSettings : undefined}
-                      isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
-                      userId={userId}
-                      userName={userName}
-                    />
-                    );
-                  })}
-                  {provided.placeholder}
+                  <CategoryBranchTree activeChatId={selectedChatId}>
+                    {uncategorizedChannels.map((channel, index) => {
+                      const channelId = channel.chatId || channel.ChatId;
+                      const unreadCount = unreadCountByChat[channelId] || 0;
+                      return (
+                        <ChannelItem
+                          key={channel.chatId || channel.ChatId}
+                          channel={channel}
+                          index={index}
+                          unreadCount={unreadCount}
+                          isActive={isChannelActive(channel)}
+                          onClick={handleChatClick}
+                          onContextMenu={onChannelContextMenu
+                            ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
+                            : undefined}
+                          onSettings={onChannelSettings ? handleChannelSettings : undefined}
+                          isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
+                          userId={userId}
+                          userName={userName}
+                        />
+                      );
+                    })}
+                    {provided.placeholder}
+                  </CategoryBranchTree>
                 </div>
               )}
             </Droppable>
