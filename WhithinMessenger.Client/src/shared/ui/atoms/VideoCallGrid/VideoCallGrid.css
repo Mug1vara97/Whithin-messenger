@@ -460,28 +460,38 @@
 }
 
 .tile-avatar-comet-dial {
+  --cd-size: 150px;
   filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
+}
+
+.small-tile .tile-avatar-comet-dial {
+  --cd-size: 135px;
+}
+
+.tile-avatar-volume-center {
+  position: relative;
+  display: grid;
+  place-items: center;
 }
 
 .tile-avatar-volume-value {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%);
+  inset: 0;
+  display: grid;
+  place-items: center;
   z-index: 2;
   pointer-events: none;
-  color: #f2f3f5;
+  color: #ffffff;
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
 }
 
 .small-tile .tile-avatar-volume-value {
   font-size: 16px;
-  bottom: calc(100% + 6px);
 }
 
 /* ===== GRID LAYOUTS ===== */

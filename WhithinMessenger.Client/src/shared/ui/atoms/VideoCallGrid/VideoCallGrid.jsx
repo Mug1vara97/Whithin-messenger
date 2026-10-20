@@ -654,15 +654,14 @@ const VideoCallGrid = ({
       />
     );
 
+    // --cd-size: 150px (~10% smaller than the previous 190px ring).
+    const dialSize = isSmall ? 135 : 150;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
           needsContrastOutline ? ' tile-avatar-wrap--contrast-outline' : ''
         }`}
       >
-        <span className="tile-avatar-volume-value" aria-hidden="true">
-          {volumeDial.value}%
-        </span>
         <CometDial
           className="tile-avatar-comet-dial"
           value={volumeDial.value}
@@ -671,16 +670,21 @@ const VideoCallGrid = ({
           step={1}
           unit="%"
           label="Громкость"
-          accent="#5865f2"
-          ink="#B5BAC1"
-          size={isSmall ? 130 : 190}
+          accent="#ffffff"
+          ink="rgba(255, 255, 255, 0.32)"
+          size={dialSize}
           sweep={340}
-          thickness={3.5}
+          thickness={6}
           speed={8}
           onChange={volumeDial.onChange}
           onContextMenu={volumeDial.onContextMenu}
         >
-          {avatar}
+          <div className="tile-avatar-volume-center">
+            {avatar}
+            <span className="tile-avatar-volume-value" aria-hidden="true">
+              {volumeDial.value}%
+            </span>
+          </div>
         </CometDial>
       </div>
     ) : (
