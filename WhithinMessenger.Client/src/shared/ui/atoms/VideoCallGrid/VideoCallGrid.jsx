@@ -654,8 +654,8 @@ const VideoCallGrid = ({
       />
     );
 
-    // --cd-size: 120px; arc ~15% shorter than a near-full ring (340° → 289°).
-    const dialSize = 120;
+    // Blocks keep 150px dial; only the arc is ~15% shorter (340° → 289°).
+    const dialSize = isSmall ? 135 : 150;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
