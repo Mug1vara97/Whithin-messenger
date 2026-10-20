@@ -10,6 +10,9 @@ public class ApplicationUser : IdentityUser<Guid>
 
     public DateTimeOffset LastSeen { get; set; }
 
+    /// <summary>Machine / third-party bot account (not a human).</summary>
+    public bool IsBot { get; set; }
+
     public ICollection<AuditLog> AuditLogs { get; set; } = [];
 
     public ICollection<Member> Members { get; set; } = [];

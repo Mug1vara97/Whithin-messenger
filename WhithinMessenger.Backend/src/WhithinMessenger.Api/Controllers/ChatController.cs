@@ -15,6 +15,7 @@ using WhithinMessenger.Application.CommandsAndQueries.Messages.SendMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.GetMessages;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.EditMessage;
 using WhithinMessenger.Application.CommandsAndQueries.Messages.DeleteMessage;
+using WhithinMessenger.Api.Services;
 
 namespace WhithinMessenger.Api.Controllers
 {
@@ -26,11 +27,19 @@ namespace WhithinMessenger.Api.Controllers
         private const bool E2eTempDisabled = true;
         private readonly IMediator _mediator;
         private readonly IHubContext<AppHub> _groupChatHub;
+        private readonly IChatMessagePublisher _messagePublisher;
+        private readonly IBotEventForwarder _botEvents;
 
-        public ChatController(IMediator mediator, IHubContext<AppHub> groupChatHub)
+        public ChatController(
+            IMediator mediator,
+            IHubContext<AppHub> groupChatHub,
+            IChatMessagePublisher messagePublisher,
+            IBotEventForwarder botEvents)
         {
             _mediator = mediator;
             _groupChatHub = groupChatHub;
+            _messagePublisher = messagePublisher;
+            _botEvents = botEvents;
         }
 
         [HttpGet("user-chats")]
@@ -167,10 +176,19 @@ namespace WhithinMessenger.Api.Controllers
                 );
                 var result = await _mediator.Send(command);
 
-                if (!result.Success)
+                if (!result.Success || !result.MessageId.HasValue)
                 {
                     return BadRequest(new { error = result.ErrorMessage });
                 }
+
+                await _messagePublisher.PublishTextMessageAsync(
+                    chatId,
+                    userId,
+                    result.MessageId.Value,
+                    request.Content,
+                    E2eTempDisabled ? 0 : request.EncryptionVersion,
+                    request.RepliedToMessageId,
+                    request.ForwardedFromMessageId);
 
                 return Ok(new { messageId = result.MessageId });
             }
@@ -221,6 +239,7 @@ namespace WhithinMessenger.Api.Controllers
                     await _groupChatHub.Clients
                         .Group(HubGroups.Chat(result.ChatId.Value))
                         .SendAsync("MessageDeleted", result.MessageId);
+                    await _botEvents.ForwardMessageDeletedAsync(result.ChatId.Value, messageId);
                 }
 
                 return Ok(new { success = true });

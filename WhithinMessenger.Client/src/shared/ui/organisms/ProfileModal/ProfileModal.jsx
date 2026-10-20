@@ -599,6 +599,11 @@ const ProfileModal = ({
                 <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
                   <div className="profile-hero__nameplate-body">
                     <h1 className="profile-hero__name">{visibleName}</h1>
+                    {activeProfile?.isBot || activeProfile?.IsBot ? (
+                      <span className="profile-hero__bot-badge" title="Бот">
+                        BOT
+                      </span>
+                    ) : null}
                   </div>
                 </UserNameplate>
               </div>

@@ -78,7 +78,8 @@ public class ProfileController : ControllerBase
                 nameplate = userProfile.Nameplate,
                 avatarDecoration = userProfile.AvatarDecoration,
                 status = user?.Status.ToString().ToLowerInvariant(),
-                createdAt = user?.CreatedAt ?? DateTimeOffset.UtcNow
+                createdAt = user?.CreatedAt ?? DateTimeOffset.UtcNow,
+                isBot = user?.IsBot ?? false,
             });
         }
         catch (Exception ex)

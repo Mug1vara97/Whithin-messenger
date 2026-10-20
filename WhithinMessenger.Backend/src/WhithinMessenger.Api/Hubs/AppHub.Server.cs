@@ -697,6 +697,8 @@ public partial class AppHub
 
             if (result.Success)
             {
+                await _botMemberJoinNotifier.NotifyAsync(serverId, userId);
+
                 await Clients.Group(HubGroups.Server(serverId)).SendAsync("MemberAdded", new
                 {
                     serverId,

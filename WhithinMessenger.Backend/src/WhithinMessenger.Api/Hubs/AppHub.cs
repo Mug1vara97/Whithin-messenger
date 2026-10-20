@@ -43,6 +43,8 @@ public partial class AppHub : Hub
     private readonly IUserPresenceBroadcastService _presenceBroadcast;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly WithinDbContext _dbContext;
+    private readonly IChatMessagePublisher _chatMessagePublisher;
+    private readonly BotMemberJoinNotifier _botMemberJoinNotifier;
 
     public AppHub(
         IMediator mediator,
@@ -57,7 +59,9 @@ public partial class AppHub : Hub
         IMessageReceiptService messageReceiptService,
         IUserPresenceBroadcastService presenceBroadcast,
         ServerPermissionChecker permissionChecker,
-        WithinDbContext dbContext)
+        WithinDbContext dbContext,
+        IChatMessagePublisher chatMessagePublisher,
+        BotMemberJoinNotifier botMemberJoinNotifier)
     {
         _mediator = mediator;
         _logger = logger;
@@ -72,6 +76,8 @@ public partial class AppHub : Hub
         _presenceBroadcast = presenceBroadcast;
         _permissionChecker = permissionChecker;
         _dbContext = dbContext;
+        _chatMessagePublisher = chatMessagePublisher;
+        _botMemberJoinNotifier = botMemberJoinNotifier;
     }
 
     // ----------------------------------------------------------------------

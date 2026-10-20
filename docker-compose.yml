@@ -65,11 +65,37 @@ services:
       - Email__FromAddress=noreply@whithin.ru
       - Email__FromName=Whithin
       - Email__FrontendBaseUrl=https://whithin.ru
+      - BotPlatform__InternalApiKey=whithin-bot-internal-dev-key
+      - BotPlatform__BotServiceBaseUrl=http://bot-service:8091
+      - BotPlatform__ForwardEvents=true
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  bot-service:
+    build:
+      context: ./bot-service
+      dockerfile: Dockerfile
+    ports:
+      - "8091:8091"
+    environment:
+      - PORT=8091
+      - DATABASE_URL=postgres://postgres:1000-7@db:5432/whithin_db?sslmode=disable
+      - CORE_API_BASE_URL=http://backend:8080
+      - INTERNAL_API_KEY=whithin-bot-internal-dev-key
+      - JWT_ISSUER=https://whithin.ru
+      - JWT_AUDIENCE=https://whithin.ru
+      - JWT_KEY=WhithinMessenger2024!SuperSecretJWTKeyForTesting123456789
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
     networks:
       - app-network
     restart: unless-stopped
@@ -167,6 +193,7 @@ services:
     depends_on:
       - client
       - backend
+      - bot-service
       - music-signal
       - voice-server
       - livekit

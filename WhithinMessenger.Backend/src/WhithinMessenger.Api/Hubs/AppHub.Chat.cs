@@ -367,9 +367,6 @@ public partial class AppHub
                     return;
                 }
 
-                var resolvedUsername = await ResolveChatSenderUsernameAsync(parsedChatId, userId.Value);
-                var senderIdentity = await ResolveChatSenderIdentityAsync(parsedChatId, userId.Value);
-
                 var command = new SendMessageCommand(
                     userId.Value,
                     parsedChatId,
@@ -381,85 +378,16 @@ public partial class AppHub
 
                 var result = await _mediator.Send(command);
 
-                if (result.Success)
+                if (result.Success && result.MessageId.HasValue)
                 {
-                    object? repliedMessage = null;
-                    if (repliedToMessageId.HasValue)
-                    {
-                        var repliedToMessage = await _messageRepository.GetReplyPreviewAsync(
-                            repliedToMessageId.Value);
-                        if (repliedToMessage != null)
-                        {
-                            repliedMessage = new
-                            {
-                                messageId = repliedToMessage.Id,
-                                content = repliedToMessage.Content,
-                                senderUsername = UserDisplayNames.Resolve(
-                                    repliedToMessage.User?.UserProfile?.DisplayName,
-                                    repliedToMessage.User?.UserName),
-                                createdAt = repliedToMessage.CreatedAt,
-                                mediaFiles = repliedToMessage.MediaFiles?.Select(mf => new
-                                {
-                                    id = mf.Id,
-                                    fileName = mf.FileName,
-                                    originalFileName = mf.OriginalFileName,
-                                    filePath = mf.FilePath,
-                                    contentType = mf.ContentType,
-                                    fileSize = mf.FileSize,
-                                    thumbnailPath = mf.ThumbnailPath,
-                                    createdAt = mf.CreatedAt,
-                                    isVideoNote = mf.IsVideoNote,
-                                    durationSeconds = mf.DurationSeconds,
-                                    streamingManifestPath = mf.StreamingManifestPath
-                                }).ToList()
-                            };
-                        }
-                    }
-
-                    object? forwardedMessage = null;
-                    if (forwardedFromMessageId.HasValue)
-                    {
-                        var forwardedSource = await _messageRepository.GetByIdWithForwardAsync(result.MessageId.Value);
-                        forwardedMessage = BuildForwardedMessagePayload(forwardedSource);
-                    }
-
-                    var userProfile = await _mediator.Send(new GetUserProfileQuery(userId.Value));
-                    string avatarColor = userProfile?.AvatarColor ?? GenerateAvatarColor(userId.Value);
-                    string? avatarUrl = userProfile?.Avatar;
-                    string? avatarDecoration = userProfile?.AvatarDecoration;
-
-                    await Clients.Group(HubGroups.Chat(parsedChatId)).SendAsync("MessageSent", 
-                        new { 
-                            messageId = result.MessageId,
-                            senderId = userId.Value,
-                            content = message, 
-                            encryptionVersion = encryptionVersion,
-                            username = resolvedUsername,
-                            senderDisplayName = senderIdentity.DisplayName,
-                            senderLogin = senderIdentity.Login,
-                            chatId = parsedChatId,
-                            avatarUrl = avatarUrl,
-                            avatarDecoration = avatarDecoration,
-                            avatarColor = avatarColor,
-                            repliedMessage = repliedMessage,
-                            forwardedMessage = forwardedMessage,
-                            mediaFiles = (object?)null,
-                            status = MessageStatusHelper.Sent
-                        });
-
-                    await _chatMessageNotificationService.NotifyTextMessageAsync(
+                    await _chatMessagePublisher.PublishTextMessageAsync(
                         parsedChatId,
                         userId.Value,
-                        resolvedUsername,
-                        result.MessageId,
-                        message,
-                        encryptionVersion: encryptionVersion
-                    );
-
-                    await _messageReceiptService.AutoDeliverToReachableRecipientsAsync(
-                        parsedChatId,
                         result.MessageId.Value,
-                        userId.Value);
+                        message,
+                        encryptionVersion,
+                        repliedToMessageId,
+                        forwardedFromMessageId);
                 }
                 else
                 {

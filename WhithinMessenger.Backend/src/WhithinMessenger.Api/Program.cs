@@ -28,6 +28,15 @@ builder.Services.AddScoped<IProfileRealtimeNotifier, ProfileRealtimeNotifier>();
 builder.Services.AddScoped<IE2eRealtimeNotifier, E2eRealtimeNotifier>();
 builder.Services.AddScoped<IMessageReceiptService, MessageReceiptService>();
 builder.Services.AddScoped<IUserPresenceBroadcastService, UserPresenceBroadcastService>();
+builder.Services.Configure<WhithinMessenger.Api.Options.BotPlatformSettings>(
+    builder.Configuration.GetSection(WhithinMessenger.Api.Options.BotPlatformSettings.SectionName));
+builder.Services.AddScoped<IBotEventForwarder, BotEventForwarder>();
+builder.Services.AddScoped<BotMemberJoinNotifier>();
+builder.Services.AddScoped<IChatMessagePublisher, ChatMessagePublisher>();
+builder.Services.AddHttpClient("bot-service", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
 
 builder.Services.AddScoped<WhithinMessenger.Application.Services.IFileService>(provider => 
 {

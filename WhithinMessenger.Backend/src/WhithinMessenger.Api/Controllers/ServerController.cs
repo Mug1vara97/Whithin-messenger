@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using WhithinMessenger.Api.Attributes;
 using WhithinMessenger.Api.Hubs;
+using WhithinMessenger.Api.Services;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
 using WhithinMessenger.Application.Services;
@@ -22,6 +23,7 @@ public class ServerController : ControllerBase
     private readonly IHubContext<AppHub> _serverHub;
     private readonly ServerPermissionChecker _permissionChecker;
     private readonly IServerAuditLogService _auditLog;
+    private readonly BotMemberJoinNotifier _botMemberJoinNotifier;
 
     public ServerController(
         IServerRepository serverRepository,
@@ -29,7 +31,8 @@ public class ServerController : ControllerBase
         IWebHostEnvironment environment,
         IHubContext<AppHub> serverHub,
         ServerPermissionChecker permissionChecker,
-        IServerAuditLogService auditLog)
+        IServerAuditLogService auditLog,
+        BotMemberJoinNotifier botMemberJoinNotifier)
     {
         _serverRepository = serverRepository;
         _mediator = mediator;
@@ -37,6 +40,7 @@ public class ServerController : ControllerBase
         _serverHub = serverHub;
         _permissionChecker = permissionChecker;
         _auditLog = auditLog;
+        _botMemberJoinNotifier = botMemberJoinNotifier;
     }
 
     [HttpGet("servers")]
@@ -157,6 +161,8 @@ public class ServerController : ControllerBase
             {
                 return BadRequest(new { error = result.ErrorMessage });
             }
+
+            await _botMemberJoinNotifier.NotifyAsync(serverId, userId);
             
             return Ok(new { message = "Успешно присоединились к серверу" });
         }
@@ -532,6 +538,8 @@ public class ServerController : ControllerBase
             {
                 return BadRequest(new { error = result.ErrorMessage });
             }
+
+            await _botMemberJoinNotifier.NotifyAsync(serverId, request.UserId);
 
             return Ok(new { message = "Участник успешно добавлен на сервер", serverMemberId = result.ServerMemberId });
         }

@@ -8,7 +8,9 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import TuneIcon from '@mui/icons-material/Tune';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import KeyboardOutlinedIcon from '@mui/icons-material/KeyboardOutlined';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import { Mic, Headset, GraphicEq, RestartAlt, Check } from '@mui/icons-material';
+import BotDeveloperPanel from '../../molecules/BotDeveloperPanel/BotDeveloperPanel';
 import hotkeyStorage from '../../../lib/utils/hotkeyStorage';
 import { soundpadBridge } from '../../../lib/soundpad/soundpadBridge';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
@@ -73,6 +75,7 @@ const BASE_TABS = [
   { id: 'interface', label: 'Интерфейс', icon: TuneIcon },
   { id: 'notifications', label: 'Уведомления', icon: NotificationsOutlinedIcon },
   { id: 'hotkeys', label: 'Горячие клавиши', icon: KeyboardOutlinedIcon },
+  { id: 'developers', label: 'Боты', icon: SmartToyOutlinedIcon },
 ];
 
 const SettingsPanel = ({ title, description, children }) => (
@@ -1008,6 +1011,16 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                   Сбросить
                 </button>
               </SettingsRow>
+          </SettingsPanel>
+        );
+
+      case 'developers':
+        return (
+          <SettingsPanel
+            title="Developer Portal"
+            description="Создавайте ботов с HTTP API (как Telegram) и устанавливайте их на серверы (как Discord)."
+          >
+            <BotDeveloperPanel />
           </SettingsPanel>
         );
 

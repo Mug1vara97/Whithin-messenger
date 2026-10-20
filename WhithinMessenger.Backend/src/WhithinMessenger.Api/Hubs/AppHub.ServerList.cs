@@ -134,6 +134,8 @@ public partial class AppHub
 
             if (result.Success)
             {
+                await _botMemberJoinNotifier.NotifyAsync(serverId, userId.Value);
+
                 var updatedServers = await GetUserServers();
                 
                 await Clients.Caller.SendAsync("ServerListUpdated");

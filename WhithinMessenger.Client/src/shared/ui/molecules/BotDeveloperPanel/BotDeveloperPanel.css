@@ -1,0 +1,113 @@
+.bot-dev {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bot-dev__lead {
+  margin: 0;
+  color: var(--text-muted, #949ba4);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.bot-dev__error {
+  margin: 0;
+  color: #ed4245;
+  font-size: 13px;
+}
+
+.bot-dev__token {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary, #5865f2) 18%, transparent);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.bot-dev__token code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bot-dev__row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bot-dev__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #949ba4);
+}
+
+.bot-dev__input {
+  flex: 1;
+  min-width: 160px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #3f4147);
+  background: var(--surface, #2b2d31);
+  color: var(--text, #dbdee1);
+}
+
+.bot-dev__btn {
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary, #5865f2);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bot-dev__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bot-dev__btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border, #3f4147);
+  color: var(--text, #dbdee1);
+}
+
+.bot-dev__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bot-dev__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface, #2b2d31);
+}
+
+.bot-dev__list li.is-selected {
+  outline: 1px solid var(--primary, #5865f2);
+}
+
+.bot-dev__bot-pick {
+  border: none;
+  background: transparent;
+  color: var(--text, #dbdee1);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}

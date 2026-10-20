@@ -40,6 +40,7 @@ export const normalizeProfilePayload = (payload) => {
   assign('avatarDecoration', pick(payload, 'avatarDecoration', 'AvatarDecoration'));
   assign('status', pick(payload, 'status', 'Status'));
   assign('createdAt', pick(payload, 'createdAt', 'CreatedAt'));
+  assign('isBot', pick(payload, 'isBot', 'IsBot'));
   assign('changedFields', pick(payload, 'changedFields', 'ChangedFields'));
 
   return next;
