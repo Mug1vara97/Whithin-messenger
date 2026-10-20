@@ -62,14 +62,15 @@
 /* —— CodePen-style hero (no sidebar) —— */
 .profile-hero {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: min(58vh, 520px);
+  display: block;
+  height: 168px;
+  min-height: 168px;
+  margin-bottom: 92px;
   border-radius: var(--pm-radius);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
   isolation: isolate;
 }
@@ -77,11 +78,12 @@
 .profile-hero__shade {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
+  border-radius: inherit;
   pointer-events: none;
   background:
-    linear-gradient(120deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0.35) 100%),
-    linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, transparent 42%);
+    linear-gradient(120deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 50%, rgba(0, 0, 0, 0.28) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, transparent 55%);
 }
 
 .profile-hero__actions {
@@ -135,87 +137,44 @@
   background: rgba(0, 0, 0, 0.65);
 }
 
-/* Top-right organic chip */
-.profile-hero__chip {
-  position: relative;
-  z-index: 3;
-  width: fit-content;
-  align-self: flex-end;
-  margin-right: 12%;
-  padding: 14px;
-  padding-top: 0;
-  background: var(--pm-page);
-  border-radius: 0 0 40px 40px;
-}
-
-.profile-hero__chip::before,
-.profile-hero__chip::after {
-  content: '';
+/* Avatar + nameplate under it (overlaps short banner) */
+.profile-hero__identity {
   position: absolute;
-  z-index: 1;
-  top: 0;
-  width: 48px;
-  height: 40px;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.profile-hero__chip::before {
-  left: -48px;
-  box-shadow: 20px -19px 0 var(--pm-page);
-}
-
-.profile-hero__chip::after {
-  right: -48px;
-  height: 48px;
-  box-shadow: -19px -19px 0 var(--pm-page);
-}
-
-.profile-hero__chip-inner {
-  position: relative;
-  z-index: 2;
+  left: 22px;
+  bottom: 0;
+  z-index: 4;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 10px 8px 16px;
-  background: var(--pm-panel);
-  border-radius: 40px;
-  color: var(--pm-ink);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  transform: translateY(72%);
+  max-width: calc(100% - 48px);
+  min-width: 0;
 }
 
-.profile-hero__chip-text {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--pm-muted);
-  white-space: nowrap;
-}
-
-.profile-hero__chip-text span {
-  color: var(--pm-ink);
-  font-weight: 600;
-}
-
-.profile-hero__chip-avatar {
-  --avatar-decoration-scale: 1.35;
+.profile-hero__avatar {
+  --avatar-decoration-scale: 1.32;
 
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
+  border: 5px solid var(--pm-page);
+  box-sizing: border-box;
   overflow: visible;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 18px;
+  font-size: 44px;
   font-weight: 700;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  background: var(--profile-accent, var(--pm-accent));
 }
 
-.profile-hero__chip-avatar > img,
-.profile-hero__chip-avatar > span:not(.profile-modal__avatar-status) {
+.profile-hero__avatar > img,
+.profile-hero__avatar > span {
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -226,11 +185,11 @@
   overflow: hidden;
 }
 
-.profile-hero__chip-avatar--decorated {
+.profile-hero__avatar--decorated {
   background: transparent !important;
 }
 
-.profile-hero__chip-decoration {
+.profile-hero__avatar-decoration {
   position: absolute;
   inset: 0;
   display: flex;
@@ -240,39 +199,6 @@
   z-index: 2;
 }
 
-.profile-hero__chip-avatar .profile-modal__avatar-status {
-  right: -1px;
-  bottom: -1px;
-  width: 16px;
-  height: 16px;
-  border-width: 3px;
-  border-color: var(--pm-panel);
-}
-
-.profile-hero__chip-avatar .profile-modal__avatar-status--do_not_disturb::after {
-  width: 7px;
-  height: 2px;
-  background: var(--pm-panel);
-}
-
-.profile-hero__chip-avatar .profile-modal__avatar-status--offline {
-  background-color: var(--pm-panel);
-}
-
-/* Large titles */
-.profile-hero__titles {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-self: flex-end;
-  width: min(100%, 560px);
-  padding: 24px 48px 28px;
-  min-width: 0;
-}
-
 .profile-hero__nameplate,
 .profile-hero__nameplate.user-nameplate {
   width: fit-content;
@@ -280,10 +206,11 @@
   min-height: 0;
   border-radius: 10px;
   align-self: flex-start;
+  margin-top: 4px;
 }
 
 .profile-hero__nameplate .user-nameplate__content {
-  padding: 6px 10px;
+  padding: 6px 12px;
   width: auto;
 }
 
@@ -292,97 +219,25 @@
   text-transform: uppercase;
   font-family: 'Abril Fatface', Georgia, 'Times New Roman', serif;
   font-weight: 400;
-  font-size: clamp(2.6rem, 7vw, 4.6rem);
-  line-height: 0.88;
+  font-size: clamp(1.65rem, 3.6vw, 2.35rem);
+  line-height: 1;
   letter-spacing: 0.01em;
-  color: #fff;
-  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  color: var(--pm-ink);
   word-break: break-word;
 }
 
 .profile-hero__nameplate.user-nameplate--decorated .profile-hero__name {
-  color: var(--text, #fff);
+  color: inherit;
   text-shadow: none;
 }
 
-.profile-hero__subtitle {
-  margin: 14px 0 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: rgba(255, 255, 255, 0.88);
+.profile-hero__login {
+  margin: -2px 0 0;
   font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.profile-hero__subtitle::after {
-  content: '';
-  flex: 1;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 1px;
-}
-
-.profile-hero__presence {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--presence-color, #80848e);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Bottom-right organic bio dock */
-.profile-hero__bio-dock {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-self: flex-end;
-  width: min(68%, 520px);
-  padding: 14px 0 0 14px;
-  background: var(--pm-page);
-  border-radius: 36px 0 0 0;
-}
-
-.profile-hero__bio-dock::before,
-.profile-hero__bio-dock::after {
-  content: '';
-  position: absolute;
-  z-index: 1;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.profile-hero__bio-dock::before {
-  top: -48px;
-  right: 0;
-  box-shadow: 21px 21px 0 var(--pm-page);
-}
-
-.profile-hero__bio-dock::after {
-  bottom: 0;
-  left: -48px;
-  box-shadow: 21px 21px 0 var(--pm-page);
-}
-
-.profile-hero__bio-panel {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  background: var(--pm-panel-deep);
-  border: 1px solid color-mix(in srgb, var(--border, #3f4147) 80%, transparent);
-  border-radius: 28px;
-  color: var(--pm-ink);
-  min-width: 0;
+  letter-spacing: 0.04em;
+  color: var(--pm-muted);
 }
 
 .profile-hero__bio-head {
@@ -390,6 +245,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 8px;
 }
 
 .profile-hero__bio-label {
@@ -950,29 +806,20 @@
   }
 
   .profile-hero {
-    min-height: 420px;
+    height: 140px;
+    min-height: 140px;
+    margin-bottom: 100px;
     border-radius: 0 0 28px 28px;
   }
 
-  .profile-hero__chip {
-    margin-right: 8%;
-    padding-right: 10px;
+  .profile-hero__identity {
+    left: 16px;
   }
 
-  .profile-hero__chip-text {
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .profile-hero__titles {
-    padding: 18px 22px 20px;
-    width: 100%;
-    align-self: stretch;
-  }
-
-  .profile-hero__bio-dock {
-    width: 92%;
+  .profile-hero__avatar {
+    width: 104px;
+    height: 104px;
+    font-size: 38px;
   }
 
   .profile-modal__body--wall {

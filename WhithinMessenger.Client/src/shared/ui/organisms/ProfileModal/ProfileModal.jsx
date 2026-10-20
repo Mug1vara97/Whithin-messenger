@@ -12,8 +12,7 @@ import { feedApi, formatFeedTime } from '../../../../entities/feed';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
-import { useResolvedPresence } from '../../../lib/contexts/PresenceContext';
-import { getOwnStatusLabel, normalizeUserStatus } from '../../../lib/utils/userStatus';
+import { normalizeUserStatus } from '../../../lib/utils/userStatus';
 import { mergeProfileState } from '../../../lib/utils/profilePatchHelpers';
 import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
@@ -122,11 +121,6 @@ const ProfileModal = ({
     fallback: username || 'П',
   });
   const accentColor = activeProfile?.avatarColor || '#5865f2';
-  const presence = useResolvedPresence(userId, activeProfile?.status ?? initialStatus);
-  const presenceLabel = isOwnProfile
-    ? getOwnStatusLabel(presence.normalized)
-    : presence.label;
-  const presenceColor = presence.color;
 
   const bannerStyle = useMemo(() => {
     const banner = activeProfile?.banner;
@@ -357,12 +351,6 @@ const ProfileModal = ({
     );
   };
 
-  const nameParts = visibleName.trim().split(/\s+/).filter(Boolean);
-  const nameLine1 = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : visibleName;
-  const nameLine2 = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
-  const chipGreeting = isOwnProfile ? 'это вы,' : 'профиль';
-  const chipName = login ? `@${login}` : visibleName;
-
   const bioPanel = (
     <>
       <div className="profile-hero__bio-head">
@@ -456,72 +444,40 @@ const ProfileModal = ({
             </button>
           </div>
 
-          <div className="profile-hero__chip">
-            <div className="profile-hero__chip-inner">
-              <p className="profile-hero__chip-text">
-                {chipGreeting} <span>{chipName}</span>
-              </p>
-              <div
-                className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
-                style={
-                  hasAvatarDecoration
-                    ? undefined
-                    : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
-                }
-              >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" />
-                ) : (
-                  <span>{avatarInitial}</span>
-                )}
-                {hasAvatarDecoration && (
-                  <div className="profile-hero__chip-decoration" aria-hidden="true">
-                    <AvatarDecorationMedia
-                      src={avatarDecorationUrl}
-                      className="profile-modal__avatar-decoration"
-                    />
-                  </div>
-                )}
-                <span
-                  className={`profile-modal__avatar-status profile-modal__avatar-status--${presence.normalized}`}
-                  style={{ ['--presence-color']: presenceColor }}
-                  title={presenceLabel}
-                  aria-label={presenceLabel}
-                />
-              </div>
+          <div className="profile-hero__identity">
+            <div
+              className={`profile-hero__avatar ${hasAvatarDecoration ? 'profile-hero__avatar--decorated' : ''}`}
+              style={
+                hasAvatarDecoration
+                  ? undefined
+                  : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
+              }
+            >
+              {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
+              {hasAvatarDecoration && (
+                <div className="profile-hero__avatar-decoration" aria-hidden="true">
+                  <AvatarDecorationMedia
+                    src={avatarDecorationUrl}
+                    className="profile-modal__avatar-decoration"
+                  />
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="profile-hero__titles">
             <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
-              <h1 className="profile-hero__name">
-                {nameLine1}
-                {nameLine2 ? (
-                  <>
-                    <br />
-                    {nameLine2}
-                  </>
-                ) : null}
-              </h1>
+              <h1 className="profile-hero__name">{visibleName}</h1>
             </UserNameplate>
-            <p className="profile-hero__subtitle">
-              <span
-                className={`profile-hero__presence profile-hero__presence--${presence.normalized}`}
-                style={{ ['--presence-color']: presenceColor }}
-              />
-              {presenceLabel}
-              {login ? ` · @${login}` : ''}
-            </p>
-          </div>
-
-          <div className="profile-hero__bio-dock">
-            <div className="profile-hero__bio-panel">{bioPanel}</div>
+            {login ? <p className="profile-hero__login">@{login}</p> : null}
           </div>
         </header>
 
         <div className="profile-modal__body profile-modal__body--wall">
           <div className="profile-wall profile-wall--solo">
             <div className="profile-wall__main">
+              <section className="profile-wall__card profile-wall__card--bio">
+                {bioPanel}
+              </section>
+
               <section className="profile-wall__card profile-wall__card--meta">
                 <div className="profile-modal__info-list profile-modal__info-list--inline">
                   {memberSince ? (
