@@ -3,6 +3,10 @@ import { ProfileModal, SettingsModal } from '../../ui/organisms';
 import { useAuthContext } from './AuthContext';
 import { resolveUserDisplayName } from '../utils/userDisplayNameHelpers';
 import { SOUNDPAD_OPEN_MANAGER_EVENT } from '../soundpad/soundpadPanelEvents';
+import {
+  getCachedProfileAbout,
+  setCachedProfileAbout,
+} from '../utils/profileAboutCache';
 
 const ProfileModalContext = createContext(null);
 
@@ -39,17 +43,21 @@ export const ProfileModalProvider = ({ children }) => {
 
   const openProfile = useCallback((userId, username, initialStatus = null, extras = null) => {
     if (!userId) return;
-    const initialDescription =
+    const fromExtras =
       extras?.description ?? extras?.Description ?? extras?.initialDescription ?? null;
+    const fromExtrasText =
+      fromExtras != null && String(fromExtras).trim() ? String(fromExtras).trim() : '';
+    if (fromExtrasText) {
+      setCachedProfileAbout(userId, fromExtrasText);
+    }
+    const initialDescription =
+      fromExtrasText || getCachedProfileAbout(userId) || null;
     setProfileView({
       isOpen: true,
       userId,
       username: username || 'Пользователь',
       initialStatus,
-      initialDescription:
-        initialDescription != null && String(initialDescription).trim()
-          ? String(initialDescription)
-          : null,
+      initialDescription,
     });
   }, []);
 
@@ -68,8 +76,14 @@ export const ProfileModalProvider = ({ children }) => {
       displayName: user?.displayName ?? user?.DisplayName,
       username: currentUsername,
     });
-    openProfile(currentUserId, currentVisibleName, status);
-  }, [currentUserId, currentUsername, openProfile, user?.DisplayName, user?.displayName]);
+    openProfile(currentUserId, currentVisibleName, status, {
+      description:
+        user?.description ??
+        user?.Description ??
+        getCachedProfileAbout(currentUserId) ??
+        null,
+    });
+  }, [currentUserId, currentUsername, openProfile, user?.Description, user?.description, user?.DisplayName, user?.displayName]);
 
   const openSettings = useCallback((tab = 'account') => {
     setSettingsInitialTab(tab);

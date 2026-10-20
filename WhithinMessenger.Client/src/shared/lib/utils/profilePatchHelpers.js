@@ -53,18 +53,59 @@ const matchesUserId = (entityUserId, patchUserId) =>
   patchUserId != null &&
   String(entityUserId) === String(patchUserId);
 
+const changedFieldsInclude = (patch, field) => {
+  const fields = Array.isArray(patch?.changedFields)
+    ? patch.changedFields
+    : Array.isArray(patch?.ChangedFields)
+      ? patch.ChangedFields
+      : null;
+  if (!fields || fields.length === 0) return false;
+  const needle = String(field).toLowerCase();
+  return fields.some((item) => String(item).toLowerCase() === needle);
+};
+
+const resolvePatchDescription = (patch) => {
+  if (!patch) return undefined;
+  if (patch.description !== undefined) return patch.description;
+  if (patch.Description !== undefined) return patch.Description;
+  return undefined;
+};
+
+/** Apply description from a profile patch without wiping a known about-me on soft loads. */
+export const applyDescriptionPatch = (currentDescription, patch) => {
+  const incoming = resolvePatchDescription(patch);
+  if (incoming === undefined) {
+    return currentDescription;
+  }
+
+  const incomingText = incoming == null ? '' : String(incoming).trim();
+  const descriptionExplicitlyChanged = changedFieldsInclude(patch, 'description');
+
+  if (descriptionExplicitlyChanged) {
+    return incomingText;
+  }
+
+  // Soft updates (profile-load, avatar, etc.) must not clear an existing about-me.
+  if (!incomingText) {
+    return currentDescription;
+  }
+
+  return incomingText;
+};
+
 export const patchFriendWithProfile = (friend, patch) => {
   if (!friend || !patch?.userId || !matchesUserId(friend.userId, patch.userId)) {
     return friend;
   }
 
   const label = resolveProfileDisplayLabel(patch);
+  const nextDescription = applyDescriptionPatch(friend.description, patch);
   return {
     ...friend,
     ...(label !== undefined ? { username: label } : {}),
     ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
     ...(patch.avatarColor !== undefined ? { avatarColor: patch.avatarColor } : {}),
-    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(nextDescription !== friend.description ? { description: nextDescription } : {}),
   };
 };
 
@@ -121,6 +162,8 @@ export const patchChatUserProfileWithProfile = (profile, patch) => {
   }
 
   const label = resolveProfileDisplayLabel(patch);
+  const currentDescription = profile?.description ?? profile?.Description;
+  const nextDescription = applyDescriptionPatch(currentDescription, patch);
   return {
     ...(profile || {}),
     ...(label !== undefined ? { username: label } : {}),
@@ -128,7 +171,7 @@ export const patchChatUserProfileWithProfile = (profile, patch) => {
     ...(patch.avatarColor !== undefined ? { avatarColor: patch.avatarColor } : {}),
     ...(patch.avatarDecoration !== undefined ? { avatarDecoration: patch.avatarDecoration } : {}),
     ...(patch.banner !== undefined ? { banner: patch.banner } : {}),
-    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(nextDescription !== currentDescription ? { description: nextDescription } : {}),
     ...(patch.nameplate !== undefined ? { nameplate: patch.nameplate } : {}),
   };
 };
@@ -139,6 +182,7 @@ export const patchMemberWithProfile = (member, patch) => {
   }
 
   const label = resolveProfileDisplayLabel(patch);
+  const nextDescription = applyDescriptionPatch(member.description, patch);
   return {
     ...member,
     ...(label !== undefined ? { username: label } : {}),
@@ -147,7 +191,7 @@ export const patchMemberWithProfile = (member, patch) => {
     ...(patch.avatarDecoration !== undefined ? { avatarDecoration: patch.avatarDecoration } : {}),
     ...(patch.nameplate !== undefined ? { nameplate: patch.nameplate } : {}),
     ...(patch.banner !== undefined ? { banner: patch.banner } : {}),
-    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(nextDescription !== member.description ? { description: nextDescription } : {}),
   };
 };
 

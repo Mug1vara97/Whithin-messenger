@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -13,7 +13,15 @@ import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
 import { normalizeUserStatus } from '../../../lib/utils/userStatus';
-import { mergeProfileState, normalizeProfilePayload } from '../../../lib/utils/profilePatchHelpers';
+import {
+  applyDescriptionPatch,
+  mergeProfileState,
+  normalizeProfilePayload,
+} from '../../../lib/utils/profilePatchHelpers';
+import {
+  getCachedProfileAbout,
+  setCachedProfileAbout,
+} from '../../../lib/utils/profileAboutCache';
 import { resolveUserDisplayName, resolveAvatarInitial } from '../../../lib/utils/userDisplayNameHelpers';
 import UserNameplate from '../../atoms/UserNameplate';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
@@ -24,6 +32,16 @@ import CreateFeedPostModal from '../../../../widgets/feed-panel/ui/CreateFeedPos
 import './ProfileModal.css';
 
 const MAX_BIO_LENGTH = 190;
+
+/** First non-empty trimmed about-me among candidates (empty string does not win). */
+const pickAboutText = (...candidates) => {
+  for (const value of candidates) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+};
 
 const resolveMediaUrl = (path) => {
   if (!path) return null;
@@ -79,6 +97,7 @@ const ProfileModal = ({
   const [previewMedia, setPreviewMedia] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const { user } = useAuthContext();
+  const seedAboutRef = useRef('');
 
   const profileUserId = profile?.userId ?? profile?.UserId;
   const profileMatchesUser =
@@ -155,18 +174,36 @@ const ProfileModal = ({
         status: normalized.status ?? data?.status ?? data?.Status,
         createdAt: normalized.createdAt ?? data?.createdAt ?? data?.CreatedAt,
       };
-      const loadedDescription = String(
-        next.description ?? next.Description ?? initialDescription ?? '',
-      ).trim();
-      next.description = loadedDescription;
-      setProfile(next);
-      setBioDraft(loadedDescription);
-      // Sync other views, but mark that description was loaded so listeners
-      // don't treat a missing/null field as "cleared".
-      onProfileUpdated?.({
+      // Empty string from API must not beat a known seed/cache (?? treats "" as present).
+      const loadedDescription = pickAboutText(
+        next.description,
+        next.Description,
+        seedAboutRef.current,
+        initialDescription,
+        getCachedProfileAbout(userId),
+      );
+      next.description = loadedDescription || null;
+      if (loadedDescription) {
+        setCachedProfileAbout(userId, loadedDescription);
+      }
+      setProfile((prev) => ({
+        ...(prev || {}),
         ...next,
-        changedFields: ['profile-load'],
-      });
+        description: pickAboutText(
+          loadedDescription,
+          prev?.description,
+          prev?.Description,
+          seedAboutRef.current,
+        ) || null,
+      }));
+      setBioDraft((prev) => pickAboutText(loadedDescription, prev, seedAboutRef.current));
+      // Soft sync — never advertise an empty description as a real change.
+      const syncPayload = { ...next, changedFields: ['profile-load'] };
+      if (!loadedDescription) {
+        delete syncPayload.description;
+        delete syncPayload.Description;
+      }
+      onProfileUpdated?.(syncPayload);
     } catch (error) {
       console.error('Error loading profile:', error);
     }
@@ -195,10 +232,11 @@ const ProfileModal = ({
   useEffect(() => {
     if (!isOpen || !userId) return;
 
-    const seededDescription =
-      initialDescription != null && String(initialDescription).trim()
-        ? String(initialDescription)
-        : '';
+    const seededDescription = pickAboutText(
+      initialDescription,
+      getCachedProfileAbout(userId),
+    );
+    seedAboutRef.current = seededDescription;
 
     setProfile({
       userId,
@@ -238,38 +276,36 @@ const ProfileModal = ({
 
       const changedFields = Array.isArray(patch.changedFields)
         ? patch.changedFields.map((field) => String(field).toLowerCase())
-        : [];
+        : Array.isArray(patch.ChangedFields)
+          ? patch.ChangedFields.map((field) => String(field).toLowerCase())
+          : [];
       const descriptionExplicitlyChanged = changedFields.includes('description');
-      const incomingDescription =
-        patch.description !== undefined
-          ? patch.description
-          : patch.Description !== undefined
-            ? patch.Description
-            : undefined;
-      const incomingText =
-        incomingDescription == null ? '' : String(incomingDescription).trim();
+      const incomingText = pickAboutText(patch?.description, patch?.Description);
 
       setProfile((prev) => {
         const nextPatch = { ...patch };
         delete nextPatch.changedFields;
         delete nextPatch.ChangedFields;
+        delete nextPatch.description;
+        delete nextPatch.Description;
 
-        // Keep existing about-me unless it was explicitly changed or a non-empty
-        // description arrived.
-        if (!descriptionExplicitlyChanged && !incomingText) {
-          delete nextPatch.description;
-          delete nextPatch.Description;
-        } else if (incomingDescription !== undefined) {
-          nextPatch.description = incomingText;
-        }
-
-        return mergeProfileState(prev, nextPatch);
+        const merged = mergeProfileState(prev, nextPatch);
+        const nextDescription = applyDescriptionPatch(
+          prev?.description ?? prev?.Description ?? seedAboutRef.current,
+          patch,
+        );
+        return { ...merged, description: nextDescription || null };
       });
 
       if (descriptionExplicitlyChanged) {
-        setBioDraft(incomingText);
+        const nextDraft = pickAboutText(patch?.description, patch?.Description);
+        seedAboutRef.current = nextDraft;
+        setBioDraft(nextDraft);
+        setCachedProfileAbout(userId, nextDraft);
       } else if (incomingText) {
-        setBioDraft((prev) => prev || incomingText);
+        seedAboutRef.current = pickAboutText(seedAboutRef.current, incomingText);
+        setBioDraft((prev) => pickAboutText(prev, incomingText));
+        setCachedProfileAbout(userId, incomingText);
       }
     };
 
@@ -304,11 +340,21 @@ const ProfileModal = ({
     setBioError('');
     try {
       const result = await userApi.updateDescription(userId, bioDraft.trim());
-      const nextDescription = result?.description ?? result?.Description ?? bioDraft.trim();
-      setProfile((prev) => ({ ...prev, description: nextDescription }));
+      const nextDescription = pickAboutText(
+        result?.description,
+        result?.Description,
+        bioDraft,
+      );
+      setCachedProfileAbout(userId, nextDescription);
+      seedAboutRef.current = nextDescription;
+      setProfile((prev) => ({ ...prev, description: nextDescription || null }));
       setBioDraft(nextDescription || '');
       setIsEditingBio(false);
-      onProfileUpdated?.({ ...profile, description: nextDescription });
+      onProfileUpdated?.({
+        ...profile,
+        description: nextDescription || null,
+        changedFields: ['description'],
+      });
     } catch (error) {
       setBioError(error.message || 'Не удалось сохранить описание');
     } finally {
@@ -409,11 +455,15 @@ const ProfileModal = ({
     );
   };
 
-  const savedAboutText = String(
-    profile?.description || profile?.Description || initialDescription || '',
-  ).trim();
+  const savedAboutText = pickAboutText(
+    profile?.description,
+    profile?.Description,
+    initialDescription,
+    getCachedProfileAbout(userId),
+    seedAboutRef.current,
+  );
   // View uses the same draft that powers the editor — keeps them in sync.
-  const displayAboutText = String(bioDraft || savedAboutText || '').trim();
+  const displayAboutText = pickAboutText(bioDraft, savedAboutText);
   const hasAboutText = Boolean(displayAboutText);
 
   const bioPanel = (

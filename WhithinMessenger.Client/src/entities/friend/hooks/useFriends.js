@@ -4,6 +4,7 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../shared/lib/contexts/ProfileModalContext';
 import { patchFriendWithProfile } from '../../../shared/lib/utils/profilePatchHelpers';
 import { normalizeFriend } from '../lib/friendHelpers';
+import { setCachedProfileAbout } from '../../../shared/lib/utils/profileAboutCache';
 
 export const useFriends = () => {
   const [friends, setFriends] = useState([]);
@@ -44,6 +45,12 @@ export const useFriends = () => {
       const formattedFriends = (friendsData || [])
         .map(normalizeFriend)
         .filter(Boolean);
+
+      formattedFriends.forEach((friend) => {
+        if (friend.description) {
+          setCachedProfileAbout(friend.userId, friend.description);
+        }
+      });
 
       setFriends(formattedFriends);
     } catch (err) {
