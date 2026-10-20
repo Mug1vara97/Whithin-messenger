@@ -1,72 +1,35 @@
-# Build stage
-FROM node:20-alpine as build
-
-# Install build dependencies and clean up cache in the same layer
-RUN apk add --no-cache python3 make g++ && \
-    npm cache clean --force
+# Build stage — pure JS/Vite client, no native node-gyp deps.
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy only package files first
 COPY package*.json ./
 
-# Install dependencies with clean npm cache and force flag
-RUN npm install --legacy-peer-deps --force && \
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps && \
     npm cache clean --force
 
-# Copy only necessary source files
 COPY src ./src
 COPY public ./public
 COPY index.html ./
 COPY vite.config.js ./
 
-# Set production environment variables for build
 ENV VITE_API_URL=https://whithin.ru
 ENV VITE_API_BASE_URL=https://whithin.ru
 ENV VITE_VOICE_SERVER_URL=https://whithin.ru
 ENV NODE_ENV=production
 
-# Build the app
 RUN npm run build && \
     npm cache clean --force && \
     rm -rf node_modules
 
-# Install serve globally in a separate stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install serve
 RUN npm install -g serve
 
-# Copy only the built files from build stage
 COPY --from=build /app/dist ./dist
 
 EXPOSE 3001
 
-# Serve the Vite build output
 CMD ["serve", "-s", "dist", "-l", "3001"]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
