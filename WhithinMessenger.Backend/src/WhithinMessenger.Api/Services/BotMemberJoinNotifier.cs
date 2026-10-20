@@ -1,5 +1,5 @@
+using WhithinMessenger.Application.Services;
 using WhithinMessenger.Domain.Interfaces;
-using WhithinMessenger.Domain.Utils;
 
 namespace WhithinMessenger.Api.Services;
 
