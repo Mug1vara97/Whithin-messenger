@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
@@ -295,13 +295,65 @@ const CategoriesList = ({
     }
   };
 
+  const selectedChatId =
+    selectedChat?.chatId || selectedChat?.ChatId || selectedChat?.chat_id || null;
+
   const isChannelActive = (channel) => {
     const channelId = channel.chatId || channel.ChatId || channel.chat_id;
-    const selectedId =
-      selectedChat?.chatId || selectedChat?.ChatId || selectedChat?.chat_id;
-    if (!channelId || !selectedId) return false;
-    return String(selectedId) === String(channelId);
+    if (!channelId || !selectedChatId) return false;
+    return String(selectedChatId) === String(channelId);
   };
+
+  const listRef = useRef(null);
+  const markerRef = useRef(null);
+
+  const categoryHasActiveChannel = useCallback(
+    (category) => {
+      if (!selectedChatId || !category?.chats?.length) return false;
+      return category.chats.some((ch) => {
+        const id = ch.chatId || ch.ChatId || ch.chat_id;
+        return id != null && String(id) === String(selectedChatId);
+      });
+    },
+    [selectedChatId]
+  );
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const marker = markerRef.current;
+    if (!list || !marker) return undefined;
+
+    const place = (animate) => {
+      const head = list.querySelector('.category-item[data-active-open] .category-header');
+      if (!animate) marker.style.transition = 'none';
+      if (head) {
+        const listRect = list.getBoundingClientRect();
+        const headRect = head.getBoundingClientRect();
+        const top =
+          headRect.top - listRect.top + list.scrollTop + (headRect.height - 16) / 2;
+        marker.style.top = `${top}px`;
+        marker.setAttribute('data-on', '');
+      } else {
+        marker.removeAttribute('data-on');
+      }
+      if (!animate) {
+        void marker.offsetHeight;
+        marker.style.transition = '';
+      }
+    };
+
+    place(true);
+    let first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) {
+        first = false;
+        return;
+      }
+      place(false);
+    });
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [selectedChatId, localCategories]);
 
   const handleDragEnd = useCallback(async (result) => {
     console.log('handleDragEnd called:', result);
@@ -494,7 +546,10 @@ const CategoriesList = ({
         {(provided, snapshot) => (
           <div 
             {...provided.droppableProps}
-            ref={provided.innerRef}
+            ref={(el) => {
+              provided.innerRef(el);
+              listRef.current = el;
+            }}
             className={`categories-list ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
             onContextMenu={(e) => {
               if (!onEmptySpaceContextMenu) return;
@@ -504,6 +559,7 @@ const CategoriesList = ({
               }
             }}
           >
+            <span ref={markerRef} className="categories-list__marker" aria-hidden="true" />
             <Droppable
               droppableId="category-null"
               type="CHAT"
@@ -550,6 +606,8 @@ const CategoriesList = ({
                 onAddChannel={canManageChannels ? handleAddChannel : undefined}
                 onCategoryContextMenu={onCategoryContextMenu ? handleCategoryContextMenu : undefined}
                 isDragDisabled={!canManageChannels}
+                activeChatId={selectedChatId}
+                hasActiveChannel={categoryHasActiveChannel(category)}
               >
                 {category.chats?.map((channel, channelIndex) => {
                   const channelId = channel.chatId || channel.ChatId;

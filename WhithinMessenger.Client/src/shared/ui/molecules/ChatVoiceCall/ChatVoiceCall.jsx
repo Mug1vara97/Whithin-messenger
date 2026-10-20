@@ -438,6 +438,8 @@ const ChatVoiceCall = ({
                         sweep={289}
                         thickness={6}
                         speed={8}
+                        deadZone={28}
+                        passthroughCenter
                         onChange={(next) => changeUserVolume?.(participant.id, next)}
                         onContextMenu={handleAvatarContextMenu}
                       >

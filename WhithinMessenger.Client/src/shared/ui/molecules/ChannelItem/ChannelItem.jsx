@@ -184,6 +184,7 @@ const ChannelItem = ({
         >
           <div
             className={`channel-item ${isActive ? 'active' : ''} ${snapshot.isDragging ? 'dragging' : ''} ${isCallOnlyChannel ? 'call-only' : ''}`}
+            data-channel-id={channelId}
             onClick={handleClick}
             onContextMenu={handleContextMenu}
             style={{

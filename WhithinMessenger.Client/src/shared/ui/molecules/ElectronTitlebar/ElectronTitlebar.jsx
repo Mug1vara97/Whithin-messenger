@@ -127,8 +127,8 @@ export function ElectronTitlebar({ showNotifications = true }) {
   return (
     <>
       <div id="electron-titlebar-fill" aria-hidden="true" />
-      <div id="electron-titlebar-drag-shim">
-        <span className="electron-titlebar-app-name">{APP_DISPLAY_NAME}</span>
+      <div id="electron-titlebar-drag-shim" data-tauri-drag-region="">
+        <span className="electron-titlebar-app-name" data-tauri-drag-region="">{APP_DISPLAY_NAME}</span>
       </div>
       <div id="electron-window-controls">
         {showNotifications && <ElectronTitlebarNotifications />}

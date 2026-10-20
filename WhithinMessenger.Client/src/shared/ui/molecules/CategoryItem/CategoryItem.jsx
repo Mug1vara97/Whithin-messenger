@@ -1,121 +1,129 @@
-
 import React, { useState, useEffect } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { FaLock, FaPlus } from 'react-icons/fa';
+import CategoryBranchTree from './CategoryBranchTree';
 import './CategoryItem.css';
 
-const CategoryItem = ({ 
-    category,
-    index,
-    onAddChannel,
-    onCategoryContextMenu,
-    children,
-    isDragDisabled = false
+const CategoryItem = ({
+  category,
+  index,
+  onAddChannel,
+  onCategoryContextMenu,
+  children,
+  isDragDisabled = false,
+  activeChatId = null,
+  hasActiveChannel = false,
 }) => {
-    const [isCollapsed, setIsCollapsed] = useState(() => {
-        const categoryId = category.categoryId || category.CategoryId;
-        const savedState = localStorage.getItem(`categoryCollapsed_${categoryId}`);
-        return savedState ? JSON.parse(savedState) : false;
-    });
+  const categoryId = category.categoryId || category.CategoryId;
 
-    useEffect(() => {
-        const categoryId = category.categoryId || category.CategoryId;
-        localStorage.setItem(
-            `categoryCollapsed_${categoryId}`, 
-            JSON.stringify(isCollapsed)
-        );
-    }, [isCollapsed, category.categoryId, category.CategoryId]);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const savedState = localStorage.getItem(`categoryCollapsed_${categoryId}`);
+    return savedState ? JSON.parse(savedState) : false;
+  });
 
-    const toggleCollapse = (e) => {
-        e.stopPropagation();
-        setIsCollapsed(!isCollapsed);
-    };
+  useEffect(() => {
+    localStorage.setItem(`categoryCollapsed_${categoryId}`, JSON.stringify(isCollapsed));
+  }, [isCollapsed, categoryId]);
 
-    const handleAddChannel = (e) => {
-        e.stopPropagation();
-        if (onAddChannel) {
-            onAddChannel(category.categoryId || category.CategoryId);
-        }
-    };
+  const toggleCollapse = (e) => {
+    e.stopPropagation();
+    setIsCollapsed(!isCollapsed);
+  };
 
-    const handleCategoryContextMenu = (e) => {
-        if (e.target.closest('.channel-item')) {
-            return; 
-        }
-        
-        e.preventDefault();
-        e.stopPropagation();
-        if (onCategoryContextMenu) {
-            onCategoryContextMenu(e, category);
-        }
-    };
+  const handleAddChannel = (e) => {
+    e.stopPropagation();
+    if (onAddChannel) {
+      onAddChannel(categoryId);
+    }
+  };
 
+  const handleCategoryContextMenu = (e) => {
+    if (e.target.closest('.channel-item')) {
+      return;
+    }
 
-    return (
-        <Draggable
-            draggableId={`category-${category.categoryId || category.CategoryId}`}
-            index={index}
-            isDragDisabled={isDragDisabled}
+    e.preventDefault();
+    e.stopPropagation();
+    if (onCategoryContextMenu) {
+      onCategoryContextMenu(e, category);
+    }
+  };
+
+  const isOpen = !isCollapsed;
+
+  return (
+    <Draggable
+      draggableId={`category-${categoryId}`}
+      index={index}
+      isDragDisabled={isDragDisabled}
+    >
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          className={`category-item branched ${
+            category.isPrivate || category.IsPrivate ? 'private' : ''
+          } ${snapshot.isDragging ? 'dragging' : ''}`}
+          data-category-id={categoryId}
+          data-open={isOpen ? '' : undefined}
+          data-active-open={isOpen && hasActiveChannel ? '' : undefined}
+          onContextMenu={handleCategoryContextMenu}
         >
-            {(provided, snapshot) => (
-                <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    className={`category-item ${(category.isPrivate || category.IsPrivate) ? 'private' : ''} ${snapshot.isDragging ? 'dragging' : ''}`}
-                    onContextMenu={handleCategoryContextMenu}
+          <div className="category-header" {...provided.dragHandleProps}>
+            <div className="category-name-container">
+              <span
+                className="category-name"
+                onClick={toggleCollapse}
+                aria-expanded={isOpen}
+                aria-label={isCollapsed ? 'Развернуть категорию' : 'Свернуть категорию'}
+              >
+                {category.categoryName || category.CategoryName}
+              </span>
+            </div>
+            <div className="category-actions">
+              {(category.isPrivate || category.IsPrivate) && (
+                <span className="category-private-icon" title="Приватная категория">
+                  <FaLock aria-hidden />
+                </span>
+              )}
+              {onAddChannel && (
+                <button
+                  className="add-channel-button"
+                  onClick={handleAddChannel}
+                  title="Создать канал"
                 >
-                    <div 
-                        className="category-header"
-                        {...provided.dragHandleProps}
+                  <FaPlus className="add-icon" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isOpen && (
+            <div className="category-body">
+              <div className="category-fold">
+                <Droppable droppableId={`category-${categoryId}`} type="CHAT">
+                  {(dropProvided, dropSnapshot) => (
+                    <div
+                      className={`channel-list ${
+                        dropSnapshot.isDraggingOver ? 'dragging-over' : ''
+                      }`}
+                      ref={dropProvided.innerRef}
+                      {...dropProvided.droppableProps}
                     >
-                        <div className="category-name-container">
-                            <span 
-                                className="category-name"
-                                onClick={toggleCollapse}
-                                aria-label={isCollapsed ? "Развернуть категорию" : "Свернуть категорию"}
-                            >
-                                {category.categoryName || category.CategoryName}
-                            </span>
-                        </div>
-                        <div className="category-actions">
-                            {(category.isPrivate || category.IsPrivate) && (
-                                <span className="category-private-icon" title="Приватная категория">
-                                    <FaLock aria-hidden />
-                                </span>
-                            )}
-                            {onAddChannel && (
-                            <button
-                                className="add-channel-button"
-                                onClick={handleAddChannel}
-                                title="Создать канал"
-                            >
-                                <FaPlus className="add-icon" />
-                            </button>
-                            )}
-                        </div>
+                      <CategoryBranchTree activeChatId={activeChatId}>
+                        {children}
+                        {dropProvided.placeholder}
+                      </CategoryBranchTree>
                     </div>
-                    
-                    {!isCollapsed && (
-                        <Droppable
-                            droppableId={`category-${category.categoryId || category.CategoryId}`}
-                            type="CHAT"
-                        >
-                            {(provided, snapshot) => (
-                                <div 
-                                    className={`channel-list ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                >
-                                    {children}
-                                    {provided.placeholder}
-                                </div>
-                            )}
-                        </Droppable>
-                    )}
-                </div>
-            )}
-        </Draggable>
-    );
+                  )}
+                </Droppable>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Draggable>
+  );
 };
 
 export default CategoryItem;

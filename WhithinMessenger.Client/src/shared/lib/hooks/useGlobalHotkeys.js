@@ -12,6 +12,7 @@ import { toggleSoundpadPanel } from '../soundpad/soundpadPanelEvents';
 const SHORTCUT_DEDUPE_MS = 200;
 
 const isElectronEnv = () => Boolean(window.electronAPI?.isElectron);
+const isTauriEnv = () => Boolean(window.electronAPI?.isTauri);
 
 const isEditableTarget = (target) => {
   if (!target || typeof target !== 'object') return false;
@@ -130,8 +131,13 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     return map;
   }, [currentHotkeys, soundpadSlots]);
 
-  // Keyboard in-window (fallback when global hook unavailable; dedupe avoids double-fire).
+  // Keyboard in-window (fallback when shell does not own shortcuts).
+  // Tauri bridge registers capture listeners first and stops propagation on match.
   useEffect(() => {
+    if (isTauriEnv()) {
+      return undefined;
+    }
+
     const handleKeyboardHotkey = (event) => {
       if (event.repeat || isEditableTarget(event.target)) {
         return;
@@ -153,6 +159,7 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
   }, [hotkeyToAction, handleGlobalShortcut]);
 
   useEffect(() => {
+    // Electron main owns mouse side-buttons; Tauri bridge owns them.
     if (isElectronEnv()) {
       return undefined;
     }

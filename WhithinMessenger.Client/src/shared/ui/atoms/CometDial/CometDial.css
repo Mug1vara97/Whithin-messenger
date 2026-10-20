@@ -104,3 +104,9 @@
 .comet-dial__center > * {
   pointer-events: auto;
 }
+
+/* Let the ring receive drags even when an avatar fills the middle. */
+.comet-dial--passthrough-center .comet-dial__center,
+.comet-dial--passthrough-center .comet-dial__center * {
+  pointer-events: none !important;
+}

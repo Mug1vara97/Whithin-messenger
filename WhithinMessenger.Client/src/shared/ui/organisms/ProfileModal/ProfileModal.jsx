@@ -357,13 +357,87 @@ const ProfileModal = ({
     );
   };
 
+  const nameParts = visibleName.trim().split(/\s+/).filter(Boolean);
+  const nameLine1 = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : visibleName;
+  const nameLine2 = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
+  const chipGreeting = isOwnProfile ? 'это вы,' : 'профиль';
+  const chipName = login ? `@${login}` : visibleName;
+
+  const bioPanel = (
+    <>
+      <div className="profile-hero__bio-head">
+        <span className="profile-hero__bio-label">О себе</span>
+        {isOwnProfile && !isEditingBio ? (
+          <button
+            type="button"
+            className="profile-modal__text-btn"
+            onClick={() => {
+              setBioDraft(activeProfile?.description || '');
+              setIsEditingBio(true);
+            }}
+          >
+            {activeProfile?.description ? 'Изменить' : 'Добавить'}
+          </button>
+        ) : null}
+      </div>
+
+      {isOwnProfile && isEditingBio ? (
+        <div className="profile-modal__bio-edit">
+          <textarea
+            className="profile-modal__bio-input"
+            value={bioDraft}
+            maxLength={MAX_BIO_LENGTH}
+            placeholder="Расскажите немного о себе..."
+            onChange={(e) => setBioDraft(e.target.value)}
+            rows={4}
+          />
+          <div className="profile-modal__bio-footer">
+            <span className="profile-modal__bio-count">
+              {bioDraft.length}/{MAX_BIO_LENGTH}
+            </span>
+            <div className="profile-modal__bio-actions">
+              <button
+                type="button"
+                className="profile-modal__btn profile-modal__btn--ghost"
+                onClick={() => {
+                  setIsEditingBio(false);
+                  setBioDraft(activeProfile?.description || '');
+                  setBioError('');
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="profile-modal__btn profile-modal__btn--primary"
+                disabled={isSavingBio}
+                onClick={handleSaveBio}
+              >
+                {isSavingBio ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+          {bioError ? <p className="profile-modal__error">{bioError}</p> : null}
+        </div>
+      ) : (
+        <p className={`profile-modal__bio ${!activeProfile?.description ? 'is-empty' : ''}`}>
+          {activeProfile?.description ||
+            (isOwnProfile
+              ? 'Добавьте описание, чтобы друзья знали вас лучше.'
+              : 'Нет описания')}
+        </p>
+      )}
+    </>
+  );
+
   return (
     <div className="profile-modal" role="dialog" aria-modal="true" aria-label="Профиль">
       <button type="button" className="profile-modal__backdrop" onClick={onClose} aria-label="Закрыть" />
-      <div className="profile-modal__card profile-modal__card--wall">
-        <div className="profile-modal__banner profile-modal__banner--wall" style={bannerStyle}>
-          <div className="profile-modal__banner-shade" />
-          <div className="profile-modal__banner-actions">
+      <div className="profile-modal__shell">
+        <header className="profile-hero" style={bannerStyle}>
+          <div className="profile-hero__shade" />
+
+          <div className="profile-hero__actions">
             {isOwnProfile && onOpenSettings && (
               <button
                 type="button"
@@ -381,54 +455,92 @@ const ProfileModal = ({
               <CloseIcon fontSize="small" />
             </button>
           </div>
-        </div>
 
-        <div className="profile-modal__hero profile-modal__hero--wall">
-          <div className="profile-modal__avatar-wrap">
-            <div
-              className={`profile-modal__avatar-ring ${hasAvatarDecoration ? 'profile-modal__avatar-ring--decorated' : ''}`}
-              style={hasAvatarDecoration ? undefined : { '--profile-accent': accentColor }}
-            >
+          <div className="profile-hero__chip">
+            <div className="profile-hero__chip-inner">
+              <p className="profile-hero__chip-text">
+                {chipGreeting} <span>{chipName}</span>
+              </p>
               <div
-                className="profile-modal__avatar"
-                style={{
-                  backgroundColor: hasAvatarDecoration && avatarUrl ? 'transparent' : accentColor,
-                }}
+                className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
+                style={
+                  hasAvatarDecoration
+                    ? undefined
+                    : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
+                }
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="profile-modal__avatar-img" />
+                  <img src={avatarUrl} alt="" />
                 ) : (
                   <span>{avatarInitial}</span>
                 )}
+                {hasAvatarDecoration && (
+                  <div className="profile-hero__chip-decoration" aria-hidden="true">
+                    <AvatarDecorationMedia
+                      src={avatarDecorationUrl}
+                      className="profile-modal__avatar-decoration"
+                    />
+                  </div>
+                )}
+                <span
+                  className={`profile-modal__avatar-status profile-modal__avatar-status--${presence.normalized}`}
+                  style={{ ['--presence-color']: presenceColor }}
+                  title={presenceLabel}
+                  aria-label={presenceLabel}
+                />
               </div>
-              {hasAvatarDecoration && (
-                <div className="profile-modal__avatar-decoration-layer" aria-hidden="true">
-                  <AvatarDecorationMedia
-                    src={avatarDecorationUrl}
-                    className="profile-modal__avatar-decoration"
-                  />
-                </div>
-              )}
-              <span
-                className={`profile-modal__avatar-status profile-modal__avatar-status--${presence.normalized}`}
-                style={{ ['--presence-color']: presenceColor }}
-                title={presenceLabel}
-                aria-label={presenceLabel}
-              />
             </div>
           </div>
 
-          <div className="profile-modal__identity profile-modal__identity--wall">
-            <UserNameplate nameplate={activeProfile?.nameplate} className="profile-modal__nameplate">
-              <h2 className="profile-modal__name">{visibleName}</h2>
+          <div className="profile-hero__titles">
+            <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+              <h1 className="profile-hero__name">
+                {nameLine1}
+                {nameLine2 ? (
+                  <>
+                    <br />
+                    {nameLine2}
+                  </>
+                ) : null}
+              </h1>
             </UserNameplate>
-            {login ? <p className="profile-modal__login">@{login}</p> : null}
+            <p className="profile-hero__subtitle">
+              <span
+                className={`profile-hero__presence profile-hero__presence--${presence.normalized}`}
+                style={{ ['--presence-color']: presenceColor }}
+              />
+              {presenceLabel}
+              {login ? ` · @${login}` : ''}
+            </p>
           </div>
-        </div>
+
+          <div className="profile-hero__bio-dock">
+            <div className="profile-hero__bio-panel">{bioPanel}</div>
+          </div>
+        </header>
 
         <div className="profile-modal__body profile-modal__body--wall">
-          <div className="profile-wall">
+          <div className="profile-wall profile-wall--solo">
             <div className="profile-wall__main">
+              <section className="profile-wall__card profile-wall__card--meta">
+                <div className="profile-modal__info-list profile-modal__info-list--inline">
+                  {memberSince ? (
+                    <div className="profile-modal__info-row">
+                      <span className="profile-modal__info-label">Участник с</span>
+                      <span className="profile-modal__info-value">{memberSince}</span>
+                    </div>
+                  ) : null}
+                  <div className="profile-modal__info-row">
+                    <span className="profile-modal__info-label">ID</span>
+                    <button type="button" className="profile-modal__copy-id" onClick={handleCopyId}>
+                      <code>{String(userId).slice(0, 8)}…</code>
+                      <ContentCopyIcon sx={{ fontSize: 14 }} />
+                      {copyHint ? <span className="profile-modal__copy-hint">{copyHint}</span> : null}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
               {isOwnProfile ? (
                 <button
                   type="button"
@@ -521,93 +633,6 @@ const ProfileModal = ({
                 )}
               </section>
             </div>
-
-            <aside className="profile-wall__side">
-              <section className="profile-wall__card">
-                <div className="profile-wall__card-head">
-                  <h3 className="profile-wall__card-title">О себе</h3>
-                  {isOwnProfile && !isEditingBio ? (
-                    <button
-                      type="button"
-                      className="profile-modal__text-btn"
-                      onClick={() => {
-                        setBioDraft(activeProfile?.description || '');
-                        setIsEditingBio(true);
-                      }}
-                    >
-                      {activeProfile?.description ? 'Изменить' : 'Добавить'}
-                    </button>
-                  ) : null}
-                </div>
-
-                {isOwnProfile && isEditingBio ? (
-                  <div className="profile-modal__bio-edit">
-                    <textarea
-                      className="profile-modal__bio-input"
-                      value={bioDraft}
-                      maxLength={MAX_BIO_LENGTH}
-                      placeholder="Расскажите немного о себе..."
-                      onChange={(e) => setBioDraft(e.target.value)}
-                      rows={4}
-                    />
-                    <div className="profile-modal__bio-footer">
-                      <span className="profile-modal__bio-count">
-                        {bioDraft.length}/{MAX_BIO_LENGTH}
-                      </span>
-                      <div className="profile-modal__bio-actions">
-                        <button
-                          type="button"
-                          className="profile-modal__btn profile-modal__btn--ghost"
-                          onClick={() => {
-                            setIsEditingBio(false);
-                            setBioDraft(activeProfile?.description || '');
-                            setBioError('');
-                          }}
-                        >
-                          Отмена
-                        </button>
-                        <button
-                          type="button"
-                          className="profile-modal__btn profile-modal__btn--primary"
-                          disabled={isSavingBio}
-                          onClick={handleSaveBio}
-                        >
-                          {isSavingBio ? 'Сохранение…' : 'Сохранить'}
-                        </button>
-                      </div>
-                    </div>
-                    {bioError ? <p className="profile-modal__error">{bioError}</p> : null}
-                  </div>
-                ) : (
-                  <p className={`profile-modal__bio ${!activeProfile?.description ? 'is-empty' : ''}`}>
-                    {activeProfile?.description ||
-                      (isOwnProfile
-                        ? 'Добавьте описание, чтобы друзья знали вас лучше.'
-                        : 'Нет описания')}
-                  </p>
-                )}
-              </section>
-
-              <section className="profile-wall__card">
-                <h3 className="profile-wall__card-title">Информация</h3>
-                <div className="profile-modal__info-list">
-                  {memberSince ? (
-                    <div className="profile-modal__info-row">
-                      <span className="profile-modal__info-label">Участник с</span>
-                      <span className="profile-modal__info-value">{memberSince}</span>
-                    </div>
-                  ) : null}
-                  <div className="profile-modal__info-row">
-                    <span className="profile-modal__info-label">ID</span>
-                    <button type="button" className="profile-modal__copy-id" onClick={handleCopyId}>
-                      <code>{String(userId).slice(0, 8)}…</code>
-                      <ContentCopyIcon sx={{ fontSize: 14 }} />
-                      {copyHint ? <span className="profile-modal__copy-hint">{copyHint}</span> : null}
-                    </button>
-                  </div>
-                </div>
-              </section>
-            </aside>
           </div>
         </div>
       </div>

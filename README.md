@@ -6,6 +6,8 @@
 
 **Frontend:** React 19 • Vite • SignalR Client • Material-UI • React Router
 
+**Desktop:** Electron (`/electron`) • Tauri 2 (`/tauri-desktop`, WIP)
+
 **DevOps:** Docker • Docker Compose
 
 ## Архитектура

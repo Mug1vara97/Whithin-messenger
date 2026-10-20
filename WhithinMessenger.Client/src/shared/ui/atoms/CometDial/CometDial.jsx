@@ -4,7 +4,7 @@ import { animate, useMotionValue, useReducedMotion } from 'motion/react';
 import './CometDial.css';
 
 const R = 80;
-const DEAD = 44;
+const DEFAULT_DEAD = 44;
 const K = 12;
 const V_FULL = 4;
 const V_FLICK = 2;
@@ -61,7 +61,12 @@ export default function CometDial({
   onContextMenu,
   className = '',
   children = null,
+  /** Local-radius dead zone (viewBox units, 0–100). Lower = easier grab near center. */
+  deadZone = DEFAULT_DEAD,
+  /** When true, center children ignore pointers so the ring is always draggable. */
+  passthroughCenter = false,
 }) {
+  const dead = clamp(deadZone, 0, 95);
   const reduce = useReducedMotion();
   const [dragging, setDragging] = useState(false);
   const svgRef = useRef(null);
@@ -241,7 +246,7 @@ export default function CometDial({
   const down = (e) => {
     if (disabled || grip.current || e.button > 0) return;
     const [x, y] = localPoint(e.clientX, e.clientY);
-    if (Math.hypot(x, y) < DEAD) return;
+    if (Math.hypot(x, y) < dead) return;
     e.preventDefault();
     e.stopPropagation();
     const svg = svgRef.current;
@@ -346,7 +351,7 @@ export default function CometDial({
 
   return (
     <div
-      className={`comet-dial${hasCenter ? ' comet-dial--with-center' : ''}${className ? ` ${className}` : ''}`}
+      className={`comet-dial${hasCenter ? ' comet-dial--with-center' : ''}${passthroughCenter ? ' comet-dial--passthrough-center' : ''}${className ? ` ${className}` : ''}`}
       data-dragging={dragging ? '' : undefined}
       data-disabled={disabled ? '' : undefined}
       style={{
