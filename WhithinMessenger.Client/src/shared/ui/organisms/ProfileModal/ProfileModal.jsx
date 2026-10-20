@@ -444,40 +444,43 @@ const ProfileModal = ({
             </button>
           </div>
 
-          <div className="profile-hero__identity">
-            <div
-              className={`profile-hero__avatar ${hasAvatarDecoration ? 'profile-hero__avatar--decorated' : ''}`}
-              style={
-                hasAvatarDecoration
-                  ? undefined
-                  : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
-              }
-            >
-              {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
-              {hasAvatarDecoration && (
-                <div className="profile-hero__avatar-decoration" aria-hidden="true">
-                  <AvatarDecorationMedia
-                    src={avatarDecorationUrl}
-                    className="profile-modal__avatar-decoration"
-                  />
-                </div>
-              )}
+          <div className="profile-hero__chip">
+            <div className="profile-hero__chip-inner">
+              <div
+                className={`profile-hero__chip-avatar ${hasAvatarDecoration ? 'profile-hero__chip-avatar--decorated' : ''}`}
+                style={
+                  hasAvatarDecoration
+                    ? undefined
+                    : { backgroundColor: accentColor, ['--profile-accent']: accentColor }
+                }
+              >
+                {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitial}</span>}
+                {hasAvatarDecoration && (
+                  <div className="profile-hero__chip-decoration" aria-hidden="true">
+                    <AvatarDecorationMedia
+                      src={avatarDecorationUrl}
+                      className="profile-modal__avatar-decoration"
+                    />
+                  </div>
+                )}
+              </div>
+              <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
+                <h1 className="profile-hero__name">{visibleName}</h1>
+              </UserNameplate>
+              {login ? <p className="profile-hero__login">@{login}</p> : null}
             </div>
+          </div>
 
-            <UserNameplate nameplate={activeProfile?.nameplate} className="profile-hero__nameplate">
-              <h1 className="profile-hero__name">{visibleName}</h1>
-            </UserNameplate>
-            {login ? <p className="profile-hero__login">@{login}</p> : null}
+          <div className="profile-hero__titles" aria-hidden="true" />
+
+          <div className="profile-hero__bio-dock">
+            <div className="profile-hero__bio-panel">{bioPanel}</div>
           </div>
         </header>
 
         <div className="profile-modal__body profile-modal__body--wall">
           <div className="profile-wall profile-wall--solo">
             <div className="profile-wall__main">
-              <section className="profile-wall__card profile-wall__card--bio">
-                {bioPanel}
-              </section>
-
               <section className="profile-wall__card profile-wall__card--meta">
                 <div className="profile-modal__info-list profile-modal__info-list--inline">
                   {memberSince ? (
