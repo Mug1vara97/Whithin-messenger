@@ -155,12 +155,18 @@ const ProfileModal = ({
         status: normalized.status ?? data?.status ?? data?.Status,
         createdAt: normalized.createdAt ?? data?.createdAt ?? data?.CreatedAt,
       };
-      const loadedDescription =
-        next.description ?? next.Description ?? initialDescription ?? '';
-      next.description = loadedDescription || null;
+      const loadedDescription = String(
+        next.description ?? next.Description ?? initialDescription ?? '',
+      ).trim();
+      next.description = loadedDescription;
       setProfile(next);
-      setBioDraft(loadedDescription || '');
-      onProfileUpdated?.(next);
+      setBioDraft(loadedDescription);
+      // Sync other views, but mark that description was loaded so listeners
+      // don't treat a missing/null field as "cleared".
+      onProfileUpdated?.({
+        ...next,
+        changedFields: ['profile-load'],
+      });
     } catch (error) {
       console.error('Error loading profile:', error);
     }
@@ -232,25 +238,38 @@ const ProfileModal = ({
 
       const changedFields = Array.isArray(patch.changedFields)
         ? patch.changedFields.map((field) => String(field).toLowerCase())
-        : null;
-      const descriptionChanged =
-        !changedFields ||
-        changedFields.length === 0 ||
-        changedFields.includes('description');
+        : [];
+      const descriptionExplicitlyChanged = changedFields.includes('description');
+      const incomingDescription =
+        patch.description !== undefined
+          ? patch.description
+          : patch.Description !== undefined
+            ? patch.Description
+            : undefined;
+      const incomingText =
+        incomingDescription == null ? '' : String(incomingDescription).trim();
 
       setProfile((prev) => {
         const nextPatch = { ...patch };
-        // Don't wipe a known description with null unless description actually changed.
-        if (
-          !descriptionChanged &&
-          (nextPatch.description === null || nextPatch.description === undefined)
-        ) {
+        delete nextPatch.changedFields;
+        delete nextPatch.ChangedFields;
+
+        // Keep existing about-me unless it was explicitly changed or a non-empty
+        // description arrived.
+        if (!descriptionExplicitlyChanged && !incomingText) {
           delete nextPatch.description;
+          delete nextPatch.Description;
+        } else if (incomingDescription !== undefined) {
+          nextPatch.description = incomingText;
         }
+
         return mergeProfileState(prev, nextPatch);
       });
-      if (descriptionChanged && patch.description !== undefined) {
-        setBioDraft(patch.description || '');
+
+      if (descriptionExplicitlyChanged) {
+        setBioDraft(incomingText);
+      } else if (incomingText) {
+        setBioDraft((prev) => prev || incomingText);
       }
     };
 
@@ -390,15 +409,12 @@ const ProfileModal = ({
     );
   };
 
-  const savedAboutText =
-    profile?.description ??
-    profile?.Description ??
-    activeProfile?.description ??
-    activeProfile?.Description ??
-    initialDescription ??
-    '';
-  const aboutText = isEditingBio ? bioDraft : (savedAboutText || bioDraft || '');
-  const hasAboutText = Boolean(String(aboutText).trim());
+  const savedAboutText = String(
+    profile?.description || profile?.Description || initialDescription || '',
+  ).trim();
+  // View uses the same draft that powers the editor — keeps them in sync.
+  const displayAboutText = String(bioDraft || savedAboutText || '').trim();
+  const hasAboutText = Boolean(displayAboutText);
 
   const bioPanel = (
     <>
@@ -409,7 +425,7 @@ const ProfileModal = ({
             type="button"
             className="profile-modal__text-btn"
             onClick={() => {
-              setBioDraft(savedAboutText || bioDraft || '');
+              setBioDraft(displayAboutText);
               setIsEditingBio(true);
             }}
           >
@@ -459,7 +475,7 @@ const ProfileModal = ({
       ) : (
         <p className={`profile-modal__bio ${!hasAboutText ? 'is-empty' : ''}`}>
           {hasAboutText
-            ? aboutText
+            ? displayAboutText
             : isOwnProfile
               ? 'Добавьте описание, чтобы друзья знали вас лучше.'
               : 'Нет описания'}
