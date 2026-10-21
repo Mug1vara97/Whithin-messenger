@@ -1,21 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaVolumeUp, FaMapMarkerAlt } from 'react-icons/fa';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
   SERVER_EVENT_LOCATION,
   collectServerChannels,
-  isTextChannel,
   isVoiceChannel,
-  toDatetimeLocalValue,
-  fromDatetimeLocalValue,
+  toDateInputValue,
+  toTimeInputValue,
+  combineDateAndTime,
+  formatEventWhen,
   serverEventApi,
 } from '../../../entities/server-event';
 import './ServerEvents.css';
 
-const LOCATION_OPTIONS = [
-  { value: SERVER_EVENT_LOCATION.VOICE, label: 'Голосовой канал' },
-  { value: SERVER_EVENT_LOCATION.TEXT, label: 'Текстовый канал' },
-  { value: SERVER_EVENT_LOCATION.EXTERNAL, label: 'Внешняя ссылка' },
-];
+const STEPS = ['Место', 'Сведения о событии', 'Просмотреть'];
+
+const defaultStart = () => {
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  d.setMinutes(0, 0, 0);
+  return d;
+};
+
+const defaultEnd = (start) => {
+  const d = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  return d;
+};
 
 const ServerEventModal = ({
   isOpen,
@@ -25,234 +34,450 @@ const ServerEventModal = ({
   serverId,
   categories = [],
   connection,
+  onCreated,
 }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
-  const [locationType, setLocationType] = useState(SERVER_EVENT_LOCATION.VOICE);
+  const [step, setStep] = useState(0);
+  const [locationKind, setLocationKind] = useState('voice'); // voice | external
   const [channelId, setChannelId] = useState('');
   const [externalLocation, setExternalLocation] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
 
-  const channels = useMemo(() => collectServerChannels(categories), [categories]);
-  const filteredChannels = useMemo(() => {
-    if (locationType === SERVER_EVENT_LOCATION.VOICE) {
-      return channels.filter(isVoiceChannel);
-    }
-    if (locationType === SERVER_EVENT_LOCATION.TEXT) {
-      return channels.filter(isTextChannel);
-    }
-    return [];
-  }, [channels, locationType]);
+  const voiceChannels = useMemo(
+    () => collectServerChannels(categories).filter(isVoiceChannel),
+    [categories]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     setError('');
+    setDone(false);
+    setStep(0);
+
     if (mode === 'edit' && event) {
-      setTitle(event.title || '');
-      setDescription(event.description || '');
-      setStartsAt(toDatetimeLocalValue(event.startsAt));
-      setEndsAt(toDatetimeLocalValue(event.endsAt));
-      setLocationType(event.locationType || SERVER_EVENT_LOCATION.VOICE);
+      const isExternal = event.locationType === SERVER_EVENT_LOCATION.EXTERNAL;
+      setLocationKind(isExternal ? 'external' : 'voice');
       setChannelId(event.channelId || '');
       setExternalLocation(event.externalLocation || '');
-    } else {
-      const soon = new Date(Date.now() + 60 * 60 * 1000);
-      setTitle('');
-      setDescription('');
-      setStartsAt(toDatetimeLocalValue(soon.toISOString()));
-      setEndsAt('');
-      setLocationType(SERVER_EVENT_LOCATION.VOICE);
-      setChannelId('');
-      setExternalLocation('');
-    }
-  }, [isOpen, mode, event]);
-
-  useEffect(() => {
-    if (!filteredChannels.length) {
-      setChannelId('');
+      setTitle(event.title || '');
+      setDescription(event.description || '');
+      setStartDate(toDateInputValue(event.startsAt));
+      setStartTime(toTimeInputValue(event.startsAt));
+      setEndDate(toDateInputValue(event.endsAt || event.startsAt));
+      setEndTime(toTimeInputValue(event.endsAt || event.startsAt));
       return;
     }
-    if (!filteredChannels.some((c) => String(c.chatId) === String(channelId))) {
-      setChannelId(String(filteredChannels[0].chatId));
+
+    const start = defaultStart();
+    const end = defaultEnd(start);
+    setLocationKind('voice');
+    setChannelId(voiceChannels[0]?.chatId ? String(voiceChannels[0].chatId) : '');
+    setExternalLocation('');
+    setTitle('');
+    setDescription('');
+    setStartDate(toDateInputValue(start.toISOString()));
+    setStartTime(toTimeInputValue(start.toISOString()));
+    setEndDate(toDateInputValue(end.toISOString()));
+    setEndTime(toTimeInputValue(end.toISOString()));
+  }, [isOpen, mode, event, voiceChannels]);
+
+  useEffect(() => {
+    if (locationKind !== 'voice' || !voiceChannels.length) return;
+    if (!voiceChannels.some((c) => String(c.chatId) === String(channelId))) {
+      setChannelId(String(voiceChannels[0].chatId));
     }
-  }, [filteredChannels, channelId]);
+  }, [locationKind, voiceChannels, channelId]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!connection || connection.state !== 'Connected') {
-      setError('Нет соединения с сервером');
-      return;
-    }
-    if (!title.trim()) {
-      setError('Укажите название');
-      return;
-    }
-    const startsIso = fromDatetimeLocalValue(startsAt);
-    if (!startsIso) {
-      setError('Укажите дату начала');
-      return;
-    }
-    const endsIso = endsAt ? fromDatetimeLocalValue(endsAt) : null;
-    if (endsAt && !endsIso) {
-      setError('Некорректная дата окончания');
-      return;
-    }
+  const buildPayload = () => {
+    const startsAt = combineDateAndTime(startDate, startTime);
+    const endsAt = combineDateAndTime(endDate, endTime);
+    const locationType =
+      locationKind === 'external'
+        ? SERVER_EVENT_LOCATION.EXTERNAL
+        : SERVER_EVENT_LOCATION.VOICE;
 
-    const payload = {
+    return {
       serverId,
       eventId: event?.eventId,
       title: title.trim(),
       description: description.trim() || null,
-      startsAt: startsIso,
-      endsAt: endsIso,
+      startsAt,
+      endsAt,
       locationType,
-      channelId:
-        locationType === SERVER_EVENT_LOCATION.EXTERNAL ? null : channelId || null,
+      channelId: locationKind === 'voice' ? channelId || null : null,
       externalLocation:
-        locationType === SERVER_EVENT_LOCATION.EXTERNAL
-          ? externalLocation.trim()
-          : null,
+        locationKind === 'external' ? externalLocation.trim() : null,
     };
+  };
 
+  const validateStep0 = () => {
+    if (locationKind === 'voice') {
+      if (!channelId) return 'Выберите голосовой канал';
+      return null;
+    }
+    if (!externalLocation.trim()) return 'Укажите место проведения';
+    return null;
+  };
+
+  const validateStep1 = () => {
+    if (!title.trim()) return 'Укажите тему события';
+    const startsAt = combineDateAndTime(startDate, startTime);
+    const endsAt = combineDateAndTime(endDate, endTime);
+    if (!startsAt) return 'Укажите дату и время начала';
+    if (!endsAt) return 'Укажите дату и время окончания';
+    if (new Date(endsAt) <= new Date(startsAt)) {
+      return 'Время окончания должно быть позже начала';
+    }
+    return null;
+  };
+
+  const goNext = () => {
+    setError('');
+    if (step === 0) {
+      const err = validateStep0();
+      if (err) {
+        setError(err);
+        return;
+      }
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
+      const err = validateStep1();
+      if (err) {
+        setError(err);
+        return;
+      }
+      setStep(2);
+    }
+  };
+
+  const submit = async () => {
+    setError('');
+    const err0 = validateStep0();
+    const err1 = validateStep1();
+    if (err0 || err1) {
+      setError(err0 || err1);
+      setStep(err0 ? 0 : 1);
+      return;
+    }
+    if (!connection || connection.state !== 'Connected') {
+      setError('Нет соединения с сервером');
+      return;
+    }
+
+    const payload = buildPayload();
     setSaving(true);
     try {
       if (mode === 'edit') {
         await serverEventApi.updateEvent(connection, payload);
+        onCreated?.();
+        onClose();
       } else {
         await serverEventApi.createEvent(connection, payload);
+        setDone(true);
       }
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Не удалось сохранить');
+    } catch (e) {
+      setError(e?.message || 'Не удалось сохранить событие');
     } finally {
       setSaving(false);
     }
   };
 
+  const preview = {
+    title: title.trim() || 'Без названия',
+    description: description.trim(),
+    when: formatEventWhen(
+      combineDateAndTime(startDate, startTime),
+      combineDateAndTime(endDate, endTime)
+    ),
+    location:
+      locationKind === 'external'
+        ? externalLocation.trim()
+        : voiceChannels.find((c) => String(c.chatId) === String(channelId))?.name ||
+          'Голосовой канал',
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="server-event-modal" onClick={(e) => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-header">
-            <div className="modal-header-text">
-              <h2>{mode === 'edit' ? 'Редактировать мероприятие' : 'Создать мероприятие'}</h2>
-              <p className="modal-subtitle">Как в Discord: время, место и участники</p>
+    <div className="server-events-overlay" onClick={onClose}>
+      <div className="server-events-modal wide" onClick={(e) => e.stopPropagation()}>
+        {!done && (
+          <>
+            <div className="server-events-modal-header">
+              <h2>{mode === 'edit' ? 'Изменить событие' : 'Создать событие'}</h2>
+              <button type="button" className="server-events-modal-close" onClick={onClose}>
+                <FaTimes />
+              </button>
             </div>
-            <button type="button" className="close-button" onClick={onClose} aria-label="Закрыть">
-              <FaTimes />
-            </button>
-          </div>
-
-          <div className="server-event-modal-body">
-            <label className="server-event-field">
-              <span>Название</span>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={200}
-                placeholder="Игровой вечер"
-                required
-              />
-            </label>
-
-            <label className="server-event-field">
-              <span>Описание</span>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={4000}
-                rows={3}
-                placeholder="Необязательно"
-              />
-            </label>
-
-            <div className="server-event-field-row">
-              <label className="server-event-field">
-                <span>Начало</span>
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="server-event-field">
-                <span>Конец</span>
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                />
-              </label>
+            <div className="sev-steps">
+              {STEPS.map((label, idx) => (
+                <div
+                  key={label}
+                  className={`sev-step ${idx === step ? 'active' : ''} ${idx < step ? 'done' : ''}`}
+                >
+                  {label}
+                </div>
+              ))}
             </div>
+          </>
+        )}
 
-            <div className="server-event-field">
-              <span>Место</span>
-              <div className="server-event-location-options">
-                {LOCATION_OPTIONS.map((opt) => (
-                  <label key={opt.value} className="server-event-radio">
-                    <input
-                      type="radio"
-                      name="locationType"
-                      value={opt.value}
-                      checked={locationType === opt.value}
-                      onChange={() => setLocationType(opt.value)}
-                    />
-                    {opt.label}
-                  </label>
+        <div className="server-events-modal-body">
+          {done ? (
+            <div className="sev-success">
+              <div className="sev-confetti" aria-hidden>
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      left: `${8 + (i * 5) % 84}%`,
+                      background: ['#5865f2', '#57f287', '#fee75c', '#eb459e', '#00a8fc'][i % 5],
+                      animationDelay: `${(i % 6) * 0.08}s`,
+                    }}
+                  />
                 ))}
               </div>
+              <div className="sev-success-icon">
+                <EventAvailableIcon />
+              </div>
+              <h3>Готово</h3>
+              <p>Событие создано. Расскажи друзьям или отметь «Интересно» в списке.</p>
             </div>
+          ) : (
+            <>
+              {step === 0 && (
+                <>
+                  <h3 className="sev-wizard-title">Где пройдет ваше событие?</h3>
+                  <p className="sev-wizard-sub">Чтобы все знали, где его искать.</p>
 
-            {locationType !== SERVER_EVENT_LOCATION.EXTERNAL ? (
-              <label className="server-event-field">
-                <span>Канал</span>
-                <select
-                  value={channelId}
-                  onChange={(e) => setChannelId(e.target.value)}
-                  required
-                >
-                  {filteredChannels.length === 0 && (
-                    <option value="">Нет подходящих каналов</option>
+                  <div className="sev-option disabled" aria-disabled>
+                    <input type="radio" disabled />
+                    <div>
+                      <div className="sev-option-title">Трибуна</div>
+                      <div className="sev-option-desc">
+                        Пока недоступно. Отлично подходит для крупных голосовых событий.
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className={`sev-option ${locationKind === 'voice' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="loc"
+                      checked={locationKind === 'voice'}
+                      onChange={() => setLocationKind('voice')}
+                    />
+                    <div>
+                      <div className="sev-option-title">
+                        <FaVolumeUp style={{ marginRight: 6 }} />
+                        Голосовой канал
+                      </div>
+                      <div className="sev-option-desc">
+                        Голос, видео и демонстрация экрана
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className={`sev-option ${locationKind === 'external' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="loc"
+                      checked={locationKind === 'external'}
+                      onChange={() => setLocationKind('external')}
+                    />
+                    <div>
+                      <div className="sev-option-title">
+                        <FaMapMarkerAlt style={{ marginRight: 6 }} />
+                        В другом месте
+                      </div>
+                      <div className="sev-option-desc">
+                        Текстовый канал, внешняя ссылка или место проведения
+                      </div>
+                    </div>
+                  </label>
+
+                  {locationKind === 'voice' ? (
+                    <label className="sev-field">
+                      <span>
+                        Голосовой канал <span className="req">*</span>
+                      </span>
+                      <select
+                        value={channelId}
+                        onChange={(e) => setChannelId(e.target.value)}
+                      >
+                        {voiceChannels.length === 0 && (
+                          <option value="">Нет голосовых каналов</option>
+                        )}
+                        {voiceChannels.map((ch) => (
+                          <option key={ch.chatId} value={ch.chatId}>
+                            {ch.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="sev-field">
+                      <span>
+                        Укажите место <span className="req">*</span>
+                      </span>
+                      <input
+                        value={externalLocation}
+                        onChange={(e) => setExternalLocation(e.target.value)}
+                        placeholder="Введите место, ссылку, что-нибудь."
+                        maxLength={500}
+                      />
+                    </label>
                   )}
-                  {filteredChannels.map((ch) => (
-                    <option key={ch.chatId} value={ch.chatId}>
-                      {ch.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label className="server-event-field">
-                <span>Ссылка или адрес</span>
-                <input
-                  value={externalLocation}
-                  onChange={(e) => setExternalLocation(e.target.value)}
-                  maxLength={500}
-                  placeholder="https://… или место встречи"
-                  required
-                />
-              </label>
-            )}
+                </>
+              )}
 
-            {error && <div className="server-event-error">{error}</div>}
-          </div>
+              {step === 1 && (
+                <>
+                  <h3 className="sev-wizard-title">Чему посвящено ваше событие?</h3>
+                  <p className="sev-wizard-sub">Опишите подробнее своё событие.</p>
 
-          <div className="server-event-modal-footer">
-            <button type="button" className="server-event-btn ghost" onClick={onClose}>
-              Отмена
+                  <label className="sev-field">
+                    <span>
+                      Тема события <span className="req">*</span>
+                    </span>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={200}
+                    />
+                  </label>
+
+                  <div className="sev-field-row">
+                    <label className="sev-field">
+                      <span>
+                        Дата начала <span className="req">*</span>
+                      </span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </label>
+                    <label className="sev-field">
+                      <span>
+                        Время начала <span className="req">*</span>
+                      </span>
+                      <input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="sev-field-row">
+                    <label className="sev-field">
+                      <span>
+                        Дата окончания <span className="req">*</span>
+                      </span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </label>
+                    <label className="sev-field">
+                      <span>
+                        Время окончания <span className="req">*</span>
+                      </span>
+                      <input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="sev-field">
+                    <span>Частота события</span>
+                    <select value="none" disabled>
+                      <option value="none">Не повторяется</option>
+                    </select>
+                  </label>
+
+                  <label className="sev-field">
+                    <span>Описание</span>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      maxLength={4000}
+                      placeholder="Расскажите о своём событии подробнее."
+                    />
+                  </label>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <h3 className="sev-wizard-title">Всё верно?</h3>
+                  <p className="sev-wizard-sub">Проверьте сведения перед публикацией.</p>
+                  <div className="sev-preview-card">
+                    <h3>{preview.title}</h3>
+                    <p>{preview.when}</p>
+                    <p>{preview.location}</p>
+                    {preview.description && <p>{preview.description}</p>}
+                  </div>
+                </>
+              )}
+
+              {error && <div className="sev-error">{error}</div>}
+            </>
+          )}
+        </div>
+
+        <div className="server-events-modal-footer">
+          {done ? (
+            <button
+              type="button"
+              className="sev-btn primary"
+              onClick={() => {
+                onCreated?.();
+                onClose();
+              }}
+            >
+              Готово
             </button>
-            <button type="submit" className="server-event-btn primary" disabled={saving}>
-              {saving ? 'Сохранение…' : mode === 'edit' ? 'Сохранить' : 'Создать'}
-            </button>
-          </div>
-        </form>
+          ) : (
+            <>
+              <button type="button" className="sev-btn ghost spacer" onClick={onClose}>
+                Отмена
+              </button>
+              {step > 0 && (
+                <button type="button" className="sev-btn ghost" onClick={() => setStep((s) => s - 1)}>
+                  Назад
+                </button>
+              )}
+              {step < 2 ? (
+                <button type="button" className="sev-btn primary" onClick={goNext}>
+                  Далее
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="sev-btn primary"
+                  onClick={submit}
+                  disabled={saving}
+                >
+                  {saving ? 'Сохранение…' : mode === 'edit' ? 'Сохранить' : 'Создать событие'}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

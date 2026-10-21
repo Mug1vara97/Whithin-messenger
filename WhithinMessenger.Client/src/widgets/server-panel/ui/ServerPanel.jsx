@@ -1205,7 +1205,7 @@ const ServerPanel = ({
               }}
             >
               <EventAvailable sx={{ fontSize: 16, marginRight: 8 }} />
-              Создать мероприятие
+              Создать событие
             </div>
             )}
             {currentServer?.ownerId === user?.id || currentServer?.OwnerId === user?.id ? (

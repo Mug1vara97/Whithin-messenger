@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { EventAvailable } from '@mui/icons-material';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
-  SERVER_EVENT_STATUS,
-  formatEventWhen,
+  filterUpcomingEvents,
   normalizeServerEvent,
+  pluralizeEvents,
   serverEventApi,
 } from '../../../entities/server-event';
 import ServerEventModal from './ServerEventModal';
-import ServerEventDetailModal from './ServerEventDetailModal';
+import ServerEventsListModal from './ServerEventsListModal';
 import './ServerEvents.css';
 
 const ServerEventsSection = ({
@@ -20,18 +20,18 @@ const ServerEventsSection = ({
   onCreateRequestHandled,
 }) => {
   const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState(null);
-  const [detailEvent, setDetailEvent] = useState(null);
 
   const upsertEvent = useCallback((raw) => {
     const event = normalizeServerEvent(raw);
     if (!event?.eventId) return;
     setEvents((prev) => {
       const idx = prev.findIndex((e) => String(e.eventId) === String(event.eventId));
-      if (idx === -1) return [...prev, event].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+      if (idx === -1) {
+        return [...prev, event].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+      }
       const next = [...prev];
       next[idx] = { ...next[idx], ...event };
       return next.sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
@@ -43,14 +43,11 @@ const ServerEventsSection = ({
       setEvents([]);
       return;
     }
-    setLoading(true);
     try {
       const list = await serverEventApi.loadEvents(connection, serverId);
       setEvents(list);
     } catch (err) {
       console.warn('ServerEventsSection: load failed', err);
-    } finally {
-      setLoading(false);
     }
   }, [connection, serverId]);
 
@@ -80,85 +77,41 @@ const ServerEventsSection = ({
   }, [connection, upsertEvent]);
 
   useEffect(() => {
-    if (createRequested) {
-      setCreateOpen(true);
-      onCreateRequestHandled?.();
-    }
+    if (!createRequested) return;
+    setCreateOpen(true);
+    onCreateRequestHandled?.();
   }, [createRequested, onCreateRequestHandled]);
 
-  useEffect(() => {
-    if (!detailEvent) return;
-    const fresh = events.find((e) => String(e.eventId) === String(detailEvent.eventId));
-    if (fresh) setDetailEvent(fresh);
-  }, [events, detailEvent?.eventId]);
-
-  const upcoming = useMemo(() => {
-    const now = Date.now();
-    return events.filter((e) => {
-      if (e.status === SERVER_EVENT_STATUS.CANCELED) return false;
-      const end = e.endsAt ? new Date(e.endsAt).getTime() : new Date(e.startsAt).getTime() + 2 * 60 * 60 * 1000;
-      return end >= now - 60 * 60 * 1000;
-    });
-  }, [events]);
-
-  const visible = showAll ? upcoming : upcoming.slice(0, 5);
+  const upcoming = useMemo(() => filterUpcomingEvents(events), [events]);
+  const label = upcoming.length > 0 ? pluralizeEvents(upcoming.length) : 'События';
 
   return (
-    <div className="server-events-section">
-      <div className="server-events-header">
-        <div className="server-events-title">
-          <EventAvailable sx={{ fontSize: 16 }} />
-          <span>Мероприятия</span>
-        </div>
-        {canManageEvents && (
-          <button
-            type="button"
-            className="server-events-add"
-            onClick={() => setCreateOpen(true)}
-            title="Создать мероприятие"
-          >
-            +
-          </button>
-        )}
-      </div>
+    <div className="server-events-nav">
+      <button
+        type="button"
+        className={`server-events-nav-btn ${listOpen ? 'is-active' : ''}`}
+        onClick={() => setListOpen(true)}
+      >
+        <EventAvailableIcon sx={{ fontSize: 20 }} />
+        <span>{label}</span>
+      </button>
 
-      {loading && upcoming.length === 0 && (
-        <div className="server-events-empty">Загрузка…</div>
-      )}
-
-      {!loading && upcoming.length === 0 && (
-        <div className="server-events-empty">Пока нет мероприятий</div>
-      )}
-
-      <ul className="server-events-list">
-        {visible.map((event) => (
-          <li key={event.eventId}>
-            <button
-              type="button"
-              className="server-event-item"
-              onClick={() => setDetailEvent(event)}
-            >
-              <span className="server-event-item-title">{event.title}</span>
-              <span className="server-event-item-when">
-                {formatEventWhen(event.startsAt, event.endsAt)}
-              </span>
-              <span className="server-event-item-rsvp">
-                {event.goingCount} пойдут · {event.interestedCount} интересно
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {upcoming.length > 5 && (
-        <button
-          type="button"
-          className="server-events-more"
-          onClick={() => setShowAll((v) => !v)}
-        >
-          {showAll ? 'Свернуть' : `Все (${upcoming.length})`}
-        </button>
-      )}
+      <ServerEventsListModal
+        isOpen={listOpen}
+        onClose={() => setListOpen(false)}
+        events={upcoming}
+        canManageEvents={canManageEvents}
+        connection={connection}
+        onCreate={() => {
+          setListOpen(false);
+          setCreateOpen(true);
+        }}
+        onEdit={(ev) => {
+          setListOpen(false);
+          setEditEvent(ev);
+        }}
+        onSelectChannel={onSelectChannel}
+      />
 
       <ServerEventModal
         isOpen={createOpen}
@@ -167,6 +120,11 @@ const ServerEventsSection = ({
         serverId={serverId}
         categories={categories}
         connection={connection}
+        onCreated={() => {
+          setCreateOpen(false);
+          setListOpen(true);
+          load();
+        }}
       />
 
       <ServerEventModal
@@ -177,19 +135,11 @@ const ServerEventsSection = ({
         serverId={serverId}
         categories={categories}
         connection={connection}
-      />
-
-      <ServerEventDetailModal
-        isOpen={Boolean(detailEvent)}
-        onClose={() => setDetailEvent(null)}
-        event={detailEvent}
-        canManage={canManageEvents}
-        connection={connection}
-        onEdit={(ev) => {
-          setDetailEvent(null);
-          setEditEvent(ev);
+        onCreated={() => {
+          setEditEvent(null);
+          setListOpen(true);
+          load();
         }}
-        onSelectChannel={onSelectChannel}
       />
     </div>
   );
