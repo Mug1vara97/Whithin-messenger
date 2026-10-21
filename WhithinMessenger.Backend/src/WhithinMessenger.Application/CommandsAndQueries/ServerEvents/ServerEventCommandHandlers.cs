@@ -173,8 +173,9 @@ public class GetServerEventsQueryHandler : IRequestHandler<GetServerEventsQuery,
             return new GetServerEventsResult { Success = false, ErrorMessage = "Нет доступа к серверу" };
         }
 
-        var from = DateTimeOffset.UtcNow.AddDays(-1);
-        var to = DateTimeOffset.UtcNow.AddDays(90);
+        // Keep recently finished events visible so users can still find what they created.
+        var from = DateTimeOffset.UtcNow.AddDays(-30);
+        var to = DateTimeOffset.UtcNow.AddDays(180);
         var events = await _repository.GetByServerAsync(request.ServerId, from, to, cancellationToken);
 
         return new GetServerEventsResult

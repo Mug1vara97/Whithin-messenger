@@ -21,4 +21,6 @@ export {
   getEventStatusLabel,
   getEventLocationLabel,
   filterUpcomingEvents,
+  filterPastEvents,
+  countActiveEvents,
 } from './model/types';

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
-  filterUpcomingEvents,
+  countActiveEvents,
   normalizeServerEvent,
   pluralizeEvents,
   serverEventApi,
@@ -40,7 +40,6 @@ const ServerEventsSection = ({
 
   const load = useCallback(async () => {
     if (!connection || connection.state !== 'Connected' || !serverId) {
-      setEvents([]);
       return;
     }
     try {
@@ -52,8 +51,12 @@ const ServerEventsSection = ({
   }, [connection, serverId]);
 
   useEffect(() => {
+    if (!connection || connection.state !== 'Connected' || !serverId) {
+      setEvents([]);
+      return;
+    }
     load();
-  }, [load]);
+  }, [connection, serverId, load]);
 
   useEffect(() => {
     if (!connection) return undefined;
@@ -82,15 +85,20 @@ const ServerEventsSection = ({
     onCreateRequestHandled?.();
   }, [createRequested, onCreateRequestHandled]);
 
-  const upcoming = useMemo(() => filterUpcomingEvents(events), [events]);
-  const label = upcoming.length > 0 ? pluralizeEvents(upcoming.length) : 'События';
+  const activeCount = useMemo(() => countActiveEvents(events), [events]);
+  const label = activeCount > 0 ? pluralizeEvents(activeCount) : 'События';
+
+  const openList = useCallback(() => {
+    setListOpen(true);
+    load();
+  }, [load]);
 
   return (
     <div className="server-events-nav">
       <button
         type="button"
         className={`server-events-nav-btn ${listOpen ? 'is-active' : ''}`}
-        onClick={() => setListOpen(true)}
+        onClick={openList}
       >
         <EventAvailableIcon sx={{ fontSize: 20 }} />
         <span>{label}</span>
@@ -99,7 +107,7 @@ const ServerEventsSection = ({
       <ServerEventsListModal
         isOpen={listOpen}
         onClose={() => setListOpen(false)}
-        events={upcoming}
+        events={events}
         canManageEvents={canManageEvents}
         connection={connection}
         onCreate={() => {

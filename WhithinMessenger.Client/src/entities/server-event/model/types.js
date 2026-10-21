@@ -166,15 +166,29 @@ export const getEventLocationLabel = (event) => {
     : 'Текстовый канал';
 };
 
+const eventEndMs = (event) => {
+  if (event?.endsAt) return new Date(event.endsAt).getTime();
+  return new Date(event.startsAt).getTime() + 2 * 60 * 60 * 1000;
+};
+
 export const filterUpcomingEvents = (events = []) => {
   const now = Date.now();
   return events
     .filter((e) => {
       if (e.status === SERVER_EVENT_STATUS.CANCELED) return false;
-      const end = e.endsAt
-        ? new Date(e.endsAt).getTime()
-        : new Date(e.startsAt).getTime() + 2 * 60 * 60 * 1000;
-      return end >= now - 60 * 60 * 1000;
+      return eventEndMs(e) >= now - 15 * 60 * 1000;
     })
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 };
+
+export const filterPastEvents = (events = []) => {
+  const now = Date.now();
+  return events
+    .filter((e) => {
+      if (e.status === SERVER_EVENT_STATUS.CANCELED) return true;
+      return eventEndMs(e) < now - 15 * 60 * 1000;
+    })
+    .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt));
+};
+
+export const countActiveEvents = (events = []) => filterUpcomingEvents(events).length;

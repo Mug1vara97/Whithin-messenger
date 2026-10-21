@@ -11,7 +11,7 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-muted, #949ba4);
+  color: var(--text-muted);
   padding: 8px 10px;
   cursor: pointer;
   font-size: 15px;
@@ -21,19 +21,19 @@
 
 .server-events-nav-btn:hover,
 .server-events-nav-btn.is-active {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text, #f2f3f5);
+  background: var(--hover, var(--surface-hover));
+  color: var(--text);
 }
 
 .server-events-nav-btn svg {
   flex-shrink: 0;
-  opacity: 0.85;
+  color: inherit;
 }
 
 .server-events-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: color-mix(in srgb, var(--background) 20%, rgba(0, 0, 0, 0.72));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,13 +45,14 @@
   width: 100%;
   max-width: 560px;
   max-height: min(720px, 92vh);
-  background: #313338;
+  background: var(--background);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 32px color-mix(in srgb, #000 45%, transparent);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: #f2f3f5;
+  color: var(--text);
 }
 
 .server-events-modal.wide {
@@ -64,6 +65,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .server-events-modal-header h2 {
@@ -73,12 +76,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--text);
 }
 
 .server-events-modal-close {
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--icon, var(--text-muted));
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -86,15 +90,16 @@
 }
 
 .server-events-modal-close:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--icon-hover, var(--text));
+  background: var(--hover, var(--surface-hover));
 }
 
 .server-events-modal-body {
-  padding: 0 20px 20px;
+  padding: 16px 20px 20px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  background: var(--background);
 }
 
 .server-events-modal-footer {
@@ -103,8 +108,8 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 16px 20px;
-  background: #2b2d31;
-  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
 }
 
 .server-events-modal-footer .spacer {
@@ -118,6 +123,8 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  color: var(--text);
+  background: var(--surface-hover, var(--hover));
 }
 
 .sev-btn:disabled {
@@ -126,17 +133,17 @@
 }
 
 .sev-btn.primary {
-  background: #5865f2;
+  background: var(--primary);
   color: #fff;
 }
 
 .sev-btn.primary:hover:not(:disabled) {
-  background: #4752c4;
+  background: var(--primary-hover);
 }
 
 .sev-btn.ghost {
   background: transparent;
-  color: #fff;
+  color: var(--text);
 }
 
 .sev-btn.ghost:hover:not(:disabled) {
@@ -144,17 +151,17 @@
 }
 
 .sev-btn.green {
-  background: #23a559;
+  background: var(--success, var(--secondary));
   color: #fff;
 }
 
 .sev-btn.green:hover:not(:disabled) {
-  background: #1a7f45;
+  filter: brightness(0.92);
 }
 
 .sev-btn.danger {
   background: transparent;
-  color: #f23f43;
+  color: var(--danger);
 }
 
 .sev-btn.small {
@@ -162,22 +169,33 @@
   font-size: 13px;
 }
 
-.sev-create-top {
-  margin-left: auto;
+.sev-section-label {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .sev-empty {
   padding: 28px 8px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .sev-card {
-  background: #2b2d31;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px;
   margin-bottom: 12px;
+}
+
+.sev-card.is-past,
+.sev-card.is-canceled {
+  opacity: 0.72;
 }
 
 .sev-card-top {
@@ -196,15 +214,15 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: #00a8fc;
+  color: var(--info);
 }
 
 .sev-card-status.new {
-  color: #fff;
+  color: var(--text);
 }
 
 .sev-card-status .pill {
-  background: #5865f2;
+  background: var(--primary);
   color: #fff;
   border-radius: 999px;
   padding: 2px 8px;
@@ -216,7 +234,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #b5bac1;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -224,11 +242,12 @@
   margin: 0 0 4px;
   font-size: 16px;
   font-weight: 700;
+  color: var(--text);
 }
 
 .sev-card-desc {
   margin: 0 0 10px;
-  color: #dbdee1;
+  color: var(--text-secondary, var(--text-muted));
   font-size: 14px;
   white-space: pre-wrap;
 }
@@ -239,7 +258,7 @@
   gap: 8px;
   background: transparent;
   border: none;
-  color: #dbdee1;
+  color: var(--text);
   font-size: 14px;
   cursor: pointer;
   padding: 0;
@@ -247,7 +266,7 @@
 }
 
 .sev-card-location:hover {
-  color: #fff;
+  color: var(--primary);
   text-decoration: underline;
 }
 
@@ -261,8 +280,9 @@
 .sev-steps {
   display: flex;
   gap: 18px;
-  padding: 4px 20px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 20px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .sev-step {
@@ -270,18 +290,18 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #949ba4;
+  color: var(--text-muted);
   padding-bottom: 10px;
   border-bottom: 2px solid transparent;
 }
 
 .sev-step.active {
-  color: #fff;
-  border-bottom-color: #5865f2;
+  color: var(--text);
+  border-bottom-color: var(--primary);
 }
 
 .sev-step.done {
-  color: #b5bac1;
+  color: var(--text-secondary, var(--text-muted));
 }
 
 .sev-wizard-title {
@@ -289,12 +309,13 @@
   text-align: center;
   font-size: 24px;
   font-weight: 700;
+  color: var(--text);
 }
 
 .sev-wizard-sub {
   margin: 0 0 20px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -304,19 +325,20 @@
   align-items: flex-start;
   padding: 14px;
   border-radius: 8px;
-  border: 1px solid transparent;
-  background: #2b2d31;
+  border: 1px solid var(--border);
+  background: var(--surface);
   cursor: pointer;
   margin-bottom: 8px;
+  color: var(--text);
 }
 
 .sev-option:hover {
-  background: #35373c;
+  background: var(--hover, var(--surface-hover));
 }
 
 .sev-option.selected {
-  background: #404249;
-  border-color: #5865f2;
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  border-color: var(--primary);
 }
 
 .sev-option.disabled {
@@ -326,18 +348,19 @@
 
 .sev-option input {
   margin-top: 3px;
+  accent-color: var(--primary);
 }
 
 .sev-option-title {
   font-size: 16px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--text);
 }
 
 .sev-option-desc {
   margin-top: 2px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--text-muted);
 }
 
 .sev-field {
@@ -352,20 +375,20 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: #b5bac1;
+  color: var(--text-muted);
 }
 
 .sev-field .req {
-  color: #f23f43;
+  color: var(--danger);
 }
 
 .sev-field input,
 .sev-field textarea,
 .sev-field select {
-  background: #1e1f22;
-  border: none;
+  background: var(--background-primary, var(--surface));
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: #dbdee1;
+  color: var(--text);
   font-size: 16px;
   padding: 10px;
   outline: none;
@@ -379,7 +402,8 @@
 .sev-field input:focus,
 .sev-field textarea:focus,
 .sev-field select:focus {
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .sev-field-row {
@@ -389,13 +413,14 @@
 }
 
 .sev-error {
-  color: #f23f43;
+  color: var(--danger);
   font-size: 13px;
   margin-top: 4px;
 }
 
 .sev-preview-card {
-  background: #2b2d31;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
 }
@@ -403,11 +428,12 @@
 .sev-preview-card h3 {
   margin: 0 0 8px;
   font-size: 18px;
+  color: var(--text);
 }
 
 .sev-preview-card p {
   margin: 0 0 8px;
-  color: #dbdee1;
+  color: var(--text-secondary, var(--text-muted));
   font-size: 14px;
 }
 
@@ -422,21 +448,23 @@
   height: 56px;
   margin: 0 auto 14px;
   border-radius: 50%;
-  background: #111214;
+  background: var(--surface);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text);
 }
 
 .sev-success h3 {
   margin: 0 0 8px;
   font-size: 20px;
+  color: var(--text);
 }
 
 .sev-success p {
   margin: 0;
-  color: #b5bac1;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
