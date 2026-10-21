@@ -59,6 +59,11 @@ const MemberListItem = ({ member, showStatusDot = true, onOpenProfile, onContext
             <span className="member-list-name" style={displayNameStyle}>
               {member.username}
             </span>
+            {(member.isBot || member.IsBot) && (
+              <span className="member-list-bot-badge" title="Бот">
+                BOT
+              </span>
+            )}
             {member.isServerOwner && (
               <WorkspacePremium
                 className="member-list-owner-icon"

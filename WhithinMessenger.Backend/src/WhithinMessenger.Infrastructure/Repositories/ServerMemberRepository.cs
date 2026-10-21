@@ -64,6 +64,7 @@ public class ServerMemberRepository : IServerMemberRepository
             AvatarColor = sm.User.UserProfile?.AvatarColor,
             Nameplate = sm.User.UserProfile?.Nameplate,
             AvatarDecoration = sm.User.UserProfile?.AvatarDecoration,
+            IsBot = sm.User.IsBot,
             UserStatus = sm.User.Status.ToString().ToLower(),
             LastSeen = sm.User.LastSeen.DateTime,
             JoinedAt = sm.JoinedAt.DateTime,

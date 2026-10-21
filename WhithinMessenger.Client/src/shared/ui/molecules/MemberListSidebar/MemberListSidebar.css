@@ -168,6 +168,23 @@
   color: var(--text-muted);
 }
 
+.member-list-bot-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--primary, #5865f2);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-shadow: none;
+}
+
+.member-list-nameplate.user-nameplate--decorated .member-list-bot-badge {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
 .member-list-owner-icon {
   flex-shrink: 0;
   width: 16px !important;

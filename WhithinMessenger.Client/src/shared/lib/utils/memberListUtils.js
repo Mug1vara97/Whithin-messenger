@@ -44,6 +44,12 @@ const resolveMemberAvatarDecoration = (member) =>
 
 
 
+const resolveMemberIsBot = (member) =>
+
+  Boolean(member?.isBot ?? member?.IsBot);
+
+
+
 const resolveMemberStatus = (member) =>
 
   member?.userStatus ?? member?.UserStatus ?? member?.status ?? PRESENCE_STATUS.OFFLINE;
@@ -227,6 +233,8 @@ export const mapServerMemberToListItem = (member, { serverOwnerId, resolveStatus
     nameplate: resolveMemberNameplate(member),
 
     avatarDecoration: resolveMemberAvatarDecoration(member),
+
+    isBot: resolveMemberIsBot(member),
 
     status: resolveStatus ? resolveStatus(userId, resolveMemberStatus(member)) : resolveMemberStatus(member),
 

@@ -191,6 +191,7 @@ export const patchMemberWithProfile = (member, patch) => {
     ...(patch.avatarColor !== undefined ? { avatarColor: patch.avatarColor } : {}),
     ...(patch.avatarDecoration !== undefined ? { avatarDecoration: patch.avatarDecoration } : {}),
     ...(patch.nameplate !== undefined ? { nameplate: patch.nameplate } : {}),
+    ...(patch.isBot !== undefined ? { isBot: Boolean(patch.isBot) } : {}),
     ...(patch.banner !== undefined ? { banner: patch.banner } : {}),
     ...(nextDescription !== member.description ? { description: nextDescription } : {}),
   };

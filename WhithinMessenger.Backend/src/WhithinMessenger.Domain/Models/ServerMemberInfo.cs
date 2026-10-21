@@ -11,6 +11,7 @@ public class ServerMemberInfo
     public string? AvatarColor { get; set; }
     public string? Nameplate { get; set; }
     public string? AvatarDecoration { get; set; }
+    public bool IsBot { get; set; }
     public string UserStatus { get; set; } = string.Empty;
     public DateTime? LastSeen { get; set; }
     public DateTime JoinedAt { get; set; }
