@@ -71,12 +71,14 @@ const findChatInCategories = (categories, chatId) => {
   return null;
 };
 import { CategoriesList } from '../../categories-list';
+import { ServerEventsSection } from '../../server-events';
 import { CreateChannelModal, ChannelSettingsModal, CreateCategoryModal, ContextMenu, AddMemberModal } from '../../../shared/ui/molecules';
 
 const EMPTY_GUID_LIST = [];
 import {
   canManageChannels,
   canManageServer,
+  canManageEvents,
   canCreateInvites,
   getServerPermissions,
   isServerOwner as checkIsServerOwner,
@@ -92,7 +94,8 @@ import {
   Settings,
   PersonAdd,
   Group,
-  ExitToApp
+  ExitToApp,
+  EventAvailable
 } from '@mui/icons-material';
 import './ServerPanel.css';
 
@@ -119,6 +122,7 @@ const ServerPanel = ({
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [createEventRequested, setCreateEventRequested] = useState(false);
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, type: null, data: null });
   const [serverConnection, setServerConnection] = useState(null);
   const [bannerLoadError, setBannerLoadError] = useState(false);
@@ -131,6 +135,7 @@ const ServerPanel = ({
   const serverPermissions = getServerPermissions(currentServer);
   const userCanManageChannels = canManageChannels(serverPermissions, isOwner);
   const userCanManageServer = canManageServer(serverPermissions, isOwner);
+  const userCanManageEvents = canManageEvents(serverPermissions, isOwner);
   const userCanCreateInvites = canCreateInvites(serverPermissions, isOwner);
 
   const fetchServerData = useCallback(async () => {
@@ -686,6 +691,28 @@ const ServerPanel = ({
     });
   }, [onChatSelected, memoizedCategories]);
 
+  const handleSelectEventChannel = useCallback((channelId) => {
+    let channelMeta = null;
+    for (const category of memoizedCategories) {
+      const categoryChats = category.chats ?? category.Chats ?? [];
+      const found = categoryChats.find(
+        (chat) => String(chat.chatId ?? chat.ChatId ?? chat.chat_id) === String(channelId),
+      );
+      if (found) {
+        channelMeta = found;
+        break;
+      }
+    }
+    if (!channelMeta) return;
+    const name = channelMeta.name ?? channelMeta.Name ?? 'канал';
+    const typeId = channelMeta.typeId ?? channelMeta.TypeId;
+    handleChatClick(channelId, name, typeId);
+  }, [memoizedCategories, handleChatClick]);
+
+  const handleCreateEventRequestHandled = useCallback(() => {
+    setCreateEventRequested(false);
+  }, []);
+
   const handleAddChannel = useCallback((categoryId) => {
     const category = server?.categories?.find(cat => (cat.categoryId || cat.CategoryId) === categoryId);
     setSelectedCategoryForChannel(category || {
@@ -1169,6 +1196,18 @@ const ServerPanel = ({
               Добавить участника
             </div>
             )}
+            {userCanManageEvents && (
+            <div
+              className="dropdown-item"
+              onClick={() => {
+                setShowDropdown(false);
+                setCreateEventRequested(true);
+              }}
+            >
+              <EventAvailable sx={{ fontSize: 16, marginRight: 8 }} />
+              Создать мероприятие
+            </div>
+            )}
             {currentServer?.ownerId === user?.id || currentServer?.OwnerId === user?.id ? (
               <div 
                 className="dropdown-item dropdown-item-danger"
@@ -1201,6 +1240,15 @@ const ServerPanel = ({
         }}
       >
         <div className="server-channels-scroll">
+        <ServerEventsSection
+          serverId={currentServer?.serverId ?? selectedServer?.serverId}
+          connection={serverConnection}
+          categories={memoizedCategories}
+          canManageEvents={userCanManageEvents}
+          onSelectChannel={handleSelectEventChannel}
+          createRequested={createEventRequested}
+          onCreateRequestHandled={handleCreateEventRequestHandled}
+        />
         <CategoriesList
           categories={memoizedCategories}
           selectedChat={selectedChat}

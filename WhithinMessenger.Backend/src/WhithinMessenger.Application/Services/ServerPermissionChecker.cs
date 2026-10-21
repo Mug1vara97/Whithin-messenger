@@ -12,6 +12,7 @@ public class ServerPermissionChecker
         "manageChannels",
         "manageRoles",
         "manageServer",
+        "manageEvents",
         "createInvites",
         "changeOwnNickname",
         "manageNicknames",

@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
+using WhithinMessenger.Application.CommandsAndQueries.ServerEvents;
 using WhithinMessenger.Application.Services;
 using WhithinMessenger.Application.Stickers;
 
@@ -19,6 +20,7 @@ public static class Application
         services.AddScoped<IServerAuditLogService, ServerAuditLogService>();
         services.AddScoped<IMediaFileStorageCleanup, MediaFileStorageCleanup>();
         services.AddScoped<IdeaBoardAccessHelper>();
+        services.AddScoped<ServerEventAccessHelper>();
         services.AddScoped<IStickerFileProcessingService, StickerFileProcessingService>();
         
         // FileService регистрируется в Program.cs с использованием IWebHostEnvironment

@@ -1217,6 +1217,86 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("ServerAuditLogs");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalLocation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("LocationType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ServerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("ServerId", "StartsAt");
+
+                    b.ToTable("ServerEvents", (string)null);
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerEventRsvp", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Interest")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EventId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ServerEventRsvps", (string)null);
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1977,6 +2057,51 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerEvent", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.Chat", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.Server", "Server")
+                        .WithMany()
+                        .HasForeignKey("ServerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("Server");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerEventRsvp", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.ServerEvent", "Event")
+                        .WithMany("Rsvps")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerMember", b =>
                 {
                     b.HasOne("WhithinMessenger.Domain.Models.Server", "Server")
@@ -2220,6 +2345,11 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("UserServerOrders");
 
                     b.Navigation("UserServerRoles");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerEvent", b =>
+                {
+                    b.Navigation("Rsvps");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.ServerRole", b =>

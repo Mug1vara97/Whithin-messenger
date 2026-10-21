@@ -4,6 +4,7 @@ export const ROLE_PERMISSIONS = {
   MANAGE_CHANNELS: 'manageChannels',
   MANAGE_ROLES: 'manageRoles',
   MANAGE_SERVER: 'manageServer',
+  MANAGE_EVENTS: 'manageEvents',
   CREATE_INVITES: 'createInvites',
   
   // Управление участниками
@@ -29,6 +30,7 @@ export const PERMISSION_CATEGORIES = {
       ROLE_PERMISSIONS.MANAGE_CHANNELS,
       ROLE_PERMISSIONS.MANAGE_ROLES,
       ROLE_PERMISSIONS.MANAGE_SERVER,
+      ROLE_PERMISSIONS.MANAGE_EVENTS,
       ROLE_PERMISSIONS.CREATE_INVITES
     ]
   },
@@ -59,6 +61,7 @@ export const PERMISSION_LABELS = {
   [ROLE_PERMISSIONS.MANAGE_CHANNELS]: 'Управлять каналами',
   [ROLE_PERMISSIONS.MANAGE_ROLES]: 'Управлять ролями',
   [ROLE_PERMISSIONS.MANAGE_SERVER]: 'Управлять сервером',
+  [ROLE_PERMISSIONS.MANAGE_EVENTS]: 'Управлять мероприятиями',
   [ROLE_PERMISSIONS.CREATE_INVITES]: 'Создание приглашений',
   [ROLE_PERMISSIONS.CHANGE_OWN_NICKNAME]: 'Изменить никнейм - свой ник',
   [ROLE_PERMISSIONS.MANAGE_NICKNAMES]: 'Управлять никнеймами - всех',

@@ -18,6 +18,10 @@ export const canManageRoles = (permissions, isOwner) =>
 export const canManageServer = (permissions, isOwner) =>
   hasServerPermission(permissions, isOwner, 'manageServer');
 
+export const canManageEvents = (permissions, isOwner) =>
+  hasServerPermission(permissions, isOwner, 'manageEvents')
+  || hasServerPermission(permissions, isOwner, 'manageServer');
+
 export const canKickMembers = (permissions, isOwner) =>
   hasServerPermission(permissions, isOwner, 'kickMembers');
 

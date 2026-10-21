@@ -55,6 +55,7 @@ public static class Infrastructure
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<IStickerPackRepository, StickerPackRepository>();
         services.AddScoped<IIdeaBoardRepository, IdeaBoardRepository>();
+        services.AddScoped<IServerEventRepository, ServerEventRepository>();
         services.AddScoped<IFeedPostRepository, FeedPostRepository>();
         services.AddScoped<INewsChannelFeedSyncService, NewsChannelFeedSyncService>();
         services.AddScoped<INotificationRepository, NotificationRepository>();

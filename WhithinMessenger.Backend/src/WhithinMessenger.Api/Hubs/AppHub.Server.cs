@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using WhithinMessenger.Application.CommandsAndQueries.IdeaBoard;
+using WhithinMessenger.Application.CommandsAndQueries.ServerEvents;
 using WhithinMessenger.Application.CommandsAndQueries.Servers;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.AddMember;
 using WhithinMessenger.Application.CommandsAndQueries.Servers.LeaveServer;
@@ -1138,6 +1139,187 @@ public partial class AppHub
         catch (Exception ex)
         {
             await Clients.Caller.SendAsync("Error", $"Ошибка при удалении идеи: {ex.Message}");
+        }
+    }
+
+    public async Task GetServerEvents(Guid serverId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new GetServerEventsQuery(serverId, userId.Value));
+            if (result.Success)
+            {
+                await Clients.Caller.SendAsync("ServerEventsLoaded", result.Events);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при загрузке мероприятий: {ex.Message}");
+        }
+    }
+
+    public async Task CreateServerEvent(
+        Guid serverId,
+        string title,
+        string? description,
+        DateTimeOffset startsAt,
+        DateTimeOffset? endsAt,
+        string locationType,
+        Guid? channelId,
+        string? externalLocation)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            if (!Enum.TryParse<ServerEventLocationType>(locationType, ignoreCase: true, out var loc))
+            {
+                await Clients.Caller.SendAsync("Error", "Неизвестный тип места проведения");
+                return;
+            }
+
+            var result = await _mediator.Send(new CreateServerEventCommand(
+                serverId, userId.Value, title, description, startsAt, endsAt, loc, channelId, externalLocation));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
+                    .SendAsync("ServerEventCreated", result.Event);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при создании мероприятия: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateServerEvent(
+        Guid eventId,
+        string title,
+        string? description,
+        DateTimeOffset startsAt,
+        DateTimeOffset? endsAt,
+        string locationType,
+        Guid? channelId,
+        string? externalLocation)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            if (!Enum.TryParse<ServerEventLocationType>(locationType, ignoreCase: true, out var loc))
+            {
+                await Clients.Caller.SendAsync("Error", "Неизвестный тип места проведения");
+                return;
+            }
+
+            var result = await _mediator.Send(new UpdateServerEventCommand(
+                eventId, userId.Value, title, description, startsAt, endsAt, loc, channelId, externalLocation));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
+                    .SendAsync("ServerEventUpdated", result.Event);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении мероприятия: {ex.Message}");
+        }
+    }
+
+    public async Task CancelServerEvent(Guid eventId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            var result = await _mediator.Send(new CancelServerEventCommand(eventId, userId.Value));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
+                    .SendAsync("ServerEventCanceled", result.Event);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при отмене мероприятия: {ex.Message}");
+        }
+    }
+
+    public async Task SetServerEventRsvp(Guid eventId, string? interest)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
+                return;
+            }
+
+            ServerEventInterest? parsed = null;
+            if (!string.IsNullOrWhiteSpace(interest))
+            {
+                if (!Enum.TryParse<ServerEventInterest>(interest, ignoreCase: true, out var value))
+                {
+                    await Clients.Caller.SendAsync("Error", "Неизвестный статус RSVP");
+                    return;
+                }
+
+                parsed = value;
+            }
+
+            var result = await _mediator.Send(new SetServerEventRsvpCommand(eventId, userId.Value, parsed));
+            if (result.Success && result.ServerId.HasValue)
+            {
+                await Clients.Group(HubGroups.Server(result.ServerId.Value))
+                    .SendAsync("ServerEventRsvpUpdated", result.Event);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Ошибка при обновлении RSVP: {ex.Message}");
         }
     }
 

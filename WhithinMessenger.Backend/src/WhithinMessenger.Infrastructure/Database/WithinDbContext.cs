@@ -36,6 +36,8 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<PendingPasswordChange> PendingPasswordChanges { get; set; }
     public DbSet<PendingPasswordReset> PendingPasswordResets { get; set; }
     public DbSet<IdeaBoardCard> IdeaBoardCards { get; set; }
+    public DbSet<ServerEvent> ServerEvents { get; set; }
+    public DbSet<ServerEventRsvp> ServerEventRsvps { get; set; }
     public DbSet<FeedPost> FeedPosts { get; set; }
     public DbSet<FeedPostAttachment> FeedPostAttachments { get; set; }
     public DbSet<FeedPostReaction> FeedPostReactions { get; set; }
