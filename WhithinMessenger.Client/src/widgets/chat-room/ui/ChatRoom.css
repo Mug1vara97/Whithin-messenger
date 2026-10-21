@@ -1554,18 +1554,31 @@
 }
 
 .recording-dot {
-  color: #ff0000;
+  color: var(--danger, #ff0000);
   font-size: 16px;
   animation: pulse 1s infinite;
+  flex-shrink: 0;
 }
 
 .recording-time {
   font-weight: 600;
+  flex-shrink: 0;
+  min-width: 2.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-live-waveform {
+  flex: 1;
+  min-width: 64px;
+  height: 28px;
+  color: var(--primary, #5865f2);
 }
 
 .recording-hint {
+  flex: 1;
   font-size: 12px;
   opacity: 0.8;
+  min-width: 0;
 }
 
 .cancel-recording-button,

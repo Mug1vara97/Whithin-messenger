@@ -1,0 +1,17 @@
+.live-waveform {
+  position: relative;
+  width: 100%;
+  height: 28px;
+  min-width: 0;
+  color: var(--primary, #5865f2);
+  --waveform: currentColor;
+}
+
+.live-waveform__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  color: var(--waveform, currentColor);
+}

@@ -31,7 +31,7 @@ import {
 } from '../../../shared/lib/hooks';
 import { formatTypingLabel } from '../../../shared/lib/hooks/useChat';
 import { resolveMessageAvatarIdentity } from '../../../shared/lib/utils/userDisplayNameHelpers';
-import { MessageStatusIndicator } from '../../../shared/ui';
+import { MessageStatusIndicator, LiveWaveform } from '../../../shared/ui';
 import { MessageStatus } from '../../../entities/message/model/types';
 import MessageSearch from '../../../shared/ui/molecules/MessageSearch/MessageSearch';
 import MediaFile from '../../../shared/ui/molecules/MediaFile/MediaFile';
@@ -405,6 +405,7 @@ const ChatRoom = ({
   const {
     isRecording,
     recordingTime,
+    recordingStream,
     fileInputRef,
     handleSendMedia,
     queueMediaSend,
@@ -2881,9 +2882,17 @@ const ChatRoom = ({
             <span className="recording-time">
               {formatRecordingTime(isRecordingVideoNote ? videoNoteRecordingTime : recordingTime)}
             </span>
-            <span className="recording-hint">
-              {isRecordingVideoNote ? 'Видеокружок…' : 'Запись... (ESC для отмены)'}
-            </span>
+            {isRecording && !isRecordingVideoNote ? (
+              <LiveWaveform
+                stream={recordingStream}
+                active={isRecording}
+                mode="scrolling"
+                className="recording-live-waveform"
+                aria-label="Шкала записи голосового сообщения"
+              />
+            ) : (
+              <span className="recording-hint">Видеокружок… (ESC для отмены)</span>
+            )}
             <button
               type="button"
               onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}

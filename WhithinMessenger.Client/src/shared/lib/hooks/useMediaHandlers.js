@@ -40,6 +40,7 @@ const filterSendableFiles = (files) =>
 export const useMediaHandlers = (connection, chatId, userId, username) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingStream, setRecordingStream] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -49,6 +50,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const uploadProgressSetterRef = useRef(setUploadProgress);
   const recordingTimeRef = useRef(0);
   const recordingStartedAtRef = useRef(null);
+  const audioSkipUploadRef = useRef(false);
 
   uploadProgressSetterRef.current = setUploadProgress;
 
@@ -271,6 +273,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks = [];
+      audioSkipUploadRef.current = false;
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -279,6 +282,15 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       };
 
       recorder.onstop = async () => {
+        const skipUpload = audioSkipUploadRef.current;
+        audioSkipUploadRef.current = false;
+        setRecordingStream(null);
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (skipUpload) {
+          return;
+        }
+
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         const audioFile = new File([audioBlob], `audio-message-${Date.now()}.webm`, {
           type: 'audio/webm',
@@ -309,13 +321,12 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         audioFile.durationSeconds = durationSeconds;
 
         await handleSendMedia(audioFile);
-
-        stream.getTracks().forEach((track) => track.stop());
       };
 
       recordingStartedAtRef.current = performance.now();
       recorder.start();
       setMediaRecorder(recorder);
+      setRecordingStream(stream);
       setIsRecording(true);
       setRecordingTime(0);
       recordingTimeRef.current = 0;
@@ -327,6 +338,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
   const stopRecording = useCallback(() => {
     if (mediaRecorder && isRecording) {
+      audioSkipUploadRef.current = false;
       mediaRecorder.stop();
       setIsRecording(false);
       setRecordingTime(0);
@@ -353,8 +365,10 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
   const cancelRecording = useCallback(() => {
     if (mediaRecorder && isRecording) {
+      audioSkipUploadRef.current = true;
       mediaRecorder.stop();
       setIsRecording(false);
+      setRecordingStream(null);
       setRecordingTime(0);
     }
   }, [mediaRecorder, isRecording]);
@@ -437,6 +451,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   return {
     isRecording,
     recordingTime,
+    recordingStream,
     fileInputRef,
     handleSendMedia,
     queueMediaSend,
