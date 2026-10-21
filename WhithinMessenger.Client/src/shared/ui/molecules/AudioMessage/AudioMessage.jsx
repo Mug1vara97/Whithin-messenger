@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
-import WaveSurfer from 'wavesurfer.js';
 import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
 import {
   isValidAudioDuration,
@@ -14,6 +13,7 @@ import {
   resolveMediaContentType,
   resolveMediaFilePath,
 } from '../../../lib/utils/probeAudioDuration';
+import { BarWaveform } from '../../atoms/BarWaveform';
 import './AudioMessage.css';
 
 const formatTime = (time) => {
@@ -24,28 +24,15 @@ const formatTime = (time) => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const readWaveformColors = (rootElement) => {
-  const styles = getComputedStyle(rootElement ?? document.documentElement);
-  const pick = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
-
-  return {
-    waveColor: pick('--am-wave-color', '#b9bbbe'),
-    progressColor: pick('--am-progress-color', '#5865f2'),
-    cursorColor: pick('--am-cursor-color', '#ffffff'),
-  };
-};
-
 const AudioMessage = ({ mediaFile }) => {
   const rootRef = useRef(null);
-  const waveformRef = useRef(null);
-  const wavesurferRef = useRef(null);
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
-  const peaksRef = useRef([]);
   const loadIdRef = useRef(0);
   const durationRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [peaks, setPeaks] = useState([]);
   const [duration, setDuration] = useState(() => {
     const fromMeta = readMediaFileDuration(mediaFile);
     const fromPath = readCachedAudioDuration(resolveMediaFilePath(mediaFile));
@@ -69,16 +56,6 @@ const AudioMessage = ({ mediaFile }) => {
     [filePath]
   );
 
-  const syncWaveformDuration = useCallback((nextDuration) => {
-    const wavesurfer = wavesurferRef.current;
-    const peaks = peaksRef.current;
-    if (!wavesurfer || !isValidAudioDuration(nextDuration) || !peaks.length) return;
-
-    wavesurfer.load('', [peaks], nextDuration).catch((waveError) => {
-      console.warn('AudioMessage: failed to refresh waveform duration', waveError);
-    });
-  }, []);
-
   const tryResolveDurationFromAudio = useCallback(
     async (audio, { probe = false } = {}) => {
       if (!audio) return durationRef.current;
@@ -87,7 +64,6 @@ const AudioMessage = ({ mediaFile }) => {
         if (!isValidAudioDuration(value)) return durationRef.current;
         if (Math.abs(durationRef.current - value) < 0.05) return value;
         applyDuration(value);
-        syncWaveformDuration(value);
         return value;
       };
 
@@ -106,7 +82,7 @@ const AudioMessage = ({ mediaFile }) => {
 
       return durationRef.current;
     },
-    [applyDuration, syncWaveformDuration]
+    [applyDuration]
   );
 
   useEffect(() => {
@@ -119,14 +95,14 @@ const AudioMessage = ({ mediaFile }) => {
     setIsPlaying(false);
     setError(null);
     setIsReady(false);
+    setPeaks([]);
   }, [audioUrl, mediaFile, filePath]);
 
   useEffect(() => {
-    if (!waveformRef.current || !audioUrl) return undefined;
+    if (!audioUrl) return undefined;
 
     const loadId = ++loadIdRef.current;
     let disposed = false;
-    let wavesurfer = null;
     let audio = null;
 
     const isStale = () => disposed || loadId !== loadIdRef.current;
@@ -152,13 +128,13 @@ const AudioMessage = ({ mediaFile }) => {
           else if (fromCache > 0) applyDuration(fromCache);
         }
 
-        const { peaks, duration: decodedDuration } = await analyzeAudioBuffer(
+        const { peaks: nextPeaks, duration: decodedDuration } = await analyzeAudioBuffer(
           arrayBuffer,
           filePath || audioUrl
         );
         if (isStale()) return;
 
-        peaksRef.current = peaks;
+        setPeaks(Array.isArray(nextPeaks) ? nextPeaks : []);
         if (decodedDuration > 0) {
           applyDuration(decodedDuration);
         }
@@ -176,53 +152,11 @@ const AudioMessage = ({ mediaFile }) => {
 
         if (isStale()) return;
 
-        if (!durationRef.current) {
-          console.debug('[AudioMessage] duration unresolved after init', {
-            filePath,
-            contentType,
-            audioUrl,
-            fromMeta: readMediaFileDuration(mediaFile),
-            fromCache: readCachedAudioDuration(filePath),
-            decodedDuration,
-            elementDuration: audio?.duration,
-            mediaFile,
-          });
-        }
-
-        const waveDuration = durationRef.current > 0 ? durationRef.current : 0;
-        const waveformColors = readWaveformColors(rootRef.current);
-
-        wavesurfer = WaveSurfer.create({
-          container: waveformRef.current,
-          waveColor: waveformColors.waveColor,
-          progressColor: waveformColors.progressColor,
-          cursorColor: waveformColors.cursorColor,
-          barWidth: 2,
-          barHeight: 0.7,
-          height: 40,
-          cursorWidth: 0,
-          minPxPerSec: 1,
-          interact: true,
-          dragToSeek: true,
-        });
-        wavesurferRef.current = wavesurfer;
-
-        await wavesurfer.load('', [peaks], waveDuration > 0 ? waveDuration : undefined);
-
-        if (isStale()) return;
-
         const onTimeUpdate = () => {
           if (isStale()) return;
-          const time = audio.currentTime;
-          setCurrentTime(time);
-
+          setCurrentTime(audio.currentTime);
           if (isValidAudioDuration(audio.duration)) {
             void tryResolveDurationFromAudio(audio);
-          }
-
-          const total = durationRef.current;
-          if (total > 0) {
-            wavesurfer.seekTo(time / total);
           }
         };
 
@@ -243,35 +177,13 @@ const AudioMessage = ({ mediaFile }) => {
               : audio.currentTime;
             if (finalDuration > 0) {
               applyDuration(finalDuration);
-              syncWaveformDuration(finalDuration);
             }
           }
           setCurrentTime(0);
-          wavesurfer.seekTo(0);
         };
 
         const onAudioMetadata = () => {
           void tryResolveDurationFromAudio(audio);
-        };
-
-        const onWaveInteraction = (newTime) => {
-          if (!audio || !Number.isFinite(newTime)) return;
-          audio.currentTime = newTime;
-          setCurrentTime(newTime);
-        };
-
-        const onWaveClick = (relativeX) => {
-          const total = durationRef.current;
-          if (!audio || !isValidAudioDuration(total)) return;
-          audio.currentTime = relativeX * total;
-          setCurrentTime(audio.currentTime);
-        };
-
-        const onWaveError = (waveError) => {
-          console.error('WaveSurfer error:', waveError);
-          if (!isStale()) {
-            setError('Ошибка при загрузке аудио');
-          }
         };
 
         audio.addEventListener('timeupdate', onTimeUpdate);
@@ -285,10 +197,6 @@ const AudioMessage = ({ mediaFile }) => {
             setError('Ошибка при загрузке аудио');
           }
         });
-
-        wavesurfer.on('interaction', onWaveInteraction);
-        wavesurfer.on('click', onWaveClick);
-        wavesurfer.on('error', onWaveError);
 
         if (!isStale()) {
           setIsReady(true);
@@ -305,12 +213,6 @@ const AudioMessage = ({ mediaFile }) => {
 
     return () => {
       disposed = true;
-      if (wavesurfer) {
-        wavesurfer.destroy();
-      }
-      if (wavesurferRef.current === wavesurfer) {
-        wavesurferRef.current = null;
-      }
       if (audio) {
         audio.pause();
         audio.removeAttribute('src');
@@ -323,9 +225,6 @@ const AudioMessage = ({ mediaFile }) => {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
       }
-      if (waveformRef.current) {
-        waveformRef.current.replaceChildren();
-      }
     };
   }, [
     audioUrl,
@@ -334,7 +233,6 @@ const AudioMessage = ({ mediaFile }) => {
     mediaFile,
     applyDuration,
     tryResolveDurationFromAudio,
-    syncWaveformDuration,
   ]);
 
   const togglePlay = async () => {
@@ -353,6 +251,15 @@ const AudioMessage = ({ mediaFile }) => {
     }
   };
 
+  const handleSeek = useCallback((ratio) => {
+    const audio = audioRef.current;
+    const total = durationRef.current;
+    if (!audio || !isValidAudioDuration(total)) return;
+    audio.currentTime = ratio * total;
+    setCurrentTime(audio.currentTime);
+  }, []);
+
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
   const totalTimeLabel =
     duration > 0 ? formatTime(duration) : isPlaying ? '…' : '0:00';
 
@@ -375,7 +282,13 @@ const AudioMessage = ({ mediaFile }) => {
               <PlayArrowIcon sx={{ width: 24, height: 24 }} />
             )}
           </button>
-          <div ref={waveformRef} className="waveform-container" />
+          <BarWaveform
+            peaks={peaks}
+            progress={progress}
+            className="audio-message-waveform"
+            onSeek={handleSeek}
+            aria-label="Форма волны голосового сообщения"
+          />
           <span className="duration">
             {formatTime(currentTime)} / {totalTimeLabel}
           </span>

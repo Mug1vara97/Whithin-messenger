@@ -6,6 +6,7 @@ export { ServerIcon } from './ServerIcon';
 export { NotificationButton } from './NotificationButton';
 export { NotificationBellButton } from './NotificationBellButton';
 export { LiveWaveform } from './LiveWaveform';
+export { BarWaveform } from './BarWaveform';
 export * from './MessageInput';
 export * from './VideoCallGrid';
 export * from './MessageStatusIndicator';

@@ -32,7 +32,7 @@ const LiveWaveform = ({
   minBarHeight = 3,
   fadeEdges = true,
   fadeWidth = 20,
-  sensitivity = 1.35,
+  sensitivity = 2.6,
   className = '',
   'aria-label': ariaLabel = 'Уровень записи',
 }) => {
@@ -79,7 +79,7 @@ const LiveWaveform = ({
         }
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.72;
+        analyser.smoothingTimeConstant = 0.45;
         sourceNode = audioContext.createMediaStreamSource(stream);
         sourceNode.connect(analyser);
         timeDomain = new Uint8Array(analyser.fftSize);
@@ -94,12 +94,17 @@ const LiveWaveform = ({
       if (!analyser) return 0;
       analyser.getByteTimeDomainData(timeDomain);
       let sum = 0;
+      let peak = 0;
       for (let i = 0; i < timeDomain.length; i += 1) {
         const v = (timeDomain[i] - 128) / 128;
+        const abs = Math.abs(v);
         sum += v * v;
+        if (abs > peak) peak = abs;
       }
       const rms = Math.sqrt(sum / timeDomain.length);
-      return clamp(rms * 2.4, 0, 1);
+      // Blend RMS + peak, then expand quiet levels (sqrt) so soft speech is visible.
+      const blended = clamp(rms * 0.72 + peak * 0.55, 0, 1);
+      return clamp(Math.sqrt(blended), 0, 1);
     };
 
     const drawIdle = (width, height) => {

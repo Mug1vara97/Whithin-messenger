@@ -1589,7 +1589,9 @@
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -1597,6 +1599,26 @@
 .cancel-recording-button-left:hover {
   background-color: var(--hover, rgba(79, 84, 92, 0.32));
   color: var(--text, #dbdee1);
+}
+
+.recording-send-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--primary, #5865f2);
+  color: #fff;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.recording-send-button:hover {
+  background: var(--primary-hover, #4752c4);
+  transform: scale(1.04);
 }
 
 .media-button {

@@ -2878,6 +2878,14 @@ const ChatRoom = ({
         
         {isRecording || isRecordingVideoNote ? (
           <div className="recording-indicator-input">
+            <button
+              type="button"
+              onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
+              className="cancel-recording-button"
+              title="Отменить запись"
+            >
+              ×
+            </button>
             <span className="recording-dot">●</span>
             <span className="recording-time">
               {formatRecordingTime(isRecordingVideoNote ? videoNoteRecordingTime : recordingTime)}
@@ -2887,20 +2895,32 @@ const ChatRoom = ({
                 stream={recordingStream}
                 active={isRecording}
                 mode="scrolling"
+                sensitivity={2.8}
                 className="recording-live-waveform"
                 aria-label="Шкала записи голосового сообщения"
               />
             ) : (
               <span className="recording-hint">Видеокружок… (ESC для отмены)</span>
             )}
-            <button
-              type="button"
-              onClick={isRecordingVideoNote ? cancelVideoNoteRecording : cancelRecording}
-              className="cancel-recording-button"
-              title="Отменить запись"
-            >
-              ×
-            </button>
+            {isRecording && !isRecordingVideoNote ? (
+              <button
+                type="button"
+                onClick={handleAudioRecording}
+                className="recording-send-button"
+                title="Остановить и отправить"
+              >
+                <Stop fontSize="small" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleVideoNoteRecording}
+                className="recording-send-button"
+                title="Остановить и отправить"
+              >
+                <Stop fontSize="small" />
+              </button>
+            )}
           </div>
         ) : (
           <>

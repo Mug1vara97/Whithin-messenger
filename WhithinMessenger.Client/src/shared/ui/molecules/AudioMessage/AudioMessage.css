@@ -47,7 +47,8 @@
   transform: scale(1.05);
 }
 
-.audio-message .waveform-container {
+.audio-message .waveform-container,
+.audio-message .audio-message-waveform {
   flex: 0 0 200px;
   width: 200px;
   height: 40px;
@@ -55,6 +56,8 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  --bw-wave-color: var(--am-wave-color);
+  --bw-progress-color: var(--am-progress-color);
 }
 
 .audio-message .duration {
@@ -99,7 +102,8 @@
     padding: 6px;
   }
 
-  .audio-message .waveform-container {
+  .audio-message .waveform-container,
+  .audio-message .audio-message-waveform {
     flex: 1 1 auto;
     width: auto;
     min-width: 56px;
