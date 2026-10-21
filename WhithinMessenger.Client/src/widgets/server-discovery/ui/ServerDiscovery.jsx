@@ -8,6 +8,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useServerContext } from '../../../shared/lib/contexts/useServerContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import './ServerDiscovery.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const resolveMediaUrl = (path) => {
   if (!path) return null;
@@ -143,7 +144,7 @@ const ServerDiscovery = ({
         onClose?.();
       } catch (joinError) {
         console.error('Error joining server:', joinError);
-        alert(`Ошибка при присоединении к серверу: ${joinError.message}`);
+        appToast.alert(`Ошибка при присоединении к серверу: ${joinError.message}`);
       } finally {
         setJoiningServer(null);
       }

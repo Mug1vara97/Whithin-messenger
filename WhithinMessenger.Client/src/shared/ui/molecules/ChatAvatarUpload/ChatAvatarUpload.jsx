@@ -3,6 +3,7 @@ import { BASE_URL } from '../../../lib/constants/apiEndpoints';
 import tokenManager from '../../../lib/services/tokenManager';
 import UserAvatar from '../../atoms/UserAvatar/UserAvatar';
 import './ChatAvatarUpload.css';
+import { appToast } from '../../../lib/utils/appToast';
 
 const getAuthHeaders = () => {
   const token = tokenManager.getToken();
@@ -21,13 +22,13 @@ const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarU
     // Проверяем тип файла
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Неподдерживаемый тип файла. Разрешены: JPEG, PNG, GIF, WebP');
+      appToast.alert('Неподдерживаемый тип файла. Разрешены: JPEG, PNG, GIF, WebP');
       return;
     }
 
     // Проверяем размер файла (максимум 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 5MB');
+      appToast.alert('Размер файла не должен превышать 5MB');
       return;
     }
 
@@ -102,11 +103,11 @@ const ChatAvatarUpload = ({ chatId, currentAvatar, currentAvatarColor, onAvatarU
         } catch {
           if (response.status === 401) message = 'Требуется авторизация (войдите снова)';
         }
-        alert(`Ошибка загрузки: ${message}`);
+        appToast.alert(`Ошибка загрузки: ${message}`);
       }
     } catch (error) {
       console.error('❌ Error uploading chat avatar:', error);
-      alert('Ошибка при загрузке аватара');
+      appToast.alert('Ошибка при загрузке аватара');
     } finally {
       setIsUploading(false);
     }

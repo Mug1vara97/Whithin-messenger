@@ -8,3 +8,4 @@ export * from './SoundpadSoundsModal';
 
 // Default exports
 export { default as GlobalCallManager } from './GlobalCallManager';
+export { AppToastHost } from './AppToastHost';

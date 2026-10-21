@@ -15,6 +15,7 @@ import { useProfileModal } from '../../../shared/lib/contexts/ProfileModalContex
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { UserAvatar } from '../../../shared/ui';
 import ImagePreview from '../../../shared/ui/molecules/ImagePreview/ImagePreview';
+import { appToast } from '../../../shared/lib/utils/appToast';
 import CreateFeedPostModal from './CreateFeedPostModal';
 import './FeedPanel.css';
 
@@ -72,7 +73,6 @@ const FeedPanel = ({
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentSubmitting, setCommentSubmitting] = useState({});
   const [reactionBusy, setReactionBusy] = useState({});
-  const [shareToast, setShareToast] = useState('');
   const [previewMedia, setPreviewMedia] = useState(null);
 
   const loadPosts = useCallback(async () => {
@@ -98,12 +98,6 @@ const FeedPanel = ({
   useEffect(() => {
     void loadPosts();
   }, [loadPosts]);
-
-  useEffect(() => {
-    if (!shareToast) return undefined;
-    const timer = setTimeout(() => setShareToast(''), 1800);
-    return () => clearTimeout(timer);
-  }, [shareToast]);
 
   const patchPost = useCallback((postId, updater) => {
     setPosts((prev) =>
@@ -148,10 +142,10 @@ const FeedPanel = ({
 
     try {
       await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-      setShareToast('Ссылка скопирована');
+      appToast.success('Ссылка скопирована');
     } catch (err) {
       console.error('FeedPanel: failed to share', err);
-      setShareToast('Не удалось поделиться');
+      appToast.error('Не удалось поделиться');
     }
   };
 
@@ -516,7 +510,6 @@ const FeedPanel = ({
         )}
       </div>
 
-      {shareToast ? <div className="feed-panel__toast">{shareToast}</div> : null}
 
       <ImagePreview
         mediaFile={previewMedia}

@@ -11,6 +11,7 @@ import {
   mergeCallOnlyIntoCategories,
 } from '../../../../shared/lib/voice/callOnlyVoiceChannels';
 import './CategoriesList.css';
+import { appToast } from '../../../../shared/lib/utils/appToast';
 
 const VOICE_TYPE_GUID = "44444444-4444-4444-4444-444444444444";
 const getChannelTypeValue = (channel) =>
@@ -520,12 +521,12 @@ const CategoriesList = ({
           console.log('Participant moved successfully');
         } catch (error) {
           console.error('Failed to move participant:', error);
-          alert(`Ошибка переключения пользователя: ${error.message}`);
+          appToast.alert(`Ошибка переключения пользователя: ${error.message}`);
         }
       }
     } catch (error) {
       console.error('Move operation failed:', error);
-      alert(`Ошибка перемещения: ${error.message}`);
+      appToast.alert(`Ошибка перемещения: ${error.message}`);
     }
   }, [localCategories, connection, serverId, canManageChannels]);
 

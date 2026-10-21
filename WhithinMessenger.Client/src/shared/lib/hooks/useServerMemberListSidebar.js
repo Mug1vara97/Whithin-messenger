@@ -19,6 +19,7 @@ import {
 import { mapServerMemberToListItem } from '../utils/memberListUtils';
 import { getFriendActionForMember } from '../utils/friendActionForMember';
 import { buildServerUserContextMenuItems } from '../utils/buildServerUserContextMenuItems';
+import { appToast } from '../utils/appToast';
 
 export const useServerMemberListSidebar = ({
   serverId,
@@ -250,7 +251,7 @@ export const useServerMemberListSidebar = ({
         }
         navigate(`/channels/@me/${newChatId}`);
       } catch (error) {
-        alert(error?.message || 'Не удалось открыть личный чат');
+        appToast.alert(error?.message || 'Не удалось открыть личный чат');
       }
     },
     [openPrivateChat, navigate],
@@ -262,7 +263,7 @@ export const useServerMemberListSidebar = ({
         await sendRequest(targetUserId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось отправить запрос в друзья');
+        appToast.alert(error?.message || 'Не удалось отправить запрос в друзья');
       }
     },
     [sendRequest, fetchFriends],
@@ -274,7 +275,7 @@ export const useServerMemberListSidebar = ({
         await acceptRequest(friendshipId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось принять запрос');
+        appToast.alert(error?.message || 'Не удалось принять запрос');
       }
     },
     [acceptRequest, fetchFriends],
@@ -286,7 +287,7 @@ export const useServerMemberListSidebar = ({
         await removeFriend(targetUserId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось удалить из друзей');
+        appToast.alert(error?.message || 'Не удалось удалить из друзей');
       }
     },
     [removeFriend, fetchFriends],
@@ -296,7 +297,7 @@ export const useServerMemberListSidebar = ({
     try {
       await navigator.clipboard.writeText(String(targetUserId));
     } catch {
-      alert('Не удалось скопировать ID');
+      appToast.alert('Не удалось скопировать ID');
     }
   }, []);
 
@@ -323,7 +324,7 @@ export const useServerMemberListSidebar = ({
           await removeRole(roleModal.member.userId, roleId);
         }
       } catch (error) {
-        alert(error?.message || 'Не удалось обновить роль');
+        appToast.alert(error?.message || 'Не удалось обновить роль');
       }
     },
     [roleModal.member, assignRole, removeRole],
@@ -335,7 +336,7 @@ export const useServerMemberListSidebar = ({
       await kickMember(kickTargetMember.userId);
       setKickTargetMember(null);
     } catch (error) {
-      alert(error?.message || 'Не удалось удалить участника с сервера');
+      appToast.alert(error?.message || 'Не удалось удалить участника с сервера');
     }
   }, [kickMember, kickTargetMember]);
 
@@ -351,7 +352,7 @@ export const useServerMemberListSidebar = ({
 
   const handleSaveServerNickname = useCallback(async () => {
     if (!nicknameEditorMember || !canEditMemberNickname(nicknameEditorMember.userId)) {
-      alert('Недостаточно прав для изменения ника');
+      appToast.alert('Недостаточно прав для изменения ника');
       return;
     }
 
@@ -364,7 +365,7 @@ export const useServerMemberListSidebar = ({
       );
       handleCloseNicknameEditor();
     } catch (error) {
-      alert(error?.message || 'Не удалось обновить серверный ник');
+      appToast.alert(error?.message || 'Не удалось обновить серверный ник');
     } finally {
       setNicknameSaving(false);
     }

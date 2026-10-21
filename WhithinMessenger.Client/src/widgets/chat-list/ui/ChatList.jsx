@@ -21,6 +21,7 @@ import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
 import { muteChat, unmuteChat, isChatMuted } from '../../../shared/lib/utils/chatMuteStore';
 import { PRESENCE_STATUS } from '../../../shared/lib/utils/userStatus';
 import './ChatList.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const ChatList = ({
   onChatSelected,
@@ -145,7 +146,7 @@ const ChatList = ({
       }
     } catch (error) {
       console.error('Error creating private chat:', error);
-      alert('Ошибка при создании чата');
+      appToast.alert('Ошибка при создании чата');
     }
   }, [createPrivateChat, handleChatSelection]);
 
@@ -161,7 +162,7 @@ const ChatList = ({
       setShowModal(false);
     } catch (error) {
       console.error('Error creating group chat:', error);
-      alert(error.message || 'Ошибка при создании группового чата');
+      appToast.alert(error.message || 'Ошибка при создании группового чата');
     }
   }, [handleChatSelection]);
 
@@ -210,7 +211,7 @@ const ChatList = ({
       await blockUser(targetUserId);
       closeChatContextMenu();
     } catch (error) {
-      alert(error?.message || 'Не удалось заблокировать пользователя');
+      appToast.alert(error?.message || 'Не удалось заблокировать пользователя');
     }
   }, [blockUser, closeChatContextMenu]);
 
@@ -221,7 +222,7 @@ const ChatList = ({
       await unblockUser(targetUserId);
       closeChatContextMenu();
     } catch (error) {
-      alert(error?.message || 'Не удалось разблокировать пользователя');
+      appToast.alert(error?.message || 'Не удалось разблокировать пользователя');
     }
   }, [unblockUser, closeChatContextMenu]);
 
@@ -229,7 +230,7 @@ const ChatList = ({
     try {
       await navigator.clipboard.writeText(String(value));
     } catch {
-      alert(errorMessage);
+      appToast.alert(errorMessage);
     }
   }, []);
 
@@ -272,8 +273,8 @@ const ChatList = ({
         onStartCall: () => handleChatSelection(chat),
         onInviteToServer: (serverId) => {
           void inviteUserToServer(serverId, targetUserId)
-            .then(() => alert('Пользователь приглашён на сервер'))
-            .catch((error) => alert(error?.message || 'Не удалось пригласить на сервер'));
+            .then(() => appToast.alert('Пользователь приглашён на сервер'))
+            .catch((error) => appToast.alert(error?.message || 'Не удалось пригласить на сервер'));
         },
         onRemoveFriend: friendAction?.kind === 'friend'
           ? () => {

@@ -28,7 +28,6 @@ const ForwardMessageModal = ({
   onSend,
   onClose,
   onCopyLink,
-  toastMessage,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -249,11 +248,6 @@ const ForwardMessageModal = ({
           </button>
         </footer>
 
-        {toastMessage ? (
-          <div className="forward-message-modal__toast" role="status">
-            {toastMessage}
-          </div>
-        ) : null}
       </div>
     </div>
   );

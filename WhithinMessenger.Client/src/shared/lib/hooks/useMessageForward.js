@@ -7,6 +7,7 @@ import {
   loadForwardChannelTargets,
   loadForwardDirectChats,
 } from '../utils/forwardTargets';
+import { appToast } from '../utils/appToast';
 
 const canForwardMessage = (message) => {
   const messageId = message?.messageId ?? message?.MessageId;
@@ -30,7 +31,6 @@ export const useMessageForward = (currentChatId) => {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
-  const [toastMessage, setToastMessage] = useState('');
 
   const resetState = useCallback(() => {
     setMessagesToForward([]);
@@ -39,7 +39,6 @@ export const useMessageForward = (currentChatId) => {
     setSelectedIds(new Set());
     setIsSending(false);
     setError('');
-    setToastMessage('');
     setLoadingTargets(false);
   }, []);
 
@@ -91,7 +90,6 @@ export const useMessageForward = (currentChatId) => {
     setSelectedIds(new Set());
     setForwardMessageText('');
     setError('');
-    setToastMessage('');
     return true;
   }, []);
 
@@ -125,11 +123,11 @@ export const useMessageForward = (currentChatId) => {
     if (!firstMessage) return;
     try {
       await navigator.clipboard.writeText(buildMessageLinkText(firstMessage));
-      setToastMessage('Ссылка скопирована');
-      window.setTimeout(() => setToastMessage(''), 2000);
+      appToast.success('Ссылка скопирована');
     } catch (err) {
       console.error('copyMessageLink failed', err);
       setError('Не удалось скопировать ссылку');
+      appToast.error('Не удалось скопировать ссылку');
     }
   }, [messagesToForward]);
 
@@ -170,7 +168,7 @@ export const useMessageForward = (currentChatId) => {
         toast = `Переслано в ${targetCount} чатов`;
       }
 
-      setToastMessage(toast);
+      appToast.success(toast);
       window.setTimeout(() => {
         closeForwardModal();
       }, 450);
@@ -197,7 +195,6 @@ export const useMessageForward = (currentChatId) => {
     onToggleTarget: toggleTarget,
     isSending,
     onCopyLink: copyMessageLink,
-    toastMessage,
     onClose: closeForwardModal,
   }), [
     forwardModalVisible,
@@ -210,7 +207,6 @@ export const useMessageForward = (currentChatId) => {
     toggleTarget,
     isSending,
     copyMessageLink,
-    toastMessage,
     closeForwardModal,
   ]);
 

@@ -1,4 +1,12 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import {
+  WAVEFORM_BAR_GAP,
+  WAVEFORM_BAR_RADIUS,
+  WAVEFORM_BAR_WIDTH,
+  WAVEFORM_HEIGHT_SCALE,
+  WAVEFORM_MIN_BAR_HEIGHT,
+  waveformBarFactor,
+} from '../../../lib/utils/waveformVisual';
 import './BarWaveform.css';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -21,10 +29,10 @@ const drawRoundedBar = (ctx, x, y, width, height, radius) => {
 const BarWaveform = ({
   peaks = [],
   progress = 0,
-  barWidth = 3,
-  barGap = 2,
-  barRadius = 1.5,
-  minBarHeight = 3,
+  barWidth = WAVEFORM_BAR_WIDTH,
+  barGap = WAVEFORM_BAR_GAP,
+  barRadius = WAVEFORM_BAR_RADIUS,
+  minBarHeight = WAVEFORM_MIN_BAR_HEIGHT,
   interactive = true,
   onSeek,
   className = '',
@@ -86,11 +94,14 @@ const BarWaveform = ({
 
     for (let i = 0; i < count; i += 1) {
       const value = levels[i] || 0;
-      const barHeight = Math.max(minBarHeight, value * height * 0.92);
+      // Same loudness→height curve as LiveWaveform (sensitivity 1 for already-normalized peaks).
+      const factor = waveformBarFactor(value, 1);
+      const visual = clamp(factor / WAVEFORM_HEIGHT_SCALE, 0, 1);
+      const barHeight = Math.max(minBarHeight, factor * height);
       const x = left + i * pitch;
       const y = (height - barHeight) / 2;
       ctx.fillStyle = i < playedUntil ? progressColor : waveColor;
-      ctx.globalAlpha = i < playedUntil ? 0.55 + 0.45 * value : 0.35 + 0.45 * value;
+      ctx.globalAlpha = i < playedUntil ? 0.5 + 0.5 * visual : 0.35 + 0.45 * visual;
       drawRoundedBar(ctx, x, y, barWidth, barHeight, barRadius);
     }
     ctx.globalAlpha = 1;

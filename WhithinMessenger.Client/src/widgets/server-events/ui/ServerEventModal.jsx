@@ -11,6 +11,10 @@ import {
   formatEventWhen,
   serverEventApi,
 } from '../../../entities/server-event';
+import {
+  EventDateRangePicker,
+  EventTimeWheelPicker,
+} from '../../../shared/ui/molecules/EventDateTimePickers';
 import './ServerEvents.css';
 
 const STEPS = ['Место', 'Сведения о событии', 'Просмотреть'];
@@ -356,50 +360,41 @@ const ServerEventModal = ({
                     />
                   </label>
 
-                  <div className="sev-field-row">
-                    <label className="sev-field">
-                      <span>
-                        Дата начала <span className="req">*</span>
-                      </span>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
-                    </label>
-                    <label className="sev-field">
-                      <span>
-                        Время начала <span className="req">*</span>
-                      </span>
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                      />
-                    </label>
+                  <div className="sev-field">
+                    <span>
+                      Даты события <span className="req">*</span>
+                    </span>
+                    <EventDateRangePicker
+                      from={startDate}
+                      to={endDate}
+                      onChange={({ from, to }) => {
+                        setStartDate(from);
+                        setEndDate(to);
+                      }}
+                    />
                   </div>
 
-                  <div className="sev-field-row">
-                    <label className="sev-field">
-                      <span>
-                        Дата окончания <span className="req">*</span>
-                      </span>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
-                    </label>
-                    <label className="sev-field">
-                      <span>
-                        Время окончания <span className="req">*</span>
-                      </span>
-                      <input
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                      />
-                    </label>
+                  <div className="event-datetime-pair">
+                    <EventTimeWheelPicker
+                      label={
+                        <>
+                          Время начала <span className="req">*</span>
+                        </>
+                      }
+                      value={startTime}
+                      onChange={setStartTime}
+                      minuteStep={5}
+                    />
+                    <EventTimeWheelPicker
+                      label={
+                        <>
+                          Время окончания <span className="req">*</span>
+                        </>
+                      }
+                      value={endTime}
+                      onChange={setEndTime}
+                      minuteStep={5}
+                    />
                   </div>
 
                   <label className="sev-field">

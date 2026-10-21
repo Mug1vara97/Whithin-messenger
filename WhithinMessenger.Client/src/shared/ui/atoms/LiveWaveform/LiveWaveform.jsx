@@ -1,4 +1,13 @@
 import React, { useEffect, useRef } from 'react';
+import {
+  WAVEFORM_BAR_GAP,
+  WAVEFORM_BAR_RADIUS,
+  WAVEFORM_BAR_WIDTH,
+  WAVEFORM_HEIGHT_SCALE,
+  WAVEFORM_LIVE_SENSITIVITY,
+  WAVEFORM_MIN_BAR_HEIGHT,
+  waveformBarFactor,
+} from '../../../lib/utils/waveformVisual';
 import './LiveWaveform.css';
 
 const IDLE_ALPHA = 0.35;
@@ -26,13 +35,13 @@ const LiveWaveform = ({
   stream = null,
   active = true,
   mode = 'scrolling',
-  barWidth = 3,
-  barGap = 2,
-  barRadius = 1.5,
-  minBarHeight = 3,
+  barWidth = WAVEFORM_BAR_WIDTH,
+  barGap = WAVEFORM_BAR_GAP,
+  barRadius = WAVEFORM_BAR_RADIUS,
+  minBarHeight = WAVEFORM_MIN_BAR_HEIGHT,
   fadeEdges = true,
   fadeWidth = 20,
-  sensitivity = 2.6,
+  sensitivity = WAVEFORM_LIVE_SENSITIVITY,
   className = '',
   'aria-label': ariaLabel = 'Уровень записи',
 }) => {
@@ -102,9 +111,8 @@ const LiveWaveform = ({
         if (abs > peak) peak = abs;
       }
       const rms = Math.sqrt(sum / timeDomain.length);
-      // Blend RMS + peak, then expand quiet levels (sqrt) so soft speech is visible.
-      const blended = clamp(rms * 0.72 + peak * 0.55, 0, 1);
-      return clamp(Math.sqrt(blended), 0, 1);
+      // Mild blend — loudness→height shaped later via waveformBarFactor.
+      return clamp(rms * 0.85 + peak * 0.35, 0, 1);
     };
 
     const drawIdle = (width, height) => {
@@ -172,11 +180,13 @@ const LiveWaveform = ({
       const offset = count - levels.length;
 
       for (let i = 0; i < levels.length; i += 1) {
-        const value = clamp((levels[i] || 0) * sensitivity, 0, 1);
-        const barHeight = Math.max(minBarHeight, value * height);
+        const raw = levels[i] || 0;
+        const factor = waveformBarFactor(raw, sensitivity);
+        const visual = clamp(factor / WAVEFORM_HEIGHT_SCALE, 0, 1);
+        const barHeight = Math.max(minBarHeight, factor * height);
         const x = left + (offset + i) * pitch;
         const y = (height - barHeight) / 2;
-        ctx.globalAlpha = 0.35 + 0.65 * value;
+        ctx.globalAlpha = 0.35 + 0.65 * visual;
         drawRoundedBar(ctx, x, y, barWidth, barHeight, barRadius);
       }
       ctx.globalAlpha = 1;

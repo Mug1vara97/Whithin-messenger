@@ -4,6 +4,7 @@ import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
 import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 // Хелпер для получения заголовков авторизации
 const getAuthHeaders = () => {
@@ -873,7 +874,7 @@ const ServerPanel = ({
         await handleDeleteChannel(channel.chatId || channel.ChatId);
       } catch (error) {
         console.error('Ошибка удаления канала:', error);
-        alert('Ошибка при удалении канала: ' + error.message);
+        appToast.alert('Ошибка при удалении канала: ' + error.message);
       }
     }
   }, [handleDeleteChannel]);
@@ -945,7 +946,7 @@ const ServerPanel = ({
         }
       } catch (error) {
         console.error('Ошибка удаления категории:', error);
-        alert('Ошибка при удалении категории: ' + error.message);
+        appToast.alert('Ошибка при удалении категории: ' + error.message);
       }
     }
   }, [serverConnection, server?.serverId]);

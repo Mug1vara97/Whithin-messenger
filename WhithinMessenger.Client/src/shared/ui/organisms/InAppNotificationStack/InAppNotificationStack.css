@@ -4,7 +4,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  width: min(360px, calc(100vw - 24px));
+  gap: 8px;
+  width: min(380px, calc(100vw - 24px));
   pointer-events: none;
 }
 
@@ -31,131 +32,79 @@
 .in-app-notifications__hide-all {
   pointer-events: auto;
   align-self: stretch;
-  border: none;
-  border-radius: 10px 10px 0 0;
-  background: var(--in-app-notif-bg, var(--surface, #2f3136));
+  border: 1px solid color-mix(in srgb, var(--primary, #5865f2) 28%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary, #5865f2) 8%, var(--surface, #2f3136));
   color: var(--primary, #5865f2);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.2;
-  padding: 10px 14px;
+  padding: 9px 12px;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .in-app-notifications__hide-all:hover {
-  background: color-mix(in srgb, var(--in-app-notif-bg, var(--surface, #2f3136)) 88%, var(--primary, #5865f2) 12%);
+  background: color-mix(in srgb, var(--primary, #5865f2) 14%, var(--surface, #2f3136));
 }
 
 .in-app-notifications__list {
   display: flex;
   flex-direction: column;
-  border-radius: 0 0 10px 10px;
-  overflow: hidden;
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.38),
-    0 0 0 1px color-mix(in srgb, var(--border, #4f545c) 80%, transparent);
+  gap: 8px;
+  pointer-events: none;
 }
 
-.in-app-notification-card {
+.in-app-notifications__list > * {
   pointer-events: auto;
-  position: relative;
+}
+
+.in-app-notification-alert {
+  cursor: default;
+}
+
+.in-app-notification-alert__hit {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 36px 12px 14px;
-  background: var(--in-app-notif-bg, var(--surface, #2f3136));
-  border-top: 1px solid color-mix(in srgb, var(--border, #4f545c) 70%, transparent);
-  cursor: pointer;
-  text-align: left;
-  animation: inAppNotificationIn 0.22s ease-out;
-  transition: background-color 0.15s ease;
-}
-
-.in-app-notification-card:first-child {
-  border-top: none;
-}
-
-.in-app-notification-card:hover {
-  background: color-mix(in srgb, var(--in-app-notif-bg, var(--surface, #2f3136)) 90%, var(--text, #dcddde) 10%);
-}
-
-.in-app-notification-card__close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  padding: 0;
   border: none;
-  border-radius: 6px;
   background: transparent;
-  color: var(--text-muted, #8e9297);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
-  opacity: 0.75;
-  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
-.in-app-notification-card__close:hover {
-  opacity: 1;
-  background: color-mix(in srgb, var(--text, #dcddde) 8%, transparent);
-  color: var(--text-secondary, #b9bbbe);
-}
-
-.in-app-notification-card__avatar {
+.in-app-notification-alert__avatar {
   flex-shrink: 0;
   margin-top: 1px;
 }
 
-.in-app-notification-card__body {
-  min-width: 0;
-  flex: 1;
-}
-
-.in-app-notification-card__title {
-  color: var(--text, #dcddde);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.in-app-notification-card__subtitle {
-  margin-top: 2px;
-  color: var(--primary, #5865f2);
+.in-app-notification-alert__subtitle {
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
+  color: color-mix(in srgb, currentColor 78%, var(--text-muted, #949ba4));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.in-app-notification-card__message {
-  margin-top: 3px;
-  color: var(--text-muted, #8e9297);
-  font-size: 13px;
-  line-height: 1.35;
+.in-app-notification-alert .motion-alert__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.in-app-notification-alert .motion-alert__description {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
-}
-
-@keyframes inAppNotificationIn {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 body.electron-titlebar-chrome .in-app-notifications--top-right,
@@ -185,7 +134,7 @@ body.electron-titlebar-chrome .in-app-notifications--top-left {
   }
 
   .in-app-notifications {
-    width: min(360px, calc(100vw - 16px));
+    width: min(380px, calc(100vw - 16px));
   }
 
   body.electron-titlebar-chrome .in-app-notifications--top-right,

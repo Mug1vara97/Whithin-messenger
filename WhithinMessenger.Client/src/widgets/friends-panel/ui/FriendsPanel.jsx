@@ -7,6 +7,7 @@ import { useUserBlocks } from '../../../shared/lib/contexts/UserBlockContext';
 import { usePresence } from '../../../shared/lib/contexts/PresenceContext';
 import { isUserActiveInFriendsList } from '../../../shared/lib/utils/userStatus';
 import './FriendsPanel.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const FriendsPanel = ({ onStartChat }) => {
   const [activeTab, setActiveTab] = useState('online');
@@ -92,7 +93,7 @@ const FriendsPanel = ({ onStartChat }) => {
     try {
       await unblockUser(userId);
     } catch (unblockError) {
-      alert(unblockError?.message || 'Не удалось разблокировать пользователя');
+      appToast.alert(unblockError?.message || 'Не удалось разблокировать пользователя');
     }
   };
 

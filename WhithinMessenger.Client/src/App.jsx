@@ -3,6 +3,7 @@ import { AppProviders } from './app/providers';
 import { AppRouter } from './app/router';
 import ThemeAppRouter from './app/router/ThemeAppRouter';
 import { GlobalCallManager } from './shared/ui/organisms';
+import { AppToastHost } from './shared/ui/organisms/AppToastHost';
 import { ElectronHotkeysBridge } from './shared/lib/hooks/ElectronHotkeysBridge';
 import { ElectronTitlebar } from './shared/ui/molecules/ElectronTitlebar';
 import { useGlobalTextScramble } from './shared/lib/hooks/useGlobalTextScramble';
@@ -46,6 +47,7 @@ function MainApp() {
       <ElectronHotkeysBridge />
       <AppRouter />
       <GlobalCallManager />
+      <AppToastHost />
     </AppProviders>
   );
 }

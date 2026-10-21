@@ -4,6 +4,7 @@ import { PERMISSION_CATEGORIES, PERMISSION_LABELS, DEFAULT_ROLE_COLOR } from '..
 import { Button } from '../../../shared/ui/atoms/Button';
 import { FormField } from '../../../shared/ui/atoms/FormField';
 import './RoleManagement.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const RoleManagement = ({ connection, serverId, userId, userPermissions, isServerOwner }) => {
   const {
@@ -75,7 +76,7 @@ const RoleManagement = ({ connection, serverId, userId, userPermissions, isServe
 
   const handleSubmit = async () => {
     if (!formData.roleName.trim()) {
-      alert('Введите название роли');
+      appToast.alert('Введите название роли');
       return;
     }
 
@@ -99,7 +100,7 @@ const RoleManagement = ({ connection, serverId, userId, userPermissions, isServe
       const errorMessage = error.message.includes('уже существует') 
         ? error.message 
         : 'Произошла ошибка при создании роли. Пожалуйста, попробуйте еще раз.';
-      alert(errorMessage);
+      appToast.alert(errorMessage);
     }
   };
 
@@ -108,7 +109,7 @@ const RoleManagement = ({ connection, serverId, userId, userPermissions, isServe
     try {
       await deleteRole(roleId);
     } catch (error) {
-      alert(error.message);
+      appToast.alert(error.message);
     }
   };
 

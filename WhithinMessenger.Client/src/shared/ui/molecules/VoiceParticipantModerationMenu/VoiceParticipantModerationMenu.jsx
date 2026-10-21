@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { moderateVoiceParticipant } from '../../../lib/voice/moderateVoiceParticipant';
 import { getServerHubConnection } from '../../../lib/services/serverHubRegistry';
 import './VoiceParticipantModerationMenu.css';
+import { appToast } from '../../../lib/utils/appToast';
 
 export function useVoiceParticipantModeration({
   channelId,
@@ -74,7 +75,7 @@ export function useVoiceParticipantModeration({
       });
     } catch (error) {
       console.error('Voice moderation failed:', error);
-      alert(error?.message || 'Не удалось применить модерацию');
+      appToast.alert(error?.message || 'Не удалось применить модерацию');
     } finally {
       closeMenu();
     }

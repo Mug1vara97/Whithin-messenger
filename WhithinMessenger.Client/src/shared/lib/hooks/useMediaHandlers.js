@@ -11,6 +11,7 @@ import {
   buildMediaPreviewItems,
   revokeMediaPreviewItems,
 } from '../utils/mediaSendPreview';
+import { appToast } from '../utils/appToast';
 
 const VIDEO_NOTE_MAX_SEC = 60;
 const MAX_BATCH_MEDIA_COUNT = 10;
@@ -113,7 +114,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       if (!files?.length || !connection) return false;
 
       if (!chatId) {
-        alert('Ошибка загрузки файла: чат не выбран');
+        appToast.alert('Ошибка загрузки файла: чат не выбран');
         return false;
       }
 
@@ -220,7 +221,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         setUploadingFile(null);
         setUploadProgress(0);
         setIsUploadProcessing(false);
-        alert(`Ошибка загрузки файла: ${error.message}`);
+        appToast.alert(`Ошибка загрузки файла: ${error.message}`);
         return false;
       }
     },
@@ -244,7 +245,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
     const files = filterSendableFiles(rawFiles);
     if (!files.length) {
-      alert('Голосовые сообщения нельзя отправить вместе с файлами');
+      appToast.alert('Голосовые сообщения нельзя отправить вместе с файлами');
       return;
     }
     setPendingMediaSend({ files });
@@ -332,7 +333,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       recordingTimeRef.current = 0;
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Не удалось получить доступ к микрофону');
+      appToast.alert('Не удалось получить доступ к микрофону');
     }
   }, [handleSendMedia]);
 
@@ -347,7 +348,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
 
   const handleAudioRecording = useCallback(() => {
     if (isRecordingVideoNote) {
-      alert('Сначала закончите или отмените запись видеокружка');
+      appToast.alert('Сначала закончите или отмените запись видеокружка');
       return;
     }
     if (isRecording) {
@@ -376,7 +377,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
   const handleVideoNoteRecording = useCallback(async () => {
     if (!connection) return;
     if (isRecording) {
-      alert('Сначала закончите запись голосового сообщения');
+      appToast.alert('Сначала закончите запись голосового сообщения');
       return;
     }
     if (isRecordingVideoNote && videoNoteRecorderRef.current) {
@@ -430,7 +431,7 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
       setVideoNoteRecordingTime(0);
     } catch (error) {
       console.error('Error starting video note:', error);
-      alert('Не удалось получить доступ к камере');
+      appToast.alert('Не удалось получить доступ к камере');
     }
   }, [connection, isRecording, isRecordingVideoNote, handleSendMedia]);
 

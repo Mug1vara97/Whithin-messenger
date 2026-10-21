@@ -66,6 +66,7 @@ import { AudioSettingsSection } from '../../molecules/AudioSettingsSection';
 import { FrostedGlassSettingsSection } from '../../molecules/FrostedGlassSettingsSection/FrostedGlassSettingsSection';
 import { ActiveCallOverlayPositionPicker } from '../../molecules/ActiveCallOverlayPositionPicker/ActiveCallOverlayPositionPicker';
 import './SettingsModal.css';
+import { appToast } from '../../../lib/utils/appToast';
 
 const BASE_TABS = [
   { id: 'account', label: 'Аккаунт', icon: PersonOutlineIcon },
@@ -304,7 +305,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
     if (tempKey) {
       const usedBy = hotkeyStorage.isKeyUsed(tempKey, action);
       if (usedBy) {
-        alert(`Клавиша "${tempKey}" уже используется для: ${getActionName(usedBy)}`);
+        appToast.alert(`Клавиша "${tempKey}" уже используется для: ${getActionName(usedBy)}`);
         return;
       }
     }

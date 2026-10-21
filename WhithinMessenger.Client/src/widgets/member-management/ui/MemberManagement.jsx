@@ -9,6 +9,7 @@ import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import { Button } from '../../../shared/ui/atoms/Button';
 import UserAvatar from '../../../shared/ui/atoms/UserAvatar';
 import './MemberManagement.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const MemberManagement = ({
   connection,
@@ -74,7 +75,7 @@ const MemberManagement = ({
       await fetchFriends();
       setContextMenu((prev) => ({ ...prev, visible: false }));
     } catch (error) {
-      alert(error?.message || 'Не удалось отправить запрос в друзья');
+      appToast.alert(error?.message || 'Не удалось отправить запрос в друзья');
     }
   };
 
@@ -84,7 +85,7 @@ const MemberManagement = ({
       await fetchFriends();
       setContextMenu((prev) => ({ ...prev, visible: false }));
     } catch (error) {
-      alert(error?.message || 'Не удалось принять запрос');
+      appToast.alert(error?.message || 'Не удалось принять запрос');
     }
   };
 
@@ -151,7 +152,7 @@ const MemberManagement = ({
       setContextMenu((prev) => ({ ...prev, visible: false }));
     } catch (error) {
       console.error('Ошибка при открытии/создании чата:', error);
-      alert(error?.message || 'Не удалось открыть личный чат');
+      appToast.alert(error?.message || 'Не удалось открыть личный чат');
     }
   };
 
@@ -160,7 +161,7 @@ const MemberManagement = ({
       await kickMember(memberId);
       setShowKickModal(false);
     } catch (error) {
-      alert(`Ошибка при исключении участника: ${error.message}`);
+      appToast.alert(`Ошибка при исключении участника: ${error.message}`);
     }
   };
 
@@ -180,7 +181,7 @@ const MemberManagement = ({
 
   const handleSaveNickname = async () => {
     if (!selectedMember || !canEditMemberNickname(selectedMember)) {
-      alert('Недостаточно прав для изменения ника');
+      appToast.alert('Недостаточно прав для изменения ника');
       return;
     }
     setNicknameSaving(true);
@@ -192,7 +193,7 @@ const MemberManagement = ({
       );
       handleCloseNicknameModal();
     } catch (error) {
-      alert(error?.message || 'Не удалось обновить серверный ник');
+      appToast.alert(error?.message || 'Не удалось обновить серверный ник');
     } finally {
       setNicknameSaving(false);
     }
@@ -219,7 +220,7 @@ const MemberManagement = ({
       }
       await fetchMembers();
     } catch (error) {
-      alert(`Ошибка обновления роли: ${error.message}`);
+      appToast.alert(`Ошибка обновления роли: ${error.message}`);
     }
   };
 

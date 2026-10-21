@@ -3,6 +3,7 @@ import { PhotoCamera, Upload } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
 import './ServerSettings.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const BANNER_PRESET_COLORS = [
   { value: '#000000', title: 'Чёрный' },
@@ -58,7 +59,7 @@ const ServerSettings = ({
 
   const handleServerNameUpdate = async () => {
     if (!serverName.trim()) {
-      alert('Название сервера не может быть пустым');
+      appToast.alert('Название сервера не может быть пустым');
       return;
     }
 
@@ -67,7 +68,7 @@ const ServerSettings = ({
       await connection.invoke('UpdateServerName', serverId, serverName);
       onServerUpdate({ ...server, name: serverName });
     } catch (error) {
-      alert(`Ошибка обновления названия сервера: ${error.message}`);
+      appToast.alert(`Ошибка обновления названия сервера: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -75,7 +76,7 @@ const ServerSettings = ({
 
   const handleServerDescriptionUpdate = async () => {
     if (serverDescription.length > MAX_DESCRIPTION_LENGTH) {
-      alert(`Описание не должно превышать ${MAX_DESCRIPTION_LENGTH} символов`);
+      appToast.alert(`Описание не должно превышать ${MAX_DESCRIPTION_LENGTH} символов`);
       return;
     }
 
@@ -88,7 +89,7 @@ const ServerSettings = ({
         description: nextDescription || null,
       });
     } catch (error) {
-      alert(`Ошибка обновления описания сервера: ${error.message}`);
+      appToast.alert(`Ошибка обновления описания сервера: ${error.message}`);
     } finally {
       setIsSavingDescription(false);
     }
@@ -103,7 +104,7 @@ const ServerSettings = ({
       await connection.invoke('UpdateServerPrivacy', serverId, nextIsPublic);
       onServerUpdate({ ...server, isPublic: nextIsPublic });
     } catch (error) {
-      alert(`Ошибка обновления приватности сервера: ${error.message}`);
+      appToast.alert(`Ошибка обновления приватности сервера: ${error.message}`);
     } finally {
       setIsSavingPrivacy(false);
     }
@@ -129,7 +130,7 @@ const ServerSettings = ({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение');
+      appToast.alert('Пожалуйста, выберите изображение');
       return;
     }
 
@@ -152,7 +153,7 @@ const ServerSettings = ({
       setBannerColor(serverInfo.bannerColor || '#3f3f3f');
     } catch (error) {
       console.error('Ошибка при загрузке баннера:', error);
-      alert('Не удалось загрузить баннер. Пожалуйста, попробуйте еще раз.');
+      appToast.alert('Не удалось загрузить баннер. Пожалуйста, попробуйте еще раз.');
     } finally {
       event.target.value = '';
     }
@@ -181,7 +182,7 @@ const ServerSettings = ({
       setIsDefaultColor(!serverInfo.bannerColor);
     } catch (error) {
       console.error('Ошибка при обновлении цвета баннера:', error);
-      alert('Не удалось обновить цвет баннера. Пожалуйста, попробуйте еще раз.');
+      appToast.alert('Не удалось обновить цвет баннера. Пожалуйста, попробуйте еще раз.');
     }
   };
 
@@ -212,7 +213,7 @@ const ServerSettings = ({
       }
     } catch (error) {
       console.error('Ошибка при загрузке аватара:', error);
-      alert(error.message);
+      appToast.alert(error.message);
     } finally {
       event.target.value = '';
     }
@@ -237,7 +238,7 @@ const ServerSettings = ({
       }
     } catch (error) {
       console.error('Ошибка при удалении аватара:', error);
-      alert(error.message);
+      appToast.alert(error.message);
     }
   };
 

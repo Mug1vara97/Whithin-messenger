@@ -120,6 +120,7 @@ import { muteChat, unmuteChat, isChatMuted } from '../../../shared/lib/utils/cha
 import SendIcon from '../../../shared/ui/atoms/SendIcon';
 import StickerIcon from '../../../shared/ui/atoms/StickerIcon';
 import './ChatRoom.css';
+import { appToast } from '../../../shared/lib/utils/appToast';
 
 const MESSAGE_COMPOSER_LINE_HEIGHT_PX = 22;
 const MESSAGE_COMPOSER_MAX_LINES = 7;
@@ -805,7 +806,7 @@ const ChatRoom = ({
         }
         navigate(`/channels/@me/${newChatId}`);
       } catch (error) {
-        alert(error?.message || 'Не удалось открыть личный чат');
+        appToast.alert(error?.message || 'Не удалось открыть личный чат');
       }
     },
     [openPrivateChat, navigate],
@@ -817,7 +818,7 @@ const ChatRoom = ({
         await sendRequest(targetUserId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось отправить запрос в друзья');
+        appToast.alert(error?.message || 'Не удалось отправить запрос в друзья');
       }
     },
     [sendRequest, fetchFriends],
@@ -829,7 +830,7 @@ const ChatRoom = ({
         await acceptRequest(friendshipId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось принять запрос');
+        appToast.alert(error?.message || 'Не удалось принять запрос');
       }
     },
     [acceptRequest, fetchFriends],
@@ -841,7 +842,7 @@ const ChatRoom = ({
         await removeFriend(targetUserId);
         await fetchFriends();
       } catch (error) {
-        alert(error?.message || 'Не удалось удалить из друзей');
+        appToast.alert(error?.message || 'Не удалось удалить из друзей');
       }
     },
     [removeFriend, fetchFriends],
@@ -851,7 +852,7 @@ const ChatRoom = ({
     try {
       await navigator.clipboard.writeText(String(targetUserId));
     } catch {
-      alert('Не удалось скопировать ID');
+      appToast.alert('Не удалось скопировать ID');
     }
   }, []);
 
@@ -871,7 +872,7 @@ const ChatRoom = ({
     try {
       await blockUser(targetUserId);
     } catch (error) {
-      alert(error?.message || 'Не удалось заблокировать пользователя');
+      appToast.alert(error?.message || 'Не удалось заблокировать пользователя');
     }
   }, [blockUser]);
 
@@ -881,7 +882,7 @@ const ChatRoom = ({
     try {
       await unblockUser(targetUserId);
     } catch (error) {
-      alert(error?.message || 'Не удалось разблокировать пользователя');
+      appToast.alert(error?.message || 'Не удалось разблокировать пользователя');
     }
   }, [unblockUser]);
 
@@ -904,7 +905,7 @@ const ChatRoom = ({
           await removeRole(roleModal.member.userId, roleId);
         }
       } catch (error) {
-        alert(error?.message || 'Не удалось обновить роль');
+        appToast.alert(error?.message || 'Не удалось обновить роль');
       }
     },
     [roleModal.member, assignRole, removeRole],
@@ -916,7 +917,7 @@ const ChatRoom = ({
       await kickMember(kickTargetMember.userId);
       setKickTargetMember(null);
     } catch (error) {
-      alert(error?.message || 'Не удалось удалить участника с сервера');
+      appToast.alert(error?.message || 'Не удалось удалить участника с сервера');
     }
   }, [kickMember, kickTargetMember]);
 
@@ -978,8 +979,8 @@ const ChatRoom = ({
           onStartCall: () => setShowCallTypeSelector(true),
           onInviteToServer: (serverId) => {
             void inviteUserToServer(serverId, targetUserId)
-              .then(() => alert('Пользователь приглашён на сервер'))
-              .catch((error) => alert(error?.message || 'Не удалось пригласить на сервер'));
+              .then(() => appToast.alert('Пользователь приглашён на сервер'))
+              .catch((error) => appToast.alert(error?.message || 'Не удалось пригласить на сервер'));
           },
           onRemoveFriend:
             friendAction?.kind === 'friend'
@@ -1183,7 +1184,7 @@ const ChatRoom = ({
 
   const handleSaveServerNickname = useCallback(async () => {
     if (!nicknameEditorMember || !canEditMemberNickname(nicknameEditorMember.userId)) {
-      alert('Недостаточно прав для изменения ника');
+      appToast.alert('Недостаточно прав для изменения ника');
       return;
     }
 
@@ -1196,7 +1197,7 @@ const ChatRoom = ({
       );
       handleCloseNicknameEditor();
     } catch (error) {
-      alert(error?.message || 'Не удалось обновить серверный ник');
+      appToast.alert(error?.message || 'Не удалось обновить серверный ник');
     } finally {
       setNicknameSaving(false);
     }
@@ -1734,7 +1735,7 @@ const ChatRoom = ({
       setReplyingToMessage(null);
     } catch (err) {
       console.error('Failed to send sticker:', err);
-      alert(err?.response?.data?.message || err?.message || 'Не удалось отправить стикер');
+      appToast.alert(err?.response?.data?.message || err?.message || 'Не удалось отправить стикер');
     } finally {
       setIsSendingSticker(false);
     }
@@ -1777,7 +1778,7 @@ const ChatRoom = ({
     const canDelete = isOwn || canModerateMessages;
 
     if (!canDelete) {
-      alert('У вас нет прав для удаления этого сообщения');
+      appToast.alert('У вас нет прав для удаления этого сообщения');
       return;
     }
 
@@ -1866,7 +1867,7 @@ const ChatRoom = ({
       closeContextMenu();
     } catch (error) {
       console.error('Failed to copy message text:', error);
-      alert('Не удалось скопировать сообщение');
+      appToast.alert('Не удалось скопировать сообщение');
     }
   }, [closeContextMenu]);
 
@@ -1879,7 +1880,7 @@ const ChatRoom = ({
       closeContextMenu();
     } catch (error) {
       console.error('Failed to copy image:', error);
-      alert('Не удалось скопировать изображение');
+      appToast.alert('Не удалось скопировать изображение');
     }
   }, [closeContextMenu]);
 
@@ -1892,7 +1893,7 @@ const ChatRoom = ({
       closeContextMenu();
     } catch (error) {
       console.error('Failed to copy video:', error);
-      alert('Не удалось скопировать видео');
+      appToast.alert('Не удалось скопировать видео');
     }
   }, [closeContextMenu]);
 
@@ -1906,7 +1907,7 @@ const ChatRoom = ({
       await saveMessageMediaFiles(savableMedia);
     } catch (error) {
       console.error('Failed to save media:', error);
-      alert('Не удалось сохранить файл');
+      appToast.alert('Не удалось сохранить файл');
     }
   }, [closeContextMenu]);
 
@@ -2895,7 +2896,6 @@ const ChatRoom = ({
                 stream={recordingStream}
                 active={isRecording}
                 mode="scrolling"
-                sensitivity={2.8}
                 className="recording-live-waveform"
                 aria-label="Шкала записи голосового сообщения"
               />

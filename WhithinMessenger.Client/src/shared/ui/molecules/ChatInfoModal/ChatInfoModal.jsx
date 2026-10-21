@@ -30,6 +30,7 @@ import {
   People,
 } from '@mui/icons-material';
 import './ChatInfoModal.css';
+import { appToast } from '../../../lib/utils/appToast';
 
 const isBannerImage = (banner) => {
   if (!banner || typeof banner !== 'string') return false;
@@ -247,7 +248,7 @@ const ChatInfoModal = ({
             await connection.invoke('DeleteChat', chatInfo.chatId);
             onClose();
           } catch {
-            alert('Ошибка при удалении чата. Попробуйте ещё раз.');
+            appToast.alert('Ошибка при удалении чата. Попробуйте ещё раз.');
           }
         }, 1000);
         return;
@@ -260,7 +261,7 @@ const ChatInfoModal = ({
         !error.message?.includes('connection being closed') &&
         !error.message?.includes('Invocation canceled')
       ) {
-        alert(`Ошибка при удалении чата: ${error.message}`);
+        appToast.alert(`Ошибка при удалении чата: ${error.message}`);
       }
     }
   };

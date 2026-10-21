@@ -1,0 +1,27 @@
+.app-toast-host {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.app-toast-host--with-titlebar {
+  top: 48px;
+}
+
+.app-toast-host__item {
+  pointer-events: auto;
+}
+
+@media (max-width: 520px) {
+  .app-toast-host {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}

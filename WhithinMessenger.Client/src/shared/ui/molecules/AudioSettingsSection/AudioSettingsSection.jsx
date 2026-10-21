@@ -26,10 +26,8 @@ import {
   sensitivityToMicThreshold,
 } from '../../../lib/utils/voiceCallAudioSettings';
 import SettingsWakeSlider from '../../atoms/WakeSlider/SettingsWakeSlider';
+import { MicChannelStrip } from './MicChannelStrip';
 import './AudioSettingsSection.css';
-
-const LEVEL_BAR_COUNT = 42;
-const MIC_LEVEL_MAX = 200;
 
 function getDeviceLabel(device, fallback) {
   const label = device?.label?.trim();
@@ -60,7 +58,9 @@ export function AudioSettingsSection({ active = true }) {
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(readNoiseSuppressionEnabled);
   const [echoCancellation, setEchoCancellation] = useState(() => volumeStorage.getEchoCancellation());
   const [isMicTesting, setIsMicTesting] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [micTestError, setMicTestError] = useState('');
 
   const testStreamRef = useRef(null);
   const testAudioContextRef = useRef(null);
@@ -88,9 +88,9 @@ export function AudioSettingsSection({ active = true }) {
 
   const applyTestMonitorLevels = useCallback(() => {
     if (testOutputGainRef.current) {
-      testOutputGainRef.current.gain.value = outputVolume;
+      testOutputGainRef.current.gain.value = micMuted ? 0 : outputVolume;
     }
-  }, [outputVolume]);
+  }, [micMuted, outputVolume]);
 
   const applyTestOutputDevice = useCallback(async () => {
     const audioContext = testAudioContextRef.current;
@@ -190,6 +190,7 @@ export function AudioSettingsSection({ active = true }) {
 
   const startMicTest = useCallback(async () => {
     stopMicTest();
+    setMicTestError('');
     setIsMicTesting(true);
     isMicTestingRef.current = true;
 
@@ -237,7 +238,7 @@ export function AudioSettingsSection({ active = true }) {
       const outputGainNode = audioContext.createGain();
       const monitorGateNode = audioContext.createGain();
 
-      outputGainNode.gain.value = outputVolume;
+      outputGainNode.gain.value = micMuted ? 0 : outputVolume;
       monitorGateNode.gain.value = 0;
 
       monitorSource.connect(outputGainNode);
@@ -307,12 +308,23 @@ export function AudioSettingsSection({ active = true }) {
       tick();
     } catch (error) {
       console.warn('Mic test failed:', error);
+      const name = error?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setMicTestError(
+          'Доступ к микрофону заблокирован. Разрешите его в настройках сайта браузера.',
+        );
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setMicTestError('Микрофон не найден. Подключите устройство и попробуйте снова.');
+      } else {
+        setMicTestError('Не удалось запустить проверку микрофона.');
+      }
       stopMicTest();
     }
   }, [
     applyTestVoiceProcessing,
     echoCancellation,
     inputDeviceId,
+    micMuted,
     noiseSuppressionEnabled,
     noiseSuppressionMode,
     outputDeviceId,
@@ -357,25 +369,20 @@ export function AudioSettingsSection({ active = true }) {
 
   useEffect(() => () => stopMicTest(), [stopMicTest]);
 
-  const activeBars = useMemo(
-    () => Math.round((micLevel / 255) * LEVEL_BAR_COUNT),
-    [micLevel],
-  );
-
-  const thresholdBars = useMemo(() => {
-    const baseThreshold = sensitivityToMicThreshold(micSensitivity);
-    const effectiveThreshold = getEffectiveMicThreshold(baseThreshold, inputVolume);
-    return Math.round((effectiveThreshold / MIC_LEVEL_MAX) * LEVEL_BAR_COUNT);
-  }, [micSensitivity, inputVolume]);
-
   const outputVolumePercent = outputGainToPercent(outputVolume);
+
+  const selectedInputLabel = useMemo(() => {
+    if (!inputDeviceId || inputDeviceId === 'default') return 'Системный микрофон';
+    const device = inputDevices.find((d) => d.deviceId === inputDeviceId);
+    return getDeviceLabel(device, 'Микрофон');
+  }, [inputDeviceId, inputDevices]);
 
   return (
     <div className="audio-settings">
       <div className="audio-settings__grid">
         <div className="audio-settings__column">
           <label className="audio-settings__label" htmlFor="audio-input-device">
-            Микрофон
+            Устройство ввода
           </label>
           <div className="audio-settings__select-wrap">
             <MicNoneOutlinedIcon className="audio-settings__select-icon" fontSize="small" />
@@ -387,6 +394,7 @@ export function AudioSettingsSection({ active = true }) {
                 const next = event.target.value;
                 setInputDeviceId(next);
                 volumeStorage.setInputDeviceId(next);
+                setMicTestError('');
                 if (isMicTesting) {
                   void startMicTest();
                 }
@@ -400,23 +408,6 @@ export function AudioSettingsSection({ active = true }) {
               ))}
             </select>
             <KeyboardArrowDownIcon className="audio-settings__select-chevron" fontSize="small" />
-          </div>
-
-          <div className="audio-settings__slider-block">
-            <div className="audio-settings__slider-head">
-              <span>Громкость микрофона</span>
-            </div>
-            <div className="settings-volume-control">
-              <SettingsWakeSlider
-                ariaLabel="Громкость микрофона"
-                value={Math.round(inputVolume * 100)}
-                onChange={(nextPercent) => {
-                  const next = Number(nextPercent) / 100;
-                  setInputVolume(next);
-                  volumeStorage.setInputVolume(next);
-                }}
-              />
-            </div>
           </div>
         </div>
 
@@ -467,39 +458,26 @@ export function AudioSettingsSection({ active = true }) {
         </div>
       </div>
 
-      <div className="audio-settings__test-row">
-        <button
-          type="button"
-          className={`settings-btn settings-btn--primary audio-settings__test-btn${isMicTesting ? ' is-active' : ''}`}
-          onClick={() => {
-            if (isMicTesting) {
-              stopMicTest();
-              return;
-            }
-            void startMicTest();
-          }}
-        >
-          {isMicTesting ? 'Остановить проверку' : 'Проверка микрофона'}
-        </button>
-        <div className="audio-settings__meter" aria-hidden="true">
-          {Array.from({ length: LEVEL_BAR_COUNT }, (_, index) => {
-            const isActive = index < activeBars;
-            const isThreshold = index === thresholdBars;
-            return (
-              <span
-                key={index}
-                className={[
-                  'audio-settings__meter-bar',
-                  isActive ? 'is-active' : '',
-                  isThreshold ? 'is-threshold' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              />
-            );
-          })}
-        </div>
-      </div>
+      <MicChannelStrip
+        deviceLabel={selectedInputLabel}
+        volume={inputVolume}
+        onVolumeChange={(next) => {
+          setInputVolume(next);
+          volumeStorage.setInputVolume(next);
+        }}
+        level={micLevel}
+        live={isMicTesting}
+        muted={micMuted}
+        onMuteChange={setMicMuted}
+        onToggleLive={() => {
+          if (isMicTesting) {
+            stopMicTest();
+            return;
+          }
+          void startMicTest();
+        }}
+        notice={micTestError || null}
+      />
 
       <div className="audio-settings__sensitivity">
         <div className="audio-settings__sensitivity-head">
