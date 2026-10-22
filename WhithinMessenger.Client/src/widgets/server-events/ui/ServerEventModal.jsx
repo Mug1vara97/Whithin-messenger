@@ -48,7 +48,6 @@ const ServerEventModal = ({
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,7 +73,6 @@ const ServerEventModal = ({
       setDescription(event.description || '');
       setStartDate(toDateInputValue(event.startsAt));
       setStartTime(toTimeInputValue(event.startsAt));
-      setEndDate(toDateInputValue(event.endsAt || event.startsAt));
       setEndTime(toTimeInputValue(event.endsAt || event.startsAt));
       return;
     }
@@ -88,7 +86,6 @@ const ServerEventModal = ({
     setDescription('');
     setStartDate(toDateInputValue(start.toISOString()));
     setStartTime(toTimeInputValue(start.toISOString()));
-    setEndDate(toDateInputValue(end.toISOString()));
     setEndTime(toTimeInputValue(end.toISOString()));
   }, [isOpen, mode, event, voiceChannels]);
 
@@ -103,7 +100,7 @@ const ServerEventModal = ({
 
   const buildPayload = () => {
     const startsAt = combineDateAndTime(startDate, startTime);
-    const endsAt = combineDateAndTime(endDate, endTime);
+    const endsAt = combineDateAndTime(startDate, endTime);
     const locationType =
       locationKind === 'external'
         ? SERVER_EVENT_LOCATION.EXTERNAL
@@ -135,9 +132,9 @@ const ServerEventModal = ({
   const validateStep1 = () => {
     if (!title.trim()) return 'Укажите тему события';
     const startsAt = combineDateAndTime(startDate, startTime);
-    const endsAt = combineDateAndTime(endDate, endTime);
+    const endsAt = combineDateAndTime(startDate, endTime);
     if (!startsAt) return 'Укажите дату и время начала';
-    if (!endsAt) return 'Укажите дату и время окончания';
+    if (!endsAt) return 'Укажите время окончания';
     if (new Date(endsAt) <= new Date(startsAt)) {
       return 'Время окончания должно быть позже начала';
     }
@@ -202,7 +199,7 @@ const ServerEventModal = ({
     description: description.trim(),
     when: formatEventWhen(
       combineDateAndTime(startDate, startTime),
-      combineDateAndTime(endDate, endTime)
+      combineDateAndTime(startDate, endTime)
     ),
     location:
       locationKind === 'external'
@@ -362,12 +359,10 @@ const ServerEventModal = ({
 
                   <div className="sev-field">
                     <EventDateRangePicker
-                      label="Даты события"
+                      label="Дата события"
                       from={startDate}
-                      to={endDate}
-                      onChange={({ from, to }) => {
-                        setStartDate(from);
-                        setEndDate(to);
+                      onChange={({ from }) => {
+                        setStartDate(from || '');
                       }}
                     />
                   </div>

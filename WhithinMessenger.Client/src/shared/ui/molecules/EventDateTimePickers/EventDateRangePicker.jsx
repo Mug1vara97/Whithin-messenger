@@ -1,5 +1,4 @@
 import React, {
-  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -13,8 +12,6 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  isAfter,
-  isBefore,
   isSameDay,
   isSameMonth,
   isToday,
@@ -24,7 +21,6 @@ import {
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
-  ArrowRight,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -34,6 +30,7 @@ import './EventDateTimePickers.css';
 
 const EASE_OUT = [0.16, 1, 0.3, 1];
 const SPRING_PRESS = { type: 'spring', stiffness: 500, damping: 30, mass: 0.6 };
+const SPRING_LAYOUT = { type: 'spring', stiffness: 420, damping: 36, mass: 0.8 };
 
 const parseYmd = (ymd) => {
   if (!ymd || typeof ymd !== 'string') return null;
@@ -46,70 +43,39 @@ const toYmd = (date) => format(date, 'yyyy-MM-dd');
 
 const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
-const formatShort = (date) =>
+const formatTriggerDate = (date) =>
   date ? format(date, 'd MMM yyyy', { locale: ru }) : 'Выберите дату';
 
-const formatTriggerRange = (fromDate, toDate) => {
-  if (!fromDate) return 'Выберите даты';
-  if (!toDate || isSameDay(fromDate, toDate)) {
-    return format(fromDate, 'd MMM yyyy', { locale: ru });
-  }
-  const sameYear = fromDate.getFullYear() === toDate.getFullYear();
-  if (sameYear) {
-    return `${format(fromDate, 'd MMM', { locale: ru })} – ${format(toDate, 'd MMM yyyy', { locale: ru })}`;
-  }
-  return `${format(fromDate, 'd MMM yyyy', { locale: ru })} – ${format(toDate, 'd MMM yyyy', { locale: ru })}`;
-};
-
-const dayCountInclusive = (fromDate, toDate) => {
-  if (!fromDate || !toDate) return 0;
-  const ms = startOfDay(toDate).getTime() - startOfDay(fromDate).getTime();
-  return Math.floor(ms / 86400000) + 1;
-};
-
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
 /**
- * Date range picker matching beUI Date Range Picker (dropdown composition).
+ * Single-date picker with beUI Date Range Picker trigger/calendar chrome.
  * https://beui.dev/components/motion/date-range-picker
+ *
+ * API kept as `from` (+ optional unused `to`) for ServerEventModal compatibility.
  */
 export function EventDateRangePicker({
   from,
-  to,
+  value,
+  to: _to,
   onChange,
   disabled = false,
   className = '',
-  label = 'Даты события',
+  label = 'Дата события',
+  placeholder = 'Выберите дату',
 }) {
   const reduce = useReducedMotion() ?? false;
-  const fromDate = parseYmd(from);
-  const toDate = parseYmd(to);
+  const selectedYmd = value || from || '';
+  const selectedDate = parseYmd(selectedYmd);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const headingId = useId();
   const helpId = useId();
 
   const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => startOfMonth(fromDate || new Date()));
+  const [viewMonth, setViewMonth] = useState(() =>
+    startOfMonth(selectedDate || new Date())
+  );
   const [direction, setDirection] = useState(0);
   const [view, setView] = useState('days'); // days | months | years
-  const [preview, setPreview] = useState(null);
-  const [pickingEnd, setPickingEnd] = useState(Boolean(fromDate && !toDate));
-
-  const shownTo = useMemo(() => {
-    if (toDate) return toDate;
-    if (pickingEnd && fromDate && preview) {
-      return isBefore(preview, fromDate) ? fromDate : preview;
-    }
-    return toDate;
-  }, [toDate, pickingEnd, fromDate, preview]);
-
-  const shownFrom = useMemo(() => {
-    if (pickingEnd && fromDate && preview && isBefore(preview, fromDate)) {
-      return preview;
-    }
-    return fromDate;
-  }, [pickingEnd, fromDate, preview]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 0 });
@@ -145,6 +111,10 @@ export function EventDateRangePicker({
     [yearPage]
   );
 
+  const emit = (ymd) => {
+    onChange?.({ from: ymd, to: ymd, value: ymd });
+  };
+
   const goMonth = (delta) => {
     setDirection(delta);
     setViewMonth((m) => (delta > 0 ? addMonths(m, 1) : subMonths(m, 1)));
@@ -154,30 +124,14 @@ export function EventDateRangePicker({
   const selectDay = (day) => {
     if (disabled) return;
     const ymd = toYmd(day);
-
-    if (!fromDate || (fromDate && toDate) || !pickingEnd) {
-      onChange?.({ from: ymd, to: ymd });
-      setPickingEnd(true);
-      setPreview(null);
-      return;
-    }
-
-    if (isBefore(day, fromDate)) {
-      onChange?.({ from: ymd, to: from });
-    } else {
-      onChange?.({ from, to: ymd });
-    }
-    setPickingEnd(false);
-    setPreview(null);
+    emit(ymd);
+    setOpen(false);
+    triggerRef.current?.focus();
   };
 
   const clear = () => {
-    onChange?.({ from: '', to: '' });
-    setPickingEnd(false);
-    setPreview(null);
+    emit('');
   };
-
-  const completeCount = fromDate && toDate ? dayCountInclusive(fromDate, toDate) : 0;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -199,30 +153,10 @@ export function EventDateRangePicker({
   }, [open]);
 
   useEffect(() => {
-    if (fromDate) setViewMonth(startOfMonth(fromDate));
-  }, [from]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedDate) setViewMonth(startOfMonth(selectedDate));
+  }, [selectedYmd]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const footerLabel = completeCount
-    ? `${completeCount} ${pluralDays(completeCount)} выбрано`
-    : fromDate && pickingEnd
-      ? 'Выберите дату окончания'
-      : 'Выберите дату начала';
-
-  const dayMeta = useCallback(
-    (day) => {
-      const inMonth = isSameMonth(day, viewMonth);
-      const isFrom = shownFrom && isSameDay(day, shownFrom);
-      const isTo = shownTo && isSameDay(day, shownTo);
-      const endpoint = isFrom || isTo;
-      const inRange =
-        shownFrom &&
-        shownTo &&
-        !isBefore(day, shownFrom) &&
-        !isAfter(day, shownTo);
-      return { inMonth, isFrom, isTo, endpoint, inRange, today: isToday(day) };
-    },
-    [viewMonth, shownFrom, shownTo]
-  );
+  const summary = selectedDate ? formatTriggerDate(selectedDate) : placeholder;
 
   return (
     <div
@@ -231,27 +165,42 @@ export function EventDateRangePicker({
       data-open={open || undefined}
       data-disabled={disabled || undefined}
     >
-      <button
+      <motion.button
         ref={triggerRef}
         type="button"
+        layout={!reduce}
+        transition={{ layout: SPRING_LAYOUT }}
         className="be-date-range__trigger"
         disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={`${label}: ${summary}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <CalendarDays size={16} aria-hidden className="be-date-range__trigger-icon" />
-        <span className="be-date-range__trigger-label">
-          <span className="be-date-range__trigger-prefix">{label}:</span>{' '}
-          {formatTriggerRange(fromDate, toDate)}
-        </span>
-        <ChevronDown
-          size={14}
+        <motion.span
+          layout={reduce ? false : 'position'}
+          transition={{ layout: SPRING_LAYOUT }}
+          className="be-date-range__trigger-icon"
           aria-hidden
+        >
+          <CalendarDays size={16} />
+        </motion.span>
+        <motion.span
+          layout={reduce ? false : 'position'}
+          transition={{ layout: SPRING_LAYOUT }}
+          className="be-date-range__trigger-label"
+        >
+          {summary}
+        </motion.span>
+        <motion.span
+          layout={reduce ? false : 'position'}
+          transition={{ layout: SPRING_LAYOUT }}
           className={`be-date-range__trigger-chevron${open ? ' is-open' : ''}`}
-        />
-      </button>
+          aria-hidden
+        >
+          <ChevronDown size={14} />
+        </motion.span>
+      </motion.button>
 
       <AnimatePresence>
         {open ? (
@@ -271,22 +220,6 @@ export function EventDateRangePicker({
             }}
             transition={{ duration: 0.18, ease: EASE_OUT }}
           >
-            <div className="be-date-range__summary">
-              <div className="be-date-range__summary-col">
-                <p className="be-date-range__summary-label">Дата начала</p>
-                <p className="be-date-range__summary-value">{formatShort(fromDate)}</p>
-              </div>
-              <ArrowRight size={14} className="be-date-range__summary-arrow" aria-hidden />
-              <div className="be-date-range__summary-col">
-                <p className="be-date-range__summary-label">Дата окончания</p>
-                <p
-                  className={`be-date-range__summary-value${!toDate ? ' is-muted' : ''}`}
-                >
-                  {formatShort(toDate)}
-                </p>
-              </div>
-            </div>
-
             <div className="be-date-range__header">
               <div className="be-date-range__header-titles">
                 <button
@@ -399,15 +332,10 @@ export function EventDateRangePicker({
                           <span key={d}>{d}</span>
                         ))}
                       </div>
-                      <div
-                        className="be-date-range__grid"
-                        role="grid"
-                        onMouseLeave={() => setPreview(null)}
-                      >
+                      <div className="be-date-range__grid" role="grid">
                         {weeks.map((week) =>
-                          week.map((day, dayIndex) => {
-                            const { inMonth, isFrom, isTo, endpoint, inRange, today } =
-                              dayMeta(day);
+                          week.map((day) => {
+                            const inMonth = isSameMonth(day, viewMonth);
                             if (!inMonth) {
                               return (
                                 <div
@@ -418,69 +346,31 @@ export function EventDateRangePicker({
                               );
                             }
 
-                            const rangeStart =
-                              inRange &&
-                              (dayIndex === 0 || (shownFrom && isSameDay(day, shownFrom)));
-                            const rangeEnd =
-                              inRange &&
-                              (dayIndex === 6 ||
-                                (shownTo && isSameDay(day, shownTo)) ||
-                                !shownTo);
+                            const selected =
+                              selectedDate && isSameDay(day, selectedDate);
+                            const today = isToday(day);
 
                             return (
                               <div
                                 key={toYmd(day)}
                                 role="gridcell"
-                                className={[
-                                  'be-date-range__cell',
-                                  inRange && 'is-in-range',
-                                  rangeStart && 'is-range-start',
-                                  rangeEnd && 'is-range-end',
-                                ]
-                                  .filter(Boolean)
-                                  .join(' ')}
-                                onMouseEnter={() => {
-                                  if (pickingEnd && fromDate && !toDate) setPreview(day);
-                                }}
+                                className="be-date-range__cell"
                               >
-                                <span
-                                  className="be-date-range__range-bg"
-                                  aria-hidden
-                                  style={{
-                                    opacity: inRange ? 1 : 0,
-                                    left:
-                                      endpoint &&
-                                      shownFrom &&
-                                      isSameDay(day, shownFrom)
-                                        ? '50%'
-                                        : 0,
-                                    right:
-                                      endpoint &&
-                                      shownTo &&
-                                      isSameDay(day, shownTo)
-                                        ? '50%'
-                                        : endpoint &&
-                                            shownFrom &&
-                                            !shownTo &&
-                                            isSameDay(day, shownFrom)
-                                          ? '50%'
-                                          : 0,
-                                  }}
-                                />
                                 <motion.button
                                   type="button"
                                   className={[
                                     'be-date-range__day',
-                                    endpoint && 'is-endpoint',
-                                    isFrom && 'is-from',
-                                    isTo && 'is-to',
-                                    today && !endpoint && 'is-today',
+                                    selected && 'is-endpoint is-from',
+                                    today && !selected && 'is-today',
                                   ]
                                     .filter(Boolean)
                                     .join(' ')}
                                   disabled={disabled}
-                                  aria-label={format(day, 'd MMMM yyyy', { locale: ru })}
+                                  aria-label={format(day, 'd MMMM yyyy', {
+                                    locale: ru,
+                                  })}
                                   aria-current={today ? 'date' : undefined}
+                                  aria-pressed={Boolean(selected)}
                                   whileTap={reduce ? undefined : { scale: 0.9 }}
                                   transition={SPRING_PRESS}
                                   onClick={() => selectDay(day)}
@@ -541,12 +431,16 @@ export function EventDateRangePicker({
             </div>
 
             <div className="be-date-range__footer">
-              <p className="be-date-range__selection">{footerLabel}</p>
+              <p className="be-date-range__selection">
+                {selectedDate
+                  ? format(selectedDate, 'd MMMM yyyy', { locale: ru })
+                  : 'Выберите дату'}
+              </p>
               <button
                 type="button"
                 className="be-date-range__clear"
-                aria-label="Очистить диапазон дат"
-                disabled={disabled || !fromDate}
+                aria-label="Очистить дату"
+                disabled={disabled || !selectedDate}
                 onClick={clear}
               >
                 Очистить
@@ -557,14 +451,6 @@ export function EventDateRangePicker({
       </AnimatePresence>
     </div>
   );
-}
-
-function pluralDays(n) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'день';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'дня';
-  return 'дней';
 }
 
 export default EventDateRangePicker;

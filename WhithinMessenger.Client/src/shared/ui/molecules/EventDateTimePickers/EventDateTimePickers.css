@@ -31,24 +31,26 @@
 }
 
 .be-date-range__trigger {
-  display: flex;
-  width: 100%;
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 8px 12px;
-  border-radius: 10px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
   border: 1px solid var(--bdr-border);
   background: var(--bdr-elevated);
   color: var(--bdr-fg);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .be-date-range__trigger:hover {
-  border-color: color-mix(in srgb, var(--bdr-fg) 22%, transparent);
+  background: color-mix(in srgb, var(--bdr-muted) 10%, var(--bdr-elevated));
 }
 
 .be-date-range__trigger:focus-visible {
@@ -57,25 +59,26 @@
 }
 
 .be-date-range__trigger-icon {
+  display: inline-flex;
   flex-shrink: 0;
   color: var(--bdr-muted);
+  line-height: 0;
 }
 
 .be-date-range__trigger-label {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.be-date-range__trigger-prefix {
-  color: var(--bdr-muted);
+  font-variant-numeric: tabular-nums;
+  text-transform: capitalize;
 }
 
 .be-date-range__trigger-chevron {
+  display: inline-flex;
   flex-shrink: 0;
   color: var(--bdr-muted);
+  line-height: 0;
   transition: transform 0.18s ease;
 }
 
@@ -95,44 +98,6 @@
   background: var(--bdr-bg);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   color: var(--bdr-fg);
-}
-
-.be-date-range__summary {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--bdr-border);
-  background: color-mix(in srgb, var(--bdr-muted) 8%, transparent);
-}
-
-.be-date-range__summary-label {
-  margin: 0 0 4px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--bdr-muted);
-}
-
-.be-date-range__summary-value {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-transform: capitalize;
-}
-
-.be-date-range__summary-value.is-muted {
-  color: var(--bdr-muted);
-  font-weight: 500;
-}
-
-.be-date-range__summary-arrow {
-  color: color-mix(in srgb, var(--bdr-muted) 70%, transparent);
 }
 
 .be-date-range__header {
