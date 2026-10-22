@@ -53,7 +53,7 @@ export function WheelPicker({
   const currentValue = controlled ? value : internal;
   const [grabbing, setGrabbing] = useState(false);
 
-  const { itemAngle, radius, height, hideBeyond, slotCount } = useMemo(() => {
+  const { itemAngle, radius, height, hideBeyond, slotCount, perspective } = useMemo(() => {
     const rowsEachSide = Math.max(1, Math.floor(visibleCount / 2));
     const cutoff = rowsEachSide + 1;
     const angle = 90 / cutoff;
@@ -63,6 +63,7 @@ export function WheelPicker({
       radius: r,
       hideBeyond: cutoff,
       slotCount: cutoff * 2 + 4,
+      perspective: Math.round(r * 3),
       height: Math.round(2 * r * Math.sin(rowsEachSide * angle * DEG) + itemHeight),
     };
   }, [visibleCount, itemHeight]);
@@ -177,7 +178,6 @@ export function WheelPicker({
 
   useEffect(() => {
     const i = indexOf(currentValue);
-    // Keep continuous scroll near the new value (for loop, pick nearest turn).
     if (canLoop && n > 0) {
       const base = Math.round(scroll.current);
       const currentMod = wrap(base, n);
@@ -243,7 +243,9 @@ export function WheelPicker({
     event.preventDefault();
     if (reduce) {
       const cur = indexOf(currentValue);
-      const next = canLoop ? wrap(cur + Math.sign(event.deltaY), n) : clamp(cur + Math.sign(event.deltaY), 0, last);
+      const next = canLoop
+        ? wrap(cur + Math.sign(event.deltaY), n)
+        : clamp(cur + Math.sign(event.deltaY), 0, last);
       emit(next);
       paint(canLoop ? scroll.current - cur + next : next);
       scroll.current = canLoop ? scroll.current - cur + next : next;
@@ -286,6 +288,7 @@ export function WheelPicker({
   };
 
   if (reduce) {
+    const pad = (height - itemHeight) / 2;
     return (
       <div
         className={`wheel-picker wheel-picker--flat ${className}`.trim()}
@@ -295,7 +298,8 @@ export function WheelPicker({
         tabIndex={disabled ? -1 : 0}
         onKeyDown={onKeyDown}
       >
-        <div className="wheel-picker__flat-list">
+        <div className="wheel-picker__selection wheel-picker__selection--flat" style={{ height: itemHeight }} />
+        <div className="wheel-picker__flat-list" style={{ paddingTop: pad, paddingBottom: pad }}>
           {options.map((option, i) => {
             const v = optionValue(option);
             const selected = v === currentValue;
@@ -323,14 +327,36 @@ export function WheelPicker({
     );
   }
 
-  const slots = canLoop
-    ? Array.from({ length: slotCount }, (_, k) => k)
-    : options.map((_, i) => i);
+  const slots = canLoop ? Array.from({ length: slotCount }, (_, k) => k) : options.map((_, i) => i);
+  const itemTop = -itemHeight / 2;
+
+  const renderItems = (band) =>
+    slots.map((slot) => {
+      const option = canLoop ? options[0] : options[slot];
+      return (
+        <li
+          key={band ? `band-${canLoop ? slot : optionValue(option)}` : canLoop ? `slot-${slot}` : optionValue(option)}
+          data-index={canLoop ? 0 : slot}
+          className={band ? 'wheel-picker__item wheel-picker__item--band' : 'wheel-picker__item'}
+          style={{
+            top: itemTop,
+            height: itemHeight,
+            transform: canLoop
+              ? undefined
+              : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
+          }}
+          role={band ? undefined : 'option'}
+          aria-selected={band ? undefined : canLoop ? false : optionValue(option) === currentValue}
+        >
+          {canLoop ? '' : optionLabel(option)}
+        </li>
+      );
+    });
 
   return (
     <div
       className={`wheel-picker ${grabbing ? 'is-grabbing' : ''} ${className}`.trim()}
-      style={{ height, ['--wheel-item-height']: `${itemHeight}px` }}
+      style={{ height, perspective, ['--wheel-item-height']: `${itemHeight}px` }}
       role="listbox"
       aria-label={ariaLabel}
       tabIndex={disabled ? -1 : 0}
@@ -341,66 +367,18 @@ export function WheelPicker({
       onPointerCancel={onPointerUp}
       onWheel={onWheel}
     >
-      <div className="wheel-picker__viewport" style={{ perspective: `${radius * 3}px` }}>
-        <ul
-          ref={drumRef}
-          className="wheel-picker__drum"
-          style={{
-            transformStyle: 'preserve-3d',
-            height: itemHeight,
-            marginTop: (height - itemHeight) / 2,
-          }}
-        >
-          {slots.map((slot) => {
-            const option = canLoop ? options[0] : options[slot];
-            return (
-              <li
-                key={canLoop ? `slot-${slot}` : optionValue(option)}
-                data-index={canLoop ? 0 : slot}
-                className="wheel-picker__item"
-                style={{
-                  height: itemHeight,
-                  transform: canLoop
-                    ? undefined
-                    : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
-                }}
-                role="option"
-                aria-selected={canLoop ? false : optionValue(option) === currentValue}
-              >
-                {canLoop ? '' : optionLabel(option)}
-              </li>
-            );
-          })}
+      <ul ref={drumRef} className="wheel-picker__drum" aria-hidden>
+        {renderItems(false)}
+      </ul>
+
+      <div
+        className="wheel-picker__selection"
+        style={{ height: itemHeight, perspective }}
+        aria-hidden
+      >
+        <ul ref={bandRef} className="wheel-picker__drum wheel-picker__drum--band">
+          {renderItems(true)}
         </ul>
-        <div className="wheel-picker__selection" style={{ height: itemHeight }} aria-hidden>
-          <ul
-            ref={bandRef}
-            className="wheel-picker__drum wheel-picker__drum--band"
-            style={{
-              transformStyle: 'preserve-3d',
-              height: itemHeight,
-            }}
-          >
-            {slots.map((slot) => {
-              const option = canLoop ? options[0] : options[slot];
-              return (
-                <li
-                  key={canLoop ? `band-slot-${slot}` : `band-${optionValue(option)}`}
-                  data-index={canLoop ? 0 : slot}
-                  className="wheel-picker__item wheel-picker__item--band"
-                  style={{
-                    height: itemHeight,
-                    transform: canLoop
-                      ? undefined
-                      : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
-                  }}
-                >
-                  {canLoop ? '' : optionLabel(option)}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
       </div>
     </div>
   );

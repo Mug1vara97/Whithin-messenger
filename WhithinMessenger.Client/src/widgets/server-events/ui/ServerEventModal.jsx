@@ -1,5 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FaTimes, FaVolumeUp, FaMapMarkerAlt } from 'react-icons/fa';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FaTimes,
+  FaVolumeUp,
+  FaMapMarkerAlt,
+  FaBroadcastTower,
+} from 'react-icons/fa';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
   SERVER_EVENT_LOCATION,
@@ -43,13 +48,20 @@ const ServerEventModal = ({
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
+  const [coverPreview, setCoverPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const coverInputRef = useRef(null);
 
   const voiceChannels = useMemo(
     () => collectServerChannels(categories).filter(isVoiceChannel),
     [categories]
+  );
+
+  const selectedChannel = useMemo(
+    () => voiceChannels.find((c) => String(c.chatId) === String(channelId)),
+    [voiceChannels, channelId]
   );
 
   useEffect(() => {
@@ -57,6 +69,7 @@ const ServerEventModal = ({
     setError('');
     setDone(false);
     setStep(0);
+    setCoverPreview(null);
 
     if (mode === 'edit' && event) {
       const isExternal = event.locationType === SERVER_EVENT_LOCATION.EXTERNAL;
@@ -182,6 +195,21 @@ const ServerEventModal = ({
     }
   };
 
+  const onCoverChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Обложка должна быть изображением');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setCoverPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+    setError('');
+  };
+
   const preview = {
     title: title.trim() || 'Без названия',
     description: description.trim(),
@@ -189,35 +217,42 @@ const ServerEventModal = ({
     location:
       locationKind === 'external'
         ? externalLocation.trim()
-        : voiceChannels.find((c) => String(c.chatId) === String(channelId))?.name ||
-          'Голосовой канал',
+        : selectedChannel?.name || 'Голосовой канал',
+    cover: coverPreview,
   };
 
   return (
     <div className="server-events-overlay" onClick={onClose}>
-      <div className="server-events-modal wide" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="server-events-modal wide sev-wizard"
+        onClick={(e) => e.stopPropagation()}
+      >
         {!done && (
-          <>
-            <div className="server-events-modal-header">
-              <h2>{mode === 'edit' ? 'Изменить событие' : 'Создать событие'}</h2>
-              <button type="button" className="server-events-modal-close" onClick={onClose}>
-                <FaTimes />
-              </button>
-            </div>
-            <div className="sev-steps">
+          <div className="sev-wizard-top">
+            <div className="sev-steps" role="tablist" aria-label="Шаги создания события">
               {STEPS.map((label, idx) => (
                 <div
                   key={label}
                   className={`sev-step ${idx === step ? 'active' : ''} ${idx < step ? 'done' : ''}`}
+                  aria-current={idx === step ? 'step' : undefined}
                 >
-                  {label}
+                  <span className="sev-step__bar" aria-hidden />
+                  <span className="sev-step__label">{label}</span>
                 </div>
               ))}
             </div>
-          </>
+            <button
+              type="button"
+              className="server-events-modal-close sev-wizard-close"
+              onClick={onClose}
+              aria-label="Закрыть"
+            >
+              <FaTimes />
+            </button>
+          </div>
         )}
 
-        <div className="server-events-modal-body">
+        <div className="server-events-modal-body sev-wizard-body">
           {done ? (
             <div className="sev-success">
               <div className="sev-confetti" aria-hidden>
@@ -242,73 +277,89 @@ const ServerEventModal = ({
             <>
               {step === 0 && (
                 <>
-                  <h3 className="sev-wizard-title">Где пройдет ваше событие?</h3>
+                  <h3 className="sev-wizard-title">Где пройдёт ваше событие?</h3>
                   <p className="sev-wizard-sub">Чтобы все знали, где его искать.</p>
 
                   <div className="sev-option disabled" aria-disabled>
-                    <input type="radio" disabled />
-                    <div>
+                    <span className="sev-option__radio" aria-hidden />
+                    <span className="sev-option__icon" aria-hidden>
+                      <FaBroadcastTower />
+                    </span>
+                    <div className="sev-option__text">
                       <div className="sev-option-title">Трибуна</div>
                       <div className="sev-option-desc">
-                        Пока недоступно. Отлично подходит для крупных голосовых событий.
+                        Отлично подходит для голосовых событий крупных сообществ.
                       </div>
                     </div>
                   </div>
 
-                  <label className={`sev-option ${locationKind === 'voice' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="loc"
-                      checked={locationKind === 'voice'}
-                      onChange={() => setLocationKind('voice')}
+                  <button
+                    type="button"
+                    className={`sev-option ${locationKind === 'voice' ? 'selected' : ''}`}
+                    onClick={() => setLocationKind('voice')}
+                  >
+                    <span
+                      className={`sev-option__radio ${locationKind === 'voice' ? 'is-on' : ''}`}
+                      aria-hidden
                     />
-                    <div>
-                      <div className="sev-option-title">
-                        <FaVolumeUp style={{ marginRight: 6 }} />
-                        Голосовой канал
-                      </div>
+                    <span className="sev-option__icon" aria-hidden>
+                      <FaVolumeUp />
+                    </span>
+                    <div className="sev-option__text">
+                      <div className="sev-option-title">Голосовой канал</div>
                       <div className="sev-option-desc">
-                        Голос, видео и демонстрация экрана
+                        Голос, видео, показ экрана и стриминг Go Live.
                       </div>
                     </div>
-                  </label>
+                  </button>
 
-                  <label className={`sev-option ${locationKind === 'external' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="loc"
-                      checked={locationKind === 'external'}
-                      onChange={() => setLocationKind('external')}
+                  <button
+                    type="button"
+                    className={`sev-option ${locationKind === 'external' ? 'selected' : ''}`}
+                    onClick={() => setLocationKind('external')}
+                  >
+                    <span
+                      className={`sev-option__radio ${locationKind === 'external' ? 'is-on' : ''}`}
+                      aria-hidden
                     />
-                    <div>
-                      <div className="sev-option-title">
-                        <FaMapMarkerAlt style={{ marginRight: 6 }} />
-                        В другом месте
-                      </div>
+                    <span className="sev-option__icon" aria-hidden>
+                      <FaMapMarkerAlt />
+                    </span>
+                    <div className="sev-option__text">
+                      <div className="sev-option-title">В другом месте</div>
                       <div className="sev-option-desc">
-                        Текстовый канал, внешняя ссылка или место проведения
+                        Текстовый канал, внешняя ссылка или место проведения.
                       </div>
                     </div>
-                  </label>
+                  </button>
 
                   {locationKind === 'voice' ? (
                     <label className="sev-field">
                       <span>
-                        Голосовой канал <span className="req">*</span>
+                        Выбрать канал <span className="req">*</span>
                       </span>
-                      <select
-                        value={channelId}
-                        onChange={(e) => setChannelId(e.target.value)}
-                      >
-                        {voiceChannels.length === 0 && (
-                          <option value="">Нет голосовых каналов</option>
-                        )}
-                        {voiceChannels.map((ch) => (
-                          <option key={ch.chatId} value={ch.chatId}>
-                            {ch.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="sev-channel-select">
+                        <span className="sev-channel-select__icon" aria-hidden>
+                          <FaVolumeUp />
+                        </span>
+                        <select
+                          value={channelId}
+                          onChange={(e) => setChannelId(e.target.value)}
+                        >
+                          {voiceChannels.length === 0 && (
+                            <option value="">Нет голосовых каналов</option>
+                          )}
+                          {voiceChannels.map((ch) => (
+                            <option key={ch.chatId} value={ch.chatId}>
+                              {ch.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="sev-field-hint">
+                        События в приватном канале будут видны только тем, у кого есть к нему
+                        доступ.
+                      </p>
                     </label>
                   ) : (
                     <label className="sev-field">
@@ -339,30 +390,42 @@ const ServerEventModal = ({
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       maxLength={200}
+                      placeholder="Чему посвящено ваше событие?"
                     />
                   </label>
 
-                  <div className="sev-field">
-                    <EventDateRangePicker
-                      label="Дата события"
-                      from={startDate}
-                      onChange={({ from }) => {
-                        setStartDate(from || '');
-                      }}
-                    />
-                  </div>
-
                   <div className="event-datetime-row">
-                    <EventTimeWheelPicker
-                      label="Время"
-                      value={startTime}
-                      onChange={setStartTime}
-                      minuteStep={1}
-                    />
+                    <div className="sev-field sev-field--inline">
+                      <span>
+                        Дата начала <span className="req">*</span>
+                      </span>
+                      <EventDateRangePicker
+                        label="Дата начала"
+                        from={startDate}
+                        onChange={({ from }) => {
+                          setStartDate(from || '');
+                        }}
+                        className="sev-datetime-control"
+                      />
+                    </div>
+                    <div className="sev-field sev-field--inline">
+                      <span>
+                        Время начала <span className="req">*</span>
+                      </span>
+                      <EventTimeWheelPicker
+                        label="Время начала"
+                        value={startTime}
+                        onChange={setStartTime}
+                        minuteStep={1}
+                        className="sev-datetime-control"
+                      />
+                    </div>
                   </div>
 
                   <label className="sev-field">
-                    <span>Частота события</span>
+                    <span>
+                      Частота события <span className="req">*</span>
+                    </span>
                     <select value="none" disabled>
                       <option value="none">Не повторяется</option>
                     </select>
@@ -374,9 +437,59 @@ const ServerEventModal = ({
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       maxLength={4000}
-                      placeholder="Расскажите о своём событии подробнее."
+                      placeholder="Расскажите о своём событии подробнее. Поддерживаются разметка текста, перенос строк и ссылки."
                     />
                   </label>
+
+                  <div className="sev-field">
+                    <span>Обложка</span>
+                    <p className="sev-field-hint sev-field-hint--cover">
+                      Рекомендуем использовать изображение размером не менее 800 пикселей в ширину
+                      и 320 пикселей в высоту.
+                    </p>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={onCoverChange}
+                    />
+                    {coverPreview ? (
+                      <div className="sev-cover-preview">
+                        <img src={coverPreview} alt="Обложка события" />
+                        <div className="sev-cover-preview__actions">
+                          <button
+                            type="button"
+                            className="sev-btn primary"
+                            onClick={() => coverInputRef.current?.click()}
+                          >
+                            Заменить
+                          </button>
+                          <button
+                            type="button"
+                            className="sev-btn ghost"
+                            onClick={() => {
+                              setCoverPreview((prev) => {
+                                if (prev) URL.revokeObjectURL(prev);
+                                return null;
+                              });
+                              if (coverInputRef.current) coverInputRef.current.value = '';
+                            }}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="sev-btn primary sev-cover-upload"
+                        onClick={() => coverInputRef.current?.click()}
+                      >
+                        Загрузить обложку
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -385,6 +498,11 @@ const ServerEventModal = ({
                   <h3 className="sev-wizard-title">Всё верно?</h3>
                   <p className="sev-wizard-sub">Проверьте сведения перед публикацией.</p>
                   <div className="sev-preview-card">
+                    {preview.cover && (
+                      <div className="sev-preview-cover">
+                        <img src={preview.cover} alt="" />
+                      </div>
+                    )}
                     <h3>{preview.title}</h3>
                     <p>{preview.when}</p>
                     <p>{preview.location}</p>
@@ -398,7 +516,7 @@ const ServerEventModal = ({
           )}
         </div>
 
-        <div className="server-events-modal-footer">
+        <div className={`server-events-modal-footer ${step > 0 && !done ? 'has-back' : ''}`}>
           {done ? (
             <button
               type="button"
@@ -412,28 +530,34 @@ const ServerEventModal = ({
             </button>
           ) : (
             <>
-              <button type="button" className="sev-btn ghost spacer" onClick={onClose}>
-                Отмена
-              </button>
               {step > 0 && (
-                <button type="button" className="sev-btn ghost" onClick={() => setStep((s) => s - 1)}>
+                <button
+                  type="button"
+                  className="sev-btn link"
+                  onClick={() => setStep((s) => s - 1)}
+                >
                   Назад
                 </button>
               )}
-              {step < 2 ? (
-                <button type="button" className="sev-btn primary" onClick={goNext}>
-                  Далее
+              <div className="sev-footer-actions">
+                <button type="button" className="sev-btn secondary" onClick={onClose}>
+                  Отмена
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  className="sev-btn primary"
-                  onClick={submit}
-                  disabled={saving}
-                >
-                  {saving ? 'Сохранение…' : mode === 'edit' ? 'Сохранить' : 'Создать событие'}
-                </button>
-              )}
+                {step < 2 ? (
+                  <button type="button" className="sev-btn primary" onClick={goNext}>
+                    Далее
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="sev-btn primary"
+                    onClick={submit}
+                    disabled={saving}
+                  >
+                    {saving ? 'Сохранение…' : mode === 'edit' ? 'Сохранить' : 'Создать событие'}
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>

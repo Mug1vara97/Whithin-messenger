@@ -44,7 +44,7 @@ const toYmd = (date) => format(date, 'yyyy-MM-dd');
 const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
 const formatTriggerDate = (date) =>
-  date ? format(date, 'd MMM yyyy', { locale: ru }) : 'Выберите дату';
+  date ? format(date, "d MMM yyyy 'г.'", { locale: ru }) : 'Выберите дату';
 
 /**
  * Single-date picker with beUI Date Range Picker trigger/calendar chrome.
