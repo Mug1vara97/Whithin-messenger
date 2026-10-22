@@ -361,10 +361,8 @@ const ServerEventModal = ({
                   </label>
 
                   <div className="sev-field">
-                    <span>
-                      Даты события <span className="req">*</span>
-                    </span>
                     <EventDateRangePicker
+                      label="Даты события"
                       from={startDate}
                       to={endDate}
                       onChange={({ from, to }) => {

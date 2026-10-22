@@ -12,176 +12,382 @@
   text-transform: none;
 }
 
-/* ——— Date range calendar ——— */
-.event-date-range {
-  --edr-accent: var(--primary, #5865f2);
-  --edr-accent-soft: color-mix(in srgb, var(--edr-accent) 22%, transparent);
-  --edr-surface: var(--background-secondary, var(--surface, #2b2d31));
-  --edr-elevated: var(--background-primary, var(--background, #1e1f22));
-  --edr-text: var(--text, #f2f3f5);
-  --edr-muted: var(--text-muted, #949ba4);
-  --edr-border: var(--border, rgba(255, 255, 255, 0.08));
-
-  background: var(--edr-surface);
-  border: 1px solid var(--edr-border);
-  border-radius: 12px;
-  padding: 12px;
+/* ——— beUI-matching date range picker ——— */
+.be-date-range {
+  --bdr-fg: var(--text, #f2f3f5);
+  --bdr-muted: var(--text-muted, #949ba4);
+  --bdr-bg: var(--surface, #2b2d31);
+  --bdr-elevated: var(--background, #1e1f22);
+  --bdr-border: var(--border, rgba(255, 255, 255, 0.1));
+  --bdr-ring: var(--primary, #5865f2);
+  position: relative;
+  width: 100%;
   user-select: none;
 }
 
-.event-date-range__summary {
+.be-date-range[data-disabled] {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.be-date-range__trigger {
   display: flex;
+  width: 100%;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bdr-border);
+  background: var(--bdr-elevated);
+  color: var(--bdr-fg);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.be-date-range__trigger:hover {
+  border-color: color-mix(in srgb, var(--bdr-fg) 22%, transparent);
+}
+
+.be-date-range__trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bdr-ring) 45%, transparent);
+}
+
+.be-date-range__trigger-icon {
+  flex-shrink: 0;
+  color: var(--bdr-muted);
+}
+
+.be-date-range__trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-date-range__trigger-prefix {
+  color: var(--bdr-muted);
+}
+
+.be-date-range__trigger-chevron {
+  flex-shrink: 0;
+  color: var(--bdr-muted);
+  transition: transform 0.18s ease;
+}
+
+.be-date-range__trigger-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.be-date-range__panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(100%, 320px);
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--bdr-border);
+  background: var(--bdr-bg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  color: var(--bdr-fg);
+}
+
+.be-date-range__summary {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 8px;
   margin-bottom: 10px;
-  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--bdr-border);
+  background: color-mix(in srgb, var(--bdr-muted) 8%, transparent);
+}
+
+.be-date-range__summary-label {
+  margin: 0 0 4px;
+  font-size: 10px;
   font-weight: 600;
-  color: var(--edr-text);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bdr-muted);
+}
+
+.be-date-range__summary-value {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   text-transform: capitalize;
 }
 
-.event-date-range__hint {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--edr-accent);
-  background: var(--edr-accent-soft);
-  padding: 3px 8px;
-  border-radius: 999px;
+.be-date-range__summary-value.is-muted {
+  color: var(--bdr-muted);
+  font-weight: 500;
 }
 
-.event-date-range__nav {
+.be-date-range__summary-arrow {
+  color: color-mix(in srgb, var(--bdr-muted) 70%, transparent);
+}
+
+.be-date-range__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 4px;
   margin-bottom: 8px;
 }
 
-.event-date-range__month-title {
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--edr-text);
-  text-transform: capitalize;
+.be-date-range__header-titles {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
 }
 
-.event-date-range__nav-btn {
+.be-date-range__month-btn,
+.be-date-range__year-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 6px;
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--edr-muted);
+  color: var(--bdr-fg);
+  font-size: 13px;
+  font-weight: 650;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: background 0.15s ease;
+}
+
+.be-date-range__year-btn {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--bdr-muted);
+}
+
+.be-date-range__month-btn:hover,
+.be-date-range__year-btn:hover,
+.be-date-range__month-btn.is-active,
+.be-date-range__year-btn.is-active {
+  background: color-mix(in srgb, var(--bdr-muted) 14%, transparent);
+  color: var(--bdr-fg);
+}
+
+.be-date-range__header-nav {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.be-date-range__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bdr-muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.event-date-range__nav-btn:hover:not(:disabled) {
-  background: var(--edr-elevated);
-  color: var(--edr-text);
+.be-date-range__icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bdr-muted) 14%, transparent);
+  color: var(--bdr-fg);
 }
 
-.event-date-range__nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.be-date-range__grid-wrap {
+  overflow: hidden;
+  min-height: 232px;
 }
 
-.event-date-range__weekdays {
+.be-date-range__weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.event-date-range__weekdays span {
+.be-date-range__weekdays span {
   text-align: center;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  color: var(--edr-muted);
+  text-transform: lowercase;
+  color: var(--bdr-muted);
   padding: 4px 0;
 }
 
-.event-date-range__grid-wrap {
-  overflow: hidden;
-  min-height: 216px;
-}
-
-.event-date-range__grid {
+.be-date-range__grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
 }
 
-.event-date-range__day {
+.be-date-range__cell {
   position: relative;
-  height: 36px;
-  border: none;
-  background: transparent;
-  color: var(--edr-text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: 0;
-  padding: 0;
-}
-
-.event-date-range__day span {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
   height: 32px;
-  border-radius: 999px;
-  margin: 0 auto;
+  text-align: center;
 }
 
-.event-date-range__day.is-outside {
-  visibility: hidden;
+.be-date-range__cell.is-outside {
   pointer-events: none;
 }
 
-.event-date-range__day.is-today span {
-  box-shadow: inset 0 0 0 1.5px var(--edr-muted);
-}
-
-.event-date-range__day.is-in-range {
-  background: var(--edr-accent-soft);
-}
-
-.event-date-range__day.is-from {
+.be-date-range__cell.is-range-start {
   border-radius: 999px 0 0 999px;
-  background: var(--edr-accent-soft);
 }
 
-.event-date-range__day.is-to {
+.be-date-range__cell.is-range-end {
   border-radius: 0 999px 999px 0;
-  background: var(--edr-accent-soft);
 }
 
-.event-date-range__day.is-from.is-to {
+.be-date-range__cell.is-range-start.is-range-end {
   border-radius: 999px;
 }
 
-.event-date-range__day.is-selected span {
-  background: var(--edr-accent);
-  color: #fff;
-  font-weight: 700;
-  box-shadow: none;
+.be-date-range__range-bg {
+  pointer-events: none;
+  position: absolute;
+  inset-block: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--bdr-fg) 8%, transparent);
+  transition: opacity 0.12s ease;
 }
 
-.event-date-range__day:hover:not(:disabled):not(.is-selected) span {
-  background: var(--edr-elevated);
+.be-date-range__day {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bdr-fg);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
 }
 
-.event-date-range__day:disabled {
+.be-date-range__day:hover:not(:disabled):not(.is-endpoint) {
+  background: color-mix(in srgb, var(--bdr-muted) 16%, transparent);
+}
+
+.be-date-range__day.is-endpoint {
+  background: var(--bdr-fg);
+  color: var(--bdr-elevated);
+  font-weight: 600;
+}
+
+.be-date-range__day.is-to:not(.is-from) {
+  background: transparent;
+  color: var(--bdr-fg);
+  box-shadow: inset 0 0 0 1.5px var(--bdr-fg);
+  font-weight: 600;
+}
+
+.be-date-range__day.is-today:not(.is-endpoint)::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.be-date-range__day:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bdr-ring) 55%, transparent);
+}
+
+.be-date-range__choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.be-date-range__choice {
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--bdr-fg);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 6px;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.be-date-range__choice:hover {
+  background: color-mix(in srgb, var(--bdr-muted) 14%, transparent);
+}
+
+.be-date-range__choice.is-selected {
+  background: var(--bdr-fg);
+  color: var(--bdr-elevated);
+  font-weight: 650;
+}
+
+.be-date-range__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bdr-border);
+}
+
+.be-date-range__selection {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bdr-muted);
+}
+
+.be-date-range__clear {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bdr-muted);
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.be-date-range__clear:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bdr-muted) 14%, transparent);
+  color: var(--bdr-fg);
+}
+
+.be-date-range__clear:disabled {
+  opacity: 0.3;
   cursor: default;
+}
+
+.be-date-range__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ——— Time wheels ——— */
