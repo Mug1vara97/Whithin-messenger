@@ -13,6 +13,10 @@ const BACK = 1.35;
 const easeOutCubic = (p) => 1 - (1 - p) ** 3;
 const easeOutBack = (p) => 1 + (BACK + 1) * (p - 1) ** 3 + BACK * (p - 1) ** 2;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+const wrap = (i, n) => {
+  if (n <= 0) return 0;
+  return ((Math.round(i) % n) + n) % n;
+};
 
 const optionValue = (option) => (typeof option === 'string' ? option : option.value);
 const optionLabel = (option) => (typeof option === 'string' ? option : option.label);
@@ -29,12 +33,15 @@ export function WheelPicker({
   visibleCount = 5,
   itemHeight = 36,
   disabled = false,
+  loop = false,
   className = '',
   'aria-label': ariaLabel = 'Выбор',
 }) {
   const reduce = useReducedMotion() ?? false;
   const controlled = value !== undefined;
-  const last = Math.max(0, options.length - 1);
+  const n = options.length;
+  const last = Math.max(0, n - 1);
+  const canLoop = loop && n > 1;
 
   const indexOf = useCallback(
     (v) => {
@@ -48,7 +55,7 @@ export function WheelPicker({
   const currentValue = controlled ? value : internal;
   const [grabbing, setGrabbing] = useState(false);
 
-  const { itemAngle, radius, height, hideBeyond } = useMemo(() => {
+  const { itemAngle, radius, height, hideBeyond, slotCount } = useMemo(() => {
     const rowsEachSide = Math.max(1, Math.floor(visibleCount / 2));
     const cutoff = rowsEachSide + 1;
     const angle = 90 / cutoff;
@@ -57,6 +64,7 @@ export function WheelPicker({
       itemAngle: angle,
       radius: r,
       hideBeyond: cutoff,
+      slotCount: cutoff * 2 + 4,
       height: Math.round(2 * r * Math.sin(rowsEachSide * angle * DEG) + itemHeight),
     };
   }, [visibleCount, itemHeight]);
@@ -74,37 +82,51 @@ export function WheelPicker({
       const drum = drumRef.current;
       const band = bandRef.current;
       const transform = `translateZ(${-radius}px) rotateX(${itemAngle * s}deg)`;
-      if (drum) {
-        drum.style.transform = transform;
-        for (const node of Array.from(drum.children)) {
+
+      const paintList = (list) => {
+        if (!list) return;
+        list.style.transform = transform;
+        const children = Array.from(list.children);
+        if (canLoop) {
+          const first = Math.floor(s) - hideBeyond - 1;
+          for (let k = 0; k < children.length; k += 1) {
+            const li = children[k];
+            const vi = first + k;
+            const opt = options[wrap(vi, n)];
+            const want = Math.abs(vi - s) > hideBeyond ? 'hidden' : 'visible';
+            li.dataset.index = String(vi);
+            li.style.transform = `rotateX(${-itemAngle * vi}deg) translateZ(${radius}px)`;
+            li.style.visibility = want;
+            const label = optionLabel(opt);
+            if (li.textContent !== label) li.textContent = label;
+            li.setAttribute('aria-selected', optionValue(opt) === emitted.current ? 'true' : 'false');
+          }
+          return;
+        }
+        for (const node of children) {
           const li = node;
           const i = Number(li.dataset.index);
           const want = Math.abs(i - s) > hideBeyond ? 'hidden' : 'visible';
           if (li.style.visibility !== want) li.style.visibility = want;
         }
-      }
-      if (band) {
-        band.style.transform = transform;
-        for (const node of Array.from(band.children)) {
-          const li = node;
-          const i = Number(li.dataset.index);
-          const want = Math.abs(i - s) > hideBeyond ? 'hidden' : 'visible';
-          if (li.style.visibility !== want) li.style.visibility = want;
-        }
-      }
+      };
+
+      paintList(drum);
+      paintList(band);
     },
-    [radius, itemAngle, hideBeyond]
+    [radius, itemAngle, hideBeyond, canLoop, options, n]
   );
 
   const emit = useCallback(
     (i) => {
-      const v = optionValue(options[clamp(Math.round(i), 0, last)]);
+      const idx = canLoop ? wrap(i, n) : clamp(Math.round(i), 0, last);
+      const v = optionValue(options[idx]);
       if (v === emitted.current) return;
       emitted.current = v;
       if (!controlled) setInternal(v);
       onValueChange?.(v);
     },
-    [options, last, controlled, onValueChange]
+    [options, last, canLoop, n, controlled, onValueChange]
   );
 
   const stop = useCallback(() => cancelAnimationFrame(raf.current), []);
@@ -141,25 +163,36 @@ export function WheelPicker({
   const fling = useCallback(
     (velocity) => {
       const from = scroll.current;
-      if (from < 0 || from > last) {
+      if (!canLoop && (from < 0 || from > last)) {
         glide(clamp(Math.round(from), 0, last), 260);
         return;
       }
       const dir = Math.sign(velocity) || 1;
       const coast = ((velocity * velocity) / (2 * DECELERATION)) * dir;
-      const to = clamp(Math.round(from + coast), 0, last);
+      const raw = from + coast;
+      const to = canLoop ? Math.round(raw) : clamp(Math.round(raw), 0, last);
       const duration = clamp(Math.sqrt(Math.abs(to - from)) * 300 + 240, 280, 1700);
       glide(to, duration, easeOutBack);
     },
-    [last, glide]
+    [last, canLoop, glide]
   );
 
   useEffect(() => {
     const i = indexOf(currentValue);
-    scroll.current = i;
-    paint(i);
+    // Keep continuous scroll near the new value (for loop, pick nearest turn).
+    if (canLoop && n > 0) {
+      const base = Math.round(scroll.current);
+      const currentMod = wrap(base, n);
+      let delta = i - currentMod;
+      if (delta > n / 2) delta -= n;
+      if (delta < -n / 2) delta += n;
+      scroll.current = base + delta;
+    } else {
+      scroll.current = i;
+    }
+    paint(scroll.current);
     emitted.current = currentValue;
-  }, [currentValue, indexOf, paint, options.length]);
+  }, [currentValue, indexOf, paint, options.length, canLoop, n]);
 
   useEffect(() => () => stop(), [stop]);
 
@@ -201,17 +234,21 @@ export function WheelPicker({
       velocity = clamp((first.y - lastSample.y) / itemHeight / dt, -MAX_VELOCITY, MAX_VELOCITY);
     }
     if (Math.abs(velocity) > 0.002) fling(velocity);
-    else glide(clamp(Math.round(scroll.current), 0, last), 220);
+    else {
+      const to = canLoop ? Math.round(scroll.current) : clamp(Math.round(scroll.current), 0, last);
+      glide(to, 220);
+    }
   };
 
   const onWheel = (event) => {
     if (disabled) return;
     event.preventDefault();
     if (reduce) {
-      const next = clamp(indexOf(currentValue) + Math.sign(event.deltaY), 0, last);
+      const cur = indexOf(currentValue);
+      const next = canLoop ? wrap(cur + Math.sign(event.deltaY), n) : clamp(cur + Math.sign(event.deltaY), 0, last);
       emit(next);
-      paint(next);
-      scroll.current = next;
+      paint(canLoop ? scroll.current - cur + next : next);
+      scroll.current = canLoop ? scroll.current - cur + next : next;
       return;
     }
     stop();
@@ -219,29 +256,34 @@ export function WheelPicker({
     paint(scroll.current);
     window.clearTimeout(wheelTimer.current);
     wheelTimer.current = window.setTimeout(() => {
-      glide(clamp(Math.round(scroll.current), 0, last), 200);
+      const to = canLoop ? Math.round(scroll.current) : clamp(Math.round(scroll.current), 0, last);
+      glide(to, 200);
     }, WHEEL_SETTLE);
+  };
+
+  const stepBy = (dir) => {
+    const cur = indexOf(currentValue);
+    const next = canLoop ? wrap(cur + dir, n) : clamp(cur + dir, 0, last);
+    if (reduce) {
+      emit(next);
+      const target = canLoop ? scroll.current - cur + next : next;
+      scroll.current = target;
+      paint(target);
+      return;
+    }
+    const target = canLoop ? Math.round(scroll.current) + dir : next;
+    glide(target, 180);
   };
 
   const onKeyDown = (event) => {
     if (disabled) return;
     if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
       event.preventDefault();
-      const next = clamp(indexOf(currentValue) - 1, 0, last);
-      if (reduce) {
-        emit(next);
-        paint(next);
-        scroll.current = next;
-      } else glide(next, 180);
+      stepBy(-1);
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
-      const next = clamp(indexOf(currentValue) + 1, 0, last);
-      if (reduce) {
-        emit(next);
-        paint(next);
-        scroll.current = next;
-      } else glide(next, 180);
+      stepBy(1);
     }
   };
 
@@ -283,6 +325,10 @@ export function WheelPicker({
     );
   }
 
+  const slots = canLoop
+    ? Array.from({ length: slotCount }, (_, k) => k)
+    : options.map((_, i) => i);
+
   return (
     <div
       className={`wheel-picker ${grabbing ? 'is-grabbing' : ''} ${className}`.trim()}
@@ -307,21 +353,26 @@ export function WheelPicker({
             marginTop: (height - itemHeight) / 2,
           }}
         >
-          {options.map((option, i) => (
-            <li
-              key={optionValue(option)}
-              data-index={i}
-              className="wheel-picker__item"
-              style={{
-                height: itemHeight,
-                transform: `rotateX(${-itemAngle * i}deg) translateZ(${radius}px)`,
-              }}
-              role="option"
-              aria-selected={optionValue(option) === currentValue}
-            >
-              {optionLabel(option)}
-            </li>
-          ))}
+          {slots.map((slot) => {
+            const option = canLoop ? options[0] : options[slot];
+            return (
+              <li
+                key={canLoop ? `slot-${slot}` : optionValue(option)}
+                data-index={canLoop ? 0 : slot}
+                className="wheel-picker__item"
+                style={{
+                  height: itemHeight,
+                  transform: canLoop
+                    ? undefined
+                    : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
+                }}
+                role="option"
+                aria-selected={canLoop ? false : optionValue(option) === currentValue}
+              >
+                {canLoop ? '' : optionLabel(option)}
+              </li>
+            );
+          })}
         </ul>
         <div className="wheel-picker__selection" style={{ height: itemHeight }} aria-hidden>
           <ul
@@ -332,19 +383,24 @@ export function WheelPicker({
               height: itemHeight,
             }}
           >
-            {options.map((option, i) => (
-              <li
-                key={`band-${optionValue(option)}`}
-                data-index={i}
-                className="wheel-picker__item wheel-picker__item--band"
-                style={{
-                  height: itemHeight,
-                  transform: `rotateX(${-itemAngle * i}deg) translateZ(${radius}px)`,
-                }}
-              >
-                {optionLabel(option)}
-              </li>
-            ))}
+            {slots.map((slot) => {
+              const option = canLoop ? options[0] : options[slot];
+              return (
+                <li
+                  key={canLoop ? `band-slot-${slot}` : `band-${optionValue(option)}`}
+                  data-index={canLoop ? 0 : slot}
+                  className="wheel-picker__item wheel-picker__item--band"
+                  style={{
+                    height: itemHeight,
+                    transform: canLoop
+                      ? undefined
+                      : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
+                  }}
+                >
+                  {canLoop ? '' : optionLabel(option)}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

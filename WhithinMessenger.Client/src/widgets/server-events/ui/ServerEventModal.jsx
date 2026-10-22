@@ -25,11 +25,6 @@ const defaultStart = () => {
   return d;
 };
 
-const defaultEnd = (start) => {
-  const d = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  return d;
-};
-
 const ServerEventModal = ({
   isOpen,
   onClose,
@@ -48,7 +43,6 @@ const ServerEventModal = ({
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -73,12 +67,10 @@ const ServerEventModal = ({
       setDescription(event.description || '');
       setStartDate(toDateInputValue(event.startsAt));
       setStartTime(toTimeInputValue(event.startsAt));
-      setEndTime(toTimeInputValue(event.endsAt || event.startsAt));
       return;
     }
 
     const start = defaultStart();
-    const end = defaultEnd(start);
     setLocationKind('voice');
     setChannelId(voiceChannels[0]?.chatId ? String(voiceChannels[0].chatId) : '');
     setExternalLocation('');
@@ -86,7 +78,6 @@ const ServerEventModal = ({
     setDescription('');
     setStartDate(toDateInputValue(start.toISOString()));
     setStartTime(toTimeInputValue(start.toISOString()));
-    setEndTime(toTimeInputValue(end.toISOString()));
   }, [isOpen, mode, event, voiceChannels]);
 
   useEffect(() => {
@@ -100,7 +91,9 @@ const ServerEventModal = ({
 
   const buildPayload = () => {
     const startsAt = combineDateAndTime(startDate, startTime);
-    const endsAt = combineDateAndTime(startDate, endTime);
+    const endsAt = startsAt
+      ? new Date(new Date(startsAt).getTime() + 2 * 60 * 60 * 1000).toISOString()
+      : null;
     const locationType =
       locationKind === 'external'
         ? SERVER_EVENT_LOCATION.EXTERNAL
@@ -132,12 +125,7 @@ const ServerEventModal = ({
   const validateStep1 = () => {
     if (!title.trim()) return 'Укажите тему события';
     const startsAt = combineDateAndTime(startDate, startTime);
-    const endsAt = combineDateAndTime(startDate, endTime);
     if (!startsAt) return 'Укажите дату и время начала';
-    if (!endsAt) return 'Укажите время окончания';
-    if (new Date(endsAt) <= new Date(startsAt)) {
-      return 'Время окончания должно быть позже начала';
-    }
     return null;
   };
 
@@ -197,10 +185,7 @@ const ServerEventModal = ({
   const preview = {
     title: title.trim() || 'Без названия',
     description: description.trim(),
-    when: formatEventWhen(
-      combineDateAndTime(startDate, startTime),
-      combineDateAndTime(startDate, endTime)
-    ),
+    when: formatEventWhen(combineDateAndTime(startDate, startTime), null),
     location:
       locationKind === 'external'
         ? externalLocation.trim()
@@ -367,25 +352,11 @@ const ServerEventModal = ({
                     />
                   </div>
 
-                  <div className="event-datetime-pair">
+                  <div className="event-datetime-row">
                     <EventTimeWheelPicker
-                      label={
-                        <>
-                          Время начала <span className="req">*</span>
-                        </>
-                      }
+                      label="Время"
                       value={startTime}
                       onChange={setStartTime}
-                      minuteStep={5}
-                    />
-                    <EventTimeWheelPicker
-                      label={
-                        <>
-                          Время окончания <span className="req">*</span>
-                        </>
-                      }
-                      value={endTime}
-                      onChange={setEndTime}
                       minuteStep={5}
                     />
                   </div>
