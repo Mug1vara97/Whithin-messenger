@@ -357,7 +357,7 @@ const ServerEventModal = ({
                       label="Время"
                       value={startTime}
                       onChange={setStartTime}
-                      minuteStep={5}
+                      minuteStep={1}
                     />
                   </div>
 

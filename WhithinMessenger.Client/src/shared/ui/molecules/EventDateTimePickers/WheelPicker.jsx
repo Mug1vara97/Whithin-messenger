@@ -8,10 +8,8 @@ const MAX_VELOCITY = 0.18;
 const VELOCITY_WINDOW = 90;
 const WHEEL_SENS = 0.012;
 const WHEEL_SETTLE = 110;
-const BACK = 1.35;
 
 const easeOutCubic = (p) => 1 - (1 - p) ** 3;
-const easeOutBack = (p) => 1 + (BACK + 1) * (p - 1) ** 3 + BACK * (p - 1) ** 2;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 const wrap = (i, n) => {
   if (n <= 0) return 0;
@@ -172,7 +170,7 @@ export function WheelPicker({
       const raw = from + coast;
       const to = canLoop ? Math.round(raw) : clamp(Math.round(raw), 0, last);
       const duration = clamp(Math.sqrt(Math.abs(to - from)) * 300 + 240, 280, 1700);
-      glide(to, duration, easeOutBack);
+      glide(to, duration);
     },
     [last, canLoop, glide]
   );

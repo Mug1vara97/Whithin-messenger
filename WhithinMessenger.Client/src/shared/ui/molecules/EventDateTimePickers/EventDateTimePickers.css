@@ -461,7 +461,6 @@
   font-weight: 700;
   color: var(--btp-fg);
   line-height: 1;
-  padding-bottom: 2px;
   user-select: none;
 }
 
@@ -511,7 +510,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  will-change: transform;
 }
 
 .wheel-picker__item {
@@ -528,14 +526,15 @@
   color: var(--tw-muted, #949ba4);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transition: none;
 }
 
 .wheel-picker__selection {
   position: absolute;
   left: 4px;
   right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+  /* Avoid transform here — it flattens nested 3D and shifts the highlight. */
+  top: calc(50% - (var(--wheel-item-height, 36px) / 2));
   border-radius: 8px;
   background: var(--tw-accent-soft, rgba(88, 101, 242, 0.18));
   overflow: hidden;

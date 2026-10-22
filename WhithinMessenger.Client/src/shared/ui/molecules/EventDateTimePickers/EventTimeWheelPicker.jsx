@@ -5,7 +5,6 @@ import { WheelPicker } from './WheelPicker';
 import './EventDateTimePickers.css';
 
 const EASE_OUT = [0.16, 1, 0.3, 1];
-const SPRING_LAYOUT = { type: 'spring', stiffness: 420, damping: 36, mass: 0.8 };
 
 const pad = (n) => String(n).padStart(2, '0');
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.parseInt(v, 10) || 0));
@@ -24,7 +23,7 @@ const parseTime = (value) => {
 export function EventTimeWheelPicker({
   value = '12:00',
   onChange,
-  minuteStep = 5,
+  minuteStep = 1,
   disabled = false,
   label = 'Время',
   placeholder = 'Выберите время',
@@ -84,11 +83,9 @@ export function EventTimeWheelPicker({
       data-open={open || undefined}
       data-disabled={disabled || undefined}
     >
-      <motion.button
+      <button
         ref={triggerRef}
         type="button"
-        layout={!reduce}
-        transition={{ layout: SPRING_LAYOUT }}
         className="be-time-picker__trigger"
         disabled={disabled}
         aria-haspopup="dialog"
@@ -96,30 +93,17 @@ export function EventTimeWheelPicker({
         aria-label={`${label}: ${display}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <motion.span
-          layout={reduce ? false : 'position'}
-          transition={{ layout: SPRING_LAYOUT }}
-          className="be-time-picker__trigger-icon"
-          aria-hidden
-        >
+        <span className="be-time-picker__trigger-icon" aria-hidden>
           <Clock size={16} />
-        </motion.span>
-        <motion.span
-          layout={reduce ? false : 'position'}
-          transition={{ layout: SPRING_LAYOUT }}
-          className="be-time-picker__trigger-label"
-        >
-          {display}
-        </motion.span>
-        <motion.span
-          layout={reduce ? false : 'position'}
-          transition={{ layout: SPRING_LAYOUT }}
+        </span>
+        <span className="be-time-picker__trigger-label">{display}</span>
+        <span
           className={`be-time-picker__trigger-chevron${open ? ' is-open' : ''}`}
           aria-hidden
         >
           <ChevronDown size={14} />
-        </motion.span>
-      </motion.button>
+        </span>
+      </button>
 
       <AnimatePresence>
         {open ? (
