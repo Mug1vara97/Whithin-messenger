@@ -3,9 +3,9 @@
   --cl-accent: var(--accent, var(--primary, #f5f5f5));
   --cl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
-  flex: 1;
   padding: 8px 0 8px 14px;
-  min-height: 100%;
+  /* Don't force 100% height — ServerEventsSection sits above this list inside
+     the same scrollport, so min-height:100% always overflowed and showed a bar. */
   position: relative;
 }
 
