@@ -53,7 +53,7 @@ export function WheelPicker({
   const currentValue = controlled ? value : internal;
   const [grabbing, setGrabbing] = useState(false);
 
-  const { itemAngle, radius, height, hideBeyond, slotCount, perspective } = useMemo(() => {
+  const { itemAngle, radius, height, hideBeyond, perspective } = useMemo(() => {
     const rowsEachSide = Math.max(1, Math.floor(visibleCount / 2));
     const cutoff = rowsEachSide + 1;
     const angle = 90 / cutoff;
@@ -62,7 +62,6 @@ export function WheelPicker({
       itemAngle: angle,
       radius: r,
       hideBeyond: cutoff,
-      slotCount: cutoff * 2 + 4,
       perspective: Math.round(r * 3),
       height: Math.round(2 * r * Math.sin(rowsEachSide * angle * DEG) + itemHeight),
     };
@@ -86,27 +85,27 @@ export function WheelPicker({
         if (!list) return;
         list.style.transform = transform;
         const children = Array.from(list.children);
-        if (canLoop) {
-          const first = Math.floor(s) - hideBeyond - 1;
-          for (let k = 0; k < children.length; k += 1) {
-            const li = children[k];
-            const vi = first + k;
-            const opt = options[wrap(vi, n)];
-            const want = Math.abs(vi - s) > hideBeyond ? 'hidden' : 'visible';
-            li.dataset.index = String(vi);
-            li.style.transform = `rotateX(${-itemAngle * vi}deg) translateZ(${radius}px)`;
-            li.style.visibility = want;
-            const label = optionLabel(opt);
-            if (li.textContent !== label) li.textContent = label;
-            li.setAttribute('aria-selected', optionValue(opt) === emitted.current ? 'true' : 'false');
-          }
-          return;
-        }
         for (const node of children) {
           const li = node;
           const i = Number(li.dataset.index);
-          const want = Math.abs(i - s) > hideBeyond ? 'hidden' : 'visible';
+          // Loop: keep fixed labels, place each option at the replica nearest to s
+          // so digits are not rewritten every animation frame.
+          let pos = i;
+          if (canLoop && n > 0) {
+            const k = Math.round((s - i) / n);
+            pos = i + k * n;
+          }
+          const want = Math.abs(pos - s) > hideBeyond ? 'hidden' : 'visible';
+          if (canLoop) {
+            li.style.transform = `rotateX(${-itemAngle * pos}deg) translateZ(${radius}px)`;
+          }
           if (li.style.visibility !== want) li.style.visibility = want;
+          if (!canLoop) continue;
+          const opt = options[i];
+          li.setAttribute(
+            'aria-selected',
+            optionValue(opt) === emitted.current ? 'true' : 'false'
+          );
         }
       };
 
@@ -327,28 +326,26 @@ export function WheelPicker({
     );
   }
 
-  const slots = canLoop ? Array.from({ length: slotCount }, (_, k) => k) : options.map((_, i) => i);
+  const slots = options.map((_, i) => i);
   const itemTop = -itemHeight / 2;
 
   const renderItems = (band) =>
     slots.map((slot) => {
-      const option = canLoop ? options[0] : options[slot];
+      const option = options[slot];
       return (
         <li
-          key={band ? `band-${canLoop ? slot : optionValue(option)}` : canLoop ? `slot-${slot}` : optionValue(option)}
-          data-index={canLoop ? 0 : slot}
+          key={band ? `band-${optionValue(option)}` : optionValue(option)}
+          data-index={slot}
           className={band ? 'wheel-picker__item wheel-picker__item--band' : 'wheel-picker__item'}
           style={{
             top: itemTop,
             height: itemHeight,
-            transform: canLoop
-              ? undefined
-              : `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
+            transform: `rotateX(${-itemAngle * slot}deg) translateZ(${radius}px)`,
           }}
           role={band ? undefined : 'option'}
-          aria-selected={band ? undefined : canLoop ? false : optionValue(option) === currentValue}
+          aria-selected={band ? undefined : optionValue(option) === currentValue}
         >
-          {canLoop ? '' : optionLabel(option)}
+          {optionLabel(option)}
         </li>
       );
     });
