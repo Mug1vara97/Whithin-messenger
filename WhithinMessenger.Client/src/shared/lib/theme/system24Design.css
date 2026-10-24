@@ -552,11 +552,39 @@ html[data-interface-design='system24'] ::-webkit-scrollbar-button {
 }
 
 html[data-interface-design='system24'] .messages::-webkit-scrollbar-thumb,
-html[data-interface-design='system24'] .server-channels-scroll::-webkit-scrollbar-thumb,
 html[data-interface-design='system24'] .member-list-scroll::-webkit-scrollbar-thumb,
 html[data-interface-design='system24'] .chat-list-container::-webkit-scrollbar-thumb,
 html[data-interface-design='system24'] .server-settings-scroll::-webkit-scrollbar-thumb {
   border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll:hover,
+html[data-interface-design='system24'] .server-channels-scroll:focus-within {
+  scrollbar-color: var(--border) transparent;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll:hover::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'] .server-channels-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: var(--border) !important;
+}
+
+html[data-interface-design='system24'] .server-channels-scroll:hover::-webkit-scrollbar-thumb:hover,
+html[data-interface-design='system24'] .server-channels-scroll:focus-within::-webkit-scrollbar-thumb:hover {
+  background: var(--primary) !important;
 }
 
 html[data-interface-design='system24'][data-theme-preset='cyberpunk'] ::-webkit-scrollbar-thumb {
@@ -565,6 +593,21 @@ html[data-interface-design='system24'][data-theme-preset='cyberpunk'] ::-webkit-
 }
 
 html[data-interface-design='system24'][data-theme-preset='cyberpunk'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary) !important;
+}
+
+/* Keep channel list thumb hidden until hover even in cyberpunk */
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] .server-channels-scroll::-webkit-scrollbar-thumb {
+  background: transparent !important;
+}
+
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] .server-channels-scroll:hover::-webkit-scrollbar-thumb,
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] .server-channels-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: var(--border) !important;
+}
+
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] .server-channels-scroll:hover::-webkit-scrollbar-thumb:hover,
+html[data-interface-design='system24'][data-theme-preset='cyberpunk'] .server-channels-scroll:focus-within::-webkit-scrollbar-thumb:hover {
   background: var(--primary) !important;
 }
 
