@@ -1243,6 +1243,7 @@ const ServerPanel = ({
         <div className="server-channels-scroll">
         <ServerEventsSection
           serverId={currentServer?.serverId ?? selectedServer?.serverId}
+          serverName={currentServer?.name ?? selectedServer?.name ?? ''}
           connection={serverConnection}
           categories={memoizedCategories}
           canManageEvents={userCanManageEvents}

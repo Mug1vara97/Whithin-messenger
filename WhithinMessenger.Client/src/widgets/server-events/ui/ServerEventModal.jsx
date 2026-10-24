@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FaTimes,
   FaVolumeUp,
   FaMapMarkerAlt,
   FaBroadcastTower,
+  FaCalendarAlt,
+  FaUserFriends,
 } from 'react-icons/fa';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
@@ -13,7 +14,7 @@ import {
   toDateInputValue,
   toTimeInputValue,
   combineDateAndTime,
-  formatEventWhen,
+  formatStartsIn,
   serverEventApi,
 } from '../../../entities/server-event';
 import {
@@ -210,14 +211,16 @@ const ServerEventModal = ({
     setError('');
   };
 
+  const startsAtIso = combineDateAndTime(startDate, startTime);
   const preview = {
     title: title.trim() || 'Без названия',
     description: description.trim(),
-    when: formatEventWhen(combineDateAndTime(startDate, startTime), null),
+    startsIn: formatStartsIn(startsAtIso),
     location:
       locationKind === 'external'
-        ? externalLocation.trim()
+        ? externalLocation.trim() || 'В другом месте'
         : selectedChannel?.name || 'Голосовой канал',
+    isVoice: locationKind === 'voice',
     cover: coverPreview,
   };
 
@@ -241,14 +244,6 @@ const ServerEventModal = ({
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              className="server-events-modal-close sev-wizard-close"
-              onClick={onClose}
-              aria-label="Закрыть"
-            >
-              <FaTimes />
-            </button>
           </div>
         )}
 
@@ -494,21 +489,41 @@ const ServerEventModal = ({
               )}
 
               {step === 2 && (
-                <>
-                  <h3 className="sev-wizard-title">Всё верно?</h3>
-                  <p className="sev-wizard-sub">Проверьте сведения перед публикацией.</p>
-                  <div className="sev-preview-card">
+                <div className="sev-preview-step">
+                  <div className="sev-preview-card sev-preview-card--event">
                     {preview.cover && (
                       <div className="sev-preview-cover">
                         <img src={preview.cover} alt="" />
                       </div>
                     )}
-                    <h3>{preview.title}</h3>
-                    <p>{preview.when}</p>
-                    <p>{preview.location}</p>
-                    {preview.description && <p>{preview.description}</p>}
+                    <div className="sev-preview-card__top">
+                      <span className="sev-preview-card__starts">
+                        <FaCalendarAlt aria-hidden />
+                        {preview.startsIn}
+                      </span>
+                      <span className="sev-preview-card__interest" title="Интересуются">
+                        <FaUserFriends aria-hidden />
+                        0
+                      </span>
+                    </div>
+                    <h3 className="sev-preview-card__title">{preview.title}</h3>
+                    {preview.description ? (
+                      <p className="sev-preview-card__desc">{preview.description}</p>
+                    ) : null}
+                    <div className="sev-preview-card__location">
+                      {preview.isVoice ? (
+                        <FaVolumeUp aria-hidden />
+                      ) : (
+                        <FaMapMarkerAlt aria-hidden />
+                      )}
+                      <span>{preview.location}</span>
+                    </div>
                   </div>
-                </>
+                  <h3 className="sev-wizard-title">Предпросмотр вашего события.</h3>
+                  <p className="sev-wizard-sub">
+                    Это событие автоматически начнётся в назначенное время.
+                  </p>
+                </div>
               )}
 
               {error && <div className="sev-error">{error}</div>}

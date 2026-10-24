@@ -79,6 +79,28 @@ export const formatEventWhen = (startsAt, endsAt) => {
   return `${startLabel} – ${end.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
+export const formatStartsIn = (iso) => {
+  if (!iso) return 'Время не указано';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return 'Время не указано';
+  if (ms <= 0) return 'Начинается сейчас';
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `Начало через ${mins} мин.`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `Начало через ${hours} ч.`;
+  const days = Math.round(hours / 24);
+  return `Начало через ${days} дн.`;
+};
+
+export const formatInterestedPeople = (count) => {
+  const n = Math.max(0, Number(count) || 0);
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (n === 0) return 'Пока никто не интересуется';
+  if (mod10 === 1 && mod100 !== 11) return `${n} человек интересуется`;
+  return `${n} человек интересуются`;
+};
+
 export const formatEventDateShort = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);

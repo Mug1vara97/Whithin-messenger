@@ -10,6 +10,8 @@ export {
   isVoiceChannel,
   collectServerChannels,
   formatEventWhen,
+  formatStartsIn,
+  formatInterestedPeople,
   formatEventDateShort,
   formatEventTimeShort,
   toDatetimeLocalValue,

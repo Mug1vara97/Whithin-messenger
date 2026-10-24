@@ -8,10 +8,12 @@ import {
 } from '../../../entities/server-event';
 import ServerEventModal from './ServerEventModal';
 import ServerEventsListModal from './ServerEventsListModal';
+import ServerEventDetailModal from './ServerEventDetailModal';
 import './ServerEvents.css';
 
 const ServerEventsSection = ({
   serverId,
+  serverName = '',
   connection,
   categories = [],
   canManageEvents = false,
@@ -23,6 +25,7 @@ const ServerEventsSection = ({
   const [listOpen, setListOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState(null);
+  const [detailEvent, setDetailEvent] = useState(null);
 
   const upsertEvent = useCallback((raw) => {
     const event = normalizeServerEvent(raw);
@@ -114,8 +117,34 @@ const ServerEventsSection = ({
           setListOpen(false);
           setCreateOpen(true);
         }}
+        onOpenEvent={(ev) => {
+          setListOpen(false);
+          setDetailEvent(ev);
+        }}
         onEdit={(ev) => {
           setListOpen(false);
+          setDetailEvent(null);
+          setEditEvent(ev);
+        }}
+        onSelectChannel={onSelectChannel}
+      />
+
+      <ServerEventDetailModal
+        isOpen={Boolean(detailEvent)}
+        onClose={() => {
+          setDetailEvent(null);
+          setListOpen(true);
+        }}
+        event={
+          detailEvent
+            ? events.find((e) => String(e.eventId) === String(detailEvent.eventId)) || detailEvent
+            : null
+        }
+        serverName={serverName}
+        canManageEvents={canManageEvents}
+        connection={connection}
+        onEdit={(ev) => {
+          setDetailEvent(null);
           setEditEvent(ev);
         }}
         onSelectChannel={onSelectChannel}
