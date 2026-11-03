@@ -55,20 +55,21 @@
   container-type: size;
   container-name: call-tile;
   --tile-avatar-size: clamp(36px, 42cqmin, 100px);
-  --tile-dial-size: clamp(96px, 88cqmin, 208px);
+  /* Кольцо чуть больше аватара+декора — без огромного зазора */
+  --tile-dial-size: clamp(72px, 56cqmin, 136px);
+  /* Wake-слайдер на демке — от размера плитки */
+  --ss-wake-track: clamp(64px, 38cqmin, 152px);
+  --ss-wake-bar: clamp(14px, 7.5cqmin, 30px);
+  --ss-wake-gap: clamp(2px, 0.9cqmin, 3px);
+  --ss-wake-pad: clamp(6px, 2cqmin, 10px);
+  --ss-wake-font: clamp(9px, 3cqmin, 12px);
 }
 
 .video-tile.small-tile {
   --tile-avatar-size: clamp(28px, 40cqmin, 60px);
-  --tile-dial-size: clamp(80px, 82cqmin, 168px);
-}
-
-.video-tile.volume-dial-open {
-  --tile-avatar-size: clamp(28px, 32cqmin, 88px);
-}
-
-.video-tile.small-tile.volume-dial-open {
-  --tile-avatar-size: clamp(22px, 28cqmin, 52px);
+  --tile-dial-size: clamp(56px, 50cqmin, 92px);
+  --ss-wake-track: clamp(52px, 34cqmin, 96px);
+  --ss-wake-bar: clamp(12px, 6.5cqmin, 22px);
 }
 
 .video-tile .tile-border {
@@ -228,7 +229,7 @@
   right: 0;
   padding: 8px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   z-index: 2;
 }
@@ -484,7 +485,8 @@
 }
 
 .tile-avatar-wrap--volume-dial {
-  --avatar-decoration-scale: 1.06;
+  /* Размер аватара не трогаем — только чуть слабее декор, чтобы кольцо читалось */
+  --avatar-decoration-scale: 1.14;
   position: relative;
   z-index: 20;
 }
@@ -512,43 +514,59 @@
 }
 
 .tile-volume-anchor--with-wake {
-  width: auto;
-  height: auto;
+  /* Якорь остаётся размером кнопки — слайдер абсолютно выше, не поднимает ник/лейбл */
+  width: 35px;
+  height: 35px;
   min-width: 35px;
   min-height: 35px;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
 }
 
 .tile-screen-share-wake {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 10px 8px 8px;
-  border-radius: 14px;
+  gap: clamp(4px, 1.4cqmin, 6px);
+  padding: var(--ss-wake-pad) calc(var(--ss-wake-pad) * 0.85) var(--ss-wake-pad);
+  border-radius: clamp(10px, 3cqmin, 14px);
   background: rgba(0, 0, 0, 0.58);
   backdrop-filter: blur(6px);
   pointer-events: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 8;
 }
 
 .tile-screen-share-wake-slider {
-  width: 28px;
-  height: 132px;
-  min-height: 132px;
+  width: var(--ss-wake-bar) !important;
+  height: var(--ss-wake-track) !important;
+  min-height: var(--ss-wake-track) !important;
+  --ws-height: var(--ss-wake-bar) !important;
+  --ws-gap: var(--ss-wake-gap) !important;
+}
+
+.tile-screen-share-wake-slider.wake-slider--vertical {
+  min-height: var(--ss-wake-track) !important;
 }
 
 .tile-screen-share-wake-slider.wake-slider--vertical .wake-slider__track {
-  min-height: 120px;
-  height: 120px;
+  width: var(--ss-wake-bar) !important;
+  min-width: var(--ss-wake-bar) !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.tile-screen-share-wake-slider.wake-slider--vertical .wake-slider__bar {
+  width: var(--ss-wake-bar) !important;
 }
 
 .tile-screen-share-wake-value {
   color: #fff;
-  font-size: 11px;
+  font-size: var(--ss-wake-font);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);

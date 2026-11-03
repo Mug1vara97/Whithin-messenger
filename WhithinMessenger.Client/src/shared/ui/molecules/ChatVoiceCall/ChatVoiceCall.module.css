@@ -120,8 +120,8 @@
 
 /* Dial overlays the avatar — do not grow the layout slot. */
 .participantCometDial {
-  --cd-size: 168px;
-  --avatar-decoration-scale: 1.06;
+  --cd-size: 118px;
+  --avatar-decoration-scale: 1.14;
   position: absolute;
   left: 50%;
   top: 50%;

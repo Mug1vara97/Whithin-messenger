@@ -645,20 +645,18 @@ const VideoCallGrid = ({
       tileBackgroundColor &&
       colorsMatchForTileAvatarOutline(tileBackgroundColor, avatarColor);
 
-    // Keep avatar a bit smaller than the dial so decoration does not cover the ring.
-    const dialAvatarSize = volumeDial ? (isSmall ? 52 : 88) : avatarSize;
     const avatar = (
       <UserAvatar
         username={participant.name || 'U'}
         avatarUrl={participant.avatar}
         avatarColor={avatarColor}
         avatarDecoration={participant.avatarDecoration}
-        size={dialAvatarSize}
+        size={avatarSize}
       />
     );
 
-    // Ring sits farther from avatar/decoration (~200px vs previous 150px).
-    const dialSize = isSmall ? 168 : 208;
+    // Кольцо близко к аватару (размер ещё задаётся CSS --tile-dial-size).
+    const dialSize = isSmall ? 92 : 136;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
@@ -677,9 +675,9 @@ const VideoCallGrid = ({
           ink="rgba(255, 255, 255, 0.32)"
           size={dialSize}
           sweep={289}
-          thickness={8}
+          thickness={5}
           speed={8}
-          deadZone={36}
+          deadZone={40}
           passthroughCenter
           onChange={volumeDial.onChange}
           onContextMenu={volumeDial.onContextMenu}
@@ -859,7 +857,7 @@ const VideoCallGrid = ({
               min={0}
               max={100}
               step={1}
-              bars={22}
+              bars={isSmall ? 14 : 20}
               height={28}
               restHeight={8}
               gap={3}

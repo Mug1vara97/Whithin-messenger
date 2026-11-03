@@ -434,11 +434,11 @@ const ChatVoiceCall = ({
                         label={`Громкость ${participant.name || ''}`}
                         accent="#ffffff"
                         ink="rgba(255, 255, 255, 0.32)"
-                        size={168}
+                        size={118}
                         sweep={289}
-                        thickness={8}
+                        thickness={5}
                         speed={8}
-                        deadZone={36}
+                        deadZone={40}
                         passthroughCenter
                         onChange={(next) => changeUserVolume?.(participant.id, next)}
                         onContextMenu={handleAvatarContextMenu}
@@ -449,7 +449,7 @@ const ChatVoiceCall = ({
                             avatarUrl={participant.avatar}
                             avatarColor={participant.avatarColor}
                             avatarDecoration={participant.avatarDecoration}
-                            size={60}
+                            size={72}
                           />
                           <span className={styles.participantVolumeValue} aria-hidden="true">
                             {volume}%
