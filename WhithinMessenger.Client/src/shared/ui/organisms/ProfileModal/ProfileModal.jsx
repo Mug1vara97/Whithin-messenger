@@ -454,20 +454,27 @@ const ProfileModal = ({
           />
         ))}
 
-        {files.map((item) => (
+        {files.map((item) => {
+          const displayName =
+            item.originalFileName ||
+            item.fileName ||
+            (typeof item.filePath === 'string' ? item.filePath.split('/').pop() : '') ||
+            'file';
+          return (
           <button
             key={item.id}
             type="button"
             className="profile-wall__file"
-            onClick={() => downloadMediaFile(item.filePath, item.originalFileName)}
+            onClick={() => downloadMediaFile(item.filePath, displayName)}
           >
             <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} />
             <span className="profile-wall__file-meta">
-              <span className="profile-wall__file-name">{item.originalFileName}</span>
+              <span className="profile-wall__file-name" title={displayName}>{displayName}</span>
               <span className="profile-wall__file-size">{formatFileSize(item.fileSize)}</span>
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   };

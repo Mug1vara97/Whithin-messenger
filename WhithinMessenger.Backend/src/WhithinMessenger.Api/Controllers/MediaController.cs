@@ -22,6 +22,7 @@ public class MediaController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IFileService _fileService;
+    private readonly IMediaFileRepository _mediaFileRepository;
     private readonly IHubContext<AppHub> _hubContext;
     private readonly IMessageReceiptService _messageReceiptService;
     private readonly ChatMessageNotificationService _chatMessageNotificationService;
@@ -30,6 +31,7 @@ public class MediaController : ControllerBase
     public MediaController(
         IMediator mediator,
         IFileService fileService,
+        IMediaFileRepository mediaFileRepository,
         IHubContext<AppHub> hubContext,
         IMessageReceiptService messageReceiptService,
         ChatMessageNotificationService chatMessageNotificationService,
@@ -37,6 +39,7 @@ public class MediaController : ControllerBase
     {
         _mediator = mediator;
         _fileService = fileService;
+        _mediaFileRepository = mediaFileRepository;
         _hubContext = hubContext;
         _messageReceiptService = messageReceiptService;
         _chatMessageNotificationService = chatMessageNotificationService;
@@ -178,7 +181,11 @@ public class MediaController : ControllerBase
                     messageId = result.MessageId,
                     mediaFileId = result.MediaFileId,
                     filePath = result.FilePath,
-                    thumbnailPath = result.ThumbnailPath
+                    thumbnailPath = result.ThumbnailPath,
+                    fileName = Path.GetFileName(result.FilePath),
+                    originalFileName = file.FileName,
+                    contentType = file.ContentType,
+                    fileSize = file.Length
                 });
             }
 
@@ -304,7 +311,11 @@ public class MediaController : ControllerBase
                 {
                     mediaFileId = item.MediaFileId,
                     filePath = item.FilePath,
-                    thumbnailPath = item.ThumbnailPath
+                    thumbnailPath = item.ThumbnailPath,
+                    fileName = Path.GetFileName(item.FilePath),
+                    originalFileName = item.OriginalFileName,
+                    contentType = item.ContentType,
+                    fileSize = item.FileSize
                 })
             });
         }
@@ -382,7 +393,9 @@ public class MediaController : ControllerBase
             }
 
             var contentType = await _fileService.GetContentTypeAsync(normalizedFilePath);
-            var fileName = Path.GetFileName(normalizedFilePath);
+            var originalName = await _mediaFileRepository.ResolveOriginalFileNameByPathAsync(normalizedFilePath);
+            var fileName = SanitizeDownloadFileName(originalName)
+                ?? Path.GetFileName(normalizedFilePath);
 
             return File(fileData, contentType, fileName);
         }
@@ -391,6 +404,17 @@ public class MediaController : ControllerBase
             _logger.LogError(ex, "Error downloading file {FilePath}", filePath);
             return StatusCode(500, "Ошибка при загрузке файла");
         }
+    }
+
+    private static string? SanitizeDownloadFileName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        var safe = Path.GetFileName(name.Trim());
+        return string.IsNullOrWhiteSpace(safe) ? null : safe;
     }
 
     private static bool TryParseChatId(string? chatId, out Guid parsedChatId, out string errorMessage)

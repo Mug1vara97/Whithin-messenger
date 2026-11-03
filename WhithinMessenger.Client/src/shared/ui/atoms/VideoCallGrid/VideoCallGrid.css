@@ -51,6 +51,24 @@
   aspect-ratio: 16 / 9;
   max-height: 100%; /* Ограничиваем высоту */
   height: auto; /* Автоматическая высота */
+  /* Аватар/dial масштабируются вместе с плиткой */
+  container-type: size;
+  container-name: call-tile;
+  --tile-avatar-size: clamp(36px, 42cqmin, 100px);
+  --tile-dial-size: clamp(96px, 88cqmin, 208px);
+}
+
+.video-tile.small-tile {
+  --tile-avatar-size: clamp(28px, 40cqmin, 60px);
+  --tile-dial-size: clamp(80px, 82cqmin, 168px);
+}
+
+.video-tile.volume-dial-open {
+  --tile-avatar-size: clamp(28px, 32cqmin, 88px);
+}
+
+.video-tile.small-tile.volume-dial-open {
+  --tile-avatar-size: clamp(22px, 28cqmin, 52px);
 }
 
 .video-tile .tile-border {
@@ -146,6 +164,21 @@
   place-items: center;
   overflow: visible;
   z-index: 2;
+}
+
+/* Перебиваем фиксированный size у UserAvatar / CometDial — размер от плитки */
+.video-tile .tile-avatar-wrap .user-avatar-frame {
+  width: var(--tile-avatar-size) !important;
+  height: var(--tile-avatar-size) !important;
+}
+
+.video-tile .tile-avatar-wrap .user-avatar {
+  font-size: calc(var(--tile-avatar-size) * 0.35) !important;
+}
+
+.video-tile .tile-avatar-comet-dial {
+  width: var(--tile-dial-size) !important;
+  height: var(--tile-dial-size) !important;
 }
 
 .tile-avatar-wrap--contrast-outline .user-avatar {
@@ -308,9 +341,21 @@
 /* Volume controls */
 .tile-volume-controls {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   position: relative;
+  overflow: visible;
+  z-index: 6;
+}
+
+.video-tile:has(.tile-screen-share-wake) {
+  overflow: visible;
+  z-index: 28;
+}
+
+.video-tile:has(.tile-screen-share-wake) .tile-content,
+.video-tile:has(.tile-screen-share-wake) .tile-bottom-overlay {
+  overflow: visible;
 }
 
 .tile-volume-btn {
@@ -428,6 +473,7 @@
   height: 35px;
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -438,6 +484,7 @@
 }
 
 .tile-avatar-wrap--volume-dial {
+  --avatar-decoration-scale: 1.06;
   position: relative;
   z-index: 20;
 }
@@ -460,12 +507,52 @@
 }
 
 .tile-avatar-comet-dial {
-  --cd-size: 150px;
+  --cd-size: var(--tile-dial-size, 208px);
   filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
 }
 
-.small-tile .tile-avatar-comet-dial {
-  --cd-size: 135px;
+.tile-volume-anchor--with-wake {
+  width: auto;
+  height: auto;
+  min-width: 35px;
+  min-height: 35px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tile-screen-share-wake {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 8px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.tile-screen-share-wake-slider {
+  width: 28px;
+  height: 132px;
+  min-height: 132px;
+}
+
+.tile-screen-share-wake-slider.wake-slider--vertical .wake-slider__track {
+  min-height: 120px;
+  height: 120px;
+}
+
+.tile-screen-share-wake-value {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  line-height: 1;
 }
 
 .tile-avatar-volume-center {
@@ -482,16 +569,12 @@
   z-index: 2;
   pointer-events: none;
   color: #ffffff;
-  font-size: 22px;
+  font-size: clamp(11px, calc(var(--tile-avatar-size) * 0.24), 22px);
   font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
-}
-
-.small-tile .tile-avatar-volume-value {
-  font-size: 16px;
 }
 
 /* ===== GRID LAYOUTS ===== */

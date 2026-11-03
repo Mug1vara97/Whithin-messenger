@@ -28,6 +28,7 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { useVoiceParticipantModeration } from '../../molecules/VoiceParticipantModerationMenu';
 import UserAvatar from '../UserAvatar/UserAvatar';
 import CometDial from '../CometDial/CometDial';
+import WakeSlider from '../WakeSlider/WakeSlider';
 import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationHelpers';
 import { colorsMatchForTileAvatarOutline } from '../../../lib/utils/colorMatchHelpers';
 import './VideoCallGrid.css';
@@ -644,18 +645,20 @@ const VideoCallGrid = ({
       tileBackgroundColor &&
       colorsMatchForTileAvatarOutline(tileBackgroundColor, avatarColor);
 
+    // Keep avatar a bit smaller than the dial so decoration does not cover the ring.
+    const dialAvatarSize = volumeDial ? (isSmall ? 52 : 88) : avatarSize;
     const avatar = (
       <UserAvatar
         username={participant.name || 'U'}
         avatarUrl={participant.avatar}
         avatarColor={avatarColor}
         avatarDecoration={participant.avatarDecoration}
-        size={avatarSize}
+        size={dialAvatarSize}
       />
     );
 
-    // Blocks keep 150px dial; only the arc is ~15% shorter (340° → 289°).
-    const dialSize = isSmall ? 135 : 150;
+    // Ring sits farther from avatar/decoration (~200px vs previous 150px).
+    const dialSize = isSmall ? 168 : 208;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
@@ -674,9 +677,9 @@ const VideoCallGrid = ({
           ink="rgba(255, 255, 255, 0.32)"
           size={dialSize}
           sweep={289}
-          thickness={6}
+          thickness={8}
           speed={8}
-          deadZone={28}
+          deadZone={36}
           passthroughCenter
           onChange={volumeDial.onChange}
           onContextMenu={volumeDial.onContextMenu}
@@ -763,9 +766,16 @@ const VideoCallGrid = ({
     const modColor = '#f0b232';
     const isScreenShare = participant.isScreenShare || false;
     const ownerUserId = participant.ownerUserId != null ? String(participant.ownerUserId) : null;
-    // Громкость демонстрации — только на remote-тайле share, отдельно от микрофона владельца
+    const hasScreenShareAudio =
+      ownerUserId != null
+      && typeof screenShareAudioUserIds?.has === 'function'
+      && (
+        screenShareAudioUserIds.has(ownerUserId)
+        || screenShareAudioUserIds.has(String(ownerUserId))
+      );
+    // Громкость демонстрации — только если в share есть аудиодорожка
     const showScreenShareVolumeControls =
-      isScreenShare && !participant.isLocal && ownerUserId != null;
+      isScreenShare && !participant.isLocal && ownerUserId != null && hasScreenShareAudio;
     const screenShareSliderKey = ownerUserId != null ? `screen-share-audio-${ownerUserId}` : null;
     const isAudioMuted = isScreenShare
       ? (screenShareMutedStates.get(ownerUserId) || false)
@@ -821,9 +831,9 @@ const VideoCallGrid = ({
     const showsCenteredAvatar =
       !isScreenShare &&
       !(participant.isVideoEnabled && participant.videoStream && participant.videoStream.active);
+    // Avatar comet dial — only for participant tiles (not screen share).
     const canShowVolumeDial =
-      showSlider &&
-      (isScreenShare ? showScreenShareVolumeControls : !participant.isCurrentUser);
+      showSlider && !isScreenShare && !participant.isCurrentUser;
     const volumeDialProps = canShowVolumeDial
       ? {
           value: volume,
@@ -831,9 +841,40 @@ const VideoCallGrid = ({
           onContextMenu: handleVolumeRightClick,
         }
       : null;
+    const showScreenShareWakeSlider =
+      isScreenShare && showScreenShareVolumeControls && showSlider;
 
     const volumeControl = (
-      <div className="tile-volume-anchor">
+      <div className={`tile-volume-anchor${showScreenShareWakeSlider ? ' tile-volume-anchor--with-wake' : ''}`}>
+        {showScreenShareWakeSlider ? (
+          <div
+            className="tile-screen-share-wake"
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={handleVolumeRightClick}
+          >
+            <WakeSlider
+              className="tile-screen-share-wake-slider"
+              orientation="vertical"
+              value={volume}
+              min={0}
+              max={100}
+              step={1}
+              bars={22}
+              height={28}
+              restHeight={8}
+              gap={3}
+              fillColor="#ffffff"
+              trackColor="rgba(255, 255, 255, 0.28)"
+              crestColor="#ffffff"
+              showValue={false}
+              ariaLabel="Громкость демонстрации экрана"
+              onChange={handleSliderChange}
+            />
+            <span className="tile-screen-share-wake-value" aria-hidden="true">
+              {volume}%
+            </span>
+          </div>
+        ) : null}
         <button
           type="button"
           className={`tile-volume-btn ${

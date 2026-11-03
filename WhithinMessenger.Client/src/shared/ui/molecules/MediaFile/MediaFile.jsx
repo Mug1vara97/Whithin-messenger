@@ -391,20 +391,25 @@ const MediaFile = ({ mediaFile }) => {
 
     // Для документов, архивов и других файлов — карточка-ссылка в стиле Discord
     const fileUrl = buildMediaUrl(mediaFile.filePath);
-    const isArchive = /\.(zip|rar|7z|tar|gz)$/i.test(mediaFile.originalFileName || '');
+    const displayName =
+      mediaFile.originalFileName ||
+      mediaFile.fileName ||
+      (typeof mediaFile.filePath === 'string' ? mediaFile.filePath.split('/').pop() : '') ||
+      'download';
+    const isArchive = /\.(zip|rar|7z|tar|gz)$/i.test(displayName);
     const FileIcon = isArchive ? FolderZipIcon : InsertDriveFileIcon;
     return (
       <a
         href={fileUrl}
-        download={mediaFile.originalFileName || undefined}
+        download={displayName}
         className="media-file-card"
-        onClick={(e) => handleDownload(e, fileUrl, mediaFile.originalFileName || 'download')}
+        onClick={(e) => handleDownload(e, fileUrl, displayName)}
       >
         <div className="media-file-card__icon">
           <FileIcon sx={{ fontSize: 40 }} />
         </div>
         <div className="media-file-card__info">
-          <span className="media-file-card__name">{mediaFile.originalFileName}</span>
+          <span className="media-file-card__name" title={displayName}>{displayName}</span>
           <span className="media-file-card__size">{formatFileSize(mediaFile.fileSize)}</span>
         </div>
       </a>

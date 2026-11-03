@@ -71,6 +71,62 @@ namespace WhithinMessenger.Infrastructure.Repositories
                 .OrderByDescending(mf => mf.CreatedAt)
                 .ToListAsync(cancellationToken);
         }
+
+        public async Task<string?> ResolveOriginalFileNameByPathAsync(string filePath, CancellationToken cancellationToken = default)
+        {
+            var variants = BuildPathVariants(filePath);
+            if (variants.Count == 0)
+            {
+                return null;
+            }
+
+            var fromMedia = await _context.MediaFiles
+                .AsNoTracking()
+                .Where(mf => !mf.IsDeleted && variants.Contains(mf.FilePath))
+                .Select(mf => mf.OriginalFileName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(fromMedia))
+            {
+                return fromMedia.Trim();
+            }
+
+            var fromFeed = await _context.FeedPostAttachments
+                .AsNoTracking()
+                .Where(a => variants.Contains(a.FilePath))
+                .Select(a => a.OriginalFileName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return string.IsNullOrWhiteSpace(fromFeed) ? null : fromFeed.Trim();
+        }
+
+        private static HashSet<string> BuildPathVariants(string filePath)
+        {
+            var variants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return variants;
+            }
+
+            var trimmed = filePath.Trim().Replace('\\', '/');
+            variants.Add(trimmed);
+            variants.Add(trimmed.TrimStart('/'));
+            variants.Add("/" + trimmed.TrimStart('/'));
+
+            var withoutUploads = trimmed.TrimStart('/');
+            if (withoutUploads.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+            {
+                variants.Add(withoutUploads);
+                variants.Add("/" + withoutUploads);
+            }
+            else if (!string.IsNullOrEmpty(withoutUploads))
+            {
+                variants.Add("uploads/" + withoutUploads);
+                variants.Add("/uploads/" + withoutUploads);
+            }
+
+            return variants;
+        }
     }
 }
 

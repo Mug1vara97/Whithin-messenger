@@ -51,7 +51,9 @@ export default function WakeSlider({
   ariaLabel = 'Value',
   className = '',
   id,
+  orientation = 'horizontal',
 }) {
+  const vertical = orientation === 'vertical';
   const [inner, setInner] = useState(defaultValue);
   const value = clamp(valueProp ?? inner, min, max);
   const pct = toPct(value, min, max);
@@ -99,7 +101,8 @@ export default function WakeSlider({
       const d = i - h;
       const R = d * dir < 0 ? behind : ahead;
       const lift = Math.abs(d) < R ? amp * Math.cos((Math.PI * d) / (2 * R)) ** 2 : 0;
-      el.style.transform = `scaleY(${rest + lift * (1 - rest)})`;
+      const scale = rest + lift * (1 - rest);
+      el.style.transform = vertical ? `scaleX(${scale})` : `scaleY(${scale})`;
       const crest = crestEls.current[i];
       if (crest) crest.style.opacity = String(lift);
     }
@@ -122,15 +125,24 @@ export default function WakeSlider({
     if (valueProp === undefined) setInner(clean);
     onChange?.(clean);
   };
-  const commitFromX = (x) => {
+
+  const commitFromPointer = (clientX, clientY) => {
     const track = trackRef.current;
     if (!track) return;
     const rect = track.getBoundingClientRect();
+    if (vertical) {
+      if (!rect.height) return;
+      // Bottom = min, top = max (volume-style).
+      const ratio = clamp(1 - (clientY - rect.top) / rect.height, 0, 1);
+      commit(min + ratio * (max - min));
+      return;
+    }
     if (!rect.width) return;
-    let ratio = clamp((x - rect.left) / rect.width, 0, 1);
+    let ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
     if (getComputedStyle(track).direction === 'rtl') ratio = 1 - ratio;
     commit(min + ratio * (max - min));
   };
+
   const onPointerDown = (e) => {
     if (disabled || pointerId.current !== null) return;
     pointerId.current = e.pointerId;
@@ -141,10 +153,10 @@ export default function WakeSlider({
     }
     rootRef.current?.removeAttribute('data-instant');
     handleRef.current?.focus({ preventScroll: true });
-    commitFromX(e.clientX);
+    commitFromPointer(e.clientX, e.clientY);
   };
   const onPointerMove = (e) => {
-    if (e.pointerId === pointerId.current) commitFromX(e.clientX);
+    if (e.pointerId === pointerId.current) commitFromPointer(e.clientX, e.clientY);
   };
   const endDrag = (e) => {
     if (e.pointerId !== pointerId.current) return;
@@ -181,31 +193,37 @@ export default function WakeSlider({
   const barNodes = useMemo(() => {
     barEls.current.length = bars;
     crestEls.current.length = bars;
-    return Array.from({ length: bars }, (_, i) => (
+    // Vertical: render bottom→top so index 0 is min at the bottom.
+    const indices = vertical
+      ? Array.from({ length: bars }, (_, i) => bars - 1 - i)
+      : Array.from({ length: bars }, (_, i) => i);
+
+    return indices.map((barIndex) => (
       <span
-        key={i}
+        key={barIndex}
         ref={(el) => {
-          barEls.current[i] = el;
+          barEls.current[barIndex] = el;
         }}
         className="wake-slider__bar"
       >
         {crestColor ? (
           <span
             ref={(el) => {
-              crestEls.current[i] = el;
+              crestEls.current[barIndex] = el;
             }}
             className="wake-slider__crest"
           />
         ) : null}
       </span>
     ));
-  }, [bars, crestColor]);
+  }, [bars, crestColor, vertical]);
 
   return (
     <div
       ref={rootRef}
       id={id}
-      className={`wake-slider${className ? ` ${className}` : ''}`}
+      className={`wake-slider${vertical ? ' wake-slider--vertical' : ''}${className ? ` ${className}` : ''}`}
+      data-orientation={vertical ? 'vertical' : 'horizontal'}
       aria-disabled={disabled || undefined}
       style={{
         '--ws-fill': fillColor,
@@ -233,6 +251,7 @@ export default function WakeSlider({
           className="wake-slider__handle"
           tabIndex={disabled ? -1 : 0}
           aria-label={ariaLabel}
+          aria-orientation={vertical ? 'vertical' : 'horizontal'}
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={value}

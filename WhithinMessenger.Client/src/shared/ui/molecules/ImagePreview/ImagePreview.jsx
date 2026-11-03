@@ -9,7 +9,7 @@ import {
   MdImage,
   MdRefresh
 } from 'react-icons/md';
-import { buildMediaUrl } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl, downloadMediaFile } from '../../../lib/utils/urlHelpers';
 import './ImagePreview.css';
 
 const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
@@ -51,15 +51,15 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
   }, [isOpen, onClose]);
 
   const handleDownload = () => {
-    if (mediaFile) {
-      const link = document.createElement('a');
-      link.href = buildMediaUrl(mediaFile.filePath);
-      link.download = mediaFile.originalFileName;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    if (!mediaFile) return;
+    const displayName =
+      mediaFile.originalFileName ||
+      mediaFile.fileName ||
+      (typeof mediaFile.filePath === 'string' ? mediaFile.filePath.split('/').pop() : '') ||
+      'download';
+    downloadMediaFile(mediaFile.filePath, displayName).catch(() => {
+      // ignore — пользователь уже видит превью
+    });
   };
 
   const handleZoomIn = () => {
@@ -155,7 +155,12 @@ const ImagePreview = ({ mediaFile, isOpen, onClose }) => {
               </div>
               <div>
                 <h3 className="image-preview-filename">
-                  {mediaFile.originalFileName}
+                  {mediaFile.originalFileName ||
+                    mediaFile.fileName ||
+                    (typeof mediaFile.filePath === 'string'
+                      ? mediaFile.filePath.split('/').pop()
+                      : '') ||
+                    'Файл'}
                 </h3>
                 <p className="image-preview-info">
                   {mediaFile.contentType} • {formatFileSize(mediaFile.fileSize)}

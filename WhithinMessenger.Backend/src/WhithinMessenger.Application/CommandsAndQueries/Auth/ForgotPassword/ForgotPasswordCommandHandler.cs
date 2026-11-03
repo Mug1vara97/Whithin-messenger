@@ -29,9 +29,15 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
         ForgotPasswordCommand request,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return new ForgotPasswordResult(false, "Email обязателен");
+        }
+
         var email = request.Email.Trim();
         var user = await _userManager.FindByEmailAsync(email);
 
+        // Always succeed for unknown emails to avoid account enumeration.
         if (user == null || string.IsNullOrWhiteSpace(user.Email))
         {
             return new ForgotPasswordResult(true);

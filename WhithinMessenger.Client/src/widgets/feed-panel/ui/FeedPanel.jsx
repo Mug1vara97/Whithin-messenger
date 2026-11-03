@@ -251,20 +251,27 @@ const FeedPanel = ({
           />
         ))}
 
-        {files.map((item) => (
+        {files.map((item) => {
+          const displayName =
+            item.originalFileName ||
+            item.fileName ||
+            (typeof item.filePath === 'string' ? item.filePath.split('/').pop() : '') ||
+            'file';
+          return (
           <button
             key={item.id}
             type="button"
             className="feed-panel__file"
-            onClick={() => downloadMediaFile(item.filePath, item.originalFileName)}
+            onClick={() => downloadMediaFile(item.filePath, displayName)}
           >
             <InsertDriveFileOutlinedIcon sx={{ fontSize: 20 }} />
             <span className="feed-panel__file-meta">
-              <span className="feed-panel__file-name">{item.originalFileName}</span>
+              <span className="feed-panel__file-name" title={displayName}>{displayName}</span>
               <span className="feed-panel__file-size">{formatFileSize(item.fileSize)}</span>
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   };

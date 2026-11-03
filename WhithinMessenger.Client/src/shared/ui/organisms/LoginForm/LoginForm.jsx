@@ -24,7 +24,6 @@ const LoginForm = () => {
   const [pendingEmail, setPendingEmail] = useState('');
   const [resendMessage, setResendMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const qrFlowDismissedRef = useRef(false);
 
   const closeQrOverlay = useCallback(() => {
@@ -49,10 +48,6 @@ const LoginForm = () => {
         [name]: ''
       }));
     }
-
-    if (name === 'password') {
-      setShowForgotPassword(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -66,12 +61,9 @@ const LoginForm = () => {
 
     setPendingEmail('');
     setResendMessage('');
-    setShowForgotPassword(false);
     const result = await login(formData);
     if (result?.requiresEmailConfirmation) {
       setPendingEmail(result.email || formData.username);
-    } else if (result?.error === 'Неверный пароль') {
-      setShowForgotPassword(true);
     }
   };
 
@@ -284,11 +276,9 @@ const LoginForm = () => {
             autoComplete="current-password"
           />
 
-          {showForgotPassword && (
-            <p className="auth-link" style={{ marginTop: '-4px', textAlign: 'right' }}>
-              <Link to="/forgot-password">Забыли пароль?</Link>
-            </p>
-          )}
+          <p className="auth-link" style={{ marginTop: '-4px', textAlign: 'right' }}>
+            <Link to="/forgot-password">Забыли пароль?</Link>
+          </p>
 
           <Button
             type="submit"

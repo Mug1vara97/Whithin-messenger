@@ -28,15 +28,26 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         ResetPasswordCommand request,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            return new ResetPasswordResult(false, "Токен сброса обязателен");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
+        {
+            return new ResetPasswordResult(false, "Пароль должен содержать минимум 6 символов");
+        }
+
         var user = await _userManager.FindByIdAsync(request.UserId.ToString());
         if (user == null)
         {
             return new ResetPasswordResult(false, "Пользователь не найден");
         }
 
+        var token = request.Token.Trim();
         var pendingReset = await _pendingPasswordResetRepository.GetByUserIdAndTokenAsync(
             request.UserId,
-            request.Token,
+            token,
             cancellationToken);
 
         if (pendingReset == null)

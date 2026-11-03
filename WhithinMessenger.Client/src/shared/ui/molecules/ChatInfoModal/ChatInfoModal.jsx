@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BASE_URL } from '../../../lib/constants/apiEndpoints';
-import { buildMediaUrl, openExternalUrl } from '../../../lib/utils/urlHelpers';
+import { buildMediaUrl, downloadMediaFile, openExternalUrl } from '../../../lib/utils/urlHelpers';
 import {
   getUserStatusColor,
   getUserStatusLabel,
@@ -31,6 +31,12 @@ import {
 } from '@mui/icons-material';
 import './ChatInfoModal.css';
 import { appToast } from '../../../lib/utils/appToast';
+
+const resolveMediaDisplayName = (file) =>
+  file?.originalFileName ||
+  file?.fileName ||
+  (typeof file?.filePath === 'string' ? file.filePath.split('/').pop() : '') ||
+  'Файл';
 
 const isBannerImage = (banner) => {
   if (!banner || typeof banner !== 'string') return false;
@@ -274,11 +280,11 @@ const ChatInfoModal = ({
           type="button"
           className="chat-info-photo-tile"
           onClick={() => setSelectedMedia(file)}
-          title={file.originalFileName}
+          title={resolveMediaDisplayName(file)}
         >
           <img
             src={buildMediaUrl(file.filePath)}
-            alt={file.originalFileName}
+            alt={resolveMediaDisplayName(file)}
             className="chat-info-photo-tile__image"
             loading="lazy"
           />
@@ -298,8 +304,8 @@ const ChatInfoModal = ({
         >
           <span className="chat-info-file-row__icon">{getMediaIcon(file.contentType)}</span>
           <span className="chat-info-file-row__meta">
-            <span className="chat-info-file-row__name" title={file.originalFileName}>
-              {file.originalFileName}
+            <span className="chat-info-file-row__name" title={resolveMediaDisplayName(file)}>
+              {resolveMediaDisplayName(file)}
             </span>
             <span className="chat-info-file-row__size">{formatFileSize(file.fileSize)}</span>
           </span>
@@ -585,7 +591,7 @@ const ChatInfoModal = ({
         <div className="chat-info-media-modal-overlay" onClick={() => setSelectedMedia(null)}>
           <div className="chat-info-media-modal" onClick={(e) => e.stopPropagation()}>
             <div className="chat-info-media-modal-header">
-              <h3 className="chat-info-media-modal-title">{selectedMedia.originalFileName}</h3>
+              <h3 className="chat-info-media-modal-title">{resolveMediaDisplayName(selectedMedia)}</h3>
               <button
                 type="button"
                 className="chat-info-modal-close"
@@ -610,16 +616,20 @@ const ChatInfoModal = ({
               ) : (
                 <div className="chat-info-media-preview-file">
                   <div className="chat-info-file-icon">{getMediaIcon(selectedMedia.contentType)}</div>
-                  <h4 className="chat-info-file-name">{selectedMedia.originalFileName}</h4>
+                  <h4 className="chat-info-file-name">{resolveMediaDisplayName(selectedMedia)}</h4>
                   <p className="chat-info-file-size">{formatFileSize(selectedMedia.fileSize)}</p>
                   <a
                     href={buildMediaUrl(selectedMedia.filePath)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    download={resolveMediaDisplayName(selectedMedia)}
                     className="chat-info-download-btn"
                     onClick={(e) => {
                       e.preventDefault();
-                      openExternalUrl(buildMediaUrl(selectedMedia.filePath));
+                      downloadMediaFile(
+                        selectedMedia.filePath,
+                        resolveMediaDisplayName(selectedMedia)
+                      ).catch(() => {
+                        openExternalUrl(buildMediaUrl(selectedMedia.filePath));
+                      });
                     }}
                   >
                     Скачать файл

@@ -36,51 +36,61 @@ export function micThresholdToNoiseGateOpenDb(threshold) {
   return -38 - (value / 255) * 47;
 }
 
-export function getAudioInputMediaConstraints(extra = {}) {
+/**
+ * Build mic constraints for getUserMedia / LiveKit.
+ * Avoid hard-pinning sampleRate/channelCount/latency — Focusrite/USB interfaces
+ * often fail with NotReadableError when Chromium cannot satisfy exact formats.
+ */
+export function getAudioInputMediaConstraints(extra = {}, options = {}) {
+  const { strictDevice = true, minimal = false } = options;
   const settings = volumeStorage.getSettings();
   const savedNoiseSuppression = localStorage.getItem('noiseSuppression');
   const wantsNoiseSuppression = savedNoiseSuppression ? JSON.parse(savedNoiseSuppression) : false;
-  const echoOn = settings.echoCancellation !== false;
-  const agcOn = settings.autoGainControl !== false;
+  const echoOn = !minimal && settings.echoCancellation !== false;
+  const agcOn = !minimal && settings.autoGainControl !== false;
 
   const audio = {
     echoCancellation: echoOn,
-    noiseSuppression: wantsNoiseSuppression,
+    noiseSuppression: !minimal && wantsNoiseSuppression,
     autoGainControl: agcOn,
-    sampleRate: 48000,
-    channelCount: 1,
-    latency: 0,
-    suppressLocalAudioPlayback: true,
     ...extra,
   };
 
   if (echoOn) {
     Object.assign(audio, {
       googEchoCancellation: true,
-      googEchoCancellation2: true,
-      googDAEchoCancellation: true,
       googHighpassFilter: true,
     });
-
-    if (typeof navigator !== 'undefined' && /chrome|chromium|electron/i.test(navigator.userAgent)) {
-      audio.voiceIsolation = true;
-    }
   }
 
   if (agcOn) {
     audio.googAutoGainControl = true;
   }
 
-  if (wantsNoiseSuppression) {
+  if (!minimal && wantsNoiseSuppression) {
     audio.googNoiseSuppression = true;
   }
 
   const deviceId = settings.inputDeviceId;
   if (deviceId && deviceId !== 'default') {
-    audio.deviceId = { exact: deviceId };
+    audio.deviceId = strictDevice ? { exact: deviceId } : { ideal: deviceId };
   }
 
   return { audio };
+}
+
+/** LiveKit AudioCaptureOptions from current voice settings. */
+export function getLiveKitAudioCaptureOptions(options = {}) {
+  const { audio } = getAudioInputMediaConstraints({}, options);
+  const capture = {
+    echoCancellation: audio.echoCancellation !== false,
+    noiseSuppression: Boolean(audio.noiseSuppression),
+    autoGainControl: audio.autoGainControl !== false,
+  };
+  if (audio.deviceId) {
+    capture.deviceId = audio.deviceId;
+  }
+  return capture;
 }
 
 export async function applyLiveMicCaptureConstraints(callState) {

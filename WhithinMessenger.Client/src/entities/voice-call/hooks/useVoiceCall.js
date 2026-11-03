@@ -531,13 +531,8 @@ export const useVoiceCall = (userId, userName) => {
         })));
       }
       
-      // Get room and set initial mute state
-      const room = voiceCallApi.getRoom();
-      if (room) {
-        // Set initial microphone state
-        await room.localParticipant.setMicrophoneEnabled(!initialMuted);
-        setIsMuted(initialMuted);
-      }
+      // Initial mic state is applied inside voiceCallApi.joinRoom via setMicrophoneEnabled
+      setIsMuted(initialMuted);
       
       // Обновляем текущий звонок
       setCurrentCall({ channelId: roomId, channelName: roomId });

@@ -192,20 +192,39 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest? request)
     {
-        var result = await _mediator.Send(new ForgotPasswordCommand(request.Email));
-        if (result.IsSuccess)
+        if (request == null || string.IsNullOrWhiteSpace(request.Email))
         {
-            return Ok(new { Message = "Если аккаунт с этим email существует, письмо для сброса пароля отправлено" });
+            return BadRequest(new { Error = "Email обязателен" });
         }
 
-        return BadRequest(new { Error = result.ErrorMessage });
+        var email = request.Email.Trim();
+        if (!email.Contains('@'))
+        {
+            return BadRequest(new { Error = "Некорректный email" });
+        }
+
+        var result = await _mediator.Send(new ForgotPasswordCommand(email));
+        if (result.IsSuccess)
+        {
+            return Ok(new
+            {
+                Message = "Если аккаунт с этим email существует, письмо для сброса пароля отправлено"
+            });
+        }
+
+        return BadRequest(new { Error = result.ErrorMessage ?? "Не удалось отправить письмо" });
     }
 
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest? request)
     {
+        if (request == null)
+        {
+            return BadRequest(new { Error = "Тело запроса обязательно" });
+        }
+
         if (!Guid.TryParse(request.UserId, out var userId))
         {
             return BadRequest(new { Error = "Некорректный идентификатор пользователя" });
@@ -216,13 +235,35 @@ public class AuthController : ControllerBase
             return BadRequest(new { Error = "Токен сброса обязателен" });
         }
 
-        var result = await _mediator.Send(new ResetPasswordCommand(userId, request.Token, request.NewPassword));
-        if (result.IsSuccess)
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
         {
-            return Ok(new { Message = "Пароль успешно изменён" });
+            return BadRequest(new { Error = "Новый пароль обязателен" });
         }
 
-        return BadRequest(new { Error = result.ErrorMessage });
+        if (request.NewPassword.Length < 6)
+        {
+            return BadRequest(new { Error = "Пароль должен содержать минимум 6 символов" });
+        }
+
+        var result = await _mediator.Send(
+            new ResetPasswordCommand(userId, request.Token.Trim(), request.NewPassword));
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { Error = result.ErrorMessage ?? "Не удалось сбросить пароль" });
+        }
+
+        // Invalidate all sessions after password reset.
+        var userTokens = await _dbContext.RefreshTokens
+            .Where(x => x.UserId == userId)
+            .ToListAsync();
+        if (userTokens.Count > 0)
+        {
+            _dbContext.RefreshTokens.RemoveRange(userTokens);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        return Ok(new { Message = "Пароль успешно изменён" });
     }
 
     [HttpPost("qr/session")]

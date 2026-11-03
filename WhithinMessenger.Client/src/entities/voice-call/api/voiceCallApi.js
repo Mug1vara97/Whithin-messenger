@@ -12,7 +12,10 @@ import {
 } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { ScreenShareProcessAudioSession } from '../../../shared/lib/utils/screenShareProcessAudio';
-import { getAudioInputMediaConstraints } from '../../../shared/lib/utils/voiceCallAudioSettings';
+import {
+  getAudioInputMediaConstraints,
+  getLiveKitAudioCaptureOptions,
+} from '../../../shared/lib/utils/voiceCallAudioSettings';
 import { serverApi } from '../../server/api/serverApi';
 
 // Конфигурация для голосового сервера
@@ -62,10 +65,10 @@ const getRoomOptions = () => {
     // a different Opus fmtp profile than microphone. Forcing mono here
     // can lead to SDP bundle codec collisions for multiple audio tracks.
     audioCaptureDefaults: {
+      ...getLiveKitAudioCaptureOptions(),
       echoCancellation: micDefaults.echoCancellation !== false,
       noiseSuppression: Boolean(micDefaults.noiseSuppression),
       autoGainControl: micDefaults.autoGainControl !== false,
-      suppressLocalAudioPlayback: true,
     },
     videoCaptureDefaults: {
       resolution: VideoPresets.h1080.resolution,
@@ -847,12 +850,8 @@ class VoiceCallApi {
           await this.room.connect(response.url, response.token);
           console.log('Connected to LiveKit room:', roomId);
 
-          // Set initial microphone state
-          if (initialMuted) {
-            await this.room.localParticipant.setMicrophoneEnabled(false);
-          } else {
-            await this.room.localParticipant.setMicrophoneEnabled(true);
-          }
+          // Set initial microphone state (uses Focusrite-friendly capture options)
+          await this.setMicrophoneEnabled(!initialMuted);
 
           // Set initial audio enabled state
           // Note: LiveKit doesn't have a direct "audio output enabled" concept
@@ -1099,7 +1098,44 @@ class VoiceCallApi {
       throw new Error('Not connected to room');
     }
 
-    await this.room.localParticipant.setMicrophoneEnabled(enabled);
+    if (!enabled) {
+      await this.room.localParticipant.setMicrophoneEnabled(false);
+      return;
+    }
+
+    const tryEnable = async (captureOptions) => {
+      await this.room.localParticipant.setMicrophoneEnabled(true, captureOptions);
+    };
+
+    try {
+      await tryEnable(getLiveKitAudioCaptureOptions());
+    } catch (error) {
+      const name = String(error?.name || '');
+      const message = String(error?.message || '').toLowerCase();
+      const isCaptureFail =
+        name === 'NotReadableError'
+        || name === 'OverconstrainedError'
+        || message.includes('audio source')
+        || message.includes('could not start')
+        || message.includes('constrain');
+
+      if (!isCaptureFail) throw error;
+
+      console.warn(
+        'Mic enable failed with preferred device/constraints, retrying minimal Focusrite-friendly capture:',
+        error,
+      );
+      try {
+        await tryEnable(getLiveKitAudioCaptureOptions({ minimal: true, strictDevice: false }));
+      } catch (retryError) {
+        console.warn('Mic enable retry with ideal device failed, using browser default:', retryError);
+        await tryEnable({
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: true,
+        });
+      }
+    }
   }
 
   // Enable/disable camera
