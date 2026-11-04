@@ -72,6 +72,28 @@
   gap: 12px;
 }
 
+.create-feed-post-modal__title-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, var(--background-secondary, #2f3136));
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+}
+
+.create-feed-post-modal__title-input:focus {
+  border-color: var(--primary, #5865f2);
+}
+
+.create-feed-post-modal__title-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .create-feed-post-modal__textarea {
   width: 100%;
   min-height: 120px;

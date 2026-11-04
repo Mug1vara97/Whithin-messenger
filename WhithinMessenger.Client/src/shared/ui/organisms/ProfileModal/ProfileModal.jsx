@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -9,6 +10,7 @@ import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutl
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { userApi } from '../../../../entities/user/api';
 import { feedApi, formatFeedTime } from '../../../../entities/feed';
+import { resolvePostTitle } from '../../../../widgets/feed-panel/ui/feedFormat';
 import { MEDIA_BASE_URL } from '../../../lib/constants/apiEndpoints';
 import { useAuthContext } from '../../../lib/contexts/AuthContext';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/contexts/ProfileModalContext';
@@ -99,6 +101,7 @@ const ProfileModal = ({
   const [previewMedia, setPreviewMedia] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const { user } = useAuthContext();
+  const navigate = useNavigate();
   const aboutTextRef = useRef('');
   const onProfileUpdatedRef = useRef(onProfileUpdated);
   onProfileUpdatedRef.current = onProfileUpdated;
@@ -680,7 +683,23 @@ const ProfileModal = ({
                 ) : (
                   <div className="profile-wall__feed">
                     {profilePosts.map((post) => (
-                      <article key={post.id} className="profile-wall__post">
+                      <article
+                        key={post.id}
+                        className="profile-wall__post profile-wall__post--clickable"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          onClose?.();
+                          navigate(`/channels/@me/feed/${post.id}`);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onClose?.();
+                            navigate(`/channels/@me/feed/${post.id}`);
+                          }
+                        }}
+                      >
                         <div className="profile-wall__post-top">
                           <div className="profile-wall__post-author">
                             {avatarUrl ? (
@@ -712,14 +731,24 @@ const ProfileModal = ({
                               type="button"
                               className="profile-wall__post-more"
                               title="Удалить"
-                              onClick={() => void handleDeletePost(post.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleDeletePost(post.id);
+                              }}
                             >
                               <MoreHorizIcon sx={{ fontSize: 20 }} />
                             </button>
                           ) : null}
                         </div>
 
-                        {post.text ? <p className="profile-wall__post-text">{post.text}</p> : null}
+                        <p className="profile-wall__post-text profile-wall__post-title">
+                          {resolvePostTitle(post)}
+                        </p>
+                        {post.text ? (
+                          <p className="profile-wall__post-text profile-wall__post-preview">
+                            {post.text}
+                          </p>
+                        ) : null}
                         {renderPostAttachments(post)}
 
                         <div className="profile-wall__post-stats">

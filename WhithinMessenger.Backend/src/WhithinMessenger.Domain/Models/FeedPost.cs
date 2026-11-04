@@ -12,6 +12,9 @@ public class FeedPost
 
     public Guid AuthorUserId { get; set; }
 
+    /// <summary>Заголовок треда (Reddit-style). Nullable для старых постов.</summary>
+    public string? Title { get; set; }
+
     public string Text { get; set; } = string.Empty;
 
     public FeedPostScope Scope { get; set; } = FeedPostScope.Friend;

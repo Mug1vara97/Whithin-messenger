@@ -12,6 +12,9 @@ public class FeedPostConfiguration : IEntityTypeConfiguration<FeedPost>
 
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.Title)
+            .HasMaxLength(300);
+
         builder.Property(e => e.Text)
             .HasMaxLength(2000)
             .IsRequired();

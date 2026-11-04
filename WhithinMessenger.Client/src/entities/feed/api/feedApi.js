@@ -15,11 +15,16 @@ const normalizeAttachment = (item) => {
   };
 };
 
-const normalizeComment = (comment) => {
+export const normalizeComment = (comment) => {
   if (!comment) return null;
+  const myReactionRaw = comment.myReaction ?? comment.MyReaction ?? null;
   return {
     id: String(comment.id ?? comment.Id ?? ''),
     postId: String(comment.postId ?? comment.PostId ?? ''),
+    parentCommentId: (() => {
+      const raw = comment.parentCommentId ?? comment.ParentCommentId ?? null;
+      return raw ? String(raw) : null;
+    })(),
     text: comment.text ?? comment.Text ?? '',
     createdAt: comment.createdAt ?? comment.CreatedAt ?? null,
     authorId: String(comment.authorId ?? comment.AuthorId ?? ''),
@@ -27,22 +32,28 @@ const normalizeComment = (comment) => {
     authorUsername: comment.authorUsername ?? comment.AuthorUsername ?? null,
     authorAvatar: comment.authorAvatar ?? comment.AuthorAvatar ?? null,
     authorAvatarColor: comment.authorAvatarColor ?? comment.AuthorAvatarColor ?? '#5865f2',
+    likesCount: Number(comment.likesCount ?? comment.LikesCount ?? 0),
+    dislikesCount: Number(comment.dislikesCount ?? comment.DislikesCount ?? 0),
+    myReaction: myReactionRaw === 'like' || myReactionRaw === 'dislike' ? myReactionRaw : null,
   };
 };
 
-const normalizePost = (post) => {
+export const normalizePost = (post) => {
   if (!post) return null;
   const attachmentsRaw = post.attachments ?? post.Attachments ?? [];
   const myReactionRaw = post.myReaction ?? post.MyReaction ?? null;
+  const text = post.text ?? post.Text ?? '';
+  const titleRaw = post.title ?? post.Title ?? '';
   return {
     id: String(post.id ?? post.Id ?? ''),
     scope: post.scope === 'server' || post.Scope === 'server' || post.scope === 1 ? 'server' : 'friend',
+    title: String(titleRaw || '').trim() || null,
     authorId: String(post.authorId ?? post.AuthorId ?? ''),
     authorName: post.authorName ?? post.AuthorName ?? 'Пользователь',
     authorUsername: post.authorUsername ?? post.AuthorUsername ?? null,
     authorAvatar: post.authorAvatar ?? post.AuthorAvatar ?? null,
     authorAvatarColor: post.authorAvatarColor ?? post.AuthorAvatarColor ?? '#5865f2',
-    text: post.text ?? post.Text ?? '',
+    text,
     createdAt: post.createdAt ?? post.CreatedAt ?? null,
     serverId: post.serverId ?? post.ServerId ?? null,
     serverName: post.serverName ?? post.ServerName ?? null,
@@ -56,6 +67,25 @@ const normalizePost = (post) => {
     myReaction: myReactionRaw === 'like' || myReactionRaw === 'dislike' ? myReactionRaw : null,
     isStub: false,
   };
+};
+
+/** Build nested tree from flat comment list. */
+export const buildCommentTree = (comments = []) => {
+  const byId = new Map();
+  const roots = [];
+  for (const comment of comments) {
+    byId.set(String(comment.id), { ...comment, children: [] });
+  }
+  for (const comment of comments) {
+    const node = byId.get(String(comment.id));
+    const parentId = comment.parentCommentId ? String(comment.parentCommentId) : null;
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
 };
 
 export const feedApi = {
@@ -86,8 +116,15 @@ export const feedApi = {
     return (Array.isArray(response.data) ? response.data : []).map(normalizePost).filter(Boolean);
   },
 
-  async createPost({ text = '', scope = 'friend', serverId = null, files = [] } = {}) {
+  async getPost(postId) {
+    if (!postId) return null;
+    const response = await apiClient.get(`/feed/${postId}`);
+    return normalizePost(response.data);
+  },
+
+  async createPost({ title = '', text = '', scope = 'friend', serverId = null, files = [] } = {}) {
     const formData = new FormData();
+    if (title) formData.append('title', title);
     formData.append('text', text ?? '');
     formData.append('scope', scope || 'friend');
     if (serverId) {
@@ -138,13 +175,22 @@ export const feedApi = {
     return normalizePost(response.data);
   },
 
-  async getComments(postId, take = 100) {
+  async getComments(postId, take = 500) {
     const response = await apiClient.get(`/feed/${postId}/comments`, { params: { take } });
     return (Array.isArray(response.data) ? response.data : []).map(normalizeComment).filter(Boolean);
   },
 
-  async addComment(postId, text) {
-    const response = await apiClient.post(`/feed/${postId}/comments`, { text });
+  async addComment(postId, text, parentCommentId = null) {
+    const payload = { text };
+    if (parentCommentId) payload.parentCommentId = parentCommentId;
+    const response = await apiClient.post(`/feed/${postId}/comments`, payload);
+    return normalizeComment(response.data);
+  },
+
+  async setCommentReaction(commentId, value) {
+    const response = await apiClient.put(`/feed/comments/${commentId}/reaction`, {
+      value: value || null,
+    });
     return normalizeComment(response.data);
   },
 

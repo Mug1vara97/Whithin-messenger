@@ -83,10 +83,27 @@ public class FeedController : ControllerBase
         return Ok(result.Posts);
     }
 
+    [HttpGet("{postId:guid}")]
+    public async Task<IActionResult> GetPost(Guid postId)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new GetFeedPostByIdQuery(userId, postId));
+        if (!result.Success)
+        {
+            var status = string.Equals(result.ErrorMessage, "Нет доступа к посту", StringComparison.Ordinal)
+                ? 403
+                : 404;
+            return StatusCode(status, new { error = result.ErrorMessage ?? "Пост не найден" });
+        }
+
+        return Ok(result.Post);
+    }
+
     [HttpPost]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = 524_288_000)]
     public async Task<IActionResult> CreatePost(
+        [FromForm] string? title,
         [FromForm] string? text,
         [FromForm] string? scope,
         [FromForm] Guid? serverId,
@@ -99,6 +116,7 @@ public class FeedController : ControllerBase
 
         var result = await _mediator.Send(new CreateFeedPostCommand(
             userId,
+            title,
             text ?? string.Empty,
             resolvedScope,
             serverId,
@@ -154,9 +172,10 @@ public class FeedController : ControllerBase
     }
 
     [HttpGet("{postId:guid}/comments")]
-    public async Task<IActionResult> GetComments(Guid postId, [FromQuery] int take = 100)
+    public async Task<IActionResult> GetComments(Guid postId, [FromQuery] int take = 500)
     {
-        var result = await _mediator.Send(new GetFeedCommentsQuery(postId, take));
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        var result = await _mediator.Send(new GetFeedCommentsQuery(userId, postId, take));
         if (!result.Success)
         {
             return BadRequest(new { error = result.ErrorMessage });
@@ -169,7 +188,41 @@ public class FeedController : ControllerBase
     public async Task<IActionResult> AddComment(Guid postId, [FromBody] AddFeedCommentRequest request)
     {
         var userId = (Guid)HttpContext.Items["UserId"]!;
-        var result = await _mediator.Send(new AddFeedCommentCommand(userId, postId, request?.Text ?? string.Empty));
+        var result = await _mediator.Send(new AddFeedCommentCommand(
+            userId,
+            postId,
+            request?.Text ?? string.Empty,
+            request?.ParentCommentId));
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Comment);
+    }
+
+    [HttpPut("comments/{commentId:guid}/reaction")]
+    public async Task<IActionResult> SetCommentReaction(
+        Guid commentId,
+        [FromBody] SetFeedReactionRequest request)
+    {
+        var userId = (Guid)HttpContext.Items["UserId"]!;
+        FeedReactionValue? value = null;
+        if (!string.IsNullOrWhiteSpace(request?.Value))
+        {
+            value = request.Value.Trim().ToLowerInvariant() switch
+            {
+                "like" => FeedReactionValue.Like,
+                "dislike" => FeedReactionValue.Dislike,
+                _ => null,
+            };
+            if (value == null && !string.Equals(request.Value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { error = "value должен быть like, dislike или null" });
+            }
+        }
+
+        var result = await _mediator.Send(new SetFeedCommentReactionCommand(userId, commentId, value));
         if (!result.Success)
         {
             return BadRequest(new { error = result.ErrorMessage });
@@ -200,4 +253,5 @@ public class SetFeedReactionRequest
 public class AddFeedCommentRequest
 {
     public string? Text { get; set; }
+    public Guid? ParentCommentId { get; set; }
 }

@@ -1,4 +1,9 @@
-export { feedApi } from './api/feedApi';
+export {
+  feedApi,
+  normalizePost,
+  normalizeComment,
+  buildCommentTree,
+} from './api/feedApi';
 
 export function formatFeedTime(timestamp) {
   if (!timestamp) return '';

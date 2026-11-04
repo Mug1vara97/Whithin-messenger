@@ -72,7 +72,9 @@ const HomePage = () => {
   
   const showFriends = location.pathname === '/channels/@me/friends';
   const showFeed =
-    location.pathname === '/channels/@me/feed' || location.pathname === '/channels/@me';
+    location.pathname === '/channels/@me/feed' ||
+    location.pathname.startsWith('/channels/@me/feed/') ||
+    location.pathname === '/channels/@me';
   const showDiscovery = isDiscoveryPath(location.pathname);
   const discoveryTab = parseDiscoveryTab(location.pathname) ?? DISCOVERY_TAB.SERVERS;
 

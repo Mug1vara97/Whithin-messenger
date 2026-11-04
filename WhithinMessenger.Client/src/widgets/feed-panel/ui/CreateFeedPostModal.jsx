@@ -19,6 +19,7 @@ const CreateFeedPostModal = ({
   title = 'Новый пост',
   placeholder = 'Что нового? Пост увидят только друзья.',
 }) => {
+  const [postTitle, setPostTitle] = useState('');
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
@@ -29,6 +30,7 @@ const CreateFeedPostModal = ({
 
   useEffect(() => {
     if (!isOpen) {
+      setPostTitle('');
       setText('');
       setFiles([]);
       setError('');
@@ -93,8 +95,8 @@ const CreateFeedPostModal = ({
 
   const handlePublish = useCallback(async () => {
     if (publishing) return;
-    if (!text.trim() && files.length === 0) {
-      setError('Добавьте текст или вложение');
+    if (!postTitle.trim() && !text.trim() && files.length === 0) {
+      setError('Добавьте заголовок, текст или вложение');
       return;
     }
 
@@ -102,6 +104,7 @@ const CreateFeedPostModal = ({
     setError('');
     try {
       const created = await feedApi.createPost({
+        title: postTitle.trim(),
         text,
         scope: scope === 'server' ? 'server' : 'friend',
         serverId: scope === 'server' ? serverId : null,
@@ -114,7 +117,7 @@ const CreateFeedPostModal = ({
     } finally {
       setPublishing(false);
     }
-  }, [publishing, text, files, onCreated, onClose, scope, serverId]);
+  }, [publishing, postTitle, text, files, onCreated, onClose, scope, serverId]);
 
   if (!isOpen) return null;
 
@@ -135,6 +138,15 @@ const CreateFeedPostModal = ({
         </div>
 
         <div className="create-feed-post-modal__body">
+          <input
+            type="text"
+            className="create-feed-post-modal__title-input"
+            value={postTitle}
+            maxLength={300}
+            placeholder="Заголовок"
+            onChange={(event) => setPostTitle(event.target.value)}
+            autoFocus
+          />
           <textarea
             className="create-feed-post-modal__textarea"
             value={text}
@@ -142,7 +154,6 @@ const CreateFeedPostModal = ({
             rows={5}
             placeholder={placeholder}
             onChange={(event) => setText(event.target.value)}
-            autoFocus
           />
 
           {previews.length > 0 && (
@@ -205,7 +216,7 @@ const CreateFeedPostModal = ({
           <button
             type="button"
             className="create-feed-post-modal__publish"
-            disabled={publishing || (!text.trim() && files.length === 0)}
+            disabled={publishing || (!postTitle.trim() && !text.trim() && files.length === 0)}
             onClick={handlePublish}
           >
             {publishing ? 'Публикация…' : 'Опубликовать'}

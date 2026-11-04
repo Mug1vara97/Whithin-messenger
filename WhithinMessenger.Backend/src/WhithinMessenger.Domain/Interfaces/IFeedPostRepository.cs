@@ -47,4 +47,15 @@ public interface IFeedPostRepository
     Task AddCommentAsync(FeedPostComment comment, CancellationToken cancellationToken = default);
 
     Task DeleteCommentAsync(FeedPostComment comment, CancellationToken cancellationToken = default);
+
+    Task<FeedCommentReaction?> GetCommentReactionAsync(
+        Guid commentId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task UpsertCommentReactionAsync(FeedCommentReaction reaction, CancellationToken cancellationToken = default);
+
+    Task RemoveCommentReactionAsync(FeedCommentReaction reaction, CancellationToken cancellationToken = default);
+
+    Task<int> GetCommentDepthAsync(Guid commentId, CancellationToken cancellationToken = default);
 }

@@ -812,6 +812,14 @@
   color: var(--text, #f2f3f5);
 }
 
+.profile-wall__post--clickable {
+  cursor: pointer;
+}
+
+.profile-wall__post--clickable:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
 .profile-wall__post-text {
   margin: 0 0 10px;
   font-size: 15px;
@@ -819,6 +827,22 @@
   color: var(--text, #dbdee1);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.profile-wall__post-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.profile-wall__post-preview {
+  font-size: 14px;
+  color: var(--text-muted, #949ba4);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
 }
 
 .profile-wall__attachments {

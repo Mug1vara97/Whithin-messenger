@@ -149,6 +149,7 @@ public class FeedPostRepository : IFeedPostRepository
             .AsNoTracking()
             .Include(c => c.Author)
             .ThenInclude(u => u.UserProfile)
+            .Include(c => c.Reactions)
             .Where(c => c.FeedPostId == postId)
             .OrderBy(c => c.CreatedAt)
             .Take(take)
@@ -162,6 +163,7 @@ public class FeedPostRepository : IFeedPostRepository
         return await _context.FeedPostComments
             .Include(c => c.Author)
             .ThenInclude(u => u.UserProfile)
+            .Include(c => c.Reactions)
             .FirstOrDefaultAsync(c => c.Id == commentId, cancellationToken);
     }
 
@@ -173,7 +175,91 @@ public class FeedPostRepository : IFeedPostRepository
 
     public async Task DeleteCommentAsync(FeedPostComment comment, CancellationToken cancellationToken = default)
     {
+        // Cascade-delete nested replies (FK ParentCommentId is Restrict).
+        var toRemove = new List<FeedPostComment>();
+        async Task CollectAsync(Guid id)
+        {
+            var children = await _context.FeedPostComments
+                .Where(c => c.ParentCommentId == id)
+                .ToListAsync(cancellationToken);
+            foreach (var child in children)
+            {
+                await CollectAsync(child.Id);
+                toRemove.Add(child);
+            }
+        }
+
+        await CollectAsync(comment.Id);
+        if (toRemove.Count > 0)
+        {
+            _context.FeedPostComments.RemoveRange(toRemove);
+        }
+
         _context.FeedPostComments.Remove(comment);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<FeedCommentReaction?> GetCommentReactionAsync(
+        Guid commentId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.FeedCommentReactions
+            .FirstOrDefaultAsync(
+                r => r.FeedPostCommentId == commentId && r.UserId == userId,
+                cancellationToken);
+    }
+
+    public async Task UpsertCommentReactionAsync(
+        FeedCommentReaction reaction,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await _context.FeedCommentReactions
+            .FirstOrDefaultAsync(
+                r => r.FeedPostCommentId == reaction.FeedPostCommentId && r.UserId == reaction.UserId,
+                cancellationToken);
+
+        if (existing == null)
+        {
+            _context.FeedCommentReactions.Add(reaction);
+        }
+        else
+        {
+            existing.Value = reaction.Value;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveCommentReactionAsync(
+        FeedCommentReaction reaction,
+        CancellationToken cancellationToken = default)
+    {
+        _context.FeedCommentReactions.Remove(reaction);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> GetCommentDepthAsync(Guid commentId, CancellationToken cancellationToken = default)
+    {
+        var depth = 0;
+        var currentId = (Guid?)commentId;
+        while (currentId.HasValue && depth < 32)
+        {
+            var parentId = await _context.FeedPostComments
+                .AsNoTracking()
+                .Where(c => c.Id == currentId.Value)
+                .Select(c => c.ParentCommentId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (!parentId.HasValue)
+            {
+                break;
+            }
+
+            depth += 1;
+            currentId = parentId;
+        }
+
+        return depth;
     }
 }

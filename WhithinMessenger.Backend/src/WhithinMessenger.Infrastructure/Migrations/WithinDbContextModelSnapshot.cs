@@ -454,6 +454,39 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedCommentReaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FeedPostCommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Value")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeedPostCommentId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("FeedPostCommentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("FeedCommentReactions", (string)null);
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -476,6 +509,10 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -552,6 +589,9 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Property<Guid>("FeedPostId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ParentCommentId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -563,6 +603,8 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("ParentCommentId");
 
                     b.HasIndex("FeedPostId", "CreatedAt");
 
@@ -1715,6 +1757,25 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedCommentReaction", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.FeedPostComment", "Comment")
+                        .WithMany("Reactions")
+                        .HasForeignKey("FeedPostCommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedPost", b =>
                 {
                     b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "Author")
@@ -1758,9 +1819,16 @@ namespace WhithinMessenger.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WhithinMessenger.Domain.Models.FeedPostComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Author");
 
                     b.Navigation("FeedPost");
+
+                    b.Navigation("ParentComment");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedPostReaction", b =>
@@ -2303,6 +2371,13 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Navigation("Comments");
 
                     b.Navigation("Reactions");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.FeedPostComment", b =>
+                {
+                    b.Navigation("Reactions");
+
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.Message", b =>

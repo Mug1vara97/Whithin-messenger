@@ -42,6 +42,7 @@ public class FeedPostCommentConfiguration : IEntityTypeConfiguration<FeedPostCom
             .IsRequired();
 
         builder.HasIndex(e => new { e.FeedPostId, e.CreatedAt });
+        builder.HasIndex(e => e.ParentCommentId);
 
         builder.HasOne(e => e.FeedPost)
             .WithMany(p => p.Comments)
@@ -51,6 +52,37 @@ public class FeedPostCommentConfiguration : IEntityTypeConfiguration<FeedPostCom
         builder.HasOne(e => e.Author)
             .WithMany()
             .HasForeignKey(e => e.AuthorUserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(e => e.ParentComment)
+            .WithMany(c => c.Replies)
+            .HasForeignKey(e => e.ParentCommentId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class FeedCommentReactionConfiguration : IEntityTypeConfiguration<FeedCommentReaction>
+{
+    public void Configure(EntityTypeBuilder<FeedCommentReaction> builder)
+    {
+        builder.ToTable("FeedCommentReactions");
+        builder.HasKey(e => e.Id);
+
+        builder.Property(e => e.Value)
+            .HasConversion<int>()
+            .IsRequired();
+
+        builder.HasIndex(e => new { e.FeedPostCommentId, e.UserId }).IsUnique();
+        builder.HasIndex(e => e.FeedPostCommentId);
+
+        builder.HasOne(e => e.Comment)
+            .WithMany(c => c.Reactions)
+            .HasForeignKey(e => e.FeedPostCommentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

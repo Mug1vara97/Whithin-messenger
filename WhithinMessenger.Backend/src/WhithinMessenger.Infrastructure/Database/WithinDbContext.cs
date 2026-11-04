@@ -42,6 +42,7 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<FeedPostAttachment> FeedPostAttachments { get; set; }
     public DbSet<FeedPostReaction> FeedPostReactions { get; set; }
     public DbSet<FeedPostComment> FeedPostComments { get; set; }
+    public DbSet<FeedCommentReaction> FeedCommentReactions { get; set; }
     public DbSet<MessagePoll> MessagePolls { get; set; }
     public DbSet<PollOption> PollOptions { get; set; }
     public DbSet<PollVote> PollVotes { get; set; }

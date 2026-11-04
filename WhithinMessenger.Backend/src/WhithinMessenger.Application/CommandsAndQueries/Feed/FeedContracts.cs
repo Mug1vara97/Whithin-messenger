@@ -6,6 +6,7 @@ namespace WhithinMessenger.Application.CommandsAndQueries.Feed;
 
 public record CreateFeedPostCommand(
     Guid AuthorUserId,
+    string? Title,
     string Text,
     FeedPostScope Scope,
     Guid? ServerId,
@@ -13,6 +14,8 @@ public record CreateFeedPostCommand(
 ) : IRequest<FeedPostMutationResult>;
 
 public record DeleteFeedPostCommand(Guid UserId, Guid PostId) : IRequest<FeedPostMutationResult>;
+
+public record GetFeedPostByIdQuery(Guid ViewerUserId, Guid PostId) : IRequest<FeedPostMutationResult>;
 
 public record GetFriendsFeedQuery(Guid UserId, int Take = 50) : IRequest<FeedPostsResult>;
 
@@ -29,12 +32,20 @@ public record GetUserFeedPostsQuery(Guid ViewerUserId, Guid AuthorUserId, int Ta
 public record SetFeedReactionCommand(Guid UserId, Guid PostId, FeedReactionValue? Value)
     : IRequest<FeedEngagementResult>;
 
-public record GetFeedCommentsQuery(Guid PostId, int Take = 100) : IRequest<FeedCommentsResult>;
+public record GetFeedCommentsQuery(Guid ViewerUserId, Guid PostId, int Take = 500)
+    : IRequest<FeedCommentsResult>;
 
-public record AddFeedCommentCommand(Guid AuthorUserId, Guid PostId, string Text)
-    : IRequest<FeedCommentMutationResult>;
+public record AddFeedCommentCommand(
+    Guid AuthorUserId,
+    Guid PostId,
+    string Text,
+    Guid? ParentCommentId
+) : IRequest<FeedCommentMutationResult>;
 
 public record DeleteFeedCommentCommand(Guid UserId, Guid CommentId)
+    : IRequest<FeedCommentMutationResult>;
+
+public record SetFeedCommentReactionCommand(Guid UserId, Guid CommentId, FeedReactionValue? Value)
     : IRequest<FeedCommentMutationResult>;
 
 public class FeedPostMutationResult

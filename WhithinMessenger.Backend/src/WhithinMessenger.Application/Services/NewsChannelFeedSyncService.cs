@@ -68,11 +68,17 @@ public class NewsChannelFeedSyncService : INewsChannelFeedSyncService
             }
 
             var now = DateTimeOffset.UtcNow;
+            var body = text.Length > 2000 ? text[..2000] : text;
+            var firstLine = body.Split('\n', 2, StringSplitOptions.None)[0].Trim();
+            var title = string.IsNullOrEmpty(firstLine)
+                ? null
+                : (firstLine.Length > 300 ? firstLine[..300] : firstLine);
             var post = new FeedPost
             {
                 Id = Guid.NewGuid(),
                 AuthorUserId = message.UserId,
-                Text = text.Length > 2000 ? text[..2000] : text,
+                Title = title,
+                Text = body,
                 Scope = FeedPostScope.Server,
                 ServerId = chat.ServerId.Value,
                 CreatedAt = message.CreatedAt == default ? now : message.CreatedAt,
