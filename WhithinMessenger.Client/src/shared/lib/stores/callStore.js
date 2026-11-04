@@ -3656,7 +3656,10 @@ export const useCallStore = create(
         });
       },
       
-      // Глобальное отключение звука (Discord: deafen → mute mic; undeafen → unmute mic)
+      // Headphones / deafen (Discord):
+      // - deafen → also mute mic
+      // - undeafen → do NOT unmute mic (mic stays muted until user enables it)
+      // - unmute mic while deafened → also undeafen (see toggleMute)
       toggleGlobalAudio: async () => {
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
@@ -3666,12 +3669,8 @@ export const useCallStore = create(
           return;
         }
 
-        if (newMutedState) {
-          if (!get().isMuted) {
-            await get().applyMicrophoneMute(true, { playSound: false });
-          }
-        } else if (get().isMuted) {
-          await get().applyMicrophoneMute(false, { playSound: false });
+        if (newMutedState && !get().isMuted) {
+          await get().applyMicrophoneMute(true, { playSound: false });
         }
       },
       
