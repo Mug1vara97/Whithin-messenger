@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Whithin</string>
+    <string name="share_target_label">Whithin</string>
+    <string name="join_room">Join Room</string>
+    <string name="room_name">Room Name</string>
+    <string name="your_name">Your Name</string>
+    <string name="leave">Leave</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
+    <string name="camera_on">Camera On</string>
+    <string name="camera_off">Camera Off</string>
+    <string name="screen_share">Share Screen</string>
+    <string name="stop_screen_share">Stop Sharing</string>
+    <string name="audio_enabled">Audio Enabled</string>
+    <string name="audio_disabled">Audio Disabled</string>
+    <string name="permission_required">Camera and microphone permissions are required</string>
+    <string name="permission_denied">Permissions are required to use voice chat</string>
+    <string name="error_joining_room">Failed to join room</string>
+    <string name="error_connection">Connection error</string>
+    <string name="qr_scanner_title">Сканировать QR-код</string>
+    <string name="qr_scanner_back">Назад</string>
+    <string name="incoming_call_channel_name">Входящие звонки</string>
+    <string name="incoming_call_channel_description">Уведомления о входящих голосовых звонках</string>
+    <string name="incoming_call_notification_title">Входящий звонок</string>
+    <string name="incoming_call_notification_text">%1$s звонит вам</string>
+    <string name="incoming_call_screen_subtitle">Звонок Whithin</string>
+    <string name="incoming_call_screen_status">Звонит вам…</string>
+    <string name="incoming_call_accept">Принять</string>
+    <string name="incoming_call_decline">Отклонить</string>
+</resources>

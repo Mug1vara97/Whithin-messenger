@@ -208,6 +208,12 @@ coverage/
 
 ## Application specific
 
+# Firebase Admin SDK (prod secret; copy from deploy-server/secrets if needed)
+**/whithin-*-firebase-adminsdk-*.json
+
+# TLS private key at repo root (certificate.crt may be committed if desired)
+/ssl/private.key
+
 # AI session change log (local only)
 CHANGES.md
 
@@ -217,8 +223,7 @@ CHANGES.md
 !**/ssl/.gitkeep
 
 ## Android
-
-Whithin-android/
+# Tracked under Whithin-android/; build/SDK artifacts ignored there.
 
 ## ВКР (выпускная квалификационная работа)
 

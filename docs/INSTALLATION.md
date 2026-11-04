@@ -1,10 +1,14 @@
-## Если есть docker
+## Прод с нуля (Ubuntu + Docker)
+
+Полная инструкция по развёртыванию как на `whithin.ru` (`2.59.41.26`): SSL, Firebase, data volumes, LiveKit, порты, coturn — в [`deploy-server/README.md`](../deploy-server/README.md). Инвентарь сервера: [`deploy-server/INVENTORY.md`](../deploy-server/INVENTORY.md). TURN: [`coturn-server/README.md`](../coturn-server/README.md).
+
+## Если есть docker (локально)
 
 Ввести команду в корне репозитория:
 
 > $ docker-compose up --build -d
 
-После этого можно будет получить доступ к приложению на localhost:8081
+После этого можно будет получить доступ к приложению на localhost:8081 (на проде вход через nginx `:443`, домен `whithin.ru`).
 
 ## Если docker нет
 
