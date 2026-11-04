@@ -59,7 +59,9 @@ export function VoiceCallControlDock({
   onToggleSpatialAudio,
   spatialAudioUserId,
   spatialAudioUserProfile,
-  onDisconnect
+  onDisconnect,
+  onPointerEnter,
+  onPointerLeave,
 }) {
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
 
@@ -75,7 +77,11 @@ export function VoiceCallControlDock({
   return (
     <>
       <div className="bottom-controls">
-        <div className="call-control-dock">
+        <div
+          className="call-control-dock"
+          onPointerEnter={onPointerEnter}
+          onPointerLeave={onPointerLeave}
+        >
           <div className="button-section">
             <div className="attached-button-container">
               <button

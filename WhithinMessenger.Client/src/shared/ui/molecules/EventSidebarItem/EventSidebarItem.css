@@ -1,0 +1,8 @@
+/* Inherits .channel-item look; only reset button defaults if needed */
+.event-sidebar-item {
+  border: 0;
+  background: transparent;
+  width: auto;
+  font: inherit;
+  text-align: left;
+}

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FaVolumeUp,
   FaMapMarkerAlt,
-  FaBroadcastTower,
+  FaHashtag,
   FaCalendarAlt,
   FaUserFriends,
 } from 'react-icons/fa';
@@ -11,6 +11,7 @@ import {
   SERVER_EVENT_LOCATION,
   collectServerChannels,
   isVoiceChannel,
+  isTextChannel,
   toDateInputValue,
   toTimeInputValue,
   combineDateAndTime,
@@ -42,7 +43,7 @@ const ServerEventModal = ({
   onCreated,
 }) => {
   const [step, setStep] = useState(0);
-  const [locationKind, setLocationKind] = useState('voice'); // voice | external
+  const [locationKind, setLocationKind] = useState('voice'); // voice | text | external
   const [channelId, setChannelId] = useState('');
   const [externalLocation, setExternalLocation] = useState('');
   const [title, setTitle] = useState('');
@@ -60,9 +61,16 @@ const ServerEventModal = ({
     [categories]
   );
 
+  const textChannels = useMemo(
+    () => collectServerChannels(categories).filter(isTextChannel),
+    [categories]
+  );
+
+  const channelOptions = locationKind === 'text' ? textChannels : voiceChannels;
+
   const selectedChannel = useMemo(
-    () => voiceChannels.find((c) => String(c.chatId) === String(channelId)),
-    [voiceChannels, channelId]
+    () => channelOptions.find((c) => String(c.chatId) === String(channelId)),
+    [channelOptions, channelId]
   );
 
   useEffect(() => {
@@ -73,8 +81,13 @@ const ServerEventModal = ({
     setCoverPreview(null);
 
     if (mode === 'edit' && event) {
-      const isExternal = event.locationType === SERVER_EVENT_LOCATION.EXTERNAL;
-      setLocationKind(isExternal ? 'external' : 'voice');
+      const kind =
+        event.locationType === SERVER_EVENT_LOCATION.EXTERNAL
+          ? 'external'
+          : event.locationType === SERVER_EVENT_LOCATION.TEXT
+            ? 'text'
+            : 'voice';
+      setLocationKind(kind);
       setChannelId(event.channelId || '');
       setExternalLocation(event.externalLocation || '');
       setTitle(event.title || '');
@@ -95,11 +108,16 @@ const ServerEventModal = ({
   }, [isOpen, mode, event, voiceChannels]);
 
   useEffect(() => {
-    if (locationKind !== 'voice' || !voiceChannels.length) return;
-    if (!voiceChannels.some((c) => String(c.chatId) === String(channelId))) {
-      setChannelId(String(voiceChannels[0].chatId));
+    if (locationKind !== 'voice' && locationKind !== 'text') return;
+    const options = locationKind === 'text' ? textChannels : voiceChannels;
+    if (!options.length) {
+      setChannelId('');
+      return;
     }
-  }, [locationKind, voiceChannels, channelId]);
+    if (!options.some((c) => String(c.chatId) === String(channelId))) {
+      setChannelId(String(options[0].chatId));
+    }
+  }, [locationKind, voiceChannels, textChannels, channelId]);
 
   if (!isOpen) return null;
 
@@ -111,7 +129,9 @@ const ServerEventModal = ({
     const locationType =
       locationKind === 'external'
         ? SERVER_EVENT_LOCATION.EXTERNAL
-        : SERVER_EVENT_LOCATION.VOICE;
+        : locationKind === 'text'
+          ? SERVER_EVENT_LOCATION.TEXT
+          : SERVER_EVENT_LOCATION.VOICE;
 
     return {
       serverId,
@@ -121,7 +141,8 @@ const ServerEventModal = ({
       startsAt,
       endsAt,
       locationType,
-      channelId: locationKind === 'voice' ? channelId || null : null,
+      channelId:
+        locationKind === 'voice' || locationKind === 'text' ? channelId || null : null,
       externalLocation:
         locationKind === 'external' ? externalLocation.trim() : null,
     };
@@ -130,6 +151,10 @@ const ServerEventModal = ({
   const validateStep0 = () => {
     if (locationKind === 'voice') {
       if (!channelId) return 'Выберите голосовой канал';
+      return null;
+    }
+    if (locationKind === 'text') {
+      if (!channelId) return 'Выберите текстовый канал';
       return null;
     }
     if (!externalLocation.trim()) return 'Укажите место проведения';
@@ -219,8 +244,12 @@ const ServerEventModal = ({
     location:
       locationKind === 'external'
         ? externalLocation.trim() || 'В другом месте'
-        : selectedChannel?.name || 'Голосовой канал',
-    isVoice: locationKind === 'voice',
+        : locationKind === 'text'
+          ? selectedChannel?.name
+            ? `#${selectedChannel.name}`
+            : 'Текстовый канал'
+          : selectedChannel?.name || 'Голосовой канал',
+    locationKind,
     cover: coverPreview,
   };
 
@@ -275,19 +304,6 @@ const ServerEventModal = ({
                   <h3 className="sev-wizard-title">Где пройдёт ваше событие?</h3>
                   <p className="sev-wizard-sub">Чтобы все знали, где его искать.</p>
 
-                  <div className="sev-option disabled" aria-disabled>
-                    <span className="sev-option__radio" aria-hidden />
-                    <span className="sev-option__icon" aria-hidden>
-                      <FaBroadcastTower />
-                    </span>
-                    <div className="sev-option__text">
-                      <div className="sev-option-title">Трибуна</div>
-                      <div className="sev-option-desc">
-                        Отлично подходит для голосовых событий крупных сообществ.
-                      </div>
-                    </div>
-                  </div>
-
                   <button
                     type="button"
                     className={`sev-option ${locationKind === 'voice' ? 'selected' : ''}`}
@@ -310,6 +326,26 @@ const ServerEventModal = ({
 
                   <button
                     type="button"
+                    className={`sev-option ${locationKind === 'text' ? 'selected' : ''}`}
+                    onClick={() => setLocationKind('text')}
+                  >
+                    <span
+                      className={`sev-option__radio ${locationKind === 'text' ? 'is-on' : ''}`}
+                      aria-hidden
+                    />
+                    <span className="sev-option__icon" aria-hidden>
+                      <FaHashtag />
+                    </span>
+                    <div className="sev-option__text">
+                      <div className="sev-option-title">Текстовый канал</div>
+                      <div className="sev-option-desc">
+                        Обсуждение в чате сервера — удобно для анонсов и встреч текстом.
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
                     className={`sev-option ${locationKind === 'external' ? 'selected' : ''}`}
                     onClick={() => setLocationKind('external')}
                   >
@@ -323,28 +359,32 @@ const ServerEventModal = ({
                     <div className="sev-option__text">
                       <div className="sev-option-title">В другом месте</div>
                       <div className="sev-option-desc">
-                        Текстовый канал, внешняя ссылка или место проведения.
+                        Внешняя ссылка или офлайн-место проведения.
                       </div>
                     </div>
                   </button>
 
-                  {locationKind === 'voice' ? (
+                  {locationKind === 'voice' || locationKind === 'text' ? (
                     <label className="sev-field">
                       <span>
                         Выбрать канал <span className="req">*</span>
                       </span>
                       <div className="sev-channel-select">
                         <span className="sev-channel-select__icon" aria-hidden>
-                          <FaVolumeUp />
+                          {locationKind === 'text' ? <FaHashtag /> : <FaVolumeUp />}
                         </span>
                         <select
                           value={channelId}
                           onChange={(e) => setChannelId(e.target.value)}
                         >
-                          {voiceChannels.length === 0 && (
-                            <option value="">Нет голосовых каналов</option>
+                          {channelOptions.length === 0 && (
+                            <option value="">
+                              {locationKind === 'text'
+                                ? 'Нет текстовых каналов'
+                                : 'Нет голосовых каналов'}
+                            </option>
                           )}
-                          {voiceChannels.map((ch) => (
+                          {channelOptions.map((ch) => (
                             <option key={ch.chatId} value={ch.chatId}>
                               {ch.name}
                             </option>
@@ -511,8 +551,10 @@ const ServerEventModal = ({
                       <p className="sev-preview-card__desc">{preview.description}</p>
                     ) : null}
                     <div className="sev-preview-card__location">
-                      {preview.isVoice ? (
+                      {preview.locationKind === 'voice' ? (
                         <FaVolumeUp aria-hidden />
+                      ) : preview.locationKind === 'text' ? (
+                        <FaHashtag aria-hidden />
                       ) : (
                         <FaMapMarkerAlt aria-hidden />
                       )}

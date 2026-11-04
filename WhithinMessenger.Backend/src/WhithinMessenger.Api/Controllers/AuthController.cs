@@ -282,7 +282,7 @@ public class AuthController : ControllerBase
 
         QrLoginSessions[sessionId] = state;
 
-        var qrPayload = $"within://qr-login?session={sessionId}";
+        var qrPayload = $"whithin://qr-login?session={sessionId}";
         var webLink = $"{Request.Scheme}://{Request.Host}/qr-login?session={sessionId}";
 
         return Ok(new

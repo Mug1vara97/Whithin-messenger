@@ -6,6 +6,7 @@ export const PUBLIC_AUTH_PATHS = new Set([
   '/confirm-email',
   '/confirm-email-change',
   '/confirm-password-change',
+  '/qr-login',
 ]);
 
 export const PUBLIC_OPEN_PATHS = new Set([

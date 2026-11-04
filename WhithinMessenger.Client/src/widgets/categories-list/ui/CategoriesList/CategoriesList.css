@@ -1,49 +1,6 @@
 .categories-list {
-  --cl-line: color-mix(in srgb, var(--text-muted, #8e9297) 55%, transparent);
-  --cl-accent: var(--accent, var(--primary, #f5f5f5));
-  --cl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-
-  padding: 8px 0 8px 14px;
-  /* Don't force 100% height — ServerEventsSection sits above this list inside
-     the same scrollport, so min-height:100% always overflowed and showed a bar. */
+  padding: 8px 0 16px;
   position: relative;
-}
-
-.categories-list::before {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  border-radius: 1px;
-  background: linear-gradient(
-    to bottom,
-    var(--cl-line) 0%,
-    var(--cl-line) 55%,
-    transparent 100%
-  );
-  pointer-events: none;
-}
-
-.categories-list__marker {
-  position: absolute;
-  top: -1px;
-  left: 0;
-  z-index: 1;
-  width: 2px;
-  height: 16px;
-  border-radius: 1px;
-  background: var(--cl-accent);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    top 220ms var(--cl-ease-out),
-    opacity 150ms ease;
-}
-
-.categories-list__marker[data-on] {
-  opacity: 1;
 }
 
 .categories-list.dragging-over {
@@ -52,8 +9,8 @@
 }
 
 .no-channels {
-  padding: 10px 20px;
-  text-align: center;
+  padding: 8px 16px;
+  text-align: left;
   color: var(--text-muted);
   font-size: 12px;
   font-style: italic;
@@ -67,19 +24,37 @@
   font-style: italic;
 }
 
+.categories-events-entry {
+  width: calc(100% - 16px);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  color: var(--text-muted, #949ba4);
+  box-shadow: none;
+}
+
+.categories-events-entry:hover:not(.active) {
+  background: var(--hover, rgba(79, 84, 92, 0.32));
+  color: var(--text, #dbdee1);
+}
+
+.categories-events-entry.active {
+  background: var(--hover, rgba(79, 84, 92, 0.48));
+  color: var(--text, #f2f3f5);
+}
+
 .uncategorized-channels {
-  padding: 2px 0 8px;
+  padding: 0 0 12px;
   margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .uncategorized-channels.dragging-over {
-  background: color-mix(in srgb, var(--accent, var(--primary)) 12%, transparent);
+  background: color-mix(in srgb, var(--accent, var(--primary)) 10%, transparent);
   border-radius: 4px;
-  border: 1px dashed color-mix(in srgb, var(--accent, var(--primary)) 50%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .categories-list__marker {
-    transition: opacity 150ms ease;
-  }
 }

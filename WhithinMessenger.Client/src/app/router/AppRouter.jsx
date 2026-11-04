@@ -10,6 +10,7 @@ import { ConfirmEmailChangePage } from '../../pages/confirm-email-change/ui';
 import { ConfirmPasswordChangePage } from '../../pages/confirm-password-change/ui';
 import { ForgotPasswordPage } from '../../pages/forgot-password/ui';
 import { ResetPasswordPage } from '../../pages/reset-password/ui';
+import { QrLoginPage } from '../../pages/qr-login/ui';
 import { BirthdayCardPage } from '../../pages/birthday-card/ui';
 import { HomePage } from '../../pages/home/ui';
 import { ServerSettingsPage } from '../../pages/server-settings/ui';
@@ -18,9 +19,15 @@ import SeoRouteSync from '../../shared/lib/seo/SeoRouteSync';
 import { DesktopNotificationSync } from '../../shared/lib/hooks/DesktopNotificationSync';
 import { DesktopCallOverlaySync } from '../../shared/lib/hooks/DesktopCallOverlaySync';
 import { DesktopActiveCallOverlaySync } from '../../shared/lib/hooks/DesktopActiveCallOverlaySync';
+import { useDeepLinkNavigation } from '../../shared/lib/hooks/useDeepLinkNavigation';
 import { ProfileModalProvider } from '../../shared/lib/contexts/ProfileModalContext';
 
 const MIN_BOOT_DISPLAY_MS = 380;
+
+const DeepLinkBridge = () => {
+  useDeepLinkNavigation();
+  return null;
+};
 
 const AppRouter = () => {
   const { isAuthenticated, isLoading } = useAuthContext();
@@ -71,6 +78,7 @@ const AppRouter = () => {
       <Router>
         <ProfileModalProvider>
           <SeoRouteSync />
+          <DeepLinkBridge />
           <DesktopNotificationSync />
           <DesktopCallOverlaySync />
           <DesktopActiveCallOverlaySync />
@@ -112,6 +120,10 @@ const AppRouter = () => {
             }
           />
           <Route
+            path="/qr-login"
+            element={<QrLoginPage />}
+          />
+          <Route
             path="/birthday"
             element={<BirthdayCardPage />}
           />
@@ -126,6 +138,12 @@ const AppRouter = () => {
             element={
               isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
             } 
+          />
+          <Route
+            path="/server/:serverId/event/:eventId"
+            element={
+              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+            }
           />
           <Route 
             path="/server/:serverId/channel/:channelId" 

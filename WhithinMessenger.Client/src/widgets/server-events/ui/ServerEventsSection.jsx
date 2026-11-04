@@ -1,11 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  countActiveEvents,
   normalizeServerEvent,
-  pluralizeEvents,
   serverEventApi,
 } from '../../../entities/server-event';
+import { useConnectionContext } from '../../../shared/lib/contexts/ConnectionContext';
 import ServerEventModal from './ServerEventModal';
 import ServerEventsListModal from './ServerEventsListModal';
 import ServerEventDetailModal from './ServerEventDetailModal';
@@ -20,7 +18,15 @@ const ServerEventsSection = ({
   onSelectChannel,
   createRequested = false,
   onCreateRequestHandled,
+  onEventsChange,
+  openEventId = null,
+  onOpenEventHandled,
+  listOpenRequested = false,
+  onListOpenHandled,
 }) => {
+  const connectionContext = useConnectionContext();
+  const onReconnected = connectionContext?.onReconnected;
+
   const [events, setEvents] = useState([]);
   const [listOpen, setListOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,12 +60,48 @@ const ServerEventsSection = ({
   }, [connection, serverId]);
 
   useEffect(() => {
-    if (!connection || connection.state !== 'Connected' || !serverId) {
+    if (!connection || !serverId) {
       setEvents([]);
-      return;
+      return undefined;
     }
-    load();
-  }, [connection, serverId, load]);
+
+    let cancelled = false;
+    let retryTimer = null;
+
+    const tryLoad = async () => {
+      if (cancelled) return;
+      if (connection.state !== 'Connected') {
+        retryTimer = window.setTimeout(tryLoad, 400);
+        return;
+      }
+      try {
+        const list = await serverEventApi.loadEvents(connection, serverId);
+        if (!cancelled) setEvents(list);
+      } catch (err) {
+        console.warn('ServerEventsSection: load failed', err);
+      }
+    };
+
+    tryLoad();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [connection, serverId]);
+
+  useEffect(() => {
+    if (!onReconnected) return undefined;
+    return onReconnected(() => {
+      if (connection?.state === 'Connected' && serverId) {
+        serverEventApi.loadEvents(connection, serverId).then(setEvents).catch(() => {});
+      }
+    });
+  }, [onReconnected, connection, serverId]);
+
+  useEffect(() => {
+    onEventsChange?.(events);
+  }, [events, onEventsChange]);
 
   useEffect(() => {
     if (!connection) return undefined;
@@ -88,25 +130,28 @@ const ServerEventsSection = ({
     onCreateRequestHandled?.();
   }, [createRequested, onCreateRequestHandled]);
 
-  const activeCount = useMemo(() => countActiveEvents(events), [events]);
-  const label = activeCount > 0 ? pluralizeEvents(activeCount) : 'События';
-
-  const openList = useCallback(() => {
+  useEffect(() => {
+    if (!listOpenRequested) return;
     setListOpen(true);
     load();
-  }, [load]);
+    onListOpenHandled?.();
+  }, [listOpenRequested, load, onListOpenHandled]);
+
+  useEffect(() => {
+    if (!openEventId) return;
+    const match = events.find((e) => String(e.eventId) === String(openEventId));
+    if (match) {
+      setDetailEvent(match);
+      setListOpen(false);
+      onOpenEventHandled?.();
+      return;
+    }
+    if (events.length === 0) return;
+    onOpenEventHandled?.();
+  }, [openEventId, events, onOpenEventHandled]);
 
   return (
-    <div className="server-events-nav">
-      <button
-        type="button"
-        className={`server-events-nav-btn ${listOpen ? 'is-active' : ''}`}
-        onClick={openList}
-      >
-        <EventAvailableIcon sx={{ fontSize: 20 }} />
-        <span>{label}</span>
-      </button>
-
+    <>
       <ServerEventsListModal
         isOpen={listOpen}
         onClose={() => setListOpen(false)}
@@ -131,10 +176,7 @@ const ServerEventsSection = ({
 
       <ServerEventDetailModal
         isOpen={Boolean(detailEvent)}
-        onClose={() => {
-          setDetailEvent(null);
-          setListOpen(true);
-        }}
+        onClose={() => setDetailEvent(null)}
         event={
           detailEvent
             ? events.find((e) => String(e.eventId) === String(detailEvent.eventId)) || detailEvent
@@ -159,7 +201,6 @@ const ServerEventsSection = ({
         connection={connection}
         onCreated={() => {
           setCreateOpen(false);
-          setListOpen(true);
           load();
         }}
       />
@@ -174,11 +215,10 @@ const ServerEventsSection = ({
         connection={connection}
         onCreated={() => {
           setEditEvent(null);
-          setListOpen(true);
           load();
         }}
       />
-    </div>
+    </>
   );
 };
 

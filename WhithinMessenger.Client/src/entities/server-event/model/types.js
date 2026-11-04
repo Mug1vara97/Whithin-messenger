@@ -193,12 +193,20 @@ const eventEndMs = (event) => {
   return new Date(event.startsAt).getTime() + 2 * 60 * 60 * 1000;
 };
 
+const isCanceledStatus = (status) =>
+  status === SERVER_EVENT_STATUS.CANCELED ||
+  status === 'Canceled' ||
+  status === 1 ||
+  status === '1';
+
 export const filterUpcomingEvents = (events = []) => {
   const now = Date.now();
   return events
     .filter((e) => {
-      if (e.status === SERVER_EVENT_STATUS.CANCELED) return false;
-      return eventEndMs(e) >= now - 15 * 60 * 1000;
+      if (isCanceledStatus(e?.status)) return false;
+      const end = eventEndMs(e);
+      if (Number.isNaN(end)) return Boolean(e?.startsAt);
+      return end >= now - 15 * 60 * 1000;
     })
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 };
@@ -207,10 +215,53 @@ export const filterPastEvents = (events = []) => {
   const now = Date.now();
   return events
     .filter((e) => {
-      if (e.status === SERVER_EVENT_STATUS.CANCELED) return true;
-      return eventEndMs(e) < now - 15 * 60 * 1000;
+      if (isCanceledStatus(e?.status)) return true;
+      const end = eventEndMs(e);
+      if (Number.isNaN(end)) return false;
+      return end < now - 15 * 60 * 1000;
     })
     .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt));
 };
 
 export const countActiveEvents = (events = []) => filterUpcomingEvents(events).length;
+
+/** Resolve which category an event belongs to (channel's category, or uncategorized). */
+export const resolveEventCategoryId = (event, categories = []) => {
+  if (!event) return null;
+  const explicit = event.categoryId ?? event.CategoryId;
+  if (explicit !== undefined && explicit !== null && explicit !== '') {
+    return explicit;
+  }
+
+  const channelId = event.channelId ?? event.ChannelId;
+  if (!channelId) return null;
+
+  for (const category of categories) {
+    const chats = category.chats || category.Chats || [];
+    const match = chats.some(
+      (chat) => String(chat.chatId ?? chat.ChatId) === String(channelId)
+    );
+    if (match) {
+      const id = category.categoryId ?? category.CategoryId;
+      return id === undefined ? null : id;
+    }
+  }
+
+  return null;
+};
+
+export const getEventsForCategory = (events = [], categoryId, categories = []) => {
+  const target = categoryId === undefined ? null : categoryId;
+  return filterUpcomingEvents(events).filter((event) => {
+    const resolved = resolveEventCategoryId(event, categories);
+    if (target === null || target === undefined) {
+      return resolved === null || resolved === undefined;
+    }
+    return String(resolved) === String(target);
+  });
+};
+
+export const buildServerEventPath = (serverId, eventId) => {
+  if (!serverId || !eventId) return null;
+  return `/server/${serverId}/event/${eventId}`;
+};

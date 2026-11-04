@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
@@ -7,94 +7,145 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      -webkit-font-smoothing: antialiased;
+    :root {
+      --st-bg: #2f3136;
+      --st-ink: #f5f5f5;
+      --st-ink-muted: #8e9297;
+      --st-primary: #5865f2;
+      --st-fuse: #f5a524;
+      --st-border: #4f545c;
+      --st-w: 356px;
+      --st-radius: 12px;
+      --st-slide: 700ms;
+      --st-gap: 4px;
+      --st-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     }
 
-    body {
-      display: flex;
-      flex-direction: column;
+    html, body {
+      width: var(--st-w);
+      height: auto;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent !important;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: var(--st-ink);
+      font-size: 13px;
+      line-height: 1.5;
     }
 
     .host {
       display: flex;
       flex-direction: column;
-      width: 100%;
-      flex: 0 0 auto;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+      width: var(--st-w);
+      gap: var(--st-gap);
+      /* No reserved swipe padding — empty HWND space shows as a tinted slab on Win+WebView2. */
+      padding: 0;
+      margin: 0;
+      background: transparent;
     }
 
     .host.is-bottom {
       flex-direction: column-reverse;
     }
 
-    .host.is-bottom .hide-all {
-      flex: 0 0 auto;
-      border-top: none;
-      border-bottom: 1px solid color-mix(in srgb, var(--notif-border, #4f545c) 70%, transparent);
+    .hide-all {
+      align-self: center;
+      border: none;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--st-bg) 92%, #000);
+      color: var(--st-primary);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1;
+      padding: 8px 14px;
+      cursor: pointer;
+      box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        0 4px 14px rgba(0, 0, 0, 0.18);
+      transition: background-color 0.15s ease, transform 0.15s var(--st-ease-out);
     }
 
-    .hide-all {
-      flex: 0 0 auto;
-      flex-shrink: 0;
-      border: none;
-      background: var(--notif-bg, #2f3136);
-      color: var(--notif-primary, #5865f2);
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 1.25;
-      padding: 12px 14px;
-      min-height: 42px;
-      cursor: pointer;
-      text-align: center;
-      transition: background-color 0.15s ease, color 0.15s ease;
+    .hide-all[hidden] {
+      display: none !important;
     }
 
     .hide-all:hover {
-      background: color-mix(in srgb, var(--notif-bg, #2f3136) 88%, var(--notif-primary, #5865f2) 12%);
+      background: color-mix(in srgb, var(--st-bg) 80%, var(--st-primary) 20%);
+    }
+
+    .hide-all:active {
+      transform: scale(0.97);
     }
 
     .list {
       display: flex;
       flex-direction: column;
-      flex: 0 0 auto;
-      overflow: hidden;
-      background: var(--notif-bg, #2f3136);
-      border-top: 1px solid color-mix(in srgb, var(--notif-border, #4f545c) 70%, transparent);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--notif-border, #4f545c) 80%, transparent);
+      gap: var(--st-gap);
+      width: 100%;
     }
 
     .host.is-bottom .list {
-      border-top: none;
-      border-bottom: 1px solid color-mix(in srgb, var(--notif-border, #4f545c) 70%, transparent);
+      flex-direction: column-reverse;
     }
 
-    .card {
+    .toast {
+      display: grid;
+      grid-template-rows: 1fr;
+      width: 100%;
+      overflow: hidden;
+      border-radius: var(--st-radius);
+    }
+
+    .toast__lift {
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        transform var(--st-slide) var(--st-ease-out),
+        opacity calc(var(--st-slide) * 0.6) ease;
+      will-change: transform, opacity;
+    }
+
+    .toast[data-mounted='false'] .toast__lift {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+
+    .toast[data-phase='closing'] .toast__lift {
+      opacity: 0;
+      transform: translateY(100%);
+      transition:
+        transform calc(var(--st-slide) * 0.7) var(--st-ease-out),
+        opacity calc(var(--st-slide) * 0.5) ease;
+    }
+
+    .toast__card {
       position: relative;
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      padding: 12px 36px 12px 14px;
-      border-top: 1px solid color-mix(in srgb, var(--notif-border, #4f545c) 70%, transparent);
-      cursor: pointer;
-      text-align: left;
-      background: var(--notif-bg, #2f3136);
-      transition: background-color 0.15s ease;
+      padding: 14px 36px 14px 14px;
+      border-radius: var(--st-radius);
+      overflow: hidden;
+      background: var(--st-bg);
+      box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        0 8px 24px rgba(0, 0, 0, 0.28);
+      cursor: grab;
+      outline: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
-    .card:first-child {
-      border-top: none;
+    .toast__card[data-swiping] {
+      cursor: grabbing;
+      transition: none;
     }
 
-    .card:hover {
-      background: color-mix(in srgb, var(--notif-bg, #2f3136) 90%, var(--notif-text, #dcddde) 10%);
+    .toast__card:hover {
+      background: color-mix(in srgb, var(--st-bg) 92%, var(--st-ink) 8%);
     }
 
     .close {
@@ -106,22 +157,22 @@
       border: none;
       border-radius: 6px;
       background: transparent;
-      color: var(--notif-text-muted, #8e9297);
+      color: var(--st-ink-muted);
       font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      opacity: 0.8;
+      opacity: 0.85;
+      z-index: 2;
     }
 
     .close:hover {
       opacity: 1;
-      background: color-mix(in srgb, var(--notif-text, #dcddde) 8%, transparent);
-      color: var(--notif-text-muted, #b9bbbe);
+      background: color-mix(in srgb, var(--st-ink) 10%, transparent);
     }
 
     .avatar {
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       flex-shrink: 0;
       display: flex;
@@ -129,7 +180,7 @@
       justify-content: center;
       color: #fff;
       font-weight: 700;
-      font-size: 16px;
+      font-size: 15px;
       overflow: hidden;
       background: #5865f2;
     }
@@ -143,13 +194,14 @@
     .body {
       min-width: 0;
       flex: 1;
+      padding-top: 1px;
     }
 
     .title {
-      color: var(--notif-text, #dcddde);
+      color: var(--st-ink);
       font-size: 14px;
-      font-weight: 700;
-      line-height: 1.25;
+      font-weight: 650;
+      line-height: 1.3;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -157,7 +209,7 @@
 
     .subtitle {
       margin-top: 2px;
-      color: var(--notif-primary, #5865f2);
+      color: var(--st-primary);
       font-size: 12px;
       font-weight: 600;
       line-height: 1.25;
@@ -168,7 +220,7 @@
 
     .message {
       margin-top: 3px;
-      color: var(--notif-text-muted, #8e9297);
+      color: color-mix(in srgb, var(--st-ink) 66%, transparent);
       font-size: 13px;
       line-height: 1.35;
       display: -webkit-box;
@@ -178,43 +230,70 @@
       word-break: break-word;
     }
 
+    .fuse {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--st-fuse) 18%, transparent) 9%,
+        color-mix(in srgb, var(--st-fuse) 50%, transparent) 18%,
+        color-mix(in srgb, var(--st-fuse) 84%, transparent) 28%,
+        var(--st-fuse) 38%,
+        var(--st-fuse) 62%,
+        color-mix(in srgb, var(--st-fuse) 84%, transparent) 72%,
+        color-mix(in srgb, var(--st-fuse) 50%, transparent) 82%,
+        color-mix(in srgb, var(--st-fuse) 18%, transparent) 91%,
+        transparent 100%
+      );
+      transform: scaleX(1);
+      transform-origin: left center;
+      pointer-events: none;
+    }
+
     [data-theme-preset='cyberpunk'] .hide-all {
-      color: var(--notif-cp-cyan, var(--notif-primary, #6ab2f2));
+      color: var(--notif-cp-cyan, var(--st-primary));
       text-shadow: var(--notif-cp-glow-cyan, none);
     }
 
-    [data-theme-preset='cyberpunk'] .list {
+    [data-theme-preset='cyberpunk'] .toast__card {
       box-shadow:
-        0 8px 28px rgba(0, 0, 0, 0.5),
+        0 8px 24px rgba(0, 0, 0, 0.4),
         0 0 0 1px var(--notif-cp-red, #ff2a6d);
     }
 
-    [data-theme-preset='cyberpunk'] .card {
-      border-top-color: color-mix(in srgb, var(--notif-cp-red, #ff2a6d) 55%, transparent);
-    }
-
     [data-theme-preset='cyberpunk'] .title {
-      color: var(--notif-cp-yellow, var(--notif-text, #fff));
+      color: var(--notif-cp-yellow, var(--st-ink));
       text-shadow: var(--notif-cp-glow-yellow, none);
     }
 
     [data-theme-preset='cyberpunk'] .subtitle {
-      color: var(--notif-cp-cyan, var(--notif-primary, #6ab2f2));
+      color: var(--notif-cp-cyan, var(--st-primary));
       text-shadow: var(--notif-cp-glow-cyan, none);
     }
 
     [data-theme-preset='cyberpunk'] .message {
-      color: var(--notif-cp-yellow-muted, var(--notif-text-muted, #8b9bab));
+      color: var(--notif-cp-yellow-muted, color-mix(in srgb, var(--st-ink) 66%, transparent));
     }
 
-    [data-theme-preset='night-city'] .hide-all {
-      color: var(--notif-text, #fff);
-      text-shadow: var(--notif-nc-text-glow, none);
+    [data-theme-preset='cyberpunk'] {
+      --st-fuse: var(--notif-cp-cyan, #00f0ff);
     }
 
+    [data-theme-preset='night-city'] .hide-all,
     [data-theme-preset='night-city'] .title,
     [data-theme-preset='night-city'] .subtitle {
       text-shadow: var(--notif-nc-text-glow, none);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toast__lift {
+        transform: none !important;
+        transition: opacity 200ms ease;
+      }
     }
   </style>
 </head>
@@ -225,12 +304,29 @@
   </div>
 
   <script>
+    const DURATION_MS = 90_000;
+    const SLIDE_MS = 700;
+    const SWIPE_DISTANCE = 40;
+    const FLICK = 0.11;
+    const DEAD_ZONE = 3;
+    const RESIST_PX = 24;
+    const EXIT = 0.7;
+
     const hostEl = document.getElementById('host');
     const listEl = document.getElementById('list');
     const hideAllEl = document.getElementById('hideAll');
+
     let items = [];
     let lastReportedHeight = 0;
     let lastThemeKey = '';
+    const toastCtl = new Map();
+
+    let hostApi = {
+      reportHeight: () => {},
+      dismiss: () => {},
+      dismissAll: () => {},
+      open: () => {},
+    };
 
     function themeKey(theme) {
       if (!theme) return '';
@@ -250,33 +346,77 @@
 
     function applyTheme(theme) {
       if (!theme) return;
-
       const root = document.documentElement;
-      if (theme.presetId) {
-        root.setAttribute('data-theme-preset', theme.presetId);
-      }
+      if (theme.presetId) root.setAttribute('data-theme-preset', theme.presetId);
 
       const vars = theme.vars || {};
       const map = {
-        bg: '--notif-bg',
-        text: '--notif-text',
-        textMuted: '--notif-text-muted',
-        primary: '--notif-primary',
-        border: '--notif-border',
-        cpCyan: '--notif-cp-cyan',
-        cpYellow: '--notif-cp-yellow',
-        cpYellowMuted: '--notif-cp-yellow-muted',
-        cpRed: '--notif-cp-red',
-        cpGlowCyan: '--notif-cp-glow-cyan',
-        cpGlowYellow: '--notif-cp-glow-yellow',
-        ncTextGlow: '--notif-nc-text-glow',
+        bg: ['--st-bg', '--notif-bg'],
+        text: ['--st-ink', '--notif-text'],
+        textMuted: ['--st-ink-muted', '--notif-text-muted'],
+        primary: ['--st-primary', '--notif-primary'],
+        border: ['--notif-border'],
+        voiceSpeaking: ['--st-fuse'],
+        cpCyan: ['--notif-cp-cyan'],
+        cpYellow: ['--notif-cp-yellow'],
+        cpYellowMuted: ['--notif-cp-yellow-muted'],
+        cpRed: ['--notif-cp-red'],
+        cpGlowCyan: ['--notif-cp-glow-cyan'],
+        cpGlowYellow: ['--notif-cp-glow-yellow'],
+        ncTextGlow: ['--notif-nc-text-glow'],
       };
 
-      Object.entries(map).forEach(([key, cssVar]) => {
+      Object.entries(map).forEach(([key, cssVars]) => {
         const value = vars[key];
-        if (value) {
-          root.style.setProperty(cssVar, value);
+        if (!value) return;
+        cssVars.forEach((cssVar) => root.style.setProperty(cssVar, value));
+      });
+
+      if (vars.primary && !vars.voiceSpeaking) {
+        root.style.setProperty('--st-fuse', vars.primary);
+      }
+    }
+
+    function rubberband(over, dim, c = 0.55) {
+      return (over * dim * c) / (dim + c * Math.abs(over));
+    }
+
+    function velocityOf(hist) {
+      if (hist.length < 2) return 0;
+      const [t0, y0] = hist[0];
+      const [t1, y1] = hist[hist.length - 1];
+      return performance.now() - t1 > 100 ? 0 : (y1 - y0) / Math.max(1, t1 - t0);
+    }
+
+    function measureOpaqueHeight() {
+      // Sum only visible opaque children — never trust a stretched host/window box.
+      let total = 0;
+      let gaps = 0;
+      const kids = [];
+      if (!hideAllEl.hidden) kids.push(hideAllEl);
+      for (const toast of listEl.querySelectorAll('.toast')) {
+        kids.push(toast);
+      }
+      kids.forEach((el, i) => {
+        const h = el.getBoundingClientRect().height;
+        if (h > 0) {
+          total += h;
+          if (i > 0) gaps += 4;
         }
+      });
+      return Math.ceil(total + gaps);
+    }
+
+    function reportHostHeight() {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (hostEl.hidden) return;
+          const height = measureOpaqueHeight();
+          if (height > 0 && height !== lastReportedHeight) {
+            lastReportedHeight = height;
+            hostApi.reportHeight(height);
+          }
+        });
       });
     }
 
@@ -284,121 +424,357 @@
       const name = item.senderName || item.title || '?';
       const initial = name.charAt(0).toUpperCase();
       const bg = escapeHtml(item.senderAvatarColor || '#5865f2');
-
       if (item.senderAvatarUrl) {
         return `<div class="avatar" data-initial="${escapeHtml(initial)}" style="background:${bg}"><img src="${escapeHtml(item.senderAvatarUrl)}" alt="" /></div>`;
       }
-
       return `<div class="avatar" style="background:${bg}">${escapeHtml(initial)}</div>`;
     }
 
-    function buildCardHtml(item) {
+    function buildToastHtml(item) {
       return `
-        <article class="card" data-id="${escapeHtml(item.id)}">
-          <button type="button" class="close" data-dismiss="${escapeHtml(item.id)}" aria-label="Закрыть">×</button>
-          ${renderAvatar(item)}
-          <div class="body">
-            <div class="title">${escapeHtml(item.title)}</div>
-            ${item.subtitle ? `<div class="subtitle">${escapeHtml(item.subtitle)}</div>` : ''}
-            <div class="message">${escapeHtml(item.message)}</div>
+        <div class="toast" data-id="${escapeHtml(item.id)}" data-mounted="false" data-phase="open">
+          <div class="toast__lift">
+            <article class="toast__card" role="status" aria-live="polite" tabindex="0">
+              <button type="button" class="close" data-dismiss="${escapeHtml(item.id)}" aria-label="Закрыть">×</button>
+              ${renderAvatar(item)}
+              <div class="body">
+                <div class="title">${escapeHtml(item.title)}</div>
+                ${item.subtitle ? `<div class="subtitle">${escapeHtml(item.subtitle)}</div>` : ''}
+                <div class="message">${escapeHtml(item.message)}</div>
+              </div>
+              <div class="fuse" aria-hidden="true"></div>
+            </article>
           </div>
-        </article>
+        </div>
       `;
+    }
+
+    function destroyCtl(id) {
+      const ctl = toastCtl.get(String(id));
+      if (!ctl) return;
+      ctl.fuseAnim?.cancel();
+      clearTimeout(ctl.closeTimer);
+      toastCtl.delete(String(id));
+    }
+
+    function syncFuse(ctl) {
+      const a = ctl.fuseAnim;
+      if (!a) return;
+      if (ctl.hover || ctl.interacting) a.pause();
+      else if (a.playState === 'paused') a.play();
+    }
+
+    function finishDismiss(id) {
+      destroyCtl(id);
+      const node = listEl.querySelector(`.toast[data-id="${CSS.escape(String(id))}"]`);
+      node?.remove();
+      hostApi.dismiss(String(id));
+      if (!listEl.querySelector('.toast')) {
+        items = [];
+        hostEl.hidden = true;
+        lastReportedHeight = 0;
+      }
+      reportHostHeight();
+    }
+
+    function closeToast(id, reason = 'timeout') {
+      const key = String(id);
+      const ctl = toastCtl.get(key);
+      const node = listEl.querySelector(`.toast[data-id="${CSS.escape(key)}"]`);
+      if (!node || node.dataset.phase === 'closing') return;
+      if (ctl?.drag) {
+        ctl.pendingClose = reason;
+        return;
+      }
+      ctl?.fuseAnim?.pause();
+      node.dataset.phase = 'closing';
+      const delay = reason === 'close' ? 0 : SLIDE_MS * EXIT + 60;
+      if (ctl) {
+        clearTimeout(ctl.closeTimer);
+        ctl.closeTimer = setTimeout(() => finishDismiss(key), delay);
+      } else {
+        setTimeout(() => finishDismiss(key), delay);
+      }
+    }
+
+    function swipeOut(ctl, dy, v) {
+      const card = ctl.card;
+      const lift = ctl.lift;
+      ctl.leaving = true;
+      ctl.pendingClose = null;
+      ctl.fuseAnim?.pause();
+      const h = card.offsetHeight || 80;
+      const target = dy + h;
+      const start = performance.now();
+      const startY = ctl.y;
+      const startOp = ctl.opacity;
+      const dur = 280;
+
+      function frame(now) {
+        const t = Math.min(1, (now - start) / dur);
+        const ease = 1 - Math.pow(1 - t, 3);
+        ctl.y = startY + (target - startY) * ease;
+        ctl.opacity = startOp * (1 - ease);
+        lift.style.transform = `translateY(${ctl.y}px)`;
+        lift.style.opacity = String(ctl.opacity);
+        if (t < 1) {
+          ctl.raf = requestAnimationFrame(frame);
+        } else {
+          finishDismiss(ctl.id);
+        }
+      }
+      ctl.raf = requestAnimationFrame(frame);
+      // velocity hint unused beyond spring-ish ease
+      void v;
+    }
+
+    function settleBack(ctl, v) {
+      const lift = ctl.lift;
+      const start = performance.now();
+      const startY = ctl.y;
+      const bounce = 0.2;
+      const dur = 450;
+
+      function frame(now) {
+        const t = Math.min(1, (now - start) / dur);
+        // underdamped settle toward 0
+        const decay = Math.exp(-4.2 * t);
+        const osc = Math.cos(t * Math.PI * (1 + bounce));
+        ctl.y = startY * decay * (bounce > 0 ? osc : 1 - t);
+        if (Math.abs(ctl.y) < 0.4 && t > 0.55) ctl.y = 0;
+        lift.style.transform = `translateY(${ctl.y}px)`;
+        if (t < 1 && ctl.y !== 0) {
+          ctl.raf = requestAnimationFrame(frame);
+        } else {
+          ctl.y = 0;
+          lift.style.transform = '';
+          const queued = ctl.pendingClose;
+          ctl.pendingClose = null;
+          if (queued) closeToast(ctl.id, queued);
+          else syncFuse(ctl);
+        }
+      }
+      void v;
+      ctl.raf = requestAnimationFrame(frame);
+    }
+
+    function bindToast(node, item) {
+      const id = String(item.id);
+      destroyCtl(id);
+
+      const lift = node.querySelector('.toast__lift');
+      const card = node.querySelector('.toast__card');
+      const fuse = node.querySelector('.fuse');
+
+      const ctl = {
+        id,
+        node,
+        lift,
+        card,
+        fuse,
+        y: 0,
+        opacity: 1,
+        hover: false,
+        interacting: false,
+        drag: null,
+        fuseAnim: null,
+        closeTimer: null,
+        pendingClose: null,
+        leaving: false,
+        raf: 0,
+      };
+      toastCtl.set(id, ctl);
+
+      requestAnimationFrame(() => {
+        node.dataset.mounted = 'true';
+      });
+
+      if (DURATION_MS > 0 && fuse) {
+        const anim = fuse.animate(
+          [{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }],
+          { duration: DURATION_MS, easing: 'linear', fill: 'forwards' },
+        );
+        anim.onfinish = () => closeToast(id, 'timeout');
+        ctl.fuseAnim = anim;
+        syncFuse(ctl);
+      }
+
+      card.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'mouse') {
+          ctl.hover = true;
+          syncFuse(ctl);
+        }
+      });
+      card.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'mouse') {
+          ctl.hover = false;
+          syncFuse(ctl);
+        }
+      });
+
+      card.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || ctl.drag || ctl.leaving) return;
+        if (e.target.closest('button')) return;
+        if (node.dataset.phase === 'closing') {
+          node.dataset.phase = 'open';
+          ctl.y = 0;
+          ctl.opacity = 1;
+          lift.style.transform = '';
+          lift.style.opacity = '';
+        }
+        try {
+          card.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        cancelAnimationFrame(ctl.raf);
+        ctl.drag = {
+          id: e.pointerId,
+          startY: e.clientY,
+          grab: null,
+          moved: false,
+          hist: [[performance.now(), ctl.y]],
+        };
+        ctl.interacting = true;
+        syncFuse(ctl);
+      });
+
+      card.addEventListener('pointermove', (e) => {
+        const d = ctl.drag;
+        if (!d || d.id !== e.pointerId) return;
+        if (d.grab === null) {
+          if (Math.abs(e.clientY - d.startY) < DEAD_ZONE) return;
+          d.grab = e.clientY - ctl.y;
+          card.dataset.swiping = '';
+        }
+        const raw = e.clientY - d.grab;
+        const next = raw >= 0 ? raw : rubberband(raw, RESIST_PX);
+        ctl.y = next;
+        lift.style.transform = `translateY(${next}px)`;
+        d.moved = true;
+        d.hist.push([performance.now(), next]);
+        if (d.hist.length > 4) d.hist.shift();
+      });
+
+      const endDrag = (e) => {
+        const d = ctl.drag;
+        if (!d || d.id !== e.pointerId) return;
+        ctl.drag = null;
+        delete card.dataset.swiping;
+        try {
+          card.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+        ctl.interacting = false;
+        const dy = ctl.y;
+        const v = velocityOf(d.hist);
+        if (dy > 0 && (v > FLICK || (dy >= SWIPE_DISTANCE && v >= 0))) {
+          swipeOut(ctl, dy, v);
+          return;
+        }
+        if (d.moved) settleBack(ctl, v);
+        else {
+          const queued = ctl.pendingClose;
+          ctl.pendingClose = null;
+          if (queued) closeToast(id, queued);
+          else syncFuse(ctl);
+        }
+      };
+
+      card.addEventListener('pointerup', endDrag);
+      card.addEventListener('pointercancel', endDrag);
+
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          closeToast(id, 'escape');
+        }
+      });
     }
 
     function syncCards(displayItems) {
       const existingById = new Map();
-      for (const card of listEl.querySelectorAll('.card')) {
-        existingById.set(card.dataset.id, card);
+      for (const toast of listEl.querySelectorAll('.toast')) {
+        existingById.set(toast.dataset.id, toast);
       }
 
       const nextIds = new Set(displayItems.map((item) => String(item.id)));
-      for (const [id, card] of existingById) {
+      for (const [id, toast] of existingById) {
         if (!nextIds.has(id)) {
-          card.remove();
+          destroyCtl(id);
+          toast.remove();
           existingById.delete(id);
         }
       }
 
       displayItems.forEach((item, index) => {
         const id = String(item.id);
-        let card = existingById.get(id);
-        if (!card) {
+        let toast = existingById.get(id);
+        if (!toast) {
           const wrapper = document.createElement('div');
-          wrapper.innerHTML = buildCardHtml(item).trim();
-          card = wrapper.firstElementChild;
+          wrapper.innerHTML = buildToastHtml(item).trim();
+          toast = wrapper.firstElementChild;
+          listEl.appendChild(toast);
+          bindToast(toast, item);
+          existingById.set(id, toast);
         }
 
-        if (listEl.children[index] !== card) {
-          listEl.insertBefore(card, listEl.children[index] || null);
+        if (listEl.children[index] !== toast) {
+          listEl.insertBefore(toast, listEl.children[index] || null);
         }
-      });
-    }
-
-    function reportHostHeight() {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (hostEl.hidden) return;
-          const height = Math.ceil(hideAllEl.offsetHeight + listEl.scrollHeight);
-          if (height > 0 && height !== lastReportedHeight) {
-            lastReportedHeight = height;
-            window.notificationHostAPI.reportHeight(height);
-          }
-        });
       });
     }
 
     function render() {
       if (!items.length) {
         hostEl.hidden = true;
+        hideAllEl.hidden = true;
+        for (const id of [...toastCtl.keys()]) destroyCtl(id);
         listEl.innerHTML = '';
         lastReportedHeight = 0;
         return;
       }
 
       hostEl.hidden = false;
-      const isBottom = hostEl.classList.contains('is-bottom');
-      const displayItems = isBottom ? [...items].reverse() : items;
-      syncCards(displayItems);
+      hideAllEl.hidden = items.length < 2;
+      // Newest first visually for top stack; bottom uses CSS column-reverse.
+      syncCards(items);
       reportHostHeight();
     }
 
     listEl.addEventListener('error', (event) => {
       const img = event.target;
-      if (!img.matches('.avatar img')) return;
-
+      if (!img.matches?.('.avatar img')) return;
       const avatar = img.closest('.avatar');
       if (!avatar) return;
-
       const initial = avatar.dataset.initial;
       img.remove();
-      if (initial && !avatar.textContent.trim()) {
-        avatar.textContent = initial;
-      }
+      if (initial && !avatar.textContent.trim()) avatar.textContent = initial;
     }, true);
 
     listEl.addEventListener('click', (event) => {
       const dismissId = event.target.closest('[data-dismiss]')?.getAttribute('data-dismiss');
       if (dismissId) {
         event.stopPropagation();
-        window.notificationHostAPI.dismiss(dismissId);
+        closeToast(dismissId, 'close');
         return;
       }
 
-      const card = event.target.closest('.card');
-      if (!card) return;
-      const id = card.getAttribute('data-id');
+      const card = event.target.closest('.toast__card');
+      if (!card || event.target.closest('button')) return;
+      // Ignore click if it was a drag
+      const toast = card.closest('.toast');
+      const ctl = toast && toastCtl.get(toast.dataset.id);
+      if (ctl && Math.abs(ctl.y) > 2) return;
+
+      const id = toast?.dataset.id;
       const item = items.find((entry) => String(entry.id) === String(id));
-      if (item) {
-        window.notificationHostAPI.open(item);
-      }
+      if (item) hostApi.open(item);
     });
 
     hideAllEl.addEventListener('click', () => {
-      window.notificationHostAPI.dismissAll();
+      for (const id of [...toastCtl.keys()]) destroyCtl(id);
+      hostApi.dismissAll();
     });
 
-    window.notificationHostAPI.onData((data) => {
+    function applyHostData(data) {
       const nextThemeKey = themeKey(data?.theme);
       if (data?.theme && nextThemeKey !== lastThemeKey) {
         applyTheme(data.theme);
@@ -408,7 +784,21 @@
       hostEl.classList.toggle('is-bottom', String(position).startsWith('bottom'));
       items = Array.isArray(data?.items) ? data.items : [];
       render();
-    });
+    }
+
+    hostApi = {
+      reportHeight: (height) => window.notificationHostAPI.reportHeight(Number(height) || 0),
+      dismiss: (id) => window.notificationHostAPI.dismiss(String(id)),
+      dismissAll: () => window.notificationHostAPI.dismissAll(),
+      open: (item) => window.notificationHostAPI.open(item),
+    };
+
+    window.notificationHostAPI.onData((data) => applyHostData(data || {}));
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => reportHostHeight());
+      ro.observe(hostEl);
+    }
   </script>
 </body>
 </html>

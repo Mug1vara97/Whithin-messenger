@@ -21,6 +21,10 @@ const shouldSkipNode = (textNode) => {
   if (parent.closest('[contenteditable="true"]')) return true;
   if (parent.closest('[data-no-scramble="true"]')) return true;
   if (parent.closest('.hyper')) return true;
+  // Only auth screens and the d20 boot preloader keep the reveal animation.
+  if (!parent.closest('[data-text-scramble], .auth-container, .startup-preloader')) {
+    return true;
+  }
 
   return false;
 };

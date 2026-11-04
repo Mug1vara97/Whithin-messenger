@@ -33,8 +33,8 @@ import { resolveAvatarDecorationUrl } from '../../../lib/utils/avatarDecorationH
 import { colorsMatchForTileAvatarOutline } from '../../../lib/utils/colorMatchHelpers';
 import './VideoCallGrid.css';
 
-/** Максимум участников на одной странице сетки (есть CSS для 1–9) */
-const GRID_PAGE_SIZE = 9;
+/** Максимум участников на одной странице сетки по умолчанию (есть CSS для 1–9) */
+const DEFAULT_GRID_PAGE_SIZE = 9;
 
 // Компонент для управления video элементом
 const VideoElement = React.memo(({ stream, participantId, isLocal = false }) => {
@@ -257,12 +257,16 @@ const VideoCallGrid = ({
   testMode = false, // Режим тестирования с кнопками добавления/удаления пользователей
   onAddTestParticipant, // Callback для добавления тестового участника
   onRemoveTestParticipant, // Callback для удаления тестового участника
+  onFocusedModeChange = null,
+  gridPageSize = DEFAULT_GRID_PAGE_SIZE,
   canMuteMembers = false,
   voiceChannelId = null,
   serverId = null,
   currentUserId = null,
 }) => {
+  const pageSize = Math.max(1, Number(gridPageSize) || DEFAULT_GRID_PAGE_SIZE);
   const bottomGridRef = useRef(null);
+  const bottomContainerRef = useRef(null);
   const participantSpeakingStates = useParticipantSpeakingStates();
   const participantMuteStates = useParticipantMuteStates();
   const participantGlobalAudioStates = useParticipantGlobalAudioStates();
@@ -371,7 +375,8 @@ const VideoCallGrid = ({
   const [focusedParticipantId, setFocusedParticipantId] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [bottomPage, setBottomPage] = useState(0);
-  const [visibleBottomUsers] = useState(6);
+  /** Сколько плиток реально влезает в нижнюю полосу focus-режима */
+  const [visibleBottomUsers, setVisibleBottomUsers] = useState(4);
   const [lastVideoParticipants, setLastVideoParticipants] = useState(new Set());
   const [fullscreenScreenShareId, setFullscreenScreenShareId] = useState(null);
   const [fullscreenUiVisible, setFullscreenUiVisible] = useState(false);
@@ -444,9 +449,13 @@ const VideoCallGrid = ({
   const isFocusedMode = focusedParticipantId !== null;
   const focusedParticipant = extendedParticipants.find(p => p.id === focusedParticipantId);
 
-  const totalPages = extendedParticipants.length <= GRID_PAGE_SIZE
+  useEffect(() => {
+    onFocusedModeChange?.(isFocusedMode && !forceGridMode);
+  }, [isFocusedMode, forceGridMode, onFocusedModeChange]);
+
+  const totalPages = extendedParticipants.length <= pageSize
     ? 1
-    : Math.ceil(extendedParticipants.length / GRID_PAGE_SIZE);
+    : Math.ceil(extendedParticipants.length / pageSize);
 
   const bottomParticipants = useMemo(
     () => extendedParticipants.filter((participant) => participant.id !== focusedParticipantId),
@@ -458,12 +467,12 @@ const VideoCallGrid = ({
     : Math.ceil(bottomParticipants.length / visibleBottomUsers);
 
   const currentPageParticipants = useMemo(() => {
-    if (extendedParticipants.length <= GRID_PAGE_SIZE) {
+    if (extendedParticipants.length <= pageSize) {
       return extendedParticipants;
     }
-    const start = currentPage * GRID_PAGE_SIZE;
-    return extendedParticipants.slice(start, start + GRID_PAGE_SIZE);
-  }, [extendedParticipants, currentPage]);
+    const start = currentPage * pageSize;
+    return extendedParticipants.slice(start, start + pageSize);
+  }, [extendedParticipants, currentPage, pageSize]);
 
   const currentBottomParticipants = useMemo(() => {
     if (bottomParticipants.length <= visibleBottomUsers) {
@@ -472,6 +481,35 @@ const VideoCallGrid = ({
     const start = bottomPage * visibleBottomUsers;
     return bottomParticipants.slice(start, start + visibleBottomUsers);
   }, [bottomParticipants, bottomPage, visibleBottomUsers]);
+
+  // Стрелки снизу — когда участников больше, чем влезает по ширине контейнера
+  useEffect(() => {
+    if (!isFocusedMode || hideBottomUsers) {
+      return undefined;
+    }
+
+    const el = bottomContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    // DM focus: PIP ~168px; иначе фиксированные 220px как в полосе
+    const isDmFocus = Boolean(el.closest?.('.dm-grid-fit'));
+    const TILE_WIDTH = isDmFocus ? 168 : 220;
+    const GAP = isDmFocus ? 8 : 10;
+    const SIDE_RESERVE = 96; // место под стрелки/паддинг
+
+    const updateFit = () => {
+      const width = Math.max(0, el.clientWidth - SIDE_RESERVE);
+      const fit = Math.max(1, Math.floor((width + GAP) / (TILE_WIDTH + GAP)));
+      setVisibleBottomUsers((prev) => (prev === fit ? prev : fit));
+    };
+
+    updateFit();
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isFocusedMode, hideBottomUsers, bottomParticipants.length]);
 
   useEffect(() => {
     setCurrentPage((page) => {
@@ -655,8 +693,8 @@ const VideoCallGrid = ({
       />
     );
 
-    // Кольцо близко к аватару (размер ещё задаётся CSS --tile-dial-size).
-    const dialSize = isSmall ? 92 : 136;
+    // CSS --tile-dial-size задаёт итоговый размер; stroke на ~80% радиуса → dial > avatar+рамка.
+    const dialSize = isSmall ? 120 : 180;
     const avatarNode = volumeDial ? (
       <div
         className={`tile-avatar-wrap tile-avatar-wrap--volume-dial${overlay ? ' tile-avatar-wrap--overlay' : ''}${
@@ -675,9 +713,9 @@ const VideoCallGrid = ({
           ink="rgba(255, 255, 255, 0.32)"
           size={dialSize}
           sweep={289}
-          thickness={5}
+          thickness={7}
           speed={8}
-          deadZone={40}
+          deadZone={42}
           passthroughCenter
           onChange={volumeDial.onChange}
           onContextMenu={volumeDial.onContextMenu}
@@ -760,7 +798,7 @@ const VideoCallGrid = ({
     const micSelfMuted = Boolean(isMuted && !isServerMuted);
     const deafModerated = Boolean(isDeafened && isServerDeafened);
     const deafSelf = Boolean(isDeafened && !isServerDeafened);
-    const iconSize = isSmall ? 16 : 18;
+    const iconSize = isSmall ? 12 : 18;
     const modColor = '#f0b232';
     const isScreenShare = participant.isScreenShare || false;
     const ownerUserId = participant.ownerUserId != null ? String(participant.ownerUserId) : null;
@@ -1086,17 +1124,26 @@ const VideoCallGrid = ({
       <>
       <div className={`video-call-container focused-mode ${className}`}>
         {renderTestControls()}
-        <div className="focused-view">
+        <div
+          className={`focused-view${
+            !hideBottomUsers && bottomParticipants.length <= 2 ? ' focused-view--compact-pip' : ''
+          }`}
+        >
           <div className="focused-user-wrapper">
             {focusedParticipant && renderParticipantTile(focusedParticipant, false)}
           </div>
           
           {!hideBottomUsers && (
-            <div className="bottom-users-container">
-              {totalBottomPages > 1 && bottomPage > 0 && (
-                <button 
-                  className="pagination-arrow pagination-arrow-left" 
+            <div
+              className={`bottom-users-container${totalBottomPages > 1 ? ' has-pagination' : ''}`}
+              ref={bottomContainerRef}
+            >
+              {totalBottomPages > 1 && (
+                <button
+                  type="button"
+                  className="pagination-arrow pagination-arrow-left"
                   onClick={handlePrevBottomPage}
+                  disabled={bottomPage <= 0}
                   aria-label="Предыдущая страница"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -1109,10 +1156,12 @@ const VideoCallGrid = ({
                 {currentBottomParticipants.map((participant) => renderParticipantTile(participant, true))}
               </div>
 
-              {totalBottomPages > 1 && bottomPage < totalBottomPages - 1 && (
-                <button 
-                  className="pagination-arrow pagination-arrow-right" 
+              {totalBottomPages > 1 && (
+                <button
+                  type="button"
+                  className="pagination-arrow pagination-arrow-right"
                   onClick={handleNextBottomPage}
+                  disabled={bottomPage >= totalBottomPages - 1}
                   aria-label="Следующая страница"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -1165,11 +1214,6 @@ const VideoCallGrid = ({
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="pagination-info">
-          Страница {currentPage + 1} из {totalPages}
-        </div>
-      )}
     </div>
     {moderationMenu}
     </>
@@ -1179,6 +1223,15 @@ const VideoCallGrid = ({
 // Мемоизированный компонент с кастомной функцией сравнения
 const MemoizedVideoCallGrid = React.memo(VideoCallGrid, (prevProps, nextProps) => {
   if (prevProps.testMode !== nextProps.testMode) {
+    return false;
+  }
+  if (prevProps.hideBottomUsers !== nextProps.hideBottomUsers) {
+    return false;
+  }
+  if (prevProps.gridPageSize !== nextProps.gridPageSize) {
+    return false;
+  }
+  if (prevProps.onFocusedModeChange !== nextProps.onFocusedModeChange) {
     return false;
   }
 

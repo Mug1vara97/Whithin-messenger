@@ -33,7 +33,14 @@ import {
 import styles from './ChatVoiceCall.module.css';
 
 const PANEL_MIN_HEIGHT = 230;
-const PANEL_MAX_HEIGHT_VH = 80;
+const CIRCLE_PAGE_SIZE = 8;
+const DM_FOCUS_CHROME_HIDE_MS = 5000;
+
+/** Макс. высота панели = ширина × 9/16 (и в сетке, и в фокусе) */
+const getPanelMaxHeightForWidth = (width) => {
+  const w = Math.max(0, Number(width) || 0);
+  return Math.max(PANEL_MIN_HEIGHT, (w * 9) / 16);
+};
 
 const ChatVoiceCall = ({
   chatId,
@@ -44,13 +51,72 @@ const ChatVoiceCall = ({
 }) => {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [panelHeight, setPanelHeight] = useState(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState(null);
+  const [circlePage, setCirclePage] = useState(0);
+  const [testBlockLayout, setTestBlockLayout] = useState(false);
+  const [isGridFocusedMode, setIsGridFocusedMode] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
   const containerRef = useRef(null);
+  const chromeHideTimerRef = useRef(null);
+  const chromePinnedRef = useRef(false);
   const {
     testMode,
     handleAddTestParticipant,
     handleRemoveTestParticipant,
     appendTestParticipants,
   } = useCallGridTestMode();
+
+  useEffect(() => {
+    if (!testMode) {
+      setTestBlockLayout(false);
+    }
+  }, [testMode]);
+
+  const handleFocusedModeChange = useCallback((focused) => {
+    setIsGridFocusedMode(Boolean(focused));
+  }, []);
+
+  const clearChromeHideTimer = useCallback(() => {
+    if (chromeHideTimerRef.current) {
+      clearTimeout(chromeHideTimerRef.current);
+      chromeHideTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleChromeHide = useCallback(() => {
+    clearChromeHideTimer();
+    if (chromePinnedRef.current) return;
+    chromeHideTimerRef.current = setTimeout(() => {
+      setChromeVisible(false);
+    }, DM_FOCUS_CHROME_HIDE_MS);
+  }, [clearChromeHideTimer]);
+
+  const bumpChromeVisibility = useCallback(() => {
+    setChromeVisible(true);
+    scheduleChromeHide();
+  }, [scheduleChromeHide]);
+
+  const handleCallScreenPointerEnter = useCallback(() => {
+    setChromeVisible(true);
+    scheduleChromeHide();
+  }, [scheduleChromeHide]);
+
+  const handleCallScreenPointerLeave = useCallback(() => {
+    chromePinnedRef.current = false;
+    clearChromeHideTimer();
+    setChromeVisible(false);
+  }, [clearChromeHideTimer]);
+
+  const handleChromePointerEnter = useCallback(() => {
+    chromePinnedRef.current = true;
+    clearChromeHideTimer();
+    setChromeVisible(true);
+  }, [clearChromeHideTimer]);
+
+  const handleChromePointerLeave = useCallback(() => {
+    chromePinnedRef.current = false;
+    scheduleChromeHide();
+  }, [scheduleChromeHide]);
 
   const handleResizeStart = useCallback((event) => {
     event.preventDefault();
@@ -59,7 +125,7 @@ const ChatVoiceCall = ({
 
     const startY = event.clientY;
     const startHeight = container.getBoundingClientRect().height;
-    const maxHeight = (window.innerHeight * PANEL_MAX_HEIGHT_VH) / 100;
+    const maxHeight = getPanelMaxHeightForWidth(container.getBoundingClientRect().width);
 
     const handleMouseMove = (moveEvent) => {
       const nextHeight = Math.min(
@@ -294,28 +360,125 @@ const ChatVoiceCall = ({
     userId,
   ]);
 
+  const circleTotalPages =
+    displayParticipants.length <= CIRCLE_PAGE_SIZE
+      ? 1
+      : Math.ceil(displayParticipants.length / CIRCLE_PAGE_SIZE);
+
+  const visibleCircleParticipants = useMemo(() => {
+    if (displayParticipants.length <= CIRCLE_PAGE_SIZE) {
+      return displayParticipants;
+    }
+    const start = circlePage * CIRCLE_PAGE_SIZE;
+    return displayParticipants.slice(start, start + CIRCLE_PAGE_SIZE);
+  }, [displayParticipants, circlePage]);
+
+  useEffect(() => {
+    setCirclePage((page) => Math.min(page, Math.max(0, circleTotalPages - 1)));
+  }, [circleTotalPages]);
+
+  const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
+  const hasAnyVideo = isVideoEnabled || participants.some((participant) => participant.isVideoEnabled);
+  // Сетка при видео/SS или в тестовом режиме «блоки»
+  const shouldShowVideoGrid =
+    hasAnyScreenShare || hasAnyVideo || (testMode && testBlockLayout);
+  const isCircleVoiceMode = !shouldShowVideoGrid;
+  // Автоскрытие дока на всём экране звонка 1-на-1
+  const isDmChromeAutoHide = true;
+  const isDmFocusFullscreen = shouldShowVideoGrid && isGridFocusedMode;
+
+  useEffect(() => {
+    if (!isDmChromeAutoHide) {
+      chromePinnedRef.current = false;
+      clearChromeHideTimer();
+      setChromeVisible(true);
+      return undefined;
+    }
+    bumpChromeVisibility();
+    return () => clearChromeHideTimer();
+  }, [isDmChromeAutoHide, bumpChromeVisibility, clearChromeHideTimer]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const updateMaxHeight = () => {
+      const width = container.getBoundingClientRect().width;
+      const maxHeight = getPanelMaxHeightForWidth(width);
+      setPanelMaxHeight(maxHeight);
+      setPanelHeight((prev) => (prev != null && prev > maxHeight ? maxHeight : prev));
+    };
+
+    updateMaxHeight();
+    const observer = new ResizeObserver(updateMaxHeight);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   if (!isConnected) {
     return null;
   }
 
-  const hasAnyScreenShare = isScreenSharing || remoteScreenShares.size > 0;
-  const hasAnyVideo = isVideoEnabled || participants.some((participant) => participant.isVideoEnabled);
-  const shouldShowVideoGrid = hasAnyScreenShare || hasAnyVideo || testMode;
-  const isOneToOneVoiceMode = !shouldShowVideoGrid && displayParticipants.length <= 2;
-
-  const containerStyle =
-    panelHeight != null
-      ? { height: `${panelHeight}px`, flex: '0 0 auto' }
-      : undefined;
+  const containerStyle = {
+    ...(panelMaxHeight != null ? { maxHeight: `${panelMaxHeight}px` } : null),
+    ...(panelHeight != null
+      ? {
+          height: `${panelHeight}px`,
+          flex: '0 0 auto',
+        }
+      : null),
+  };
 
   return (
     <div
       ref={containerRef}
-      className={`chat-voice-call ${styles.voiceCallContainer}`}
+      className={`chat-voice-call ${styles.voiceCallContainer}${
+        isDmFocusFullscreen ? ` ${styles.dmFocusFullscreen}` : ''
+      }`}
       style={containerStyle}
+      onPointerEnter={isDmChromeAutoHide ? handleCallScreenPointerEnter : undefined}
+      onPointerLeave={isDmChromeAutoHide ? handleCallScreenPointerLeave : undefined}
+      onPointerMove={isDmChromeAutoHide ? bumpChromeVisibility : undefined}
+      onPointerDown={isDmChromeAutoHide ? bumpChromeVisibility : undefined}
     >
+      {testMode && (
+        <div className={styles.testControls}>
+          <button
+            type="button"
+            className={styles.testBtnAdd}
+            onClick={handleAddTestParticipant}
+            title="Добавить тестового участника"
+          >
+            + Добавить участника ({displayParticipants.length})
+          </button>
+          <button
+            type="button"
+            className={styles.testBtnRemove}
+            onClick={handleRemoveTestParticipant}
+            disabled={displayParticipants.length <= 1}
+            title="Удалить последнего участника"
+          >
+            − Удалить участника
+          </button>
+          {!hasAnyScreenShare && !hasAnyVideo && (
+            <button
+              type="button"
+              className={testBlockLayout ? styles.testBtnLayoutActive : styles.testBtnLayout}
+              onClick={() => setTestBlockLayout((prev) => !prev)}
+              title={testBlockLayout ? 'Показать кружки' : 'Показать блоки (как сетка)'}
+            >
+              {testBlockLayout ? '○ Кружки' : '▦ Блоки'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className={styles.voiceCallWrapper}>
-        <div className={`${styles.participantsContainer} ${isOneToOneVoiceMode ? styles.oneToOneParticipants : ''}`}>
+        <div
+          className={`${styles.participantsContainer} ${isCircleVoiceMode ? styles.oneToOneParticipants : ''} ${isCircleVoiceMode && displayParticipants.length > 2 ? styles.circleParticipantsWrap : ''} ${isCircleVoiceMode && circleTotalPages > 1 ? styles.hasCirclePagination : ''}`}
+        >
           {shouldShowVideoGrid ? (
             <div className={styles.screenShareContainer}>
               <VideoCallGrid
@@ -350,17 +513,45 @@ const ChatVoiceCall = ({
                 remoteScreenShares={remoteScreenShares}
                 onStopScreenShare={toggleScreenShare}
                 forceGridMode={false}
-                hideBottomUsers={displayParticipants.length <= 2}
+                /* Discord focus в DM: только сцена, без полосы блоков снизу */
+                hideBottomUsers
+                gridPageSize={6}
                 isVideoEnabled={isVideoEnabled}
                 videoStream={cameraStream}
                 enableAutoFocus={false}
-                testMode={testMode}
+                testMode={false}
                 onAddTestParticipant={handleAddTestParticipant}
                 onRemoveTestParticipant={handleRemoveTestParticipant}
+                onFocusedModeChange={handleFocusedModeChange}
               />
             </div>
           ) : (
-            displayParticipants.map((participant) => {
+            <>
+            {circleTotalPages > 1 && (
+              <button
+                type="button"
+                className={`${styles.circlePaginationArrow} ${styles.circlePaginationArrowLeft}`}
+                onClick={() => setCirclePage((page) => Math.max(0, page - 1))}
+                disabled={circlePage <= 0}
+                aria-label="Предыдущая страница"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+            <div
+              className={styles.circleParticipantsGrid}
+              style={{
+                '--circle-cols': (() => {
+                  const n = visibleCircleParticipants.length;
+                  if (n <= 5) return Math.max(1, n); // одна линия
+                  if (n === 6) return 3; // 3×2
+                  return 4; // 7–8: 4×2, нижний ряд центрируется
+                })(),
+              }}
+            >
+            {visibleCircleParticipants.map((participant) => {
               const channelParticipant = findChannelParticipant(
                 activeVoiceChannelParticipants,
                 participant.id
@@ -434,11 +625,11 @@ const ChatVoiceCall = ({
                         label={`Громкость ${participant.name || ''}`}
                         accent="#ffffff"
                         ink="rgba(255, 255, 255, 0.32)"
-                        size={118}
+                        size={148}
                         sweep={289}
-                        thickness={5}
+                        thickness={7}
                         speed={8}
-                        deadZone={40}
+                        deadZone={42}
                         passthroughCenter
                         onChange={(next) => changeUserVolume?.(participant.id, next)}
                         onContextMenu={handleAvatarContextMenu}
@@ -473,7 +664,22 @@ const ChatVoiceCall = ({
                   </div>
                 </div>
               );
-            })
+            })}
+            </div>
+            {circleTotalPages > 1 && (
+              <button
+                type="button"
+                className={`${styles.circlePaginationArrow} ${styles.circlePaginationArrowRight}`}
+                onClick={() => setCirclePage((page) => Math.min(circleTotalPages - 1, page + 1))}
+                disabled={circlePage >= circleTotalPages - 1}
+                aria-label="Следующая страница"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+            </>
           )}
         </div>
       </div>
@@ -486,6 +692,9 @@ const ChatVoiceCall = ({
         showAudioBlockedBanner={showAudioBlockedBanner}
         onDismissError={() => setDismissedError(true)}
         onDismissAudioBlocked={() => setDismissedAudioBlocked(true)}
+        chromeVisible={!isDmChromeAutoHide || chromeVisible}
+        onChromePointerEnter={isDmChromeAutoHide ? handleChromePointerEnter : undefined}
+        onChromePointerLeave={isDmChromeAutoHide ? handleChromePointerLeave : undefined}
         controlProps={{
           isMuted,
           onToggleMute: toggleMute,

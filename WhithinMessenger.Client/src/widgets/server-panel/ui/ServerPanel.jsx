@@ -105,7 +105,9 @@ const ServerPanel = ({
   onChatSelected, 
   selectedChat,
   onServerDataUpdated,
-  unreadCountByChat = {}
+  unreadCountByChat = {},
+  openEventId: openEventIdProp = null,
+  onOpenEventHandled,
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
@@ -124,6 +126,10 @@ const ServerPanel = ({
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [createEventRequested, setCreateEventRequested] = useState(false);
+  const [listEventsRequested, setListEventsRequested] = useState(false);
+  const [sidebarEvents, setSidebarEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [openEventId, setOpenEventId] = useState(null);
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, type: null, data: null });
   const [serverConnection, setServerConnection] = useState(null);
   const [bannerLoadError, setBannerLoadError] = useState(false);
@@ -660,6 +666,7 @@ const ServerPanel = ({
 
   const handleChatClick = useCallback((chatId, groupName, chatType) => {
     if (!onChatSelected) return;
+    setSelectedEventId(null);
 
     let channelMeta = null;
     for (const category of memoizedCategories) {
@@ -713,6 +720,31 @@ const ServerPanel = ({
   const handleCreateEventRequestHandled = useCallback(() => {
     setCreateEventRequested(false);
   }, []);
+
+  const handleListEventsRequestHandled = useCallback(() => {
+    setListEventsRequested(false);
+  }, []);
+
+  const handleSidebarEventsChange = useCallback((list) => {
+    setSidebarEvents(Array.isArray(list) ? list : []);
+  }, []);
+
+  const handleEventClick = useCallback((event) => {
+    if (!event?.eventId) return;
+    setSelectedEventId(event.eventId);
+    setOpenEventId(event.eventId);
+  }, []);
+
+  const handleOpenEventHandled = useCallback(() => {
+    setOpenEventId(null);
+    onOpenEventHandled?.();
+  }, [onOpenEventHandled]);
+
+  useEffect(() => {
+    if (!openEventIdProp) return;
+    setSelectedEventId(openEventIdProp);
+    setOpenEventId(openEventIdProp);
+  }, [openEventIdProp]);
 
   const handleAddChannel = useCallback((categoryId) => {
     const category = server?.categories?.find(cat => (cat.categoryId || cat.CategoryId) === categoryId);
@@ -1197,6 +1229,16 @@ const ServerPanel = ({
               Добавить участника
             </div>
             )}
+            <div
+              className="dropdown-item"
+              onClick={() => {
+                setShowDropdown(false);
+                setListEventsRequested(true);
+              }}
+            >
+              <EventAvailable sx={{ fontSize: 16, marginRight: 8 }} />
+              Все события
+            </div>
             {userCanManageEvents && (
             <div
               className="dropdown-item"
@@ -1234,7 +1276,11 @@ const ServerPanel = ({
         className={`server-channels ${(serverBanner?.banner || serverBanner?.bannerColor) ? 'with-banner' : ''}`}
         onContextMenu={(e) => {
           if (!userCanManageChannels) return;
-          if (!e.target.closest('.category-item') && !e.target.closest('.channel-item')) {
+          if (
+            !e.target.closest('.category-item') &&
+            !e.target.closest('.channel-item') &&
+            !e.target.closest('.event-sidebar-item')
+          ) {
             e.preventDefault();
             handleContextMenu(e, 'empty');
           }
@@ -1250,6 +1296,11 @@ const ServerPanel = ({
           onSelectChannel={handleSelectEventChannel}
           createRequested={createEventRequested}
           onCreateRequestHandled={handleCreateEventRequestHandled}
+          listOpenRequested={listEventsRequested}
+          onListOpenHandled={handleListEventsRequestHandled}
+          onEventsChange={handleSidebarEventsChange}
+          openEventId={openEventId}
+          onOpenEventHandled={handleOpenEventHandled}
         />
         <CategoriesList
           categories={memoizedCategories}
@@ -1275,6 +1326,10 @@ const ServerPanel = ({
           onChatsReordered={handleChatsReordered}
           userId={user?.id}
           userName={user?.username || user?.userName}
+          events={sidebarEvents}
+          selectedEventId={selectedEventId}
+          onEventClick={handleEventClick}
+          onEventsHeaderClick={() => setListEventsRequested(true)}
         />
         </div>
       </div>

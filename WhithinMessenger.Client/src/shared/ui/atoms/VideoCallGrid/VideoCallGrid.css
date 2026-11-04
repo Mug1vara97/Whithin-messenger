@@ -55,8 +55,8 @@
   container-type: size;
   container-name: call-tile;
   --tile-avatar-size: clamp(36px, 42cqmin, 100px);
-  /* Кольцо чуть больше аватара+декора — без огромного зазора */
-  --tile-dial-size: clamp(72px, 56cqmin, 136px);
+  /* Кольцо снаружи аватара+рамки: stroke у CometDial на ~80% радиуса */
+  --tile-dial-size: clamp(96px, 74cqmin, 180px);
   /* Wake-слайдер на демке — от размера плитки */
   --ss-wake-track: clamp(64px, 38cqmin, 152px);
   --ss-wake-bar: clamp(14px, 7.5cqmin, 30px);
@@ -67,7 +67,7 @@
 
 .video-tile.small-tile {
   --tile-avatar-size: clamp(28px, 40cqmin, 60px);
-  --tile-dial-size: clamp(56px, 50cqmin, 92px);
+  --tile-dial-size: clamp(76px, 66cqmin, 120px);
   --ss-wake-track: clamp(52px, 34cqmin, 96px);
   --ss-wake-bar: clamp(12px, 6.5cqmin, 22px);
 }
@@ -352,9 +352,20 @@
 .video-tile:has(.tile-screen-share-wake) {
   overflow: visible;
   z-index: 28;
+  background: transparent;
 }
 
-.video-tile:has(.tile-screen-share-wake) .tile-content,
+.video-tile:has(.tile-screen-share-wake) .tile-content {
+  border-radius: var(--voice-call-tile-radius, 8px);
+  background: #1e1f22;
+  overflow: visible;
+}
+
+.video-tile:has(.tile-screen-share-wake) .tile-background,
+.video-tile:has(.tile-screen-share-wake) .tile-background > * {
+  border-radius: var(--voice-call-tile-radius, 8px);
+}
+
 .video-tile:has(.tile-screen-share-wake) .tile-bottom-overlay {
   overflow: visible;
 }
@@ -482,13 +493,40 @@
 .video-tile.volume-dial-open {
   overflow: visible;
   z-index: 30;
+  /* иначе при overflow:visible непрозрачный фон плитки выглядит квадратом */
+  background: transparent;
+}
+
+.video-tile.volume-dial-open .tile-content {
+  border-radius: var(--voice-call-tile-radius, 8px);
+  background: #1e1f22;
+  overflow: visible;
+}
+
+/* Квадратные дети (цвет баннера / video) без radius дают «острые» углы */
+.video-tile.volume-dial-open .tile-background,
+.video-tile.volume-dial-open .tile-background > div,
+.video-tile.volume-dial-open .tile-video,
+.video-tile.volume-dial-open video {
+  border-radius: var(--voice-call-tile-radius, 8px);
+}
+
+.video-tile.volume-dial-open .tile-avatar-wrap--volume-dial,
+.video-tile.volume-dial-open .tile-avatar-volume-layer {
+  overflow: visible;
 }
 
 .tile-avatar-wrap--volume-dial {
-  /* Размер аватара не трогаем — только чуть слабее декор, чтобы кольцо читалось */
-  --avatar-decoration-scale: 1.14;
+  /* Аватар/рамка как есть — кольцо снаружи за счёт большего --tile-dial-size */
+  --avatar-decoration-scale: 1.22;
   position: relative;
   z-index: 20;
+}
+
+.tile-avatar-wrap--volume-dial .tile-avatar-volume-center {
+  /* Центр = размер аватара; кольцо SVG с отступом вокруг рамки */
+  width: var(--tile-avatar-size);
+  height: var(--tile-avatar-size);
 }
 
 .tile-avatar-wrap--volume-dial.tile-avatar-wrap--overlay {
@@ -891,81 +929,137 @@
   font-size: 14px;
 }
 
-/* ===== FOCUSED MODE ===== */
-.focused-mode {
+/* ===== FOCUSED MODE (Discord-like: large stage + compact strip) ===== */
+.video-call-container.focused-mode {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
+/*
+ * Фокус + нижняя полоса — одна группа по центру сцены
+ * (полоса не прибита к низу экрана).
+ */
 .focused-view {
+  --focus-strip-reserve: 168px;
+  --focus-strip-tile-width: 220px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  gap: 16px;
+  justify-content: center;
+  align-items: stretch;
+  padding: 8px 12px 4px;
+  gap: 8px;
   overflow: hidden;
   max-height: 100%;
-  min-height: 0; /* Позволяет сжиматься */
-  height: 100%; /* Занимает всю доступную высоту */
+  min-height: 0;
+  height: 100%;
+  container-type: size;
+  container-name: focus-stage;
 }
 
-/* DM focus layout: large centered share + compact participant strip */
+/*
+ * Discord DM Focus: максимальная 16:9 сцена в области звонка
+ * (пропорции сохранены, без полосы снизу).
+ */
 .video-call-container.dm-grid-fit.focused-mode .focused-view {
-  padding: 10px 14px 12px;
-  gap: 10px;
+  --focus-strip-reserve: 0px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+  height: 100%;
+  container-type: size;
+  container-name: dm-focus-stage;
 }
 
 .video-call-container.dm-grid-fit.focused-mode .focused-user-wrapper {
-  align-items: flex-start;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  container-name: dm-focus-main;
 }
 
-.video-call-container.dm-grid-fit.focused-mode .focused-tile {
-  width: min(100%, 980px);
-  max-height: min(66vh, 360px);
-  margin: 0 auto;
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile {
+  width: min(100cqw, calc(100cqh * 16 / 9)) !important;
+  height: min(100cqh, calc(100cqw * 9 / 16)) !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  align-self: center;
+  margin: 0;
+}
+
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile .tile-video,
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile video {
+  object-fit: contain;
 }
 
 .video-call-container.dm-grid-fit.focused-mode .bottom-users-container {
-  width: 100%;
-  justify-content: center;
-  padding: 0;
-  gap: 8px;
-  border-radius: 0;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  display: none !important;
 }
 
-.video-call-container.dm-grid-fit.focused-mode .bottom-users-grid {
-  justify-content: center;
-  max-width: 100%;
-  gap: 8px;
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile:hover .tile-border {
+  border-color: transparent;
 }
 
-.video-call-container.dm-grid-fit.focused-mode .bottom-users-grid .small-tile {
-  width: min(320px, calc((100% - 8px) / 2));
-  min-width: 150px;
-  max-width: 380px;
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile:hover {
+  filter: none;
+  box-shadow: none;
 }
 
 .focused-user-wrapper {
-  flex: 1;
+  flex: 0 1 auto;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 0;
   overflow: hidden;
+  width: 100%;
   max-width: 100%;
-  max-height: 100%; /* Ограничиваем высоту */
-  height: 100%; /* Занимает всю доступную высоту */
 }
 
-.focused-tile {
-  width: 100%;
-  max-width: 1200px;
-  max-height: 100%;
+.video-tile.focused-tile {
+  flex: 0 1 auto;
   aspect-ratio: 16 / 9;
+  width: min(100cqw, calc((100cqh - var(--focus-strip-reserve)) * 16 / 9));
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100cqh - var(--focus-strip-reserve));
   cursor: pointer;
-  height: auto; /* Автоматическая высота */
+  border-radius: var(--voice-call-tile-radius, 12px);
+  margin: 0;
+  align-self: center;
+  overflow: hidden;
+}
+
+.video-tile.focused-tile .tile-content,
+.video-tile.focused-tile .tile-background,
+.video-tile.focused-tile .tile-background > div {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.video-tile.focused-tile .tile-video,
+.video-tile.focused-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
 }
 
 /* Bottom users container in focused mode */
@@ -974,27 +1068,35 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 8px 60px;
-  border-radius: 8px;
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  flex: 0 0 auto;
+  gap: 12px;
+  width: 100%;
+  padding: 0 48px 2px;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .bottom-users-grid {
   display: flex;
-  gap: 8px;
-  justify-content: flex-start;
+  gap: 10px;
+  justify-content: center;
+  align-items: stretch;
   flex-wrap: nowrap;
-  max-width: 1300px;
-  overflow: hidden;
+  width: auto;
+  max-width: 100%;
+  /* Не режем плитки — иначе край выглядит квадратным */
+  overflow: visible;
+  padding: 2px 4px 4px;
 }
 
 .bottom-users-grid .small-tile {
-  flex-shrink: 0;
-  width: 200px;
-  min-width: 150px;
-  max-width: 250px;
+  flex: 0 0 var(--focus-strip-tile-width, 220px);
+  width: var(--focus-strip-tile-width, 220px);
+  min-width: var(--focus-strip-tile-width, 220px);
+  max-width: var(--focus-strip-tile-width, 220px);
 }
 
 /* Small tile styles */
@@ -1002,6 +1104,27 @@
   aspect-ratio: 16 / 9;
   flex-shrink: 0;
   background: #1e1f22;
+  border-radius: var(--voice-call-tile-radius, 8px);
+  isolation: isolate;
+}
+
+.small-tile .tile-content,
+.small-tile .tile-background,
+.small-tile .tile-background > div,
+.small-tile .tile-video,
+.small-tile video {
+  border-radius: var(--voice-call-tile-radius, 8px);
+}
+
+/* В полосе focus dial не ломает соседние плитки и углы */
+.focused-mode .bottom-users-grid .small-tile.volume-dial-open {
+  z-index: 40;
+}
+
+.focused-mode .bottom-users-grid .small-tile.volume-dial-open .tile-content,
+.focused-mode .bottom-users-grid .small-tile.volume-dial-open .tile-background,
+.focused-mode .bottom-users-grid .small-tile.volume-dial-open .tile-background > div {
+  border-radius: var(--voice-call-tile-radius, 8px);
 }
 
 /* Speaking animation for small tiles */
@@ -1012,7 +1135,8 @@
 }
 
 .small-tile.speaking {
-  transform: scale(1.02);
+  /* Без scale — иначе в focus-полосе «прыгают» зазоры */
+  transform: none;
 }
 
 @keyframes speaking-glow-small {
@@ -1027,17 +1151,19 @@
 }
 
 .small-tile .tile-avatar-bg {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
 }
 
 .small-tile .tile-bottom-overlay {
   padding: 6px;
 }
 
-.small-tile .mic-status {
-  width: 16px;
-  height: 16px;
+.small-tile .mic-status,
+.small-tile .headset-status {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
 }
 
 .small-tile .participant-name {
@@ -1068,21 +1194,31 @@
   z-index: 10;
 }
 
-.bottom-users-container .pagination-arrow:hover {
+.bottom-users-container .pagination-arrow:hover:not(:disabled) {
   background: #5865f2;
   transform: translateY(-50%) scale(1.1);
 }
 
-.bottom-users-container .pagination-arrow:active {
+.bottom-users-container .pagination-arrow:active:not(:disabled) {
   transform: translateY(-50%) scale(0.95);
 }
 
+.bottom-users-container .pagination-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .bottom-users-container .pagination-arrow-left {
-  left: 10px;
+  left: 4px;
 }
 
 .bottom-users-container .pagination-arrow-right {
-  right: 10px;
+  right: 4px;
+}
+
+.bottom-users-container.has-pagination {
+  padding-left: 48px;
+  padding-right: 48px;
 }
 
 /* Стили для демонстрации экрана в сетке */

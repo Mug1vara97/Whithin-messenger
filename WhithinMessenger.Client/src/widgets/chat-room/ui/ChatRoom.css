@@ -70,9 +70,9 @@
 
 /* Chat Voice Call Integration */
 .group-chat-container .chat-voice-call {
-  flex: 0 0 50%;
-  max-height: 50vh;
-  min-height: 300px;
+  flex: 0 0 auto;
+  /* max-height: ширина × 9/16 — задаёт ChatVoiceCall, чтобы 16:9 блок целиком влезал */
+  min-height: 230px;
   margin: 0;
   border-radius: 0;
   box-shadow: none;

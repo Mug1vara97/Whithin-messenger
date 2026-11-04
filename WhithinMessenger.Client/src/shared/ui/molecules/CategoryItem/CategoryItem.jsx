@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
-import { FaLock, FaPlus } from 'react-icons/fa';
-import CategoryBranchTree from './CategoryBranchTree';
+import { FaLock, FaPlus, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import './CategoryItem.css';
 
 const CategoryItem = ({
@@ -11,7 +10,6 @@ const CategoryItem = ({
   onCategoryContextMenu,
   children,
   isDragDisabled = false,
-  activeChatId = null,
   hasActiveChannel = false,
 }) => {
   const categoryId = category.categoryId || category.CategoryId;
@@ -61,7 +59,7 @@ const CategoryItem = ({
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`category-item branched ${
+          className={`category-item ${
             category.isPrivate || category.IsPrivate ? 'private' : ''
           } ${snapshot.isDragging ? 'dragging' : ''}`}
           data-category-id={categoryId}
@@ -70,16 +68,22 @@ const CategoryItem = ({
           onContextMenu={handleCategoryContextMenu}
         >
           <div className="category-header" {...provided.dragHandleProps}>
-            <div className="category-name-container">
-              <span
-                className="category-name"
-                onClick={toggleCollapse}
-                aria-expanded={isOpen}
-                aria-label={isCollapsed ? 'Развернуть категорию' : 'Свернуть категорию'}
-              >
+            <button
+              type="button"
+              className="category-collapse"
+              onClick={toggleCollapse}
+              aria-expanded={isOpen}
+              aria-label={isCollapsed ? 'Развернуть категорию' : 'Свернуть категорию'}
+            >
+              {isOpen ? (
+                <FaChevronDown className="category-collapse__icon" aria-hidden />
+              ) : (
+                <FaChevronRight className="category-collapse__icon" aria-hidden />
+              )}
+              <span className="category-name">
                 {category.categoryName || category.CategoryName}
               </span>
-            </div>
+            </button>
             <div className="category-actions">
               {(category.isPrivate || category.IsPrivate) && (
                 <span className="category-private-icon" title="Приватная категория">
@@ -100,24 +104,20 @@ const CategoryItem = ({
 
           {isOpen && (
             <div className="category-body">
-              <div className="category-fold">
-                <Droppable droppableId={`category-${categoryId}`} type="CHAT">
-                  {(dropProvided, dropSnapshot) => (
-                    <div
-                      className={`channel-list ${
-                        dropSnapshot.isDraggingOver ? 'dragging-over' : ''
-                      }`}
-                      ref={dropProvided.innerRef}
-                      {...dropProvided.droppableProps}
-                    >
-                      <CategoryBranchTree activeChatId={activeChatId}>
-                        {children}
-                        {dropProvided.placeholder}
-                      </CategoryBranchTree>
-                    </div>
-                  )}
-                </Droppable>
-              </div>
+              <Droppable droppableId={`category-${categoryId}`} type="CHAT">
+                {(dropProvided, dropSnapshot) => (
+                  <div
+                    className={`channel-list ${
+                      dropSnapshot.isDraggingOver ? 'dragging-over' : ''
+                    }`}
+                    ref={dropProvided.innerRef}
+                    {...dropProvided.droppableProps}
+                  >
+                    {children}
+                    {dropProvided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
           )}
         </div>

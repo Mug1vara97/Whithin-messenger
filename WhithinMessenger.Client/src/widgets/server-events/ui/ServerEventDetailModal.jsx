@@ -93,7 +93,7 @@ const ServerEventDetailModal = ({
     const text =
       event.locationType === SERVER_EVENT_LOCATION.EXTERNAL && event.externalLocation
         ? event.externalLocation
-        : `${window.location.origin}/?event=${event.eventId}`;
+        : `${window.location.origin}/server/${event.serverId}/event/${event.eventId}`;
     try {
       await navigator.clipboard.writeText(text);
     } catch {

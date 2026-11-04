@@ -13,10 +13,19 @@ export function VoiceCallChromeOverlay({
   showAudioBlockedBanner,
   onDismissError,
   onDismissAudioBlocked,
-  controlProps
+  controlProps,
+  chromeVisible = true,
+  onChromePointerEnter,
+  onChromePointerLeave,
 }) {
   return (
-    <div className={`voice-call-chrome video-controls${showHeader ? '' : ' video-controls--no-header'}`}>
+    <div
+      className={`voice-call-chrome video-controls${showHeader ? '' : ' video-controls--no-header'}${
+        chromeVisible ? '' : ' video-controls--hidden'
+      }`}
+      onPointerEnter={onChromePointerEnter}
+      onPointerLeave={onChromePointerLeave}
+    >
       {showHeader && <div className="gradient-top" />}
       <div className="gradient-bottom" />
 
@@ -31,7 +40,11 @@ export function VoiceCallChromeOverlay({
         compact={compactBanners}
       />
 
-      <VoiceCallControlDock {...controlProps} />
+      <VoiceCallControlDock
+        {...controlProps}
+        onPointerEnter={onChromePointerEnter}
+        onPointerLeave={onChromePointerLeave}
+      />
     </div>
   );
 }

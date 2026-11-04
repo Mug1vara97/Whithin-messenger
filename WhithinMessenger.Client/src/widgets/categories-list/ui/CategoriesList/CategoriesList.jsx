@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
-import { CategoryItem, ChannelItem } from '../../../../shared/ui/molecules';
-import CategoryBranchTree from '../../../../shared/ui/molecules/CategoryItem/CategoryBranchTree';
+import { CategoryItem, ChannelItem, EventSidebarItem } from '../../../../shared/ui/molecules';
 import { reorderCategories, moveChatBetweenCategories } from '../../../../shared/lib/dnd';
 import voiceChannelService from '../../../../shared/lib/services/voiceChannelService';
 import { useCallStore } from '../../../../shared/lib/stores/callStore';
@@ -10,6 +9,8 @@ import {
   getChannelDisplayName,
   mergeCallOnlyIntoCategories,
 } from '../../../../shared/lib/voice/callOnlyVoiceChannels';
+import { filterUpcomingEvents } from '../../../../entities/server-event';
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import './CategoriesList.css';
 import { appToast } from '../../../../shared/lib/utils/appToast';
 
@@ -47,7 +48,11 @@ const CategoriesList = ({
   userName,
   onCategoriesReordered,
   onChatsReordered,
-  onServerDataUpdated
+  onServerDataUpdated,
+  events = [],
+  selectedEventId = null,
+  onEventClick,
+  onEventsHeaderClick,
 }) => {
   const [localCategories, setLocalCategories] = useState(categories);
   const isInCall = useCallStore((state) => state.isInCall);
@@ -70,6 +75,8 @@ const CategoriesList = ({
       ),
     [localCategories, callOnlyVoiceChannels, isInCall, currentRoomId, currentCallServerId]
   );
+
+  const upcomingEvents = useMemo(() => filterUpcomingEvents(events), [events]);
 
   // Подключаемся к voice-server для получения участников голосовых каналов
   const voiceServiceConnectedRef = useRef(false);
@@ -307,7 +314,6 @@ const CategoriesList = ({
   };
 
   const listRef = useRef(null);
-  const markerRef = useRef(null);
 
   const categoryHasActiveChannel = useCallback(
     (category) => {
@@ -319,45 +325,6 @@ const CategoriesList = ({
     },
     [selectedChatId]
   );
-
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    const marker = markerRef.current;
-    if (!list || !marker) return undefined;
-
-    const place = (animate) => {
-      const head =
-        list.querySelector('.category-item[data-active-open] .category-header') ||
-        list.querySelector('.uncategorized-channels[data-active]');
-      if (!animate) marker.style.transition = 'none';
-      if (head) {
-        const listRect = list.getBoundingClientRect();
-        const headRect = head.getBoundingClientRect();
-        const top =
-          headRect.top - listRect.top + list.scrollTop + Math.max(0, (Math.min(headRect.height, 36) - 16) / 2);
-        marker.style.top = `${top}px`;
-        marker.setAttribute('data-on', '');
-      } else {
-        marker.removeAttribute('data-on');
-      }
-      if (!animate) {
-        void marker.offsetHeight;
-        marker.style.transition = '';
-      }
-    };
-
-    place(true);
-    let first = true;
-    const ro = new ResizeObserver(() => {
-      if (first) {
-        first = false;
-        return;
-      }
-      place(false);
-    });
-    ro.observe(list);
-    return () => ro.disconnect();
-  }, [selectedChatId, localCategories]);
 
   const handleDragEnd = useCallback(async (result) => {
     console.log('handleDragEnd called:', result);
@@ -557,13 +524,16 @@ const CategoriesList = ({
             className={`categories-list ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
             onContextMenu={(e) => {
               if (!onEmptySpaceContextMenu) return;
-              if (!e.target.closest('.category-item') && !e.target.closest('.channel-item')) {
+              if (
+                !e.target.closest('.category-item') &&
+                !e.target.closest('.channel-item') &&
+                !e.target.closest('.event-sidebar-item')
+              ) {
                 e.preventDefault();
                 onEmptySpaceContextMenu(e);
               }
             }}
           >
-            <span ref={markerRef} className="categories-list__marker" aria-hidden="true" />
             <Droppable
               droppableId="category-null"
               type="CHAT"
@@ -572,79 +542,109 @@ const CategoriesList = ({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`uncategorized-channels branched ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                  className={`uncategorized-channels ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
                   data-active={
                     uncategorizedChannels.some((ch) => isChannelActive(ch)) ? '' : undefined
                   }
                 >
-                  <CategoryBranchTree activeChatId={selectedChatId}>
-                    {uncategorizedChannels.map((channel, index) => {
-                      const channelId = channel.chatId || channel.ChatId;
-                      const unreadCount = unreadCountByChat[channelId] || 0;
-                      return (
-                        <ChannelItem
-                          key={channel.chatId || channel.ChatId}
-                          channel={channel}
-                          index={index}
-                          unreadCount={unreadCount}
-                          isActive={isChannelActive(channel)}
-                          onClick={handleChatClick}
-                          onContextMenu={onChannelContextMenu
-                            ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
-                            : undefined}
-                          onSettings={onChannelSettings ? handleChannelSettings : undefined}
-                          isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
-                          userId={userId}
-                          userName={userName}
-                        />
-                      );
-                    })}
-                    {provided.placeholder}
-                  </CategoryBranchTree>
+                  <button
+                    type="button"
+                    className={`channel-item categories-events-entry ${
+                      upcomingEvents.some((e) => String(e.eventId) === String(selectedEventId))
+                        ? 'active'
+                        : ''
+                    }`}
+                    onClick={() => onEventsHeaderClick?.()}
+                  >
+                    <span className="channel-icon" aria-hidden="true">
+                      <EventAvailableOutlinedIcon sx={{ fontSize: 16, width: 16, height: 16 }} />
+                    </span>
+                    <span className="channel-name">События</span>
+                    {upcomingEvents.length > 0 && (
+                      <span className="channel-unread-badge">{upcomingEvents.length}</span>
+                    )}
+                  </button>
+
+                  {upcomingEvents.map((event) => (
+                    <EventSidebarItem
+                      key={`event-${event.eventId}`}
+                      event={event}
+                      isActive={String(selectedEventId) === String(event.eventId)}
+                      onClick={onEventClick}
+                    />
+                  ))}
+
+                  {uncategorizedChannels.map((channel, index) => {
+                    const channelId = channel.chatId || channel.ChatId;
+                    const unreadCount = unreadCountByChat[channelId] || 0;
+                    return (
+                      <ChannelItem
+                        key={channel.chatId || channel.ChatId}
+                        channel={channel}
+                        index={index}
+                        unreadCount={unreadCount}
+                        isActive={isChannelActive(channel)}
+                        onClick={handleChatClick}
+                        onContextMenu={onChannelContextMenu
+                          ? (e) => handleChannelContextMenu(e, channel, { categoryId: null, categoryName: null })
+                          : undefined}
+                        onSettings={onChannelSettings ? handleChannelSettings : undefined}
+                        isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
+                        userId={userId}
+                        userName={userName}
+                      />
+                    );
+                  })}
+                  {provided.placeholder}
                 </div>
               )}
             </Droppable>
 
             {sortedCategories
               .filter(category => category.categoryId !== null)
-              .map((category, index) => (
+              .map((category, index) => {
+              const categoryId = category.categoryId || category.CategoryId;
+              const chats = category.chats || [];
+              return (
               <CategoryItem
-                key={category.categoryId || category.CategoryId}
+                key={categoryId}
                 category={category}
                 index={index}
                 onAddChannel={canManageChannels ? handleAddChannel : undefined}
                 onCategoryContextMenu={onCategoryContextMenu ? handleCategoryContextMenu : undefined}
                 isDragDisabled={!canManageChannels}
-                activeChatId={selectedChatId}
                 hasActiveChannel={categoryHasActiveChannel(category)}
               >
-                {category.chats?.map((channel, channelIndex) => {
-                  const channelId = channel.chatId || channel.ChatId;
-                  const unreadCount = unreadCountByChat[channelId] || 0;
-                  return (
-                  <ChannelItem
-                    key={channel.chatId || channel.ChatId}
-                    channel={channel}
-                    index={channelIndex}
-                    unreadCount={unreadCount}
-                    isActive={isChannelActive(channel)}
-                    onClick={handleChatClick}
-                    onContextMenu={onChannelContextMenu
-                      ? (e) => handleChannelContextMenu(e, channel, category)
-                      : undefined}
-                    onSettings={onChannelSettings && !channel.isCallOnlyChannel ? handleChannelSettings : undefined}
-                    isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
-                    userId={userId}
-                    userName={userName}
-                  />
-                  );
-                }) || (
+                {chats.length > 0 ? (
+                  chats.map((channel, channelIndex) => {
+                    const channelId = channel.chatId || channel.ChatId;
+                    const unreadCount = unreadCountByChat[channelId] || 0;
+                    return (
+                    <ChannelItem
+                      key={channel.chatId || channel.ChatId}
+                      channel={channel}
+                      index={channelIndex}
+                      unreadCount={unreadCount}
+                      isActive={isChannelActive(channel)}
+                      onClick={handleChatClick}
+                      onContextMenu={onChannelContextMenu
+                        ? (e) => handleChannelContextMenu(e, channel, category)
+                        : undefined}
+                      onSettings={onChannelSettings && !channel.isCallOnlyChannel ? handleChannelSettings : undefined}
+                      isDragDisabled={!canManageChannels || channel.isCallOnlyChannel}
+                      userId={userId}
+                      userName={userName}
+                    />
+                    );
+                  })
+                ) : (
                   <div className="no-channels">
                     <p>Нет каналов в этой категории</p>
                   </div>
                 )}
               </CategoryItem>
-            )) || (
+            );
+            }) || (
               <div className="no-categories">
                 <p>Нет категорий</p>
               </div>

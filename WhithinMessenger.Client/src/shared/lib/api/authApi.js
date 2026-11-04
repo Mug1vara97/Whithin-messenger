@@ -153,6 +153,18 @@ export const authApi = {
       throw new Error(error.response?.data?.error || 'Failed to check QR session');
     }
   },
+  async approveQrLogin(sessionId) {
+    try {
+      const response = await apiClient.post('/auth/qr/approve', { sessionId });
+      return response.data;
+    } catch (error) {
+      throw new Error(
+        error.response?.data?.error ||
+          error.response?.data?.Error ||
+          'Не удалось подтвердить QR-вход'
+      );
+    }
+  },
   async refreshToken() {
     const refreshToken = tokenManager.getRefreshToken();
     if (!refreshToken) {

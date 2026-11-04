@@ -69,6 +69,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('electron:open-notification', listener);
   },
 
+  onDeepLink: (callback) => {
+    if (typeof callback !== 'function') return undefined;
+    const listener = (_event, url) => callback(url);
+    ipcRenderer.on('electron:deep-link', listener);
+    return () => ipcRenderer.removeListener('electron:deep-link', listener);
+  },
+
   openExternal: (url) => ipcRenderer.invoke('electron:open-external', url),
   chooseScreenSource: () => ipcRenderer.invoke('electron:choose-screen-source'),
   armScreenCapture: (options) => ipcRenderer.invoke('electron:arm-screen-capture', options),

@@ -395,7 +395,7 @@ export default function CometDial({
             />
           ))}
         </g>
-        <circle ref={headRef} className="comet-dial__head" r={thickness * 1.8} />
+        <circle ref={headRef} className="comet-dial__head" r={Math.max(1, thickness * 1.8 - 1)} />
       </svg>
       {hasCenter ? (
         <div className="comet-dial__center">{children}</div>

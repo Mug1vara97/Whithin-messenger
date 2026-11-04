@@ -1,12 +1,14 @@
 const path = require('node:path');
 const { BrowserWindow, screen, ipcMain } = require('electron');
 
-const TOAST_WIDTH = 360;
-const TOAST_CARD_HEIGHT = 92;
-const HEADER_HEIGHT = 42;
+const TOAST_WIDTH = 356;
+const TOAST_CARD_HEIGHT = 96;
+const HEADER_HEIGHT = 36;
+const TOAST_GAP = 4;
 const MARGIN = 12;
 const MAX_VISIBLE = 5;
-const AUTO_DISMISS_MS = 3 * 60 * 1000;
+// Host fuse is 90s; this is a slightly longer safety net.
+const AUTO_DISMISS_MS = 100 * 1000;
 
 let hostWindow = null;
 let notificationQueue = [];
@@ -24,7 +26,9 @@ function isBottomPosition(position) {
 }
 
 function getHostHeight(count) {
-  return HEADER_HEIGHT + count * TOAST_CARD_HEIGHT;
+  const n = Math.max(1, count);
+  const header = n >= 2 ? HEADER_HEIGHT + TOAST_GAP : 0;
+  return header + n * TOAST_CARD_HEIGHT + Math.max(0, n - 1) * TOAST_GAP;
 }
 
 function getHostBounds(count, measuredHeight) {

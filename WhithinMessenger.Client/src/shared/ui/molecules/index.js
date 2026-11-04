@@ -13,6 +13,7 @@ export * from './CreateGroupChatModal';
 export * from './ContextMenu';
 export * from './CategoryItem';
 export * from './ChannelItem';
+export * from './EventSidebarItem';
 export * from './UserPanel';
 export * from './FriendItem';
 export * from './FriendRequestItem';

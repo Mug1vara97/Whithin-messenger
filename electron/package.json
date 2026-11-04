@@ -80,7 +80,13 @@
       "installerIcon": "app-icon.ico",
       "uninstallerIcon": "app-icon.ico",
       "installerHeaderIcon": "app-icon.ico"
-    }
+    },
+    "protocols": [
+      {
+        "name": "Whithin",
+        "schemes": ["whithin", "within"]
+      }
+    ]
   },
   "dependencies": {
     "global-mouse-events": "^1.2.0",

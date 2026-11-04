@@ -5,31 +5,52 @@ import {
 
 export const serverEventApi = {
   async loadEvents(connection, serverId) {
-    if (!connection || connection.state !== 'Connected' || !serverId) {
+    if (!connection || !serverId) {
+      return [];
+    }
+
+    if (connection.state !== 'Connected') {
       return [];
     }
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      let settled = false;
+
+      const finish = (fn, value) => {
+        if (settled) return;
+        settled = true;
         cleanup();
-        reject(new Error('Timeout loading server events'));
+        fn(value);
+      };
+
+      const timeout = setTimeout(() => {
+        finish(reject, new Error('Timeout loading server events'));
       }, 15000);
 
       const onLoaded = (events) => {
-        cleanup();
-        const list = Array.isArray(events) ? events.map(normalizeServerEvent).filter(Boolean) : [];
-        resolve(list);
+        const list = Array.isArray(events)
+          ? events.map(normalizeServerEvent).filter(Boolean)
+          : [];
+        finish(resolve, list);
+      };
+
+      const onError = (message) => {
+        // Ignore unrelated hub errors while waiting; only fail if we still haven't loaded.
+        if (typeof message === 'string' && /мероприят/i.test(message)) {
+          finish(reject, new Error(message));
+        }
       };
 
       const cleanup = () => {
         clearTimeout(timeout);
         connection.off('ServerEventsLoaded', onLoaded);
+        connection.off('Error', onError);
       };
 
       connection.on('ServerEventsLoaded', onLoaded);
+      connection.on('Error', onError);
       connection.invoke('GetServerEvents', serverId).catch((err) => {
-        cleanup();
-        reject(err);
+        finish(reject, err);
       });
     });
   },

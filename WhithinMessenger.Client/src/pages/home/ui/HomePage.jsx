@@ -52,7 +52,7 @@ import { useCallStore } from '../../../shared/lib/stores/callStore';
 import './HomePage.css';
 
 const HomePage = () => {
-  const { serverId, channelId, chatId } = useParams();
+  const { serverId, channelId, chatId, eventId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
@@ -64,6 +64,7 @@ const HomePage = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedServer, setSelectedServer] = useState(null);
   const [serverDataFromPanel, setServerDataFromPanel] = useState(null);
+  const [pendingOpenEventId, setPendingOpenEventId] = useState(eventId || null);
   const [discoverySearch, setDiscoverySearch] = useState('');
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
@@ -74,6 +75,12 @@ const HomePage = () => {
     location.pathname === '/channels/@me/feed' || location.pathname === '/channels/@me';
   const showDiscovery = isDiscoveryPath(location.pathname);
   const discoveryTab = parseDiscoveryTab(location.pathname) ?? DISCOVERY_TAB.SERVERS;
+
+  useEffect(() => {
+    if (eventId) {
+      setPendingOpenEventId(eventId);
+    }
+  }, [eventId]);
 
   useEffect(() => {
     if (!showDiscovery) return;
@@ -1256,6 +1263,13 @@ const HomePage = () => {
                       selectedChat={selectedChat}
                       onServerDataUpdated={handleServerDataUpdated}
                       unreadCountByChat={notificationUnreadCountByChat}
+                      openEventId={pendingOpenEventId}
+                      onOpenEventHandled={() => {
+                        setPendingOpenEventId(null);
+                        if (eventId && serverId) {
+                          navigate(`/server/${serverId}`, { replace: true });
+                        }
+                      }}
                     />
                   ) : (
                     <ChatList

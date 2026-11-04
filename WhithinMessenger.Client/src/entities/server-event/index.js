@@ -25,4 +25,7 @@ export {
   filterUpcomingEvents,
   filterPastEvents,
   countActiveEvents,
+  resolveEventCategoryId,
+  getEventsForCategory,
+  buildServerEventPath,
 } from './model/types';
