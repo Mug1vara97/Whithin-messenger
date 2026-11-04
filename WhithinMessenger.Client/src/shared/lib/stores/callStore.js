@@ -36,6 +36,10 @@ import { volumeStorage } from '../utils/volumeStorage';
 import { selectActiveServerVoiceModeration } from '../voice/serverVoiceModerationState';
 import { buildCallOnlyChannelEntry } from '../voice/callOnlyVoiceChannels';
 import { participantVolumeStorage } from '../utils/participantVolumeStorage';
+import {
+  saveScreenShareFps,
+  saveScreenShareResolution,
+} from '../utils/screenShareResolution';
 import voiceChannelService from '../services/voiceChannelService';
 
 function notifyVoiceCallOverlaySync() {
@@ -2914,14 +2918,21 @@ export const useCallStore = create(
         }
       },
 
-      // Переключение микрофона
-      toggleMute: async () => {
+      /**
+       * Apply mic mute without Discord coupling. Used by toggleMute / toggleGlobalAudio.
+       * @param {boolean} newMutedState
+       * @param {{ playSound?: boolean }} [options]
+       */
+      applyMicrophoneMute: async (newMutedState, options = {}) => {
+        const { playSound = true } = options;
         const state = get();
-        const newMutedState = !state.isMuted;
 
         const { isServerMuted } = selectActiveServerVoiceModeration(state);
         if (!newMutedState && isServerMuted) {
-          return;
+          return false;
+        }
+        if (state.isMuted === newMutedState) {
+          return true;
         }
 
         localStorage.setItem('micMuted', JSON.stringify(newMutedState));
@@ -2963,10 +2974,12 @@ export const useCallStore = create(
 
         voiceCallApi.broadcastMuteState(newMutedState);
 
-        if (newMutedState) {
-          audioNotificationManager.playMicMutedSound().catch(() => {});
-        } else {
-          audioNotificationManager.playMicUnmutedSound().catch(() => {});
+        if (playSound) {
+          if (newMutedState) {
+            audioNotificationManager.playMicMutedSound().catch(() => {});
+          } else {
+            audioNotificationManager.playMicUnmutedSound().catch(() => {});
+          }
         }
 
         try {
@@ -2992,6 +3005,106 @@ export const useCallStore = create(
         }
 
         notifyVoiceCallOverlaySync();
+        return true;
+      },
+
+      /**
+       * Apply headphones / deafen without Discord mic coupling.
+       * @param {boolean} newMutedState - true = deafened
+       * @param {{ playSound?: boolean }} [options]
+       */
+      applyGlobalAudioMute: (newMutedState, options = {}) => {
+        const { playSound = true } = options;
+        const state = get();
+
+        const { isServerDeafened } = selectActiveServerVoiceModeration(state);
+        if (!newMutedState && isServerDeafened) {
+          return false;
+        }
+        if (state.isGlobalAudioMuted === newMutedState) {
+          return true;
+        }
+
+        localStorage.setItem('audioMuted', JSON.stringify(newMutedState));
+
+        if (voiceCallApi.socket) {
+          voiceCallApi.socket.emit('audioState', {
+            isEnabled: !newMutedState,
+            isGlobalAudioMuted: newMutedState,
+            userId: get().currentUserId,
+          });
+        }
+
+        const normalizedUserId =
+          state.currentUserId != null ? String(state.currentUserId) : null;
+
+        set((prev) => {
+          const newGlobalAudioStates = new Map(prev.participantGlobalAudioStates);
+          if (normalizedUserId) {
+            newGlobalAudioStates.set(normalizedUserId, newMutedState);
+          }
+          return {
+            isGlobalAudioMuted: newMutedState,
+            isAudioEnabled: !newMutedState,
+            participantGlobalAudioStates: newGlobalAudioStates,
+            participants: prev.participants.map((p) =>
+              normalizedUserId && String(p.userId) === normalizedUserId
+                ? { ...p, isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState }
+                : p
+            ),
+          };
+        });
+
+        if (normalizedUserId && get().currentRoomId) {
+          get().updateVoiceChannelParticipant(get().currentRoomId, normalizedUserId, {
+            isGlobalAudioMuted: newMutedState,
+            isAudioDisabled: newMutedState,
+            isDeafened: newMutedState,
+          });
+        }
+
+        if (voiceCallApi.socket) {
+          voiceCallApi.socket.emit('globalAudioState', {
+            userId: state.currentUserId,
+            isGlobalAudioMuted: newMutedState,
+          });
+        }
+
+        get().applyAllParticipantAudioRouting();
+        get().applyAllScreenShareAudioPlayback();
+        get().applyRemoteSoundpadVolumes();
+
+        if (playSound) {
+          if (newMutedState) {
+            audioNotificationManager.playGlobalMutedSound().catch(() => {});
+          } else {
+            audioNotificationManager.playGlobalUnmutedSound().catch(() => {});
+          }
+        }
+
+        notifyVoiceCallOverlaySync();
+        return true;
+      },
+
+      // Переключение микрофона (Discord: unmute while deafened → also undeafen)
+      toggleMute: async () => {
+        const state = get();
+        const newMutedState = !state.isMuted;
+
+        const { isServerMuted, isServerDeafened } = selectActiveServerVoiceModeration(state);
+        if (!newMutedState && isServerMuted) {
+          return;
+        }
+
+        // Unmuting mic while headphones are off also turns headphones back on.
+        if (!newMutedState && state.isGlobalAudioMuted) {
+          if (isServerDeafened) {
+            return;
+          }
+          get().applyGlobalAudioMute(false, { playSound: true });
+        }
+
+        await get().applyMicrophoneMute(newMutedState, { playSound: true });
       },
       
       applyRemoteSoundpadVolumes: () => {
@@ -3543,87 +3656,23 @@ export const useCallStore = create(
         });
       },
       
-      // Глобальное отключение/включение звука всех участников
-      toggleGlobalAudio: () => {
+      // Глобальное отключение звука (Discord: deafen → mute mic; undeafen → unmute mic)
+      toggleGlobalAudio: async () => {
         const state = get();
         const newMutedState = !state.isGlobalAudioMuted;
 
-        const { isServerDeafened } = selectActiveServerVoiceModeration(state);
-        if (!newMutedState && isServerDeafened) {
+        const applied = get().applyGlobalAudioMute(newMutedState, { playSound: true });
+        if (!applied) {
           return;
         }
-        
-        // Сохраняем состояние в localStorage
-        localStorage.setItem('audioMuted', JSON.stringify(newMutedState));
-        console.log('💾 Audio (headphones) state saved to localStorage:', newMutedState);
-        
-        // Отправляем состояние наушников на сервер (как в старом клиенте)
-        if (voiceCallApi.socket) {
-          const audioStateData = { 
-            isEnabled: !newMutedState,
-            isGlobalAudioMuted: newMutedState,
-            userId: get().currentUserId
-          };
-          console.log('Sending audioState to server:', audioStateData);
-          voiceCallApi.socket.emit('audioState', audioStateData);
-        }
-        
-        const normalizedUserId =
-          state.currentUserId != null ? String(state.currentUserId) : null;
 
-        set((prev) => {
-          const newGlobalAudioStates = new Map(prev.participantGlobalAudioStates);
-          if (normalizedUserId) {
-            newGlobalAudioStates.set(normalizedUserId, newMutedState);
-          }
-          return {
-            isGlobalAudioMuted: newMutedState,
-            isAudioEnabled: !newMutedState,
-            participantGlobalAudioStates: newGlobalAudioStates,
-            participants: prev.participants.map((p) =>
-              normalizedUserId && String(p.userId) === normalizedUserId
-                ? { ...p, isGlobalAudioMuted: newMutedState, isAudioEnabled: !newMutedState }
-                : p
-            ),
-          };
-        });
-
-        if (normalizedUserId && get().currentRoomId) {
-          get().updateVoiceChannelParticipant(get().currentRoomId, normalizedUserId, {
-            isGlobalAudioMuted: newMutedState,
-            isAudioDisabled: newMutedState,
-            isDeafened: newMutedState,
-          });
-        }
-        
-        // Также отправляем отдельное событие для глобального звука
-        if (voiceCallApi.socket) {
-          console.log('Sending globalAudioState to server:', { 
-            userId: state.currentUserId,
-            isGlobalAudioMuted: newMutedState 
-          });
-          voiceCallApi.socket.emit('globalAudioState', { 
-            userId: state.currentUserId,
-            isGlobalAudioMuted: newMutedState 
-          });
-        }
-        
-        get().applyAllParticipantAudioRouting();
-        get().applyAllScreenShareAudioPlayback();
-        get().applyRemoteSoundpadVolumes();
-        
-        // Воспроизводим звук глобального мьюта/размьюта (только локально)
         if (newMutedState) {
-          audioNotificationManager.playGlobalMutedSound().catch(error => {
-            console.warn('Failed to play global muted sound:', error);
-          });
-        } else {
-          audioNotificationManager.playGlobalUnmutedSound().catch(error => {
-            console.warn('Failed to play global unmuted sound:', error);
-          });
+          if (!get().isMuted) {
+            await get().applyMicrophoneMute(true, { playSound: false });
+          }
+        } else if (get().isMuted) {
+          await get().applyMicrophoneMute(false, { playSound: false });
         }
-
-        notifyVoiceCallOverlaySync();
       },
       
       // Переключение шумоподавления
@@ -4224,11 +4273,19 @@ export const useCallStore = create(
               sourceType: selectedSource.type,
               processPid: selectedSource.processPid,
               excludeSelfPid: selectedSource.excludeSelfPid,
+              resolution: selectedSource.resolution || '720p',
+              frameRate: selectedSource.frameRate ?? selectedSource.fps ?? 30,
             });
           }
 
           const includeCamera = Boolean(selectedSource?.includeCamera);
           const hadVideoBeforeShare = state.isVideoEnabled;
+          const screenShareResolution = saveScreenShareResolution(
+            selectedSource?.resolution || '720p',
+          );
+          const screenShareFps = saveScreenShareFps(
+            selectedSource?.frameRate ?? selectedSource?.fps ?? 30,
+          );
 
           // Stop previous share only after we already own a fresh capture stream.
           if (state.isScreenSharing) {
@@ -4242,6 +4299,8 @@ export const useCallStore = create(
           console.log('Starting screen share via LiveKit...', {
             includeAudio,
             includeCamera,
+            resolution: screenShareResolution,
+            fps: screenShareFps,
             preCaptured: Boolean(preCapturedStream),
           });
 
@@ -4253,7 +4312,12 @@ export const useCallStore = create(
               sourceType: selectedSource.type,
               processPid: selectedSource.processPid,
               excludeSelfPid: selectedSource.excludeSelfPid,
-            } : {},
+              resolution: screenShareResolution,
+              frameRate: screenShareFps,
+            } : {
+              resolution: screenShareResolution,
+              frameRate: screenShareFps,
+            },
           });
           
           // Get the screen share stream from LiveKit room
@@ -4324,8 +4388,13 @@ export const useCallStore = create(
                   sourceType: selectedSource.type,
                   processPid: selectedSource.processPid,
                   excludeSelfPid: selectedSource.excludeSelfPid,
+                  resolution: screenShareResolution,
+                  frameRate: screenShareFps,
                 }
-              : null,
+              : {
+                  resolution: screenShareResolution,
+                  frameRate: screenShareFps,
+                },
             screenShareAudioEnabled: includeAudio,
           });
 

@@ -341,6 +341,41 @@
         font-weight: 500;
       }
 
+      .res-pills {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px;
+        border-radius: 10px;
+        background: var(--tab-track, #111214);
+        border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+      }
+
+      .res-pill {
+        border: none;
+        border-radius: 7px;
+        padding: 5px 10px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+
+      .res-pill:hover {
+        color: var(--text);
+        background: color-mix(in srgb, var(--surface-hover) 80%, transparent);
+      }
+
+      .res-pill[aria-checked='true'] {
+        color: #fff;
+        background: var(--primary);
+      }
+
       .toggle-switch {
         position: relative;
         width: 44px;
@@ -544,6 +579,23 @@
                 ></button>
                 <span class="toggle-row__label">С веб-камерой</span>
               </div>
+              <div class="toggle-row">
+                <span class="toggle-row__label">Качество</span>
+                <div class="res-pills" id="resolutionPills" role="radiogroup" aria-label="Разрешение демонстрации">
+                  <button type="button" class="res-pill" role="radio" data-res="480p" aria-checked="false">480p</button>
+                  <button type="button" class="res-pill" role="radio" data-res="720p" aria-checked="true">720p</button>
+                  <button type="button" class="res-pill" role="radio" data-res="1080p" aria-checked="false">1080p</button>
+                  <button type="button" class="res-pill" role="radio" data-res="1440p" aria-checked="false">2K</button>
+                </div>
+              </div>
+              <div class="toggle-row">
+                <span class="toggle-row__label">FPS</span>
+                <div class="res-pills" id="fpsPills" role="radiogroup" aria-label="Частота кадров">
+                  <button type="button" class="res-pill" role="radio" data-fps="15" aria-checked="false">15</button>
+                  <button type="button" class="res-pill" role="radio" data-fps="30" aria-checked="true">30</button>
+                  <button type="button" class="res-pill" role="radio" data-fps="60" aria-checked="false">60</button>
+                </div>
+              </div>
             </div>
             <div id="audioHint" class="hint" style="display:none;">
               Для выбранного источника звук недоступен на этой системе.
@@ -574,6 +626,65 @@
       let activeTab = 'applications';
       let captureAudioEnabled = false;
       let includeCameraEnabled = false;
+      let selectedResolution = '720p';
+      let selectedFps = 30;
+      const RESOLUTION_STORAGE_KEY = 'screenShareResolution';
+      const FPS_STORAGE_KEY = 'screenShareFps';
+      const resolutionPills = Array.from(document.querySelectorAll('#resolutionPills .res-pill'));
+      const fpsPills = Array.from(document.querySelectorAll('#fpsPills .res-pill'));
+
+      function normalizeResolution(value) {
+        const id = String(value || '').toLowerCase();
+        if (id === '2k' || id === '1440') return '1440p';
+        if (['480p', '720p', '1080p', '1440p'].includes(id)) return id;
+        return '720p';
+      }
+
+      function normalizeFps(value) {
+        const n = Number(value);
+        return n === 15 || n === 30 || n === 60 ? n : 30;
+      }
+
+      function setSelectedResolution(value, persist = true) {
+        selectedResolution = normalizeResolution(value);
+        resolutionPills.forEach((pill) => {
+          const active = pill.dataset.res === selectedResolution;
+          pill.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        if (persist) {
+          try {
+            localStorage.setItem(RESOLUTION_STORAGE_KEY, selectedResolution);
+          } catch (_) { /* ignore */ }
+        }
+      }
+
+      function setSelectedFps(value, persist = true) {
+        selectedFps = normalizeFps(value);
+        fpsPills.forEach((pill) => {
+          const active = Number(pill.dataset.fps) === selectedFps;
+          pill.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        if (persist) {
+          try {
+            localStorage.setItem(FPS_STORAGE_KEY, String(selectedFps));
+          } catch (_) { /* ignore */ }
+        }
+      }
+
+      try {
+        setSelectedResolution(localStorage.getItem(RESOLUTION_STORAGE_KEY) || '720p', false);
+        setSelectedFps(localStorage.getItem(FPS_STORAGE_KEY) || 30, false);
+      } catch (_) {
+        setSelectedResolution('720p', false);
+        setSelectedFps(30, false);
+      }
+
+      resolutionPills.forEach((pill) => {
+        pill.addEventListener('click', () => setSelectedResolution(pill.dataset.res));
+      });
+      fpsPills.forEach((pill) => {
+        pill.addEventListener('click', () => setSelectedFps(pill.dataset.fps));
+      });
 
       function setToggleState(toggle, enabled) {
         toggle.setAttribute('aria-checked', enabled ? 'true' : 'false');
@@ -798,6 +909,8 @@
           type: selected.type,
           captureAudio: Boolean(captureAudioEnabled && !captureAudioToggle.disabled),
           includeCamera: Boolean(includeCameraEnabled),
+          resolution: selectedResolution,
+          frameRate: selectedFps,
         });
       });
 

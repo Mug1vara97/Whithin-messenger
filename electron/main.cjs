@@ -32,6 +32,36 @@ const { setupAudioCaptureIpc } = require('process-audio-capture/dist/main');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 const rendererUrl = process.env.WEB_CLIENT_URL || 'https://whithin.ru';
+const DEEP_LINK_SCHEMES = ['whithin', 'within'];
+
+function isDeepLinkUrl(value) {
+  if (!value || typeof value !== 'string') return false;
+  return DEEP_LINK_SCHEMES.some((scheme) => value.toLowerCase().startsWith(`${scheme}://`));
+}
+
+function extractDeepLinkFromArgv(argv = []) {
+  return (argv || []).find((arg) => isDeepLinkUrl(arg)) || null;
+}
+
+function deliverDeepLink(url) {
+  if (!isDeepLinkUrl(url)) return;
+  showMainWindow();
+  const send = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('electron:deep-link', url);
+    }
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.once('did-finish-load', send);
+    } else {
+      send();
+    }
+    return;
+  }
+  // Window not ready yet — retry shortly after create.
+  setTimeout(send, 800);
+}
 
 /** Дополнительные origin через запятую (напр. http://127.0.0.1:5173 для dev) */
 function getAppNavigationOrigins() {
@@ -1599,11 +1629,35 @@ if (!gotSingleInstanceLock) {
     app.setAppUserModelId('ru.whithin.desktop');
   }
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const deepLink = extractDeepLinkFromArgv(argv);
+    if (deepLink) {
+      deliverDeepLink(deepLink);
+      return;
+    }
     showMainWindow();
   });
 
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    deliverDeepLink(url);
+  });
+
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient('whithin', process.execPath, [path.resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient('within', process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient('whithin');
+    app.setAsDefaultProtocolClient('within');
+  }
+
   app.whenReady().then(() => {
+  const coldStartDeepLink = extractDeepLinkFromArgv(process.argv);
+  if (coldStartDeepLink) {
+    setTimeout(() => deliverDeepLink(coldStartDeepLink), 1200);
+  }
   setupAudioCaptureIpc();
   session.defaultSession.setDisplayMediaRequestHandler(
     async (request, callback) => {
@@ -1874,12 +1928,25 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     : null;
   const excludeSelfPid = process.platform === 'win32' ? process.pid : null;
 
+  const resolution = (() => {
+    const raw = String(selection.resolution || '720p').toLowerCase();
+    if (raw === '2k' || raw === '1440') return '1440p';
+    if (['480p', '720p', '1080p', '1440p'].includes(raw)) return raw;
+    return '720p';
+  })();
+  const frameRate = (() => {
+    const n = Number(selection.frameRate ?? selection.fps);
+    return n === 15 || n === 30 || n === 60 ? n : 30;
+  })();
+
   selectedScreenSource = {
     id: selection.id,
     type: selection.type,
     captureAudio: Boolean(selection.captureAudio),
     processPid,
     excludeSelfPid,
+    resolution,
+    frameRate,
   };
   lastSelectedScreenSource = {
     id: selection.id,
@@ -1887,6 +1954,8 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     captureAudio: Boolean(selection.captureAudio),
     processPid,
     excludeSelfPid,
+    resolution,
+    frameRate,
     selectedAt: Date.now()
   };
 
@@ -1911,6 +1980,8 @@ ipcMain.handle('electron:choose-screen-source', async () => {
     includeCamera: Boolean(selection.includeCamera),
     processPid,
     excludeSelfPid,
+    resolution,
+    frameRate,
   };
 });
 

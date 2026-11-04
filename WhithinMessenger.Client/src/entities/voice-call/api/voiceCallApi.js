@@ -12,6 +12,7 @@ import {
 } from 'livekit-client';
 import { useCallStore } from '../../../shared/lib/stores/callStore';
 import { ScreenShareProcessAudioSession } from '../../../shared/lib/utils/screenShareProcessAudio';
+import { getScreenShareResolutionPreset } from '../../../shared/lib/utils/screenShareResolution';
 import {
   getAudioInputMediaConstraints,
   getLiveKitAudioCaptureOptions,
@@ -70,16 +71,40 @@ const getRoomOptions = () => {
       noiseSuppression: Boolean(micDefaults.noiseSuppression),
       autoGainControl: micDefaults.autoGainControl !== false,
     },
-    videoCaptureDefaults: {
-      resolution: VideoPresets.h1080.resolution,
-      frameRate: 30
-    },
-    publishDefaults: {
-      videoCodec: 'vp8',
-      videoEncoding: VideoPresets.h1080.encoding,
-      simulcast: true,
-      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
-    }
+    videoCaptureDefaults: (() => {
+      const isTauriShell = typeof window !== 'undefined' && Boolean(window.electronAPI?.isTauri);
+      if (isTauriShell) {
+        return {
+          resolution: VideoPresets.h720.resolution,
+          frameRate: 30,
+        };
+      }
+      return {
+        resolution: VideoPresets.h1080.resolution,
+        frameRate: 30,
+      };
+    })(),
+    publishDefaults: (() => {
+      const isTauriShell = typeof window !== 'undefined' && Boolean(window.electronAPI?.isTauri);
+      if (isTauriShell) {
+        return {
+          videoCodec: 'vp8',
+          videoEncoding: {
+            ...VideoPresets.h720.encoding,
+            maxBitrate: 2_500_000,
+            maxFramerate: 30,
+          },
+          simulcast: true,
+          videoSimulcastLayers: [VideoPresets.h360],
+        };
+      }
+      return {
+        videoCodec: 'vp8',
+        videoEncoding: VideoPresets.h1080.encoding,
+        simulcast: true,
+        videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720],
+      };
+    })(),
   };
 };
 
@@ -192,12 +217,17 @@ class VoiceCallApi {
       });
     }
 
+    const resolution = getScreenShareResolutionPreset(
+      captureOptions.resolution,
+      captureOptions.frameRate ?? captureOptions.fps,
+    );
+
     const buildConstraints = (withAudio) => {
       const constraints = {
         video: {
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
-          frameRate: { ideal: 60, max: 60 },
+          width: { ideal: resolution.width, max: resolution.width },
+          height: { ideal: resolution.height, max: resolution.height },
+          frameRate: { ideal: resolution.maxFramerate, max: resolution.maxFramerate },
         },
         audio: withAudio ? true : false,
         preferCurrentTab: false,
@@ -221,6 +251,8 @@ class VoiceCallApi {
       includeAudio,
       isElectron,
       useProcessAudio,
+      resolution: resolution.id,
+      fps: resolution.maxFramerate,
       processPid: captureOptions.processPid ?? null,
       excludeSelfPid: captureOptions.excludeSelfPid ?? null,
       sourceType: captureOptions.sourceType ?? null,
@@ -315,10 +347,25 @@ class VoiceCallApi {
       throw new Error('Not connected to room');
     }
 
-    const { includeAudio = true } = options;
+    const {
+      includeAudio = true,
+      resolution: resolutionId = '720p',
+      frameRate: fpsValue,
+    } = options;
+    const resolution = getScreenShareResolutionPreset(resolutionId, fpsValue);
     const videoMediaTrack = stream.getVideoTracks()[0];
     if (!videoMediaTrack) {
       throw new Error('No video track to publish');
+    }
+
+    try {
+      await videoMediaTrack.applyConstraints({
+        width: { ideal: resolution.width, max: resolution.width },
+        height: { ideal: resolution.height, max: resolution.height },
+        frameRate: { ideal: resolution.maxFramerate, max: resolution.maxFramerate },
+      });
+    } catch {
+      /* ignore unsupported constraints */
     }
 
     const localVideoTrack = new LocalVideoTrack(videoMediaTrack, undefined, true);
@@ -327,9 +374,8 @@ class VoiceCallApi {
       simulcast: false,
       videoCodec: 'vp8',
       videoEncoding: {
-        ...VideoPresets.h720.encoding,
-        maxBitrate: 5_000_000,
-        maxFramerate: 60,
+        maxBitrate: resolution.maxBitrate,
+        maxFramerate: resolution.maxFramerate,
       },
     });
 
@@ -1145,20 +1191,44 @@ class VoiceCallApi {
     }
     
     if (enabled) {
-      // Камера: 1080p/30fps, VP8 (меньше нагрузка на CPU чем VP9 — без лагов), simulcast [h360, h720]
-      await this.room.localParticipant.setCameraEnabled(
-        true,
-        {
-          resolution: VideoPresets.h1080.resolution,
-          frameRate: 30
-        },
-        {
-          videoCodec: 'vp8',
-          videoEncoding: VideoPresets.h1080.encoding,
-          simulcast: true,
-          videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
-        }
-      );
+      // Tauri/WebView2: same philosophy as screen-share — VP8, capped 720p, no heavy 1080p
+      // simulcast stack (WebView2 software encode chokes on h1080 + 2 layers).
+      // Electron/Chromium can keep 1080p simulcast.
+      const isTauriShell = Boolean(window.electronAPI?.isTauri);
+      if (isTauriShell) {
+        await this.room.localParticipant.setCameraEnabled(
+          true,
+          {
+            resolution: VideoPresets.h720.resolution,
+            frameRate: 30,
+          },
+          {
+            videoCodec: 'vp8',
+            videoEncoding: {
+              ...VideoPresets.h720.encoding,
+              maxBitrate: 2_500_000,
+              maxFramerate: 30,
+            },
+            simulcast: true,
+            videoSimulcastLayers: [VideoPresets.h360],
+          },
+        );
+      } else {
+        // Камера: 1080p/30fps, VP8, simulcast [h360, h720]
+        await this.room.localParticipant.setCameraEnabled(
+          true,
+          {
+            resolution: VideoPresets.h1080.resolution,
+            frameRate: 30
+          },
+          {
+            videoCodec: 'vp8',
+            videoEncoding: VideoPresets.h1080.encoding,
+            simulcast: true,
+            videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720]
+          }
+        );
+      }
     } else {
       await this.room.localParticipant.setCameraEnabled(false);
     }
@@ -1209,6 +1279,8 @@ class VoiceCallApi {
       try {
         await this.publishScreenShareStream(captureStream, {
           includeAudio: includeAudio && captureStream.getAudioTracks().length > 0,
+          resolution: captureOptions.resolution || '720p',
+          frameRate: captureOptions.frameRate ?? captureOptions.fps,
         });
 
         if (includeAudio && !this.hasLocalScreenShareAudioPublication()) {
