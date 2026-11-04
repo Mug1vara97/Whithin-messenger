@@ -223,7 +223,8 @@ CHANGES.md
 !**/ssl/.gitkeep
 
 ## Android
-# Tracked under Whithin-android/; build/SDK artifacts ignored there.
+# Keep out of the main messenger repo (local / separate remote only).
+Whithin-android/
 
 ## ВКР (выпускная квалификационная работа)
 
