@@ -99,8 +99,8 @@ const AudioMessage = ({ mediaFile }) => {
     setIsPlaying(false);
     setError(null);
     setIsReady(false);
-    const fromMeta = readMediaFilePeaks(mediaFile);
-    setPeaks(fromMeta.length >= 8 ? fromMeta : []);
+    const fromPeaks = readMediaFilePeaks(mediaFile);
+    setPeaks(fromPeaks.length >= 8 ? fromPeaks : []);
   }, [audioUrl, mediaFile, filePath]);
 
   useEffect(() => {
