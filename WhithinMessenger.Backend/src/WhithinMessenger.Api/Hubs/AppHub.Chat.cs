@@ -508,29 +508,32 @@ public partial class AppHub
                 var userId = GetCurrentUserId();
                 if (userId == null)
                 {
-                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
-                    return;
+                    throw new HubException("Пользователь не авторизован");
                 }
 
                 var result = await _mediator.Send(new PinMessageCommand(messageId, userId.Value));
                 if (!result.Success || !result.ChatId.HasValue)
                 {
-                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось закрепить сообщение");
-                    return;
+                    // HubException so clients' invoke() fails (Android/web can show the error).
+                    throw new HubException(result.ErrorMessage ?? "Не удалось закрепить сообщение");
                 }
 
                 await Clients.Group(HubGroups.Chat(result.ChatId.Value)).SendAsync(
                     "MessagePinned",
                     new
                     {
-                        messageId,
-                        chatId = result.ChatId.Value,
+                        messageId = messageId.ToString(),
+                        chatId = result.ChatId.Value.ToString(),
                         pinnedAt = result.PinnedAt,
                     });
             }
+            catch (HubException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("Error", $"Ошибка при закреплении сообщения: {ex.Message}");
+                throw new HubException($"Ошибка при закреплении сообщения: {ex.Message}");
             }
         }
 
@@ -541,28 +544,30 @@ public partial class AppHub
                 var userId = GetCurrentUserId();
                 if (userId == null)
                 {
-                    await Clients.Caller.SendAsync("Error", "Пользователь не авторизован");
-                    return;
+                    throw new HubException("Пользователь не авторизован");
                 }
 
                 var result = await _mediator.Send(new UnpinMessageCommand(messageId, userId.Value));
                 if (!result.Success || !result.ChatId.HasValue)
                 {
-                    await Clients.Caller.SendAsync("Error", result.ErrorMessage ?? "Не удалось открепить сообщение");
-                    return;
+                    throw new HubException(result.ErrorMessage ?? "Не удалось открепить сообщение");
                 }
 
                 await Clients.Group(HubGroups.Chat(result.ChatId.Value)).SendAsync(
                     "MessageUnpinned",
                     new
                     {
-                        messageId,
-                        chatId = result.ChatId.Value,
+                        messageId = messageId.ToString(),
+                        chatId = result.ChatId.Value.ToString(),
                     });
+            }
+            catch (HubException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                await Clients.Caller.SendAsync("Error", $"Ошибка при откреплении сообщения: {ex.Message}");
+                throw new HubException($"Ошибка при откреплении сообщения: {ex.Message}");
             }
         }
 
