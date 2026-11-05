@@ -53,6 +53,7 @@ internal static class MessageDtoMappers
             CreatedAt = mediaFile.CreatedAt,
             IsVideoNote = mediaFile.IsVideoNote,
             DurationSeconds = mediaFile.DurationSeconds,
+            WaveformPeaks = mediaFile.WaveformPeaks,
             StreamingManifestPath = mediaFile.StreamingManifestPath
         };
 }

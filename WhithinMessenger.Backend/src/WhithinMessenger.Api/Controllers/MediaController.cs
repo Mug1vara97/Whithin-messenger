@@ -55,7 +55,8 @@ public class MediaController : ControllerBase
         [FromForm] string? caption = null,
         [FromForm] string? username = null,
         [FromForm] string? isVideoNote = null,
-        [FromForm] string? durationSeconds = null)
+        [FromForm] string? durationSeconds = null,
+        [FromForm] string? waveformPeaks = null)
     {
         try
         {
@@ -105,7 +106,8 @@ public class MediaController : ControllerBase
                 caption,
                 username,
                 videoNote,
-                parsedDuration);
+                parsedDuration,
+                waveformPeaks);
             var result = await _mediator.Send(command);
 
             if (result.Success)
@@ -126,6 +128,7 @@ public class MediaController : ControllerBase
                             createdAt = DateTimeOffset.UtcNow,
                             isVideoNote = result.IsVideoNote,
                             durationSeconds = result.DurationSeconds,
+                            waveformPeaks = result.WaveformPeaks,
                             streamingManifestPath = result.StreamingManifestPath
                         }
                     };
@@ -385,7 +388,7 @@ public class MediaController : ControllerBase
                 return BadRequest("Путь к файлу не указан");
             }
 
-            var normalizedFilePath = filePath.Trim().TrimStart('/');
+            var normalizedFilePath = Uri.UnescapeDataString(filePath.Trim().TrimStart('/'));
             var fileData = await _fileService.GetFileAsync(normalizedFilePath);
             if (fileData == null)
             {

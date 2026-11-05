@@ -41,6 +41,34 @@ export const readMediaFileDuration = (mediaFile) => {
   return isValidAudioDuration(duration) ? duration : 0;
 };
 
+/** Telegram-style peaks embedded on the media file (comma-separated or array). */
+export const readMediaFilePeaks = (mediaFile) => {
+  const raw = mediaFile?.waveformPeaks ?? mediaFile?.WaveformPeaks;
+  if (Array.isArray(raw)) {
+    return raw
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.min(1, Math.max(0, v)));
+  }
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  return raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((v) => Number.isFinite(v))
+    .map((v) => Math.min(1, Math.max(0, v)));
+};
+
+export const serializeWaveformPeaks = (peaks) => {
+  if (!Array.isArray(peaks) || peaks.length < 8) return '';
+  return peaks
+    .slice(0, PEAK_BAR_COUNT)
+    .map((v) => {
+      const n = Math.min(1, Math.max(0, Number(v) || 0));
+      return n.toFixed(3);
+    })
+    .join(',');
+};
+
 function hashString(value) {
   const str = String(value || '');
   let hash = 0;

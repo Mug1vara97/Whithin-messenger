@@ -47,6 +47,7 @@ public class GetMediaFilesQueryHandler : IRequestHandler<GetMediaFilesQuery, Get
                 Caption = mf.Message?.Content,
                 IsVideoNote = mf.IsVideoNote,
                 DurationSeconds = mf.DurationSeconds,
+                WaveformPeaks = mf.WaveformPeaks,
                 StreamingManifestPath = mf.StreamingManifestPath
             })
             .ToList();

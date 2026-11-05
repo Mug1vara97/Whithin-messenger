@@ -6,6 +6,7 @@ import {
   cacheAudioDuration,
   probeAudioDurationFromBlobUrl,
   probeVideoDurationFromFile,
+  serializeWaveformPeaks,
 } from '../utils/probeAudioDuration';
 import {
   buildMediaPreviewItems,
@@ -161,6 +162,9 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
               String(Math.round(fileList[0].durationSeconds * 1000) / 1000)
             );
           }
+          if (fileList[0].waveformPeaks) {
+            formData.append('waveformPeaks', String(fileList[0].waveformPeaks));
+          }
         }
 
         await new Promise((resolve, reject) => {
@@ -298,14 +302,16 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         });
 
         let durationSeconds = 0;
+        let waveformPeaks = '';
         const blobUrl = URL.createObjectURL(audioBlob);
         try {
-          const { duration } = await analyzeAudioBuffer(await audioBlob.arrayBuffer(), 'recording');
-          if (duration > 0) {
-            durationSeconds = duration;
+          const analyzed = await analyzeAudioBuffer(await audioBlob.arrayBuffer(), 'recording');
+          if (analyzed.duration > 0) {
+            durationSeconds = analyzed.duration;
           } else {
             durationSeconds = await probeAudioDurationFromBlobUrl(blobUrl);
           }
+          waveformPeaks = serializeWaveformPeaks(analyzed.peaks);
         } catch (probeError) {
           console.warn('Voice duration probe failed:', probeError);
         } finally {
@@ -320,6 +326,9 @@ export const useMediaHandlers = (connection, chatId, userId, username) => {
         }
 
         audioFile.durationSeconds = durationSeconds;
+        if (waveformPeaks) {
+          audioFile.waveformPeaks = waveformPeaks;
+        }
 
         await handleSendMedia(audioFile);
       };

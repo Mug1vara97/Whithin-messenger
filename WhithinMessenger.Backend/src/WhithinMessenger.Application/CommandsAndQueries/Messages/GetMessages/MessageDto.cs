@@ -44,6 +44,7 @@ public class MediaFileDto
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsVideoNote { get; set; }
     public double? DurationSeconds { get; set; }
+    public string? WaveformPeaks { get; set; }
     public string? StreamingManifestPath { get; set; }
 }
 

@@ -786,6 +786,9 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("WaveformPeaks")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MessageId");

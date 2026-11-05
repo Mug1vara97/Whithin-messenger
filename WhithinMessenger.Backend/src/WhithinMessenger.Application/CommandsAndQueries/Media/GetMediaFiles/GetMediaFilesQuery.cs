@@ -32,5 +32,6 @@ public record MediaFileDto
     public string? Caption { get; init; }
     public bool IsVideoNote { get; init; }
     public double? DurationSeconds { get; init; }
+    public string? WaveformPeaks { get; init; }
     public string? StreamingManifestPath { get; init; }
 }

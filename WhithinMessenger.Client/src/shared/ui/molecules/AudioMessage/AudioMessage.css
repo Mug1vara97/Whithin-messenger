@@ -49,8 +49,10 @@
 
 .audio-message .waveform-container,
 .audio-message .audio-message-waveform {
-  flex: 0 0 200px;
-  width: 200px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 56px;
+  max-width: 200px;
   height: 28px;
   border-radius: 10px;
   position: relative;

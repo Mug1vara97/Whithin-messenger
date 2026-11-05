@@ -7,6 +7,7 @@ import {
   fetchAudioBlob,
   analyzeAudioBuffer,
   readMediaFileDuration,
+  readMediaFilePeaks,
   readCachedAudioDuration,
   cacheAudioDuration,
   probeDurationOnElement,
@@ -32,7 +33,10 @@ const AudioMessage = ({ mediaFile }) => {
   const durationRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [peaks, setPeaks] = useState([]);
+  const [peaks, setPeaks] = useState(() => {
+    const fromMeta = readMediaFilePeaks(mediaFile);
+    return fromMeta.length >= 8 ? fromMeta : [];
+  });
   const [duration, setDuration] = useState(() => {
     const fromMeta = readMediaFileDuration(mediaFile);
     const fromPath = readCachedAudioDuration(resolveMediaFilePath(mediaFile));
@@ -95,7 +99,8 @@ const AudioMessage = ({ mediaFile }) => {
     setIsPlaying(false);
     setError(null);
     setIsReady(false);
-    setPeaks([]);
+    const fromMeta = readMediaFilePeaks(mediaFile);
+    setPeaks(fromMeta.length >= 8 ? fromMeta : []);
   }, [audioUrl, mediaFile, filePath]);
 
   useEffect(() => {
@@ -128,15 +133,20 @@ const AudioMessage = ({ mediaFile }) => {
           else if (fromCache > 0) applyDuration(fromCache);
         }
 
-        const { peaks: nextPeaks, duration: decodedDuration } = await analyzeAudioBuffer(
-          arrayBuffer,
-          filePath || audioUrl
-        );
-        if (isStale()) return;
-
-        setPeaks(Array.isArray(nextPeaks) ? nextPeaks : []);
-        if (decodedDuration > 0) {
-          applyDuration(decodedDuration);
+        const embeddedPeaks = readMediaFilePeaks(mediaFile);
+        if (embeddedPeaks.length >= 8) {
+          // Telegram-style: peaks already on the message — draw immediately, no silhouette swap.
+          setPeaks(embeddedPeaks);
+        } else {
+          const { peaks: nextPeaks, duration: decodedDuration } = await analyzeAudioBuffer(
+            arrayBuffer,
+            filePath || audioUrl
+          );
+          if (isStale()) return;
+          setPeaks(Array.isArray(nextPeaks) ? nextPeaks : []);
+          if (decodedDuration > 0) {
+            applyDuration(decodedDuration);
+          }
         }
 
         audio = new Audio();
@@ -260,8 +270,12 @@ const AudioMessage = ({ mediaFile }) => {
   }, []);
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
-  const totalTimeLabel =
-    duration > 0 ? formatTime(duration) : isPlaying ? '…' : '0:00';
+  // Telegram-style single timer: total when idle, elapsed while playing.
+  const timeLabel = isPlaying
+    ? formatTime(currentTime)
+    : duration > 0
+      ? formatTime(duration)
+      : '0:00';
 
   return (
     <div ref={rootRef} className={`audio-message ${isPlaying ? 'playing' : ''}`}>
@@ -289,9 +303,7 @@ const AudioMessage = ({ mediaFile }) => {
             onSeek={handleSeek}
             aria-label="Форма волны голосового сообщения"
           />
-          <span className="duration">
-            {formatTime(currentTime)} / {totalTimeLabel}
-          </span>
+          <span className="duration">{timeLabel}</span>
         </>
       )}
     </div>

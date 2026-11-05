@@ -84,6 +84,7 @@ public class ChatMessagePublisher : IChatMessagePublisher
                         createdAt = mf.CreatedAt,
                         isVideoNote = mf.IsVideoNote,
                         durationSeconds = mf.DurationSeconds,
+                        waveformPeaks = mf.WaveformPeaks,
                         streamingManifestPath = mf.StreamingManifestPath
                     }).ToList()
                 };

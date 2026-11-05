@@ -30,6 +30,12 @@ public class MediaFile
     /// <summary>Длительность аудио/видео в секундах (для голосовых сообщений и t.п.).</summary>
     public double? DurationSeconds { get; set; }
 
+    /// <summary>
+    /// Telegram-style voice waveform peaks (comma-separated 0..1 floats),
+    /// captured at send time so clients can draw immediately without decoding audio.
+    /// </summary>
+    public string? WaveformPeaks { get; set; }
+
     /// <summary>HLS master.m3u8 для адаптивного стриминга (несколько качеств).</summary>
     public string? StreamingManifestPath { get; set; }
     

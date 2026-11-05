@@ -830,6 +830,7 @@ public partial class AppHub
                             createdAt = mf.CreatedAt,
                             isVideoNote = mf.IsVideoNote,
                             durationSeconds = mf.DurationSeconds,
+                            waveformPeaks = mf.WaveformPeaks,
                             streamingManifestPath = mf.StreamingManifestPath
                         }).ToList();
                     }
@@ -1577,6 +1578,7 @@ public partial class AppHub
                     createdAt = mf.CreatedAt,
                     isVideoNote = mf.IsVideoNote,
                     durationSeconds = mf.DurationSeconds,
+                    waveformPeaks = mf.WaveformPeaks,
                     streamingManifestPath = mf.StreamingManifestPath
                 }).ToList()
             };

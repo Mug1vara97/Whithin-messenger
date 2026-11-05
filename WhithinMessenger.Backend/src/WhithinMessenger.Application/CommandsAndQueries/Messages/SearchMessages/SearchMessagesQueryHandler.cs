@@ -60,6 +60,7 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                                 CreatedAt = mf.CreatedAt,
                                 IsVideoNote = mf.IsVideoNote,
                                 DurationSeconds = mf.DurationSeconds,
+                                WaveformPeaks = mf.WaveformPeaks,
                                 StreamingManifestPath = mf.StreamingManifestPath
                             }).ToList() ?? new List<MediaFileDto>()
                         }
@@ -83,6 +84,7 @@ public class SearchMessagesQueryHandler : IRequestHandler<SearchMessagesQuery, S
                         CreatedAt = mf.CreatedAt,
                         IsVideoNote = mf.IsVideoNote,
                         DurationSeconds = mf.DurationSeconds,
+                        WaveformPeaks = mf.WaveformPeaks,
                         StreamingManifestPath = mf.StreamingManifestPath
                     }).ToList() ?? new List<MediaFileDto>()
                 };

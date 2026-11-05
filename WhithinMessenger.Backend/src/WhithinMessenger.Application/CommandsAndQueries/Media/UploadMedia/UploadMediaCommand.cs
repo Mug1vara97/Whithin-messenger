@@ -10,7 +10,8 @@ public record UploadMediaCommand(
     string? Caption = null,
     string? Username = null,
     bool IsVideoNote = false,
-    double? DurationSeconds = null
+    double? DurationSeconds = null,
+    string? WaveformPeaks = null
 ) : IRequest<UploadMediaResult>;
 
 public record UploadMediaResult
@@ -22,6 +23,7 @@ public record UploadMediaResult
     public string? ThumbnailPath { get; init; }
     public bool IsVideoNote { get; init; }
     public double? DurationSeconds { get; init; }
+    public string? WaveformPeaks { get; init; }
     public string? StreamingManifestPath { get; init; }
     public string? ErrorMessage { get; init; }
 }

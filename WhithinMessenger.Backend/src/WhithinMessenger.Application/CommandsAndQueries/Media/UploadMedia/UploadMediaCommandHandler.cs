@@ -119,7 +119,10 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                     && (contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
                         || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
                         ? request.DurationSeconds
-                        : null
+                        : null,
+                WaveformPeaks = contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
+                    ? WaveformPeaksNormalizer.Normalize(request.WaveformPeaks)
+                    : null
             };
 
             if (_fileService.IsImageFile(contentType))
@@ -161,6 +164,7 @@ public class UploadMediaCommandHandler : IRequestHandler<UploadMediaCommand, Upl
                 ThumbnailPath = savedMediaFile.ThumbnailPath,
                 IsVideoNote = savedMediaFile.IsVideoNote,
                 DurationSeconds = savedMediaFile.DurationSeconds,
+                WaveformPeaks = savedMediaFile.WaveformPeaks,
                 StreamingManifestPath = savedMediaFile.StreamingManifestPath
             };
         }
