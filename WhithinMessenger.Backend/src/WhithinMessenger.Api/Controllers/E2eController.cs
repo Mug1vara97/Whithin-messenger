@@ -17,7 +17,7 @@ namespace WhithinMessenger.Api.Controllers;
 [RequireAuth]
 public class E2eController : ControllerBase
 {
-    private const bool E2eTempDisabled = true;
+    private static bool E2eTempDisabled => E2eFeatureFlags.TempDisabled;
     private readonly IMediator _mediator;
     private readonly IChatRepository _chatRepository;
     private readonly IE2eRealtimeNotifier _e2eRealtimeNotifier;

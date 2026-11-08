@@ -1,0 +1,19 @@
+{
+  "name": "whithin-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Whithin desktop shell (Tauri) — Electron остаётся в /electron",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:remote": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/with-msvc.ps1 node ./scripts/run-dev-remote.mjs",
+    "dev:remote:raw": "cross-env WEB_CLIENT_URL=https://whithin.ru tauri dev --config src-tauri/tauri.remote.conf.json",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/with-msvc.ps1 npm run build:raw",
+    "build:raw": "tauri build",
+    "icon": "tauri icon ./app-icon.png -o src-tauri/icons"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.0",
+    "cross-env": "^10.1.0"
+  }
+}

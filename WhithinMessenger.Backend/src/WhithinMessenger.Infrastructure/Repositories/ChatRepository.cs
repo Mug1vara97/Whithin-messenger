@@ -229,12 +229,34 @@ namespace WhithinMessenger.Infrastructure.Repositories
 
             var chatIds = chats.Select(c => c.ChatId).ToList();
 
-            var lastMessageIds = await _context.Messages
+            // Load recent candidates per chat; when E2E is disabled prefer plaintext for the preview
+            // so the chat list does not stick on «Зашифрованное сообщение» from legacy rows.
+            var recentCandidates = await _context.Messages
                 .AsNoTracking()
                 .Where(m => chatIds.Contains(m.ChatId))
-                .GroupBy(m => m.ChatId)
-                .Select(g => g.OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Select(m => m.Id).First())
+                .Select(m => new { m.Id, m.ChatId, m.CreatedAt, m.EncryptionVersion })
                 .ToListAsync(cancellationToken);
+
+            var lastMessageIds = recentCandidates
+                .GroupBy(m => m.ChatId)
+                .Select(g =>
+                {
+                    var ordered = g
+                        .OrderByDescending(m => m.CreatedAt)
+                        .ThenByDescending(m => m.Id)
+                        .ToList();
+                    if (E2eFeatureFlags.TempDisabled)
+                    {
+                        var plaintext = ordered.FirstOrDefault(m => m.EncryptionVersion <= 0);
+                        if (plaintext != null)
+                        {
+                            return plaintext.Id;
+                        }
+                    }
+
+                    return ordered[0].Id;
+                })
+                .ToList();
 
             if (lastMessageIds.Count == 0)
             {
@@ -271,6 +293,16 @@ namespace WhithinMessenger.Infrastructure.Repositories
         {
             if (message.EncryptionVersion > 0 && !string.IsNullOrWhiteSpace(message.Content))
             {
+                if (E2eFeatureFlags.TempDisabled)
+                {
+                    // E2E off: never surface the encrypted placeholder / ciphertext in the list.
+                    chat.LastMessage = "Сообщение";
+                    chat.LastMessageEncryptionVersion = 0;
+                    chat.LastMessageEncryptedPayload = null;
+                    chat.LastMessageSenderId = message.UserId;
+                    return;
+                }
+
                 chat.LastMessage = "Зашифрованное сообщение";
                 chat.LastMessageEncryptionVersion = message.EncryptionVersion;
                 chat.LastMessageEncryptedPayload = message.Content;

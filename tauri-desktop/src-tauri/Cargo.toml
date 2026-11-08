@@ -1,0 +1,58 @@
+[package]
+name = "whithin-tauri"
+version = "0.1.0"
+description = "Whithin desktop (Tauri)"
+authors = ["Whithin"]
+edition = "2021"
+default-run = "whithin-tauri"
+
+[lib]
+name = "whithin_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "bench-screen-sources"
+path = "src/bin/bench_screen_sources.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+url = "2"
+xcap = "0.4"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+jpeg-encoder = { version = "0.6", features = ["simd"] }
+fast_image_resize = "5"
+rayon = "1"
+tungstenite = "0.26"
+
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.19"
+webview2-com = "0.38"
+windows-capture = "2"
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_Xps",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+# Image pipeline (resize + JPEG) is far too slow unoptimized; keep dev builds usable.
+[profile.dev]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 3

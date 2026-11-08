@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whithin</title>
+  <style>
+    :root {
+      --bg: #1e1f22;
+      --titlebar-h: 32px;
+      --titlebar-bg: #1e1f22;
+      --titlebar-text: #dcddde;
+      --titlebar-nav: #9aa1ac;
+      --titlebar-nav-hover: #d2d6de;
+      --titlebar-controls: 140px;
+      --border: #3f4147;
+      --primary: #5865f2;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .titlebar {
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: var(--titlebar-h);
+      background: var(--titlebar-bg);
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      z-index: 10000;
+    }
+
+    .titlebar__drag {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: var(--titlebar-controls);
+      height: var(--titlebar-h);
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+    }
+
+    .titlebar__brand {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--titlebar-text);
+      pointer-events: none;
+    }
+
+    .titlebar__controls {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      height: var(--titlebar-h);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tl {
+      width: 30px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--titlebar-nav);
+    }
+
+    .tl:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--titlebar-nav-hover);
+    }
+
+    .tl:active { background: rgba(0, 0, 0, 0.12); }
+    .tl svg { display: block; pointer-events: none; }
+    .tl--reload { margin-right: 6px; }
+    .tl--reload .flip { transform: scaleY(-1); }
+
+    #oopss {
+      background: var(--bg);
+      position: fixed;
+      left: 0;
+      top: var(--titlebar-h);
+      width: 100%;
+      height: calc(100% - var(--titlebar-h));
+      line-height: 1.5em;
+      z-index: 9999;
+      display: none;
+      overflow: auto;
+    }
+
+    #oopss.is-active { display: block; }
+
+    #oopss #error-text {
+      min-height: 100%;
+      padding: clamp(16px, 4vh, 48px) clamp(12px, 3vw, 24px);
+      font-size: clamp(18px, 4.2vmin, 40px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-family: 'Shabnam', Tahoma, 'Segoe UI', sans-serif;
+      color: #dbdee1;
+      direction: ltr;
+    }
+
+    #oopss #error-text img {
+      margin: 0 auto clamp(12px, 2.5vh, 20px);
+      width: auto;
+      height: clamp(120px, 38vmin, 342px);
+      max-width: min(90vw, 342px);
+      object-fit: contain;
+    }
+
+    #oopss #error-text span {
+      position: relative;
+      font-size: clamp(1.4em, 8vmin, 3.3em);
+      font-weight: 900;
+      margin-bottom: clamp(12px, 4vh, 50px);
+      color: #fff;
+      line-height: 1.1;
+      max-width: 95vw;
+    }
+
+    #oopss #error-text p.p-a {
+      font-size: clamp(14px, 2.4vmin, 19px);
+      margin: clamp(8px, 2vh, 30px) 0 0;
+      color: #dbdee1;
+      max-width: 36ch;
+    }
+
+    #connecting {
+      display: none;
+      position: fixed;
+      inset: var(--titlebar-h) 0 0 0;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: var(--bg);
+      z-index: 9998;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #dbdee1;
+    }
+
+    #connecting.is-active { display: flex; }
+
+    .spinner {
+      width: clamp(28px, 6vmin, 42px);
+      height: clamp(28px, 6vmin, 42px);
+      border-radius: 50%;
+      border: 3px solid color-mix(in srgb, var(--primary) 25%, transparent);
+      border-top-color: var(--primary);
+      animation: spin 0.85s linear infinite;
+      margin-bottom: 18px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #connecting p {
+      margin: 0;
+      font-size: clamp(13px, 2.2vmin, 15px);
+      color: #949ba4;
+    }
+  </style>
+</head>
+<body>
+  <header class="titlebar">
+    <div class="titlebar__drag" data-tauri-drag-region>
+      <span class="titlebar__brand" data-tauri-drag-region>Whithin</span>
+    </div>
+    <div class="titlebar__controls">
+      <button type="button" class="tl tl--reload" id="btnReload" title="Обновить" aria-label="Обновить">
+        <svg class="flip" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+        </svg>
+      </button>
+      <button type="button" class="tl" id="btnMax" title="Развернуть" aria-label="Развернуть">
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1" fill="none" stroke="#28c840" stroke-width="1.35"/>
+        </svg>
+      </button>
+      <button type="button" class="tl" id="btnMin" title="Свернуть" aria-label="Свернуть">
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path stroke="#ffbd2e" stroke-width="1.35" stroke-linecap="round" d="M2.25 9h7.5"/>
+        </svg>
+      </button>
+      <button type="button" class="tl" id="btnClose" title="Закрыть" aria-label="Закрыть">
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path stroke="#ff5f57" stroke-width="1.35" stroke-linecap="round" d="M3 3l6 6M9 3L3 9"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="connecting" class="is-active" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Подключение к Whithin…</p>
+  </div>
+
+  <div id="oopss" aria-live="polite">
+    <div id="error-text">
+      <img src="sad404.svg" alt="" />
+      <span>Что-то не так</span>
+      <p class="p-a" id="offlineText">Сервер не доступен</p>
+    </div>
+  </div>
+
+  <script>
+    const panelConnecting = document.getElementById('connecting');
+    const panelOffline = document.getElementById('oopss');
+    const offlineText = document.getElementById('offlineText');
+    const OFFLINE_MSG = 'Сервер не доступен';
+
+    function show(panel) {
+      panelConnecting.classList.toggle('is-active', panel === 'connecting');
+      panelOffline.classList.toggle('is-active', panel === 'offline');
+    }
+
+    function waitTauri(cb) {
+      if (window.__TAURI__?.core?.invoke) {
+        cb();
+        return;
+      }
+      let n = 0;
+      const t = setInterval(() => {
+        n += 1;
+        if (window.__TAURI__?.core?.invoke) {
+          clearInterval(t);
+          cb();
+        } else if (n > 200) {
+          clearInterval(t);
+          offlineText.textContent = OFFLINE_MSG;
+          show('offline');
+        }
+      }, 25);
+    }
+
+    async function connect() {
+      show('connecting');
+      const { invoke } = window.__TAURI__.core;
+      try {
+        const info = await invoke('shell_probe_client');
+        if (info?.ok) {
+          await invoke('shell_open_client');
+          return;
+        }
+        offlineText.textContent = OFFLINE_MSG;
+        show('offline');
+      } catch (_) {
+        offlineText.textContent = OFFLINE_MSG;
+        show('offline');
+      }
+    }
+
+    waitTauri(() => {
+      const { invoke } = window.__TAURI__.core;
+      document.getElementById('btnMin').onclick = () => invoke('window_minimize').catch(() => {});
+      document.getElementById('btnMax').onclick = () => invoke('window_toggle_maximize').catch(() => {});
+      document.getElementById('btnClose').onclick = () => invoke('window_close').catch(() => {});
+      document.getElementById('btnReload').onclick = () => connect();
+
+      const params = new URLSearchParams(location.search);
+      if (params.get('error')) {
+        offlineText.textContent = OFFLINE_MSG;
+        show('offline');
+      } else {
+        connect();
+      }
+    });
+  </script>
+</body>
+</html>

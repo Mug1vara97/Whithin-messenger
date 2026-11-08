@@ -257,3 +257,10 @@ electron/.env
 electron/.env.*
 electron/*.log
 
+## Tauri desktop
+
+tauri-desktop/node_modules/
+tauri-desktop/src-tauri/target/
+tauri-desktop/src-tauri/gen/
+tauri-desktop/*.log
+

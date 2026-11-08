@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Демонстрация экрана — Whithin</title>
+  <style>
+    :root {
+      --titlebar-height: 32px;
+      --titlebar-bg: #1e1f22;
+      --titlebar-text: #dcddde;
+      --titlebar-nav: #9aa1ac;
+      --titlebar-nav-hover: #d2d6de;
+      --titlebar-controls-reserve: 140px;
+      --bg: #1e1f22;
+      --surface: #2b2d31;
+      --surface-hover: #35373c;
+      --tab-track: #111214;
+      --border: #3f4147;
+      --primary: #5865f2;
+      --success: #23a559;
+      --text: #dbdee1;
+      --muted: #949ba4;
+      --danger: #ed4245;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }
+
+    .titlebar {
+      position: relative;
+      height: var(--titlebar-height);
+      flex-shrink: 0;
+      background: var(--titlebar-bg);
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      user-select: none;
+    }
+
+    .titlebar__drag {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: var(--titlebar-controls-reserve);
+      height: var(--titlebar-height);
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      box-sizing: border-box;
+    }
+
+    .titlebar__brand {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--titlebar-text);
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .titlebar__controls {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      height: var(--titlebar-height);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .titlebar__btn {
+      width: 30px;
+      height: 24px;
+      min-width: 30px;
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+    }
+
+    .titlebar__btn svg { display: block; pointer-events: none; }
+
+    .titlebar__btn--reload {
+      margin-right: 6px;
+      color: var(--titlebar-nav);
+    }
+
+    .titlebar__btn--reload:hover {
+      background: color-mix(in srgb, var(--titlebar-nav) 12%, transparent);
+      color: var(--titlebar-nav-hover);
+    }
+
+    .titlebar__btn--reload .reload-icon { transform: scaleY(-1); }
+
+    .titlebar__btn:hover:not(.titlebar__btn--reload) {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .titlebar__btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .tab-bar {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      padding: 18px 24px 14px;
+    }
+
+    .tab-bar__inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      border-radius: 8px;
+      background: var(--tab-track);
+      border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 34px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .tab svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+
+    .tab:hover { color: var(--text); }
+
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .grid-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 4px 24px 12px;
+    }
+
+    .grid-wrap::-webkit-scrollbar { width: 8px; }
+    .grid-wrap::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: 8px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 18px 16px;
+    }
+
+    .card {
+      border: none;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .thumb-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      background: color-mix(in srgb, var(--bg) 75%, #000);
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .card:hover .thumb-wrap {
+      border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+    }
+
+    .card.active .thumb-wrap {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent);
+    }
+
+    .thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb--empty {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      min-width: 0;
+      padding: 0 2px;
+    }
+
+    .app-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      object-fit: contain;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+
+    .app-icon--fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+    }
+
+    .label-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .footer {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px 20px;
+      border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      background: color-mix(in srgb, var(--bg) 92%, #000);
+    }
+
+    .footer__left {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .footer__toggles {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px 20px;
+    }
+
+    .toggle-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .toggle-row__label {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .res-pills {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px;
+      border-radius: 10px;
+      background: var(--tab-track);
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }
+
+    .res-pill {
+      border: none;
+      border-radius: 7px;
+      padding: 5px 10px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .res-pill:hover {
+      color: var(--text);
+      background: color-mix(in srgb, var(--surface-hover) 80%, transparent);
+    }
+
+    .res-pill[aria-checked='true'] {
+      color: #fff;
+      background: var(--primary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+      border: none;
+      border-radius: 999px;
+      padding: 0;
+      background: #4f545c;
+      cursor: pointer;
+      transition: background 0.18s ease, opacity 0.18s ease;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+      transition: transform 0.18s ease;
+    }
+
+    .toggle-switch[aria-checked='true'] { background: var(--success); }
+    .toggle-switch[aria-checked='true']::after { transform: translateX(20px); }
+    .toggle-switch:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .card-select {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .card.active .card-select {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .card.active .card-select::after {
+      content: '';
+      width: 5px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) translateY(-1px);
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #ffbf66;
+    }
+
+    .footer__actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 4px;
+      height: 38px;
+      padding: 0 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+    }
+
+    .btn--ghost {
+      background: transparent;
+      color: var(--text);
+    }
+
+    .btn--ghost:hover:not(:disabled) { background: var(--surface-hover); }
+
+    .btn--share {
+      background: var(--success);
+      color: #fff;
+      min-width: 120px;
+    }
+
+    .btn--share:hover:not(:disabled) { filter: brightness(1.06); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .empty {
+      grid-column: 1 / -1;
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="titlebar">
+      <div class="titlebar__drag" data-tauri-drag-region>
+        <span class="titlebar__brand" data-tauri-drag-region>Whithin</span>
+      </div>
+      <div class="titlebar__controls">
+        <button type="button" class="titlebar__btn titlebar__btn--reload" id="titlebarReloadBtn" title="Обновить список" aria-label="Обновить список">
+          <svg class="reload-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+        </button>
+        <button type="button" class="titlebar__btn" disabled title="Развернуть" aria-label="Развернуть">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1" fill="none" stroke="#28c840" stroke-width="1.35" />
+          </svg>
+        </button>
+        <button type="button" class="titlebar__btn" id="titlebarMinBtn" title="Свернуть" aria-label="Свернуть">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path stroke="#ffbd2e" stroke-width="1.35" stroke-linecap="round" d="M2.25 9h7.5" />
+          </svg>
+        </button>
+        <button type="button" class="titlebar__btn" id="titlebarCloseBtn" title="Закрыть" aria-label="Закрыть">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path stroke="#ff5f57" stroke-width="1.35" stroke-linecap="round" d="M3 3l6 6M9 3L3 9" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <nav class="tab-bar" aria-label="Тип источника">
+        <div class="tab-bar__inner" role="tablist">
+          <button type="button" class="tab" role="tab" aria-selected="false" data-tab="applications">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 5h7v7H4V5zm9 0h7v7h-7V5zM4 14h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
+            Приложения
+          </button>
+          <button type="button" class="tab" role="tab" aria-selected="false" data-tab="screen">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+            Весь экран
+          </button>
+        </div>
+      </nav>
+
+      <div class="grid-wrap">
+        <div id="sources" class="grid" role="tabpanel"></div>
+      </div>
+
+      <footer class="footer">
+        <div class="footer__left">
+          <div class="footer__toggles">
+            <div class="toggle-row">
+              <button type="button" class="toggle-switch" id="captureAudioToggle" role="switch" aria-checked="false" aria-label="Передавать звук" disabled></button>
+              <span class="toggle-row__label">Передавать звук</span>
+            </div>
+            <div class="toggle-row">
+              <button type="button" class="toggle-switch" id="includeCameraToggle" role="switch" aria-checked="false" aria-label="Показать веб-камеру"></button>
+              <span class="toggle-row__label">С веб-камерой</span>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-row__label">Качество</span>
+              <div class="res-pills" id="resolutionPills" role="radiogroup" aria-label="Разрешение демонстрации">
+                <button type="button" class="res-pill" role="radio" data-res="480p" aria-checked="false">480p</button>
+                <button type="button" class="res-pill" role="radio" data-res="720p" aria-checked="true">720p</button>
+                <button type="button" class="res-pill" role="radio" data-res="1080p" aria-checked="false">1080p</button>
+                <button type="button" class="res-pill" role="radio" data-res="1440p" aria-checked="false">2K</button>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-row__label">FPS</span>
+              <div class="res-pills" id="fpsPills" role="radiogroup" aria-label="Частота кадров">
+                <button type="button" class="res-pill" role="radio" data-fps="15" aria-checked="false">15</button>
+                <button type="button" class="res-pill" role="radio" data-fps="30" aria-checked="true">30</button>
+                <button type="button" class="res-pill" role="radio" data-fps="60" aria-checked="false">60</button>
+              </div>
+            </div>
+          </div>
+          <div id="audioHint" class="hint" style="display:none;">
+            Для выбранного источника звук недоступен на этой системе.
+          </div>
+          <div class="hint" style="margin-top:6px;opacity:0.85;color:var(--muted);">
+            Захват идёт через встроенный движок Whithin — системное окно Windows не нужно.
+          </div>
+        </div>
+        <div class="footer__actions">
+          <button id="cancelBtn" class="btn btn--ghost" type="button">Отмена</button>
+          <button id="shareBtn" class="btn btn--share" type="button" disabled>Поделиться</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const sourcesNode = document.getElementById('sources');
+    const captureAudioToggle = document.getElementById('captureAudioToggle');
+    const includeCameraToggle = document.getElementById('includeCameraToggle');
+    const shareBtn = document.getElementById('shareBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const titlebarCloseBtn = document.getElementById('titlebarCloseBtn');
+    const titlebarMinBtn = document.getElementById('titlebarMinBtn');
+    const titlebarReloadBtn = document.getElementById('titlebarReloadBtn');
+    const audioHint = document.getElementById('audioHint');
+    const tabButtons = Array.from(document.querySelectorAll('.tab'));
+
+    let activeTab = null;
+    let allSources = [];
+    let selected = null;
+    let captureAudioEnabled = false;
+    let includeCameraEnabled = false;
+    let selectedResolution = '720p';
+    let selectedFps = 30;
+    const RESOLUTION_STORAGE_KEY = 'screenShareResolution';
+    const FPS_STORAGE_KEY = 'screenShareFps';
+    const resolutionPills = Array.from(document.querySelectorAll('#resolutionPills .res-pill'));
+    const fpsPills = Array.from(document.querySelectorAll('#fpsPills .res-pill'));
+
+    function normalizeResolution(value) {
+      const id = String(value || '').toLowerCase();
+      if (id === '2k' || id === '1440') return '1440p';
+      if (['480p', '720p', '1080p', '1440p'].includes(id)) return id;
+      return '720p';
+    }
+
+    function normalizeFps(value) {
+      const n = Number(value);
+      return n === 15 || n === 30 || n === 60 ? n : 30;
+    }
+
+    function setSelectedResolution(value, persist = true) {
+      selectedResolution = normalizeResolution(value);
+      resolutionPills.forEach((pill) => {
+        const active = pill.dataset.res === selectedResolution;
+        pill.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+      if (persist) {
+        try {
+          localStorage.setItem(RESOLUTION_STORAGE_KEY, selectedResolution);
+        } catch (_) { /* ignore */ }
+      }
+    }
+
+    function setSelectedFps(value, persist = true) {
+      selectedFps = normalizeFps(value);
+      fpsPills.forEach((pill) => {
+        const active = Number(pill.dataset.fps) === selectedFps;
+        pill.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+      if (persist) {
+        try {
+          localStorage.setItem(FPS_STORAGE_KEY, String(selectedFps));
+        } catch (_) { /* ignore */ }
+      }
+    }
+
+    try {
+      setSelectedResolution(localStorage.getItem(RESOLUTION_STORAGE_KEY) || '720p', false);
+      setSelectedFps(localStorage.getItem(FPS_STORAGE_KEY) || 30, false);
+    } catch (_) {
+      setSelectedResolution('720p', false);
+      setSelectedFps(30, false);
+    }
+
+    resolutionPills.forEach((pill) => {
+      pill.addEventListener('click', () => setSelectedResolution(pill.dataset.res));
+    });
+    fpsPills.forEach((pill) => {
+      pill.addEventListener('click', () => setSelectedFps(pill.dataset.fps));
+    });
+
+    function invoke(cmd, args) {
+      return window.__TAURI__.core.invoke(cmd, args || {});
+    }
+
+    function listen(event, cb) {
+      return window.__TAURI__.event.listen(event, cb);
+    }
+
+    async function currentWindow() {
+      return window.__TAURI__.window.getCurrentWindow();
+    }
+
+    function setToggleState(toggle, enabled) {
+      toggle.setAttribute('aria-checked', enabled ? 'true' : 'false');
+    }
+
+    function setCaptureAudioEnabled(enabled) {
+      if (captureAudioToggle.disabled) {
+        captureAudioEnabled = false;
+        setToggleState(captureAudioToggle, false);
+        return;
+      }
+      captureAudioEnabled = Boolean(enabled);
+      setToggleState(captureAudioToggle, captureAudioEnabled);
+    }
+
+    function setIncludeCameraEnabled(enabled) {
+      includeCameraEnabled = Boolean(enabled);
+      setToggleState(includeCameraToggle, includeCameraEnabled);
+    }
+
+    captureAudioToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (captureAudioToggle.disabled) return;
+      setCaptureAudioEnabled(!captureAudioEnabled);
+    });
+
+    includeCameraToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setIncludeCameraEnabled(!includeCameraEnabled);
+    });
+
+    const TAB_EMPTY = {
+      applications: 'Нет открытых окон для демонстрации',
+      screen: 'Нет доступных экранов',
+    };
+
+    const ICON_WINDOW = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/></svg>';
+    const ICON_SCREEN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>';
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getFilteredSources() {
+      if (activeTab === 'screen') {
+        return allSources.filter((source) => source.type === 'screen');
+      }
+      if (activeTab === 'applications') {
+        return allSources.filter((source) => source.type === 'window');
+      }
+      return [];
+    }
+
+    function renderIcon(source) {
+      if (source.appIcon) {
+        return `<img class="app-icon" src="${source.appIcon}" alt="">`;
+      }
+      const fallback = source.type === 'screen' ? ICON_SCREEN : ICON_WINDOW;
+      return `<span class="app-icon app-icon--fallback" aria-hidden="true">${fallback}</span>`;
+    }
+
+    function selectSource(source) {
+      selected = source;
+      shareBtn.disabled = false;
+      const canShareAudio = Boolean(source.canShareAudio);
+      captureAudioToggle.disabled = !canShareAudio;
+      if (!canShareAudio) {
+        setCaptureAudioEnabled(false);
+        audioHint.style.display = 'block';
+      } else {
+        audioHint.style.display = 'none';
+        if (!captureAudioEnabled) setCaptureAudioEnabled(true);
+      }
+      render();
+    }
+
+    function render() {
+      sourcesNode.innerHTML = '';
+      const visible = getFilteredSources();
+
+      if (!visible.length) {
+        sourcesNode.innerHTML = `<div class="empty">${TAB_EMPTY[activeTab] || 'Нет источников'}</div>`;
+        if (selected && !visible.some((item) => item.id === selected.id)) {
+          selected = null;
+          shareBtn.disabled = true;
+          setCaptureAudioEnabled(false);
+          captureAudioToggle.disabled = true;
+          audioHint.style.display = 'none';
+        }
+        return;
+      }
+
+      visible.forEach((source) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `card ${selected?.id === source.id ? 'active' : ''}`;
+        const thumb = source.thumbnail
+          ? `<img class="thumb" src="${source.thumbnail}" alt="">`
+          : '<div class="thumb thumb--empty">Нет превью</div>';
+
+        card.innerHTML = `
+          <div class="thumb-wrap">
+            <span class="card-select" aria-hidden="true"></span>
+            ${thumb}
+          </div>
+          <div class="label-row">
+            ${renderIcon(source)}
+            <span class="label-text">${escapeHtml(source.name || 'Источник')}</span>
+          </div>
+        `;
+        card.setAttribute('aria-pressed', selected?.id === source.id ? 'true' : 'false');
+        card.addEventListener('click', () => selectSource(source));
+        card.addEventListener('dblclick', () => {
+          selectSource(source);
+          shareBtn.click();
+        });
+        sourcesNode.appendChild(card);
+      });
+    }
+
+    function setActiveTab(tabId) {
+      activeTab = tabId;
+      tabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tabId;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+
+      const visible = getFilteredSources();
+      if (selected && !visible.some((item) => item.id === selected.id)) {
+        selected = null;
+        shareBtn.disabled = true;
+        setCaptureAudioEnabled(false);
+        captureAudioToggle.disabled = true;
+        audioHint.style.display = 'none';
+      }
+      render();
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => setActiveTab(button.dataset.tab));
+    });
+
+    function applySources(sources) {
+      const prevSelectedId = selected?.id || null;
+      const prevTab = activeTab;
+      allSources = sources || [];
+
+      if (prevSelectedId) {
+        selected = allSources.find((item) => item.id === prevSelectedId) || null;
+        shareBtn.disabled = !selected;
+        if (selected) {
+          const canShareAudio = Boolean(selected.canShareAudio);
+          captureAudioToggle.disabled = !canShareAudio;
+          if (!canShareAudio) {
+            setCaptureAudioEnabled(false);
+            audioHint.style.display = 'block';
+          }
+        }
+      } else {
+        selected = null;
+        shareBtn.disabled = true;
+        setCaptureAudioEnabled(false);
+        captureAudioToggle.disabled = true;
+        setIncludeCameraEnabled(false);
+        audioHint.style.display = 'none';
+      }
+
+      const hasWindows = allSources.some((item) => item.type === 'window');
+      const hasScreens = allSources.some((item) => item.type === 'screen');
+      const defaultTab = hasWindows ? 'applications' : hasScreens ? 'screen' : 'applications';
+      // Keep user's tab if they already switched; only auto-pick on first fill.
+      const nextTab =
+        prevTab && allSources.some((item) =>
+          prevTab === 'screen' ? item.type === 'screen' : item.type === 'window',
+        )
+          ? prevTab
+          : defaultTab;
+      setActiveTab(nextTab);
+    }
+
+    async function refreshSources() {
+      titlebarReloadBtn.disabled = true;
+      try {
+        const sources = await invoke('picker_refresh');
+        if (Array.isArray(sources)) applySources(sources);
+      } finally {
+        titlebarReloadBtn.disabled = false;
+      }
+    }
+
+    function cancel() {
+      invoke('picker_cancel').catch(() => {});
+    }
+
+    shareBtn.addEventListener('click', () => {
+      if (!selected) return;
+      invoke('picker_submit', {
+        selection: {
+          id: selected.id,
+          name: selected.name,
+          type: selected.type,
+          captureAudio: Boolean(captureAudioEnabled && !captureAudioToggle.disabled),
+          includeCamera: Boolean(includeCameraEnabled),
+          processPid: selected.processPid || null,
+          resolution: selectedResolution,
+          frameRate: selectedFps,
+        },
+      }).catch(console.error);
+    });
+
+    cancelBtn.addEventListener('click', cancel);
+    titlebarCloseBtn.addEventListener('click', cancel);
+    titlebarMinBtn.addEventListener('click', async () => {
+      try {
+        await (await currentWindow()).minimize();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+    titlebarReloadBtn.addEventListener('click', () => refreshSources());
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') cancel();
+    });
+
+    function boot() {
+      if (!window.__TAURI__?.core?.invoke) {
+        setTimeout(boot, 30);
+        return;
+      }
+      listen('screen-picker-init', (event) => {
+        applySources(event.payload?.sources || []);
+      }).then(async () => {
+        try {
+          const sources = await invoke('picker_ready');
+          if (Array.isArray(sources) && sources.length) {
+            applySources(sources);
+          }
+        } catch (err) {
+          console.error('[screen-picker] picker_ready failed', err);
+          sourcesNode.innerHTML =
+            '<div class="empty">Не удалось загрузить источники. Нажмите обновить.</div>';
+        }
+      }).catch(console.error);
+    }
+    boot();
+  </script>
+</body>
+</html>

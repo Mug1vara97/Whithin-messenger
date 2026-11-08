@@ -469,6 +469,7 @@ export const useCallStore = create(
       previousVolumes: new Map(),
       voiceActivityDetectors: new Map(), // userId -> VoiceActivityDetector
       localVoiceActivityDetector: null, // VAD для локального пользователя
+      localVadMediaStream: null, // cloned mic track — independent of publish mute
       
       // Флаги состояния
       connecting: false,
@@ -872,6 +873,11 @@ export const useCallStore = create(
         
         await detector.start(stream, audioContext);
         set({ localVoiceActivityDetector: detector });
+        // After (re)start, push current speaking once so unmute mid-speech shows the ring.
+        if (!get().isMuted && detector.getSpeakingState()) {
+          get().updateSpeakingState(String(userId), true);
+          applyVoiceActivationTransmission(get(), true);
+        }
         console.log('[VAD] Initialized local voice activity detector for user:', userId);
       },
       
@@ -986,9 +992,21 @@ export const useCallStore = create(
         for (const detector of state.voiceActivityDetectors.values()) {
           detector.cleanup();
         }
+
+        const vadStream = state.localVadMediaStream;
+        if (vadStream) {
+          vadStream.getTracks().forEach((track) => {
+            try {
+              track.stop();
+            } catch (_) {
+              /* ignore */
+            }
+          });
+        }
         
         set({
           localVoiceActivityDetector: null,
+          localVadMediaStream: null,
           voiceActivityDetectors: new Map(),
           participantSpeakingStates: new Map()
         });
@@ -2714,7 +2732,24 @@ export const useCallStore = create(
           }
 
           try {
-            await get().initializeLocalVAD(vadSourceStream, audioContext);
+            // Clone mic track for VAD so voice-activation gating / LiveKit mute
+            // cannot silence the detector (indicator froze after unmute).
+            const sourceTrack = vadSourceStream.getAudioTracks?.()[0];
+            const vadStream = sourceTrack
+              ? new MediaStream([sourceTrack.clone()])
+              : vadSourceStream;
+            const previousVadStream = get().localVadMediaStream;
+            if (previousVadStream && previousVadStream !== vadSourceStream) {
+              previousVadStream.getTracks().forEach((track) => {
+                try {
+                  track.stop();
+                } catch (_) {
+                  /* ignore */
+                }
+              });
+            }
+            set({ localVadMediaStream: vadStream });
+            await get().initializeLocalVAD(vadStream, audioContext);
           } catch (vadError) {
             console.warn('[VAD] Failed to initialize local VAD:', vadError);
           }
@@ -2983,8 +3018,6 @@ export const useCallStore = create(
         }
 
         try {
-          const speaking = get().localVoiceActivityDetector?.getSpeakingState?.() ?? false;
-
           if (usesInAppSoundpad()) {
             if (newMutedState) {
               applyVoiceActivationTransmission(get(), false);
@@ -2994,11 +3027,28 @@ export const useCallStore = create(
               if (mixedTrack) {
                 mixedTrack.enabled = true;
               }
-              applyVoiceActivationTransmission(get(), speaking);
+              // Resume AudioContext + re-evaluate VAD after unmute (WebView2 often suspends).
+              await get().resumeCallAudioIfSuspended?.();
+              applyVoiceActivationTransmissionFromDetector(get());
+              const speaking =
+                get().localVoiceActivityDetector?.getSpeakingState?.() ?? false;
+              if (speaking && normalizedUserId) {
+                get().updateSpeakingState(normalizedUserId, true);
+              }
             }
           } else {
             await voiceCallApi.setMicrophoneEnabled(!newMutedState);
-            applyVoiceActivationTransmission(get(), newMutedState ? false : speaking);
+            if (newMutedState) {
+              applyVoiceActivationTransmission(get(), false);
+            } else {
+              await get().resumeCallAudioIfSuspended?.();
+              applyVoiceActivationTransmissionFromDetector(get());
+              const speaking =
+                get().localVoiceActivityDetector?.getSpeakingState?.() ?? false;
+              if (speaking && normalizedUserId) {
+                get().updateSpeakingState(normalizedUserId, true);
+              }
+            }
           }
         } catch (error) {
           console.warn('Failed to toggle microphone via LiveKit:', error);

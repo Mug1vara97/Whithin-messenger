@@ -78,12 +78,14 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Select(m => new { m.CreatedAt, m.Id })
                     .FirstOrDefaultAsync(cancellationToken);
 
-                if (cursor != null)
+                if (cursor == null)
                 {
-                    query = query.Where(m =>
-                        m.CreatedAt < cursor.CreatedAt ||
-                        (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
+                    return new List<Message>();
                 }
+
+                query = query.Where(m =>
+                    m.CreatedAt < cursor.CreatedAt ||
+                    (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
             }
 
             var page = await ApplyMessageIncludes(query)
@@ -118,12 +120,16 @@ namespace WhithinMessenger.Infrastructure.Repositories
                     .Select(m => new { m.CreatedAt, m.Id })
                     .FirstOrDefaultAsync(cancellationToken);
 
-                if (cursor != null)
+                // Missing cursor must not fall through to the newest page — that looks like
+                // "can't load older" on clients (same page forever, 0 new ids).
+                if (cursor == null)
                 {
-                    query = query.Where(m =>
-                        m.CreatedAt < cursor.CreatedAt ||
-                        (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
+                    return (new List<Message>(), false);
                 }
+
+                query = query.Where(m =>
+                    m.CreatedAt < cursor.CreatedAt ||
+                    (m.CreatedAt == cursor.CreatedAt && m.Id < cursor.Id));
             }
 
             var page = await ApplyMessageIncludes(query)

@@ -237,6 +237,7 @@ app.UseStaticFiles(new StaticFileOptions
         {
             [".m3u8"] = "application/vnd.apple.mpegurl",
             [".ts"] = "video/mp2t",
+            [".apk"] = "application/vnd.android.package-archive",
         }
     },
     OnPrepareResponse = ctx =>

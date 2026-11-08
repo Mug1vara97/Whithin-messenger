@@ -152,11 +152,16 @@ namespace WhithinMessenger.Application.Services
         {
             try
             {
-                var fullPath = Path.Combine(_webRootPath, filePath);
-                if (File.Exists(fullPath))
+                foreach (var candidate in EnumeratePathCandidates(filePath))
                 {
-                    return await File.ReadAllBytesAsync(fullPath);
+                    var fullPath = ResolveStoredPath(candidate);
+                    if (File.Exists(fullPath))
+                    {
+                        return await File.ReadAllBytesAsync(fullPath);
+                    }
                 }
+
+                _logger.LogWarning("File not found for download path: {FilePath}", filePath);
                 return null;
             }
             catch (Exception ex)
@@ -164,6 +169,47 @@ namespace WhithinMessenger.Application.Services
                 _logger.LogError(ex, "Error reading file: {FilePath}", filePath);
                 return null;
             }
+        }
+
+        private static IEnumerable<string> EnumeratePathCandidates(string filePath)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var list = new List<string>();
+
+            void Collect(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                var normalized = Uri.UnescapeDataString(value.Replace('\\', '/').Trim().TrimStart('/'));
+                if (string.IsNullOrWhiteSpace(normalized)) return;
+                if (seen.Add(normalized))
+                {
+                    list.Add(normalized);
+                }
+            }
+
+            Collect(filePath);
+            if (filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Uri.TryCreate(filePath, UriKind.Absolute, out var uri))
+                {
+                    Collect(uri.AbsolutePath);
+                }
+            }
+
+            foreach (var current in list.ToArray())
+            {
+                if (current.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+                {
+                    Collect(current.Substring("uploads/".Length));
+                }
+                else
+                {
+                    Collect("uploads/" + current);
+                }
+            }
+
+            return list;
         }
 
         public async Task<string> GetContentTypeAsync(string filePath)

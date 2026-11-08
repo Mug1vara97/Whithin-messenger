@@ -1,0 +1,41 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default Whithin Tauri capabilities",
+  "windows": ["main", "screen-picker", "desktop-notifications", "call-overlay", "active-call-overlay"],
+  "remote": {
+    "urls": [
+      "http://localhost:*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*",
+      "http://127.0.0.1:*/*",
+      "https://whithin.ru",
+      "https://whithin.ru/*",
+      "https://*.whithin.ru",
+      "https://*.whithin.ru/*",
+      "http://whithin-asset.localhost",
+      "http://whithin-asset.localhost/*",
+      "https://whithin-asset.localhost",
+      "https://whithin-asset.localhost/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:path:default",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-set-background-color",
+    "core:window:allow-set-overlay-icon",
+    "core:window:allow-start-dragging",
+    "core:webview:default",
+    "shell:allow-open",
+    "dialog:default",
+    "deep-link:default"
+  ]
+}
