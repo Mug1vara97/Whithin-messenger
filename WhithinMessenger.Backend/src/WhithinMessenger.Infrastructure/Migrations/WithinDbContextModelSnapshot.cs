@@ -1512,6 +1512,50 @@ namespace WhithinMessenger.Infrastructure.Migrations
                     b.ToTable("UserE2eKeyBackups", (string)null);
                 });
 
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserMusicTrack", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Artist")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VideoId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "AddedAt");
+
+                    b.HasIndex("UserId", "VideoId")
+                        .IsUnique();
+
+                    b.ToTable("UserMusicTracks");
+                });
+
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2237,6 +2281,17 @@ namespace WhithinMessenger.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("WhithinMessenger.Domain.Models.UserE2eKeyBackup", b =>
+                {
+                    b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WhithinMessenger.Domain.Models.UserMusicTrack", b =>
                 {
                     b.HasOne("WhithinMessenger.Domain.Models.ApplicationUser", "User")
                         .WithMany()

@@ -33,6 +33,7 @@ public class WithinDbContext : IdentityDbContext<ApplicationUser, IdentityRole<G
     public DbSet<StickerPack> StickerPacks { get; set; }
     public DbSet<Sticker> Stickers { get; set; }
     public DbSet<UserStickerPack> UserStickerPacks { get; set; }
+    public DbSet<UserMusicTrack> UserMusicTracks { get; set; }
     public DbSet<PendingPasswordChange> PendingPasswordChanges { get; set; }
     public DbSet<PendingPasswordReset> PendingPasswordResets { get; set; }
     public DbSet<IdeaBoardCard> IdeaBoardCards { get; set; }
