@@ -210,7 +210,19 @@
 
     function fireShortcut(action) {
       if (!action) return;
-      if (document.hasFocus() && isEditableTarget(document.activeElement)) return;
+      // Voice toggles (F1/F2/F3) must work while typing in the composer — only
+      // suppress character/soundpad binds in editable fields.
+      const alwaysAllow =
+        action === 'toggle-mic' ||
+        action === 'toggle-audio' ||
+        action === 'toggle-soundpad-panel';
+      if (
+        !alwaysAllow &&
+        document.hasFocus() &&
+        isEditableTarget(document.activeElement)
+      ) {
+        return;
+      }
       const now = Date.now();
       if (lastShortcut.action === action && now - lastShortcut.at < 180) return;
       lastShortcut = { action, at: now };

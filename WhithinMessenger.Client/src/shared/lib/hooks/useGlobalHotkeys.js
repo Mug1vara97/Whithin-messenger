@@ -131,21 +131,26 @@ export const useGlobalHotkeys = (onToggleMic, onToggleAudio) => {
     return map;
   }, [currentHotkeys, soundpadSlots]);
 
-  // Keyboard in-window (fallback when shell does not own shortcuts).
-  // Tauri bridge registers capture listeners first and stops propagation on match.
+  // In-window keyboard: always on as a focused-window path.
+  // Tauri also emits via native WH_KEYBOARD_LL; SHORTCUT_DEDUPE_MS collapses doubles.
+  // Voice toggles work even while the chat composer is focused.
   useEffect(() => {
-    if (isTauriEnv()) {
-      return undefined;
-    }
-
     const handleKeyboardHotkey = (event) => {
-      if (event.repeat || isEditableTarget(event.target)) {
+      if (event.repeat) {
         return;
       }
 
       const keyString = hotkeyStorage.parseKeyEvent(event);
       const action = hotkeyToAction[keyString];
       if (!action) {
+        return;
+      }
+
+      const isVoiceToggle =
+        action === 'toggle-mic' ||
+        action === 'toggle-audio' ||
+        action === 'toggle-soundpad-panel';
+      if (!isVoiceToggle && isEditableTarget(event.target)) {
         return;
       }
 
