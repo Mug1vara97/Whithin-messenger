@@ -432,6 +432,46 @@ public class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Issues a separate refresh token for the signed-in user (desktop music player), so its
+    /// token rotation never invalidates the web client's session.
+    /// </summary>
+    [Authorize]
+    [HttpPost("device-session")]
+    public async Task<IActionResult> CreateDeviceSession()
+    {
+        var userIdClaim = User.FindFirst("UserId")?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { Error = "Invalid user token" });
+        }
+
+        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+        if (user == null)
+        {
+            return Unauthorized(new { Error = "User not found" });
+        }
+
+        var accessToken = _tokenGenerator.GenerateAccessToken(
+            user.Id.ToString(),
+            user.UserName ?? string.Empty,
+            user.Email ?? string.Empty
+        );
+        var refreshToken = await CreateRefreshTokenAsync(user.Id);
+
+        return Ok(new
+        {
+            Token = accessToken,
+            RefreshToken = refreshToken,
+            User = new
+            {
+                Id = user.Id,
+                Username = user.UserName,
+                Email = user.Email
+            }
+        });
+    }
+
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutRequest? request = null)
     {
