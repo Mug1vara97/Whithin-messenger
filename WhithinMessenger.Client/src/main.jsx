@@ -9,6 +9,7 @@ import { applySavedInterfaceDesign } from './shared/lib/theme/interfaceDesignSet
 import { hasStartupBootCompleted } from './shared/lib/startup/startupBoot'
 import './shared/lib/theme/system24Design.css'
 import './shared/lib/theme/midnightDesign.css'
+import './shared/lib/theme/playerDesign.css'
 import './shared/lib/theme/frostedGlass.css'
 import { applySiteSeo } from './shared/lib/seo/siteSeo'
 import App from './App.jsx'

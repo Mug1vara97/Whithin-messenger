@@ -57,6 +57,7 @@ import {
   setActiveCallOverlayCoords,
 } from '../../../lib/utils/activeCallOverlaySettings';
 import { syncDesktopActiveCallOverlaySettings } from '../../../lib/utils/desktopActiveCallOverlayBridge';
+import { getSnowEnabled, isDesktopApp, setSnowEnabled } from '../../../lib/seasonal/snowSettings';
 import {
   DISPLAY_NAME_MAX_LENGTH,
   resolveUserDisplayName,
@@ -138,6 +139,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
   const [notificationPosition, setNotificationPositionState] = useState(() => getNotificationPosition());
   const [activeCallOverlayEnabled, setActiveCallOverlayEnabledState] = useState(() => getActiveCallOverlayEnabled());
   const [activeCallOverlayCoords, setActiveCallOverlayCoordsState] = useState(() => getActiveCallOverlayCoords());
+  const [snowEnabled, setSnowEnabledState] = useState(() => getSnowEnabled());
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -884,6 +886,25 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
             >
               <FrostedGlassSettingsSection />
             </SettingsPanel>
+
+            {isDesktopApp() && (
+              <SettingsPanel
+                title="Зимнее оформление"
+                description="Пиксельный снег поверх окна приложения с 1 декабря до конца февраля."
+              >
+                <SettingsToggle
+                  id="settings-snow"
+                  checked={snowEnabled}
+                  onChange={() => {
+                    const next = !snowEnabled;
+                    setSnowEnabledState(next);
+                    setSnowEnabled(next);
+                  }}
+                  label="Снег"
+                  description="Снежинки падают и копятся внизу окна. Клики проходят сквозь них."
+                />
+              </SettingsPanel>
+            )}
 
             {isElectron && (
               <SettingsPanel

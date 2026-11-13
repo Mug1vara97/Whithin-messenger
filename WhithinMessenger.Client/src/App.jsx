@@ -13,6 +13,7 @@ import { applyAppBackgroundSettings } from './shared/lib/theme/appBackgroundSett
 import { applyInterfaceDesign } from './shared/lib/theme/interfaceDesignSettings';
 import { isThemeColorsWindow } from './shared/lib/theme/themeWindow';
 import { AppBadgeSync } from './shared/lib/hooks/AppBadgeSync';
+import SeasonalSnow from './shared/ui/effects/PixelSnow/SeasonalSnow';
 import './shared/lib/styles/profileOpenTrigger.css';
 import './App.css';
 
@@ -48,6 +49,7 @@ function MainApp() {
       <AppRouter />
       <GlobalCallManager />
       <AppToastHost />
+      <SeasonalSnow />
     </AppProviders>
   );
 }

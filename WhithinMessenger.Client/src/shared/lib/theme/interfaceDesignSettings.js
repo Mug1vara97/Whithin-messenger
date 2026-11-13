@@ -7,6 +7,12 @@ export const INTERFACE_DESIGN_IDS = {
   DEFAULT: 'default',
   ROUNDED: 'rounded',
   SYSTEM24: 'system24',
+  PLAYER: 'player',
+};
+
+/** Designs drawn as a skin on top of another design's layout. */
+const SKIN_LAYOUTS = {
+  [INTERFACE_DESIGN_IDS.PLAYER]: INTERFACE_DESIGN_IDS.ROUNDED,
 };
 
 export const INTERFACE_DESIGNS = [
@@ -25,6 +31,11 @@ export const INTERFACE_DESIGNS = [
     name: 'System24 (TUI)',
     description: 'Терминальный стиль: моноширинный шрифт, острые углы, рамки и подписи панелей.',
     suggestedThemeId: 'system24',
+  },
+  {
+    id: INTERFACE_DESIGN_IDS.PLAYER,
+    name: 'Новое',
+    description: 'Тёмный фон, панели без рамок, акцентные шапки и округлые поля.',
   },
 ];
 
@@ -75,10 +86,16 @@ export function applyInterfaceDesign(designId = getInterfaceDesignId()) {
     ? INTERFACE_DESIGN_IDS.ROUNDED
     : designId;
   const root = document.documentElement;
-  if (!normalizedDesignId || normalizedDesignId === INTERFACE_DESIGN_IDS.DEFAULT) {
+  const layoutId = SKIN_LAYOUTS[normalizedDesignId] || normalizedDesignId;
+  if (!layoutId || layoutId === INTERFACE_DESIGN_IDS.DEFAULT) {
     root.removeAttribute('data-interface-design');
   } else {
-    root.setAttribute('data-interface-design', normalizedDesignId);
+    root.setAttribute('data-interface-design', layoutId);
+  }
+  if (SKIN_LAYOUTS[normalizedDesignId]) {
+    root.setAttribute('data-interface-skin', normalizedDesignId);
+  } else {
+    root.removeAttribute('data-interface-skin');
   }
 
   return normalizedDesignId;

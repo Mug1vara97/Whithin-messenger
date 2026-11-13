@@ -1,0 +1,713 @@
+/**
+ * "Новое" design — the look of the Whithin music player applied to the messenger.
+ * Activated with [data-interface-skin='player'] on <html>, on top of the rounded layout
+ * ([data-interface-design='rounded']), which supplies the separate columns and gaps.
+ *
+ * A few large borderless panels on the darkest backdrop: the sidebar column is one panel,
+ * the chat (messages + composer) is one panel with an accent wash at the top, and the chat
+ * title sits directly on the backdrop like the player's top bar.
+ */
+
+[data-interface-skin='player'] {
+  --midnight-gap: 8px;
+  --midnight-radius-lg: 8px;
+  --midnight-radius-md: 8px;
+  --midnight-radius-sm: 6px;
+  --midnight-panel-border: 0 solid transparent;
+  --midnight-border-hover: transparent;
+  --player-backdrop: var(--server-list-background, #1e1f22);
+  --player-panel: var(--background, #36393f);
+  --player-dock: color-mix(in srgb, var(--player-backdrop) 45%, var(--player-panel));
+  --player-item-hover: color-mix(in srgb, var(--text, #dcddde) 7%, transparent);
+  --player-item-active: color-mix(in srgb, var(--text, #dcddde) 12%, transparent);
+  --player-field: color-mix(in srgb, var(--text, #dcddde) 7%, transparent);
+  --player-wash: color-mix(in srgb, var(--primary, #5865f2) 16%, var(--player-panel));
+}
+
+/* ---------- Backdrop ---------- */
+
+[data-interface-skin='player'] .home-page,
+[data-interface-skin='player'] .server-settings-page {
+  background: var(--player-backdrop);
+}
+
+[data-interface-skin='player'] .main-layout > div[class*='server-list'] {
+  width: 60px;
+  min-width: 60px;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* ---------- Sidebar column: one panel (banner / channels or chats / user dock) ---------- */
+
+[data-interface-skin='player'] .sidebar-panel-layout {
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--player-panel);
+}
+
+[data-interface-skin='player'] .server-panel,
+[data-interface-skin='player'] .chat-sidebar {
+  gap: 0;
+  background: transparent;
+}
+
+[data-interface-skin='player'] .server-panel-header,
+[data-interface-skin='player'] .server-panel .server-panel-header,
+[data-interface-skin='player'] .server-channels,
+[data-interface-skin='player'] .chat-sidebar-main {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-interface-skin='player'] .server-panel .server-panel-header.with-banner .server-panel-banner {
+  border-radius: 0;
+}
+
+[data-interface-skin='player'] .server-info,
+[data-interface-skin='player'] .chat-list-header {
+  border-bottom: none;
+}
+
+[data-interface-skin='player'] .server-panel .user-panel,
+[data-interface-skin='player'] .chat-sidebar .user-panel,
+[data-interface-skin='player'] .sidebar-panel-layout .user-panel {
+  background: var(--player-dock);
+  border: none;
+  border-radius: 0;
+}
+
+/* ---------- Chat title on the backdrop ---------- */
+
+[data-interface-skin='player'] .chat-header {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 48px;
+  height: 48px;
+  padding-left: 4px;
+}
+
+[data-interface-skin='player'] .chat-header .user-info,
+[data-interface-skin='player'] .chat-header h2,
+[data-interface-skin='player'] .chat-header h3 {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .message-search {
+  border-radius: 999px;
+  background: var(--player-panel);
+}
+
+[data-interface-skin='player'] .message-search input {
+  background: transparent;
+}
+
+/* ---------- Chat: messages + composer in one panel ---------- */
+
+[data-interface-skin='player'] .chat-room-main {
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 220px), var(--player-panel);
+}
+
+[data-interface-skin='player'] .chat-messages-panel,
+[data-interface-skin='player'] .chat-room-main .input-container {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-interface-skin='player'] .chat-room-main .input-container {
+  height: auto;
+  min-height: 0;
+  padding: 4px 16px 16px;
+}
+
+[data-interface-skin='player'] .chat-pinned-bar {
+  background: transparent;
+  border-bottom: 1px solid var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .chat-composer {
+  min-height: 48px;
+  border-radius: 24px !important;
+  background: var(--player-field) !important;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+[data-interface-skin='player'] .chat-composer:focus-within {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text, #dcddde) 28%, transparent);
+}
+
+[data-interface-skin='player'] .chat-composer__action-btn {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .chat-composer__action-btn--send {
+  background: var(--primary, #5865f2);
+  color: var(--text-on-primary, #fff);
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+[data-interface-skin='player'] .chat-composer__action-btn--send:hover {
+  transform: scale(1.06);
+  filter: brightness(1.08);
+}
+
+/* ---------- Members, friends, call ---------- */
+
+[data-interface-skin='player'] .member-list-sidebar,
+[data-interface-skin='player'] .friends-panel,
+[data-interface-skin='player'] .main-area .voice-call-container,
+[data-interface-skin='player'] .group-chat-container .chat-voice-call {
+  background: var(--player-panel);
+  border: none;
+  box-shadow: none;
+}
+
+/* ---------- Call window ---------- */
+
+[data-interface-skin='player'] {
+  --voice-call-tile-radius: 8px;
+  --voice-call-panel-radius: 8px;
+  --voice-call-panel-border: 0 solid transparent;
+  --voice-call-banner-radius: 8px;
+}
+
+/* Same layout as the chat: title on the backdrop, the call and the members as panels */
+[data-interface-skin='player'] .voice-call-shell {
+  background: transparent;
+  gap: var(--midnight-gap);
+  overflow: visible;
+}
+
+[data-interface-skin='player'] .voice-call-shell > .chat-header {
+  background: transparent;
+  border: none;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 4px;
+}
+
+[data-interface-skin='player'] .voice-call-shell > .chat-header .username {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .voice-call-shell .member-list-toggle {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .voice-call-body {
+  gap: var(--midnight-gap);
+  overflow: visible;
+}
+
+[data-interface-skin='player'] .voice-call-body > .resizable-sidebar-shell {
+  overflow: visible;
+}
+
+[data-interface-skin='player'] .main-area .voice-call-container,
+[data-interface-skin='player'] .voice-call-body > .voice-call-container,
+[data-interface-skin='player'] .group-chat-container .chat-voice-call {
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 280px), var(--player-panel);
+}
+
+[data-interface-skin='player'] .voice-call-body .member-list-sidebar {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+[data-interface-skin='player'] .video-tile {
+  background: color-mix(in srgb, var(--player-backdrop) 55%, var(--player-panel));
+}
+
+/* ---------- Direct messages sidebar ---------- */
+
+[data-interface-skin='player'] .search-header,
+[data-interface-skin='player'] .chat-list-container,
+[data-interface-skin='player'] .chat-list-scroll,
+[data-interface-skin='player'] .chat-list,
+[data-interface-skin='player'] .friends-section {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+[data-interface-skin='player'] .search-header {
+  padding: 10px 10px 6px;
+  height: auto;
+}
+
+[data-interface-skin='player'] .search-bar-input {
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: var(--player-field);
+  color: var(--text, #dcddde);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 0.15s ease;
+}
+
+[data-interface-skin='player'] .search-bar-input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text, #dcddde) 28%, transparent);
+}
+
+/* Empty main area ("choose a chat") still sits on a panel */
+[data-interface-skin='player'] .main-area:has(> .no-selection),
+[data-interface-skin='player'] .main-area:has(> .no-chat-selected) {
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 280px), var(--player-panel);
+  justify-content: center;
+}
+
+[data-interface-skin='player'] .no-selection,
+[data-interface-skin='player'] .no-chat-selected {
+  flex: 1;
+  align-self: stretch;
+  width: auto;
+  max-width: none;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+/* ---------- Friends ---------- */
+
+/* Title sits on the backdrop like .chat-header; the body below is the panel */
+[data-interface-skin='player'] .friends-panel,
+[data-interface-skin='player'] .feed-panel,
+[data-interface-skin='player'] .feed-panel--embedded,
+[data-interface-skin='player'] .feed-thread {
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-interface-skin='player'] .friends-panel__header,
+[data-interface-skin='player'] .feed-panel__header,
+[data-interface-skin='player'] .feed-thread__toolbar {
+  height: 48px;
+  min-height: 48px;
+  margin-bottom: 8px;
+  padding: 0 9px 0 4px;
+  box-sizing: border-box;
+  background: transparent;
+  border-bottom: none;
+}
+
+[data-interface-skin='player'] .feed-panel__scroll,
+[data-interface-skin='player'] .feed-thread__scroll {
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 220px), var(--player-panel);
+}
+
+/* Search moves into the title row, next to the tabs */
+[data-interface-skin='player'] .main-area > .friends-panel,
+[data-interface-skin='player'] .friends-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+[data-interface-skin='player'] .friends-panel__header {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+[data-interface-skin='player'] .friends-panel .friends-panel__search {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 4px 0 8px;
+  border-bottom: none;
+  background: transparent;
+}
+
+[data-interface-skin='player'] .friends-panel .friends-panel__search-input {
+  width: 240px;
+  height: 32px;
+  font-size: 14px;
+  background: var(--player-panel);
+}
+
+[data-interface-skin='player'] .friends-panel__content {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 0;
+  padding-top: 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 220px), var(--player-panel);
+}
+
+[data-interface-skin='player'] .friends-panel__title h2,
+[data-interface-skin='player'] .feed-panel__title h2 {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .friends-panel__tab {
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+
+[data-interface-skin='player'] .friends-panel__tab.active {
+  background: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .friends-panel__add-button,
+[data-interface-skin='player'] .feed-panel__add {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .friends-panel__search-input {
+  height: 38px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .friends-panel__section-title {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+[data-interface-skin='player'] .friend-item {
+  margin: 0 8px;
+  border: none;
+  border-radius: 8px;
+}
+
+[data-interface-skin='player'] .friend-item:hover {
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .friend-item__action-button {
+  border-radius: 999px;
+}
+
+/* ---------- Feed ---------- */
+
+[data-interface-skin='player'] .feed-panel__list {
+  gap: 8px;
+  padding: 16px 12px;
+  box-sizing: border-box;
+}
+
+[data-interface-skin='player'] .feed-panel__card {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-item-hover);
+  transition: background-color 0.15s ease;
+}
+
+[data-interface-skin='player'] .feed-panel__card:hover {
+  background: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .feed-panel__pill,
+[data-interface-skin='player'] .feed-panel__vote,
+[data-interface-skin='player'] .feed-panel__comment-send,
+[data-interface-skin='player'] .feed-thread__back,
+[data-interface-skin='player'] .feed-thread__sort {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .feed-panel__comment-input {
+  border: none;
+  border-radius: 999px;
+  background: var(--player-field);
+}
+
+
+/* ---------- Settings modal ---------- */
+
+[data-interface-skin='player'] .settings-modal__shell {
+  gap: 8px;
+  padding: 8px;
+  border: none;
+  border-radius: 14px;
+  background: var(--player-backdrop);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+[data-interface-skin='player'] .settings-modal__sidebar {
+  background: transparent;
+  border-right: none;
+}
+
+[data-interface-skin='player'] .settings-modal__sidebar-foot {
+  border-top: none;
+  border-radius: 8px;
+  background: var(--player-dock);
+}
+
+[data-interface-skin='player'] .settings-modal__tab {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .settings-modal__main {
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 220px), var(--player-panel);
+}
+
+[data-interface-skin='player'] .settings-modal__page-header {
+  border-bottom: none;
+}
+
+[data-interface-skin='player'] .settings-modal__page-header h1 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .settings-modal__close {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .settings-modal .settings-panel__card {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .settings-modal .settings-row,
+[data-interface-skin='player'] .settings-modal .settings-form-actions {
+  border-color: transparent;
+}
+
+[data-interface-skin='player'] .settings-modal .settings-field input,
+[data-interface-skin='player'] .settings-modal .settings-field select {
+  border: none;
+  border-radius: 999px;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .settings-modal .settings-field textarea {
+  border: none;
+  border-radius: 12px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .settings-modal .settings-btn {
+  border-radius: 999px;
+  padding-left: 18px;
+  padding-right: 18px;
+  font-weight: 700;
+}
+
+/* ---------- Profile modal ---------- */
+
+[data-interface-skin='player'] .profile-modal__shell {
+  border: none;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+[data-interface-skin='player'] .profile-hero__bio-panel,
+[data-interface-skin='player'] .profile-wall__card,
+[data-interface-skin='player'] .profile-wall__composer,
+[data-interface-skin='player'] .profile-modal__info-row {
+  border-color: transparent;
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .profile-wall__composer:hover {
+  background: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .profile-wall__post {
+  border-top-color: color-mix(in srgb, var(--text, #dcddde) 8%, transparent);
+}
+
+/* ---------- Channel categories as player section titles ---------- */
+
+[data-interface-skin='player'] .category-item {
+  margin-bottom: 12px;
+}
+
+[data-interface-skin='player'] .category-header {
+  margin: 0 8px 2px;
+  padding: 0 4px 0 12px;
+  border-radius: 6px;
+}
+
+[data-interface-skin='player'] .category-collapse {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+[data-interface-skin='player'] .category-name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-interface-skin='player'] .category-collapse__icon {
+  width: 8px;
+  height: 8px;
+  margin: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+[data-interface-skin='player'] .category-header:hover .category-collapse__icon,
+[data-interface-skin='player'] .category-collapse[aria-expanded='false'] .category-collapse__icon {
+  opacity: 0.8;
+}
+
+/* ---------- Rows: chats, channels, members ---------- */
+
+[data-interface-skin='player'] .chat-list-container,
+[data-interface-skin='player'] .search-results-container {
+  padding: 4px 0 0;
+  box-sizing: border-box;
+}
+
+[data-interface-skin='player'] .chat-list-container .friends-section,
+[data-interface-skin='player'] .chat-list-container .chat-list-header {
+  margin: 0 8px;
+}
+
+[data-interface-skin='player'] .chat-list-scroll,
+[data-interface-skin='player'] .search-results-container {
+  padding: 0 4px 8px 8px;
+  box-sizing: border-box;
+}
+
+[data-interface-skin='player'] .chat-item {
+  border-bottom: none;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 1px 0;
+  transition: background-color 0.15s ease;
+}
+
+[data-interface-skin='player'] .chat-item:hover {
+  background-color: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .chat-item.active {
+  background-color: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .chat-name {
+  font-weight: 600;
+}
+
+[data-interface-skin='player'] .channel-item,
+[data-interface-skin='player'] .voice-channel-item {
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+[data-interface-skin='player'] .channel-item:hover,
+[data-interface-skin='player'] .voice-channel-item:hover {
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .channel-item.active,
+[data-interface-skin='player'] [class*='channel-item'].active {
+  background: var(--player-item-active);
+  color: var(--text, #dcddde);
+  font-weight: 600;
+}
+
+[data-interface-skin='player'] .friends-button {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* ---------- Server settings ---------- */
+
+[data-interface-skin='player'] .server-settings-sidebar,
+[data-interface-skin='player'] .server-settings-page-header,
+[data-interface-skin='player'] .server-settings-scroll {
+  background: var(--player-panel);
+  border: none;
+  border-radius: 8px;
+}
+
+/* ---------- Fields and buttons ---------- */
+
+[data-interface-skin='player'] .modal-input,
+[data-interface-skin='player'] input[type='search'] {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .create-button,
+[data-interface-skin='player'] .modal-actions button {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+[data-interface-skin='player'] .server-button {
+  transition: border-radius 0.2s ease, transform 0.1s ease;
+}
+
+[data-interface-skin='player'] .server-button:hover {
+  transform: scale(1.04);
+}
+
+/* ---------- Scrollbars as in the player ---------- */
+
+[data-interface-skin='player'],
+[data-interface-skin='player'] * {
+  scrollbar-color: color-mix(in srgb, var(--text, #dcddde) 22%, transparent) transparent !important;
+  scrollbar-width: thin;
+}
+
+[data-interface-skin='player'] ::-webkit-scrollbar,
+[data-interface-skin='player'] .messages::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+  background: transparent !important;
+}
+
+[data-interface-skin='player'] ::-webkit-scrollbar-button,
+[data-interface-skin='player'] .messages::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+[data-interface-skin='player'] ::-webkit-scrollbar-thumb,
+[data-interface-skin='player'] .messages::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text, #dcddde) 22%, transparent) !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  border-radius: 8px !important;
+}
+
+[data-interface-skin='player'] ::-webkit-scrollbar-thumb:hover,
+[data-interface-skin='player'] .messages::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--text, #dcddde) 38%, transparent) !important;
+}
+
+[data-interface-skin='player'] ::-webkit-scrollbar-track,
+[data-interface-skin='player'] .messages::-webkit-scrollbar-track {
+  background: transparent !important;
+  border: none !important;
+}
