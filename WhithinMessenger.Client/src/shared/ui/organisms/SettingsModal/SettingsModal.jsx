@@ -901,7 +901,7 @@ const SettingsModal = ({ isOpen, onClose, initialTab = 'account', onProfileUpdat
                     setSnowEnabled(next);
                   }}
                   label="Снег"
-                  description="Снежинки падают и копятся внизу окна. Клики проходят сквозь них."
+                  description="Снежинки падают поверх окна, клики проходят сквозь них."
                 />
               </SettingsPanel>
             )}

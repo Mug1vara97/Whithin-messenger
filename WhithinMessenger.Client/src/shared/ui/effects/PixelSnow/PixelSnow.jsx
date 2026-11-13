@@ -82,15 +82,13 @@ export default function PixelSnow({
   depth = 0.6,
   glow = 0.8,
   twinkle = 0.35,
-  accumulate = true,
-  maxPile = 30,
   mouseInteraction = true,
   opacity = 0.95,
 }) {
   const canvasRef = useRef(null);
   const settingsRef = useRef(null);
   settingsRef.current = {
-    color, density, speed, wind, sway, pixelSize, depth, glow, twinkle, accumulate, maxPile, mouseInteraction, opacity,
+    color, density, speed, wind, sway, pixelSize, depth, glow, twinkle, mouseInteraction, opacity,
   };
 
   useEffect(() => {
@@ -101,15 +99,10 @@ export default function PixelSnow({
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const rng = seeded(4271);
     const flakes = [];
-    const view = { width: 1, height: 1, ratio: 1, cell: 3, columns: 1 };
+    const view = { width: 1, height: 1, ratio: 1, cell: 3 };
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, inside: false, time: 0 };
     const state = { time: 0, intro: reduce ? 1 : 0, push: 0 };
     let sprites = [];
-    let pile = new Float32Array(0);
-    const pileCanvas = document.createElement('canvas');
-    const pileCtx = pileCanvas.getContext('2d');
-    let pileDirty = true;
-    let pileFrame = 0;
     let raf = 0;
     let last = 0;
 
@@ -145,14 +138,10 @@ export default function PixelSnow({
       if (flakes.length > target) flakes.length = target;
     };
 
-    const pileCap = (s) => Math.max(2, s.maxPile / s.pixelSize);
-
     const simulate = (s, dt) => {
       const windSpeed = s.wind * 46;
       const pushing = state.push > 0.001 && pointer.inside;
-      const settle = s.accumulate && s.speed > 0 && pile.length > 0;
       const ease = 1 - Math.exp(-dt * 2.2);
-      const columnWidth = view.cell / view.ratio;
       const margin = 24;
 
       for (const flake of flakes) {
@@ -178,95 +167,15 @@ export default function PixelSnow({
         flake.x += flake.vx * dt;
         flake.y += flake.vy * dt;
 
-        if (settle) {
-          const column = Math.floor(flake.x / columnWidth);
-          if (column >= 0 && column < pile.length && pile[column] > 0.5) {
-            const surface = view.height - pile[column] * columnWidth;
-            if (flake.y >= surface) {
-              for (let k = -level; k <= level; k += 1) {
-                const index = column + k;
-                if (index >= 0 && index < pile.length) {
-                  pile[index] += (0.35 + level * 0.15) * (1 - Math.abs(k) / (level + 1));
-                }
-              }
-              pileDirty = true;
-              spawn(flake, true);
-              continue;
-            }
-          }
-        }
-
         if (flake.y > view.height + margin) spawn(flake, true);
         if (flake.x < -margin) flake.x += view.width + margin * 2;
         else if (flake.x > view.width + margin) flake.x -= view.width + margin * 2;
       }
     };
 
-    const settlePile = (s, dt) => {
-      if (!pile.length) return;
-      const cap = pileCap(s);
-      if (s.accumulate && s.speed > 0) {
-        const grow = (0.25 + s.density * 0.9) * dt * Math.min(1, s.speed);
-        for (let i = 0; i < pile.length; i += 1) {
-          const dune = 0.55 + 0.45 * Math.sin(i * 0.045 + Math.sin(i * 0.013) * 2.1) * Math.sin(i * 0.021 + 1.3);
-          if (pile[i] < cap * dune) pile[i] += grow * (0.6 + 0.8 * dune);
-        }
-      }
-      for (let pass = 0; pass < 2; pass += 1) {
-        const forward = pass === 0;
-        for (let k = 0; k < pile.length - 1; k += 1) {
-          const i = forward ? k : pile.length - 2 - k;
-          const difference = pile[i] - pile[i + 1];
-          if (Math.abs(difference) > 1.2) {
-            const move = (Math.abs(difference) - 1.2) * 0.5 * Math.sign(difference);
-            pile[i] -= move;
-            pile[i + 1] += move;
-          }
-        }
-      }
-      for (let i = 0; i < pile.length; i += 1) {
-        const excess = Math.max(0, pile[i] - cap);
-        const rate = s.accumulate && s.speed > 0 ? excess * 0.8 : 2 + pile[i] * 0.6;
-        pile[i] = Math.max(0, pile[i] - rate * dt);
-      }
-      pileDirty = true;
-    };
-
-    const drawPile = (s) => {
-      const { cell } = view;
-      pileCtx.clearRect(0, 0, pileCanvas.width, pileCanvas.height);
-      pileCtx.fillStyle = s.color;
-      const bottom = pileCanvas.height;
-      for (let i = 0; i < pile.length; i += 1) {
-        const height = Math.round(pile[i]);
-        if (height < 1) continue;
-        const x = i * cell;
-        pileCtx.globalAlpha = 1;
-        pileCtx.fillRect(x, bottom - height * cell, cell, cell);
-        if (height > 1) {
-          const upper = Math.min(height - 1, 3);
-          pileCtx.globalAlpha = 0.86;
-          pileCtx.fillRect(x, bottom - (height - 1) * cell, cell, upper * cell);
-          if (height - 1 > upper) {
-            pileCtx.globalAlpha = 0.72;
-            pileCtx.fillRect(x, bottom - (height - 1 - upper) * cell, cell, (height - 1 - upper) * cell);
-          }
-        }
-      }
-      pileCtx.globalAlpha = 1;
-      pileDirty = false;
-    };
-
     const render = (s) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const fadeIn = state.intro * state.intro;
-      ctx.globalAlpha = s.opacity * fadeIn;
-      if (s.accumulate && pile.length) {
-        pileFrame += 1;
-        if (pileDirty && pileFrame % 4 === 0) drawPile(s);
-        ctx.drawImage(pileCanvas, 0, canvas.height - pileCanvas.height);
-      }
-
       const { ratio } = view;
       for (const flake of flakes) {
         const sprite = sprites[flake.slot];
@@ -301,7 +210,6 @@ export default function PixelSnow({
       if (!reduce) {
         state.time += dt;
         simulate(s, dt);
-        settlePile(s, dt);
       }
       render(s);
       if (!reduce) raf = requestAnimationFrame(frame);
@@ -321,15 +229,6 @@ export default function PixelSnow({
       canvas.width = Math.round(view.width * ratio);
       canvas.height = Math.round(view.height * ratio);
       sprites = SPRITES.map((rows) => buildSprite(rows, view.cell, s.color, s.glow));
-      const columns = Math.ceil(canvas.width / view.cell);
-      if (pile.length !== columns) {
-        const next = new Float32Array(columns);
-        next.set(pile.subarray(0, Math.min(columns, pile.length)));
-        pile = next;
-      }
-      pileCanvas.width = columns * view.cell;
-      pileCanvas.height = Math.ceil(pileCap(s) * 1.2) * view.cell;
-      pileDirty = true;
       populate(s);
       render(s);
       wake();

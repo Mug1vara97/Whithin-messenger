@@ -11,9 +11,12 @@ export function isDesktopApp() {
   return typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron || window.electronAPI?.isTauri);
 }
 
+/** Preview before the first season: snow runs from release until the season starts. */
+const PREVIEW_UNTIL = new Date(2026, 11, 1);
+
 /** Dev builds ignore the calendar so the effect can be checked any time. */
 export function isSnowAvailable(date = new Date()) {
-  return isDesktopApp() && (import.meta.env.DEV || isSnowSeason(date));
+  return isDesktopApp() && (import.meta.env.DEV || date < PREVIEW_UNTIL || isSnowSeason(date));
 }
 
 export function getSnowEnabled() {
