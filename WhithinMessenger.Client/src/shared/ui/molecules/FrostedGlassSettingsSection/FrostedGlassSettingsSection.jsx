@@ -5,13 +5,10 @@ import {
   FROSTED_GLASS_OVERLAY_TINT_OPTIONS,
   getAppBackgroundSettings,
   hasCustomBackgroundImage,
-  pickBackgroundImageFromSystem,
   setAppBackgroundSettings,
   setBackgroundImageFromFile,
   subscribeAppBackgroundSettings,
 } from '../../../lib/theme/appBackgroundSettings';
-
-const isElectron = Boolean(typeof window !== 'undefined' && window.electronAPI?.isElectron);
 
 export function FrostedGlassSettingsSection() {
   const [settings, setSettings] = useState(() => getAppBackgroundSettings());
@@ -36,18 +33,6 @@ export function FrostedGlassSettingsSection() {
       await setBackgroundImageFromFile(file);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить изображение');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleElectronPick = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await pickBackgroundImageFromSystem();
-    } catch (err) {
-      setError(err?.message || 'Не удалось выбрать изображение');
     } finally {
       setBusy(false);
     }
@@ -136,18 +121,8 @@ export function FrostedGlassSettingsSection() {
         </div>
         <div className="settings-row__control settings-row__control--wide">
           <div className="frosted-glass-settings__actions">
-            {isElectron && (
-              <button
-                type="button"
-                className="settings-btn settings-btn--ghost"
-                disabled={busy}
-                onClick={handleElectronPick}
-              >
-                {busy ? 'Загрузка…' : 'Выбрать файл…'}
-              </button>
-            )}
             <label className="settings-btn settings-btn--ghost frosted-glass-settings__file-btn">
-              {busy ? 'Загрузка…' : isElectron ? 'Или загрузить…' : 'Загрузить…'}
+              {busy ? 'Загрузка…' : 'Загрузить…'}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"

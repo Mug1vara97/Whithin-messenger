@@ -4,8 +4,54 @@ const STORAGE_KEY = 'whithin-app-background';
 const CHANGE_EVENT = 'appBackgroundSettingsChanged';
 const WALLPAPER_ROOT_ID = 'app-wallpaper-root';
 
-const MAX_WEB_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_ELECTRON_IMAGE_BYTES = 12 * 1024 * 1024;
+/*
+ * The wallpaper itself lives in IndexedDB: localStorage caps out around 5 MB per origin,
+ * which a base64 image (especially an animated one) easily exceeds.
+ * localStorage keeps only the small settings object.
+ */
+const IMAGE_DB_NAME = 'whithin-app-background';
+const IMAGE_STORE = 'images';
+const IMAGE_KEY = 'wallpaper';
+
+/** Object URL of the stored wallpaper for this page, or null. */
+let imageUrl = null;
+
+function openImageDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(IMAGE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function runImageStore(mode, operation) {
+  const db = await openImageDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_STORE, mode);
+    const request = operation(tx.objectStore(IMAGE_STORE));
+    tx.oncomplete = () => {
+      db.close();
+      resolve(request?.result);
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = tx.onerror;
+  });
+}
+
+const loadStoredImage = () => runImageStore('readonly', (store) => store.get(IMAGE_KEY));
+const saveStoredImage = (blob) => runImageStore('readwrite', (store) => store.put(blob, IMAGE_KEY));
+const deleteStoredImage = () => runImageStore('readwrite', (store) => store.delete(IMAGE_KEY));
+
+function setImageBlob(blob) {
+  if (imageUrl) URL.revokeObjectURL(imageUrl);
+  imageUrl = blob ? URL.createObjectURL(blob) : null;
+}
+
+const dataUrlToBlob = async (dataUrl) => (await fetch(dataUrl)).blob();
 
 /** Wallpaper blur radius when transparent interface mode is active. */
 export const FROSTED_GLASS_WALLPAPER_BLUR_PX = 5;
@@ -35,23 +81,23 @@ export const DEFAULT_APP_BACKGROUND_SETTINGS = {
   overlayTint: FROSTED_GLASS_OVERLAY_TINT.THEME,
 };
 
+function readStoredJson() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function readRawSettings() {
   if (typeof window === 'undefined') {
     return { ...DEFAULT_APP_BACKGROUND_SETTINGS };
   }
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { ...DEFAULT_APP_BACKGROUND_SETTINGS };
-    }
-    const parsed = JSON.parse(raw);
-    return normalizeSettings(parsed);
-  } catch {
-    return { ...DEFAULT_APP_BACKGROUND_SETTINGS };
-  }
+  return normalizeSettings(readStoredJson());
 }
 
+/** `imageDataUrl` is always the in-memory object URL, never a persisted value. */
 function normalizeSettings(value) {
   const source = value && typeof value === 'object' ? value : {};
   const overlayTint = source.overlayTint === FROSTED_GLASS_OVERLAY_TINT.DEFAULT
@@ -59,9 +105,7 @@ function normalizeSettings(value) {
     : FROSTED_GLASS_OVERLAY_TINT.THEME;
   return {
     enabled: Boolean(source.enabled),
-    imageDataUrl: typeof source.imageDataUrl === 'string' && source.imageDataUrl.trim()
-      ? source.imageDataUrl.trim()
-      : null,
+    imageDataUrl: imageUrl,
     electronFilePath: typeof source.electronFilePath === 'string' && source.electronFilePath.trim()
       ? source.electronFilePath.trim()
       : null,
@@ -73,7 +117,8 @@ function writeRawSettings(settings) {
   if (typeof window === 'undefined') {
     return;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  const { imageDataUrl: _image, ...persisted } = settings;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 
@@ -255,64 +300,68 @@ export function applyAppBackgroundSettings(settings = getAppBackgroundSettings()
   return settings;
 }
 
-export async function applySavedAppBackgroundSettings() {
-  let settings = getAppBackgroundSettings();
+/** Loads the stored wallpaper; moves an old base64 one out of localStorage on the way. */
+async function restoreStoredImage() {
+  const stored = readStoredJson();
+  const legacyDataUrl = typeof stored?.imageDataUrl === 'string' && stored.imageDataUrl.startsWith('data:image/')
+    ? stored.imageDataUrl
+    : null;
 
-  if (
-    settings.electronFilePath
-    && !settings.imageDataUrl
-    && window.electronAPI?.loadBackgroundImage
-  ) {
-    try {
-      const loaded = await window.electronAPI.loadBackgroundImage(settings.electronFilePath);
-      if (loaded?.dataUrl) {
-        settings = setAppBackgroundSettings({
-          ...settings,
-          imageDataUrl: loaded.dataUrl,
-        });
-        return settings;
-      }
-    } catch {
-      setAppBackgroundSettings({
-        ...settings,
-        electronFilePath: null,
-        imageDataUrl: null,
-        enabled: false,
-      });
-      return getAppBackgroundSettings();
-    }
+  if (legacyDataUrl) {
+    const blob = await dataUrlToBlob(legacyDataUrl);
+    await saveStoredImage(blob);
+    setImageBlob(blob);
+    writeRawSettings(normalizeSettings(stored));
+    return;
   }
 
+  const blob = await loadStoredImage();
+  if (blob) {
+    setImageBlob(blob);
+    return;
+  }
+
+  if (stored?.electronFilePath && window.electronAPI?.loadBackgroundImage) {
+    const loaded = await window.electronAPI.loadBackgroundImage(stored.electronFilePath);
+    if (loaded?.dataUrl) {
+      const fileBlob = await dataUrlToBlob(loaded.dataUrl);
+      await saveStoredImage(fileBlob);
+      setImageBlob(fileBlob);
+    }
+  }
+}
+
+export async function applySavedAppBackgroundSettings() {
+  try {
+    await restoreStoredImage();
+  } catch {
+    setImageBlob(null);
+  }
+
+  const settings = getAppBackgroundSettings();
+  if (settings.enabled && !settings.imageDataUrl) {
+    return setAppBackgroundSettings({ enabled: false, electronFilePath: null });
+  }
   applyAppBackgroundSettings(settings);
   return settings;
 }
 
-export async function readBackgroundImageFile(file) {
+export function validateBackgroundImageFile(file) {
   if (!file) {
     throw new Error('Файл не выбран');
   }
   if (!file.type.startsWith('image/')) {
     throw new Error('Нужно изображение (JPG, PNG, WebP, GIF)');
   }
+}
 
-  const isElectron = Boolean(window.electronAPI?.isElectron);
-  const maxBytes = isElectron ? MAX_ELECTRON_IMAGE_BYTES : MAX_WEB_IMAGE_BYTES;
-  if (file.size > maxBytes) {
-    throw new Error(`Файл слишком большой (максимум ${Math.round(maxBytes / (1024 * 1024))} МБ)`);
+async function storeImage(blob) {
+  try {
+    await saveStoredImage(blob);
+  } catch {
+    throw new Error('Не удалось сохранить фон: не хватает места в хранилище приложения');
   }
-
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
-    reader.readAsDataURL(file);
-  });
-
-  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
-    throw new Error('Неподдерживаемый формат изображения');
-  }
-
-  return dataUrl;
+  setImageBlob(blob);
 }
 
 export async function pickBackgroundImageFromSystem() {
@@ -325,19 +374,18 @@ export async function pickBackgroundImageFromSystem() {
     return null;
   }
 
+  await storeImage(await dataUrlToBlob(result.dataUrl));
   return setAppBackgroundSettings({
     enabled: true,
-    imageDataUrl: result.dataUrl,
     electronFilePath: result.filePath || null,
   });
 }
 
 export async function setBackgroundImageFromFile(file) {
-  const dataUrl = await readBackgroundImageFile(file);
-
+  validateBackgroundImageFile(file);
+  await storeImage(file);
   return setAppBackgroundSettings({
     enabled: true,
-    imageDataUrl: dataUrl,
     electronFilePath: null,
   });
 }
@@ -351,14 +399,18 @@ export async function clearBackgroundImage() {
     }
   }
 
+  try {
+    await deleteStoredImage();
+  } catch {
+    /* nothing stored */
+  }
+  setImageBlob(null);
   return setAppBackgroundSettings({
-    imageDataUrl: null,
     electronFilePath: null,
     enabled: false,
   });
 }
 
 export function hasCustomBackgroundImage() {
-  const settings = getAppBackgroundSettings();
-  return Boolean(settings.imageDataUrl || settings.electronFilePath);
+  return Boolean(imageUrl);
 }
