@@ -11,6 +11,10 @@ import { useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 import { useSearch } from '../store/search';
 
+const WAVE_BARS = Array.from({ length: 32 }, (_, i) =>
+  (0.25 + 0.75 * Math.abs(Math.sin(i * 0.55) * Math.cos(i * 0.21))).toFixed(2),
+);
+
 /** «Главная»: the feed, replaced by search results while the search field has text. */
 export function HomeView({ scrollRef }) {
   const searching = useSearch((s) => s.query.trim().length > 0);
@@ -46,17 +50,28 @@ function HomeFeed() {
       </div>
       <div className="view__body view__body--home">
 
-        <div className="wave" role="button" tabIndex={0} onClick={startWave}>
+        <div
+          className={`wave${waveActive && playing ? ' wave--live' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={startWave}
+        >
           <div className="wave__glow" />
+          <div className="wave__bars" aria-hidden="true">
+            {WAVE_BARS.map((height, i) => (
+              <span key={i} style={{ '--h': height, '--d': `${(i * 137) % 900}ms` }} />
+            ))}
+          </div>
           <div className="wave__info">
             <span className="wave__kind">
-              <Icon name="radio" size={18} /> Радио
+              <Icon name="radio" size={16} />
+              {waveActive ? 'Сейчас играет' : 'Радио без остановки'}
             </span>
-            <h2 className="wave__title">Моя волна</h2>
+            <h2 className="wave__title">Поток</h2>
             <p className="wave__sub">
               {library.length
-                ? 'Бесконечный поток музыки, похожей на вашу «Мою музыку»'
-                : 'Бесконечный поток популярной музыки — добавляйте треки, и волна подстроится под вас'}
+                ? 'Музыка в духе вашей коллекции — без конца и повторов'
+                : 'Популярное сейчас. Добавляйте треки в «Мою музыку» — и поток подстроится под вас'}
             </p>
           </div>
           <div className={`wave__play${radioLoading && !waveActive ? ' wave__play--busy' : ''}`}>

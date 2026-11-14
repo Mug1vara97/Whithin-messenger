@@ -1,4 +1,4 @@
-﻿/* Defaults mirror the site's base theme; the live theme is pushed from the site (see lib/theme.js). */
+/* Defaults mirror the site's base theme; the live theme is pushed from the site (see lib/theme.js). */
 :root {
   --background: #36393f;
   --background-primary: #2f3136;
@@ -666,29 +666,86 @@ input {
   display: flex;
   align-items: center;
   gap: 24px;
-  min-height: 180px;
-  padding: 32px;
-  border-radius: 12px;
+  min-height: 168px;
+  padding: 28px 32px;
+  border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  color: #fff;
-  background: var(--accent-art);
+  isolation: isolate;
+  color: var(--text);
+  background: color-mix(in srgb, var(--background-primary) 88%, var(--primary));
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  transition: border-color 0.2s;
+}
+
+.wave:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 .wave__glow {
   position: absolute;
-  inset: -40%;
+  inset: -60% -20%;
+  z-index: -1;
   background:
-    radial-gradient(circle at 30% 40%, rgb(255 255 255 / 0.22), transparent 40%),
-    radial-gradient(circle at 75% 70%, color-mix(in srgb, var(--primary) 70%, #fff) 0, transparent 35%);
-  opacity: 0.55;
-  animation: wave-drift 14s ease-in-out infinite alternate;
+    radial-gradient(closest-side at 20% 60%, rgba(var(--primary-rgb), 0.45), transparent),
+    radial-gradient(closest-side at 70% 30%, color-mix(in srgb, var(--primary) 55%, #ff4fa3 45%), transparent),
+    radial-gradient(closest-side at 90% 80%, color-mix(in srgb, var(--primary) 50%, #22d3ee 50%), transparent);
+  filter: blur(40px);
+  opacity: 0.45;
+  animation: wave-drift 16s ease-in-out infinite alternate;
   pointer-events: none;
+}
+
+.wave--live .wave__glow {
+  opacity: 0.65;
 }
 
 @keyframes wave-drift {
   to {
-    transform: translate(8%, -6%) rotate(12deg);
+    transform: translate(6%, -4%) rotate(8deg) scale(1.08);
+  }
+}
+
+.wave__bars {
+  position: absolute;
+  right: 120px;
+  bottom: 0;
+  z-index: -1;
+  height: 100%;
+  width: min(32%, 360px);
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  padding-bottom: 22px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%, #000 80%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 40%, #000 80%, transparent);
+  pointer-events: none;
+}
+
+.wave__bars span {
+  flex: 1;
+  height: calc(var(--h) * 70%);
+  border-radius: 3px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 70%, #fff), rgba(var(--primary-rgb), 0.15));
+  opacity: 0.35;
+  transform-origin: bottom;
+  transform: scaleY(0.55);
+  transition: opacity 0.3s;
+  animation: wave-bar 0.9s ease-in-out var(--d) infinite alternate;
+  animation-play-state: paused;
+}
+
+.wave--live .wave__bars span {
+  opacity: 0.7;
+  animation-play-state: running;
+}
+
+@keyframes wave-bar {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
   }
 }
 
@@ -696,37 +753,46 @@ input {
   position: relative;
   flex: 1;
   min-width: 0;
+  max-width: calc(100% - min(32%, 360px) - 120px);
 }
 
 .wave__kind {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0.85;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--primary) 55%, var(--text));
+  background: rgba(var(--primary-rgb), 0.16);
 }
 
 .wave__title {
-  margin: 6px 0;
-  font-size: clamp(32px, 4vw, 56px);
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  margin: 12px 0 6px;
+  font-size: clamp(30px, 3.2vw, 44px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 .wave__sub {
   margin: 0;
-  max-width: 520px;
-  opacity: 0.85;
+  max-width: 440px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .wave__play {
   position: relative;
+  margin-left: auto;
 }
 
 .wave__play .play-fab {
-  background: #fff;
-  color: #000;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(var(--primary-rgb), 0.45);
 }
 
 .wave__play--busy {

@@ -744,6 +744,10 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
  * frostedGlass.css zeroes --background / --server-list-background, which the panels above are
  * built from, so every panel gets an explicit tinted fill over the wallpaper instead. */
 
+html[data-frosted-glass='enabled'][data-interface-skin='player'] #electron-titlebar-fill {
+  border-bottom: none;
+}
+
 html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-room-main {
   background: var(--fg-fill-middle) !important;
 }

@@ -163,6 +163,7 @@ fn load_asset_html(file_name: &str) -> Vec<u8> {
         "shell.html" => include_str!("../assets/shell.html").as_bytes().to_vec(),
         "music.html" => include_str!("../assets/music.html").as_bytes().to_vec(),
         "titlebar-player.js" => include_str!("../assets/titlebar-player.js").as_bytes().to_vec(),
+        "boot-loader.js" => include_str!("../assets/boot-loader.js").as_bytes().to_vec(),
         "screen-picker.html" => include_str!("../assets/screen-picker.html")
             .as_bytes()
             .to_vec(),
@@ -236,6 +237,9 @@ fn shell_open_client(app: tauri::AppHandle) -> Result<(), String> {
     let parsed = client_url()
         .parse::<url::Url>()
         .map_err(|e| format!("Invalid client url: {e}"))?;
+    if let Some(color) = music_window::theme_boot_color(&app) {
+        let _ = main.set_background_color(Some(color));
+    }
     main.navigate(parsed).map_err(|e| e.to_string())
 }
 
@@ -769,6 +773,9 @@ pub fn run() {
 
             let bridge = include_str!("../assets/bridge.js");
             let titlebar_player = String::from_utf8_lossy(&load_asset_html("titlebar-player.js")).into_owned();
+            let boot_loader = String::from_utf8_lossy(&load_asset_html("boot-loader.js")).into_owned();
+            let boot_color = music_window::theme_boot_color(app.handle())
+                .unwrap_or(tauri::window::Color(0x1e, 0x1f, 0x22, 0xff));
             // Local shell first: titlebar + offline UI always available without the remote site.
             let shell = asset_url("shell.html")?;
 
@@ -781,7 +788,8 @@ pub fn run() {
                     .maximizable(true)
                     .minimizable(true)
                     .decorations(false)
-                    .background_color(tauri::window::Color(0x1e, 0x1f, 0x22, 0xff))
+                    .background_color(boot_color)
+                    .initialization_script(boot_loader)
                     .initialization_script(bridge)
                     .initialization_script(titlebar_player)
                     .build()?;

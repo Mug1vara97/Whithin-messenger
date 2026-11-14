@@ -144,38 +144,6 @@
       max-width: 36ch;
     }
 
-    #connecting {
-      display: none;
-      position: fixed;
-      inset: var(--titlebar-h) 0 0 0;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      background: var(--bg);
-      z-index: 9998;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #dbdee1;
-    }
-
-    #connecting.is-active { display: flex; }
-
-    .spinner {
-      width: clamp(28px, 6vmin, 42px);
-      height: clamp(28px, 6vmin, 42px);
-      border-radius: 50%;
-      border: 3px solid color-mix(in srgb, var(--primary) 25%, transparent);
-      border-top-color: var(--primary);
-      animation: spin 0.85s linear infinite;
-      margin-bottom: 18px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    #connecting p {
-      margin: 0;
-      font-size: clamp(13px, 2.2vmin, 15px);
-      color: #949ba4;
-    }
   </style>
 </head>
 <body>
@@ -207,11 +175,6 @@
     </div>
   </header>
 
-  <div id="connecting" class="is-active" aria-live="polite">
-    <div class="spinner" aria-hidden="true"></div>
-    <p>Подключение к Whithin…</p>
-  </div>
-
   <div id="oopss" aria-live="polite">
     <div id="error-text">
       <img src="sad404.svg" alt="" />
@@ -221,13 +184,15 @@
   </div>
 
   <script>
-    const panelConnecting = document.getElementById('connecting');
     const panelOffline = document.getElementById('oopss');
     const offlineText = document.getElementById('offlineText');
     const OFFLINE_MSG = 'Сервер не доступен';
 
+    // The D20 boot loader is injected by Tauri into every page of the main webview.
     function show(panel) {
-      panelConnecting.classList.toggle('is-active', panel === 'connecting');
+      const loader = window.WhithinBootLoader;
+      if (panel === 'connecting') loader?.mount('Подключение к Whithin');
+      else loader?.unmount({ fade: false });
       panelOffline.classList.toggle('is-active', panel === 'offline');
     }
 

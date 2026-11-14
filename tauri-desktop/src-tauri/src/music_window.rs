@@ -148,3 +148,34 @@ pub fn music_get_theme(app: AppHandle) -> Option<serde_json::Value> {
     }
     current.clone()
 }
+
+fn parse_css_color(value: &str) -> Option<tauri::window::Color> {
+    let value = value.trim();
+    if let Some(hex) = value.strip_prefix('#') {
+        let hex: String = match hex.len() {
+            3 => hex.chars().flat_map(|c| [c, c]).collect(),
+            6 | 8 => hex[..6].to_string(),
+            _ => return None,
+        };
+        let n = u32::from_str_radix(&hex, 16).ok()?;
+        return Some(tauri::window::Color((n >> 16) as u8, (n >> 8) as u8, n as u8, 0xff));
+    }
+    let inner = value
+        .strip_prefix("rgba(")
+        .or_else(|| value.strip_prefix("rgb("))?
+        .trim_end_matches(')');
+    let mut parts = inner
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<f32>().ok().map(|v| v.clamp(0.0, 255.0) as u8));
+    Some(tauri::window::Color(parts.next()??, parts.next()??, parts.next()??, 0xff))
+}
+
+/// Backdrop of the site's boot preloader in the last known theme, so navigations don't flash.
+pub fn theme_boot_color(app: &AppHandle) -> Option<tauri::window::Color> {
+    let theme = music_get_theme(app.clone())?;
+    let vars = theme.get("vars")?;
+    ["--background-primary", "--background"]
+        .iter()
+        .find_map(|key| parse_css_color(vars.get(*key)?.as_str()?))
+}

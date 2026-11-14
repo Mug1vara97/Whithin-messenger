@@ -1,6 +1,6 @@
 [package]
 name = "whithin-tauri"
-version = "0.2.27"
+version = "0.2.29"
 description = "Whithin desktop (Tauri)"
 authors = ["Whithin"]
 edition = "2021"

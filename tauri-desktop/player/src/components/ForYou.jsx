@@ -8,7 +8,7 @@ import { usePlayer } from '../store/player';
 
 const PREVIEW = 6;
 
-/** Personal recommendations under «Моя волна», built from history and the library like on Android. */
+/** Personal recommendations under «Поток», built from history and the library like on Android. */
 export function ForYou() {
   const libraryLoaded = useLibrary((s) => s.loaded);
   const { mix, artists, shelves, loading, loaded } = useForYou();
