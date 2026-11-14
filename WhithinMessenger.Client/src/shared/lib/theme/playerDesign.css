@@ -38,6 +38,10 @@
   border-radius: 0;
 }
 
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > div[class*='server-list'] {
+  background: transparent !important;
+}
+
 /* ---------- Sidebar column: one panel (banner / channels or chats / user dock) ---------- */
 
 [data-interface-skin='player'] .sidebar-panel-layout {
@@ -67,6 +71,16 @@
   border-radius: 0;
 }
 
+/* The panel itself clips the banner; the header must not, or it cuts off the server menu */
+[data-interface-skin='player'] .server-panel .server-panel-header.with-banner {
+  overflow: visible;
+  z-index: 20;
+}
+
+[data-interface-skin='player'] .server-panel-header .server-dropdown {
+  top: 52px;
+}
+
 [data-interface-skin='player'] .server-info,
 [data-interface-skin='player'] .chat-list-header {
   border-bottom: none;
@@ -75,6 +89,7 @@
 [data-interface-skin='player'] .server-panel .user-panel,
 [data-interface-skin='player'] .chat-sidebar .user-panel,
 [data-interface-skin='player'] .sidebar-panel-layout .user-panel {
+  overflow: visible;
   background: var(--player-dock);
   border: none;
   border-radius: 0;
@@ -326,6 +341,17 @@
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
+  overflow: hidden;
+}
+
+[data-interface-skin='player'] .friends-panel__title {
+  min-width: 0;
+}
+
+[data-interface-skin='player'] .friends-panel__tabs {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 [data-interface-skin='player'] .friends-panel .friends-panel__search {
@@ -364,8 +390,10 @@
 }
 
 [data-interface-skin='player'] .friends-panel__tab {
+  flex-shrink: 0;
   border-radius: 999px;
   padding: 5px 14px;
+  white-space: nowrap;
 }
 
 [data-interface-skin='player'] .friends-panel__tab.active {
@@ -710,4 +738,52 @@
 [data-interface-skin='player'] .messages::-webkit-scrollbar-track {
   background: transparent !important;
   border: none !important;
+}
+
+/* ---------- Transparent mode ----------
+ * frostedGlass.css zeroes --background / --server-list-background, which the panels above are
+ * built from, so every panel gets an explicit tinted fill over the wallpaper instead. */
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-room-main {
+  background: var(--fg-fill-middle) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-header,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-messages-panel,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .input-container,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .friends-panel,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-panel,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-panel--embedded,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-thread {
+  background: transparent !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .friends-panel__content,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-panel__scroll,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-thread__scroll {
+  background: var(--fg-fill-middle) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-composer,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .chat-composer:focus-within {
+  background: var(--player-field) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .friends-panel .friends-panel__search-input,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .feed-panel__comment-input {
+  background: var(--fg-input) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .settings-modal__shell {
+  background: rgba(var(--fg-tint-serverlist-rgb, 30, 31, 34), 0.86);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .settings-modal__main {
+  background: var(--fg-fill-middle);
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .settings-modal__sidebar-foot {
+  background: var(--fg-fill-left);
 }

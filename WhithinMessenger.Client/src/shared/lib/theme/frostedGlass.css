@@ -446,6 +446,7 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 [data-frosted-glass='enabled'] .server-member-role-modal,
 [data-frosted-glass='enabled'] .role-management-modal,
 [data-frosted-glass='enabled'] .chat-attach-menu__dropdown,
+[data-frosted-glass='enabled'] .server-dropdown,
 [data-frosted-glass='enabled'] .voice-participant-context-menu {
   background: var(--fg-popover) !important;
   backdrop-filter: blur(16px);
@@ -457,7 +458,8 @@ body.electron-titlebar-chrome #app-wallpaper-root .app-wallpaper-root__image {
 [data-frosted-glass='enabled'] .context-menu-item:hover:not(.disabled),
 [data-frosted-glass='enabled'] .context-menu-button:hover,
 [data-frosted-glass='enabled'] .friend-item__context-item:hover,
-[data-frosted-glass='enabled'] .chat-attach-menu__item:hover {
+[data-frosted-glass='enabled'] .chat-attach-menu__item:hover,
+[data-frosted-glass='enabled'] .server-dropdown .dropdown-item:hover {
   background: var(--fg-popover-hover) !important;
 }
 

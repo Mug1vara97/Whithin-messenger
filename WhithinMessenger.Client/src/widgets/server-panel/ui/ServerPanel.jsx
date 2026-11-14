@@ -1206,7 +1206,7 @@ const ServerPanel = ({
                 navigate(`/server/${currentServer?.serverId || currentServer?.ServerId}/settings`);
               }}
             >
-              <Settings sx={{ fontSize: 16, marginRight: 8 }} />
+              <Settings sx={{ fontSize: 16, marginRight: '8px' }} />
               Настройки сервера
             </div>
             )}
@@ -1217,7 +1217,7 @@ const ServerPanel = ({
                 navigate(`/server/${currentServer?.serverId || currentServer?.ServerId}/settings`);
               }}
             >
-              <Group sx={{ fontSize: 16, marginRight: 8 }} />
+              <Group sx={{ fontSize: 16, marginRight: '8px' }} />
               Участники
             </div>
             {userCanCreateInvites && (
@@ -1225,7 +1225,7 @@ const ServerPanel = ({
               className="dropdown-item"
               onClick={handleAddMember}
             >
-              <PersonAdd sx={{ fontSize: 16, marginRight: 8 }} />
+              <PersonAdd sx={{ fontSize: 16, marginRight: '8px' }} />
               Добавить участника
             </div>
             )}
@@ -1236,7 +1236,7 @@ const ServerPanel = ({
                 setListEventsRequested(true);
               }}
             >
-              <EventAvailable sx={{ fontSize: 16, marginRight: 8 }} />
+              <EventAvailable sx={{ fontSize: 16, marginRight: '8px' }} />
               Все события
             </div>
             {userCanManageEvents && (
@@ -1247,7 +1247,7 @@ const ServerPanel = ({
                 setCreateEventRequested(true);
               }}
             >
-              <EventAvailable sx={{ fontSize: 16, marginRight: 8 }} />
+              <EventAvailable sx={{ fontSize: 16, marginRight: '8px' }} />
               Создать событие
             </div>
             )}
@@ -1256,7 +1256,7 @@ const ServerPanel = ({
                 className="dropdown-item dropdown-item-danger"
                 onClick={handleDeleteServer}
               >
-                <Delete sx={{ fontSize: 16, marginRight: 8 }} />
+                <Delete sx={{ fontSize: 16, marginRight: '8px' }} />
                 Удалить сервер
               </div>
             ) : (
@@ -1264,7 +1264,7 @@ const ServerPanel = ({
                 className="dropdown-item dropdown-item-danger"
                 onClick={handleLeaveServer}
               >
-                <ExitToApp sx={{ fontSize: 16, marginRight: 8 }} />
+                <ExitToApp sx={{ fontSize: 16, marginRight: '8px' }} />
                 Покинуть сервер
               </div>
             )}
