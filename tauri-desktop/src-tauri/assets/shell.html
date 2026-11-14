@@ -12,7 +12,7 @@
       --titlebar-text: #dcddde;
       --titlebar-nav: #9aa1ac;
       --titlebar-nav-hover: #d2d6de;
-      --titlebar-controls: 140px;
+      --titlebar-controls: 174px;
       --border: #3f4147;
       --primary: #5865f2;
     }
@@ -273,7 +273,6 @@
       document.getElementById('btnMax').onclick = () => invoke('window_toggle_maximize').catch(() => {});
       document.getElementById('btnClose').onclick = () => invoke('window_close').catch(() => {});
       document.getElementById('btnReload').onclick = () => connect();
-
       const params = new URLSearchParams(location.search);
       if (params.get('error')) {
         offlineText.textContent = OFFLINE_MSG;

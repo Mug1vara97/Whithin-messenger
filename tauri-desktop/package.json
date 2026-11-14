@@ -1,7 +1,7 @@
 {
   "name": "whithin-tauri",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.27",
   "description": "Whithin desktop shell (Tauri) — Electron остаётся в /electron",
   "type": "module",
   "scripts": {
@@ -10,10 +10,18 @@
     "dev:remote:raw": "cross-env WEB_CLIENT_URL=https://whithin.ru tauri dev --config src-tauri/tauri.remote.conf.json",
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/with-msvc.ps1 npm run build:raw",
     "build:raw": "tauri build",
+    "player:build": "vite build --config player/vite.config.js && vite build --config player/vite.titlebar.config.js",
+    "player:watch": "vite build --watch --config player/vite.config.js",
     "icon": "tauri icon ./app-icon.png -o src-tauri/icons"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.0",
-    "cross-env": "^10.1.0"
+    "@vitejs/plugin-react": "^5.2.0",
+    "cross-env": "^10.1.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^7.3.8",
+    "vite-plugin-singlefile": "^2.3.4",
+    "zustand": "^5.1.0"
   }
 }

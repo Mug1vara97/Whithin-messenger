@@ -11,8 +11,6 @@ use tauri::image::Image;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-const MAX_WALLPAPER_BYTES: u64 = 12 * 1024 * 1024;
-
 fn is_deep_link_url(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
     lower.starts_with("whithin://") || lower.starts_with("within://")
@@ -30,14 +28,14 @@ pub fn deliver_deep_link<R: Runtime>(app: &AppHandle<R>, url: &str) {
     }
     show_main_window(app);
     let _ = app.emit("deep-link-received", url);
-    if let Some(main) = app.get_webview_window("main") {
+    if let Some(main) = app.get_window("main") {
         let _ = main.emit("deep-link-received", url);
     }
     eprintln!("[whithin-tauri] deep link delivered: {url}");
 }
 
 pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(main) = app.get_webview_window("main") {
+    if let Some(main) = app.get_window("main") {
         let _ = main.unminimize();
         let _ = main.show();
         let _ = main.set_focus();
@@ -218,7 +216,7 @@ pub fn set_badge_count(app: AppHandle, count: i64) -> Result<(), String> {
         0
     };
 
-    let Some(main) = app.get_webview_window("main") else {
+    let Some(main) = app.get_window("main") else {
         return Ok(());
     };
 
@@ -256,11 +254,6 @@ pub async fn pick_background_image(app: AppHandle) -> Result<Option<Value>, Stri
     let source = file_path
         .into_path()
         .map_err(|e| format!("Unsupported file path: {e}"))?;
-
-    let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
-    if meta.len() > MAX_WALLPAPER_BYTES {
-        return Err("Изображение слишком большое (максимум 12 МБ)".into());
-    }
 
     let dir = wallpaper_dir(&app)?;
     let ext = source

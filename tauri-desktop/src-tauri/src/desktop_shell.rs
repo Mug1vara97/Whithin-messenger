@@ -10,7 +10,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, State, WebviewUrl,
-    WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    WebviewWindowBuilder, WindowEvent,
 };
 
 const NOTIF_WIDTH: i32 = 356;
@@ -84,7 +84,7 @@ fn asset_url(relative: &str) -> Result<WebviewUrl, String> {
 }
 
 fn show_main_window(app: &AppHandle) {
-    if let Some(main) = app.get_webview_window("main") {
+    if let Some(main) = app.get_window("main") {
         let _ = main.unminimize();
         let _ = main.show();
         let _ = main.set_focus();
@@ -93,13 +93,13 @@ fn show_main_window(app: &AppHandle) {
 }
 
 fn hide_main_window(app: &AppHandle) {
-    if let Some(main) = app.get_webview_window("main") {
+    if let Some(main) = app.get_window("main") {
         let _ = main.hide();
         emit_visibility(app, &main);
     }
 }
 
-fn emit_visibility(app: &AppHandle, main: &WebviewWindow) {
+fn emit_visibility(app: &AppHandle, main: &tauri::Window) {
     let minimized = main.is_minimized().unwrap_or(false);
     let visible = main.is_visible().unwrap_or(false);
     let focused = main.is_focused().unwrap_or(false);
@@ -114,7 +114,7 @@ fn emit_visibility(app: &AppHandle, main: &WebviewWindow) {
 }
 
 pub fn emit_main_visibility(app: &AppHandle) {
-    if let Some(main) = app.get_webview_window("main") {
+    if let Some(main) = app.get_window("main") {
         emit_visibility(app, &main);
     }
 }
@@ -1326,7 +1326,7 @@ pub fn focus_main_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn window_minimize(app: AppHandle) -> Result<(), String> {
     let main = app
-        .get_webview_window("main")
+        .get_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
     main.minimize().map_err(|e| e.to_string())
 }
@@ -1334,7 +1334,7 @@ pub fn window_minimize(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn window_toggle_maximize(app: AppHandle) -> Result<(), String> {
     let main = app
-        .get_webview_window("main")
+        .get_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
     if main.is_maximized().unwrap_or(false) {
         main.unmaximize().map_err(|e| e.to_string())
@@ -1347,7 +1347,7 @@ pub fn window_toggle_maximize(app: AppHandle) -> Result<(), String> {
 pub fn window_close(app: AppHandle) -> Result<(), String> {
     // Close-to-tray is handled by CloseRequested on the main window.
     let main = app
-        .get_webview_window("main")
+        .get_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
     main.close().map_err(|e| e.to_string())
 }

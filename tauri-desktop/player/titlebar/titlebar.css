@@ -1,0 +1,359 @@
+﻿:host {
+  all: initial;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 2147483647;
+  transform: translateX(-50%);
+  font-family: inherit;
+  color: var(--text, #dcddde);
+  -webkit-app-region: no-drag;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+svg {
+  display: block;
+}
+
+.tp {
+  position: relative;
+}
+
+.tp-bar {
+  height: var(--electron-titlebar-height, 32px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: min(46vw, 520px);
+}
+
+.tp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 10px 0 2px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.tp-title:hover {
+  background: color-mix(in srgb, var(--text, #fff) 10%, transparent);
+}
+
+.tp-title__text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tp-title__text b {
+  font-weight: 600;
+}
+
+.tp-title__text span {
+  color: var(--text-muted, #8e9297);
+}
+
+.tp-cover {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text, #fff) 10%, transparent);
+  color: var(--text-muted, #8e9297);
+}
+
+.tp-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* i.ytimg.com thumbnails are 4:3 with the 16:9 frame letterboxed inside. */
+.tp-cover img[src*='ytimg.com'] {
+  transform: scale(1.34);
+}
+
+.tp-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-muted, #8e9297);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    transform 0.1s;
+}
+
+.tp-btn:hover {
+  color: var(--text, #fff);
+  background: color-mix(in srgb, var(--text, #fff) 10%, transparent);
+}
+
+.tp-btn--main {
+  color: var(--text, #fff);
+}
+
+/* ---------- Drop-down player: copy of the reactbits.dev elastic-slider demo card ---------- */
+
+.esd-player {
+  --esd-text: var(--text, #f4f4f5);
+  --esd-muted: color-mix(in srgb, var(--esd-text) 58%, transparent);
+  --esd-hover: color-mix(in srgb, var(--esd-text) 8%, transparent);
+  --esd-track: color-mix(in srgb, var(--esd-text) 16%, transparent);
+  --esd-fill: var(--esd-text);
+  --esd-tile: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--esd-text) 18%, transparent) 0%,
+    color-mix(in srgb, var(--esd-text) 8%, transparent) 100%
+  );
+  --esd-tile-edge:
+    inset 0 0 0 1px color-mix(in srgb, var(--esd-text) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--esd-text) 14%, transparent);
+
+  position: absolute;
+  top: calc(var(--electron-titlebar-height, 32px) + 8px);
+  left: 50%;
+  box-sizing: border-box;
+  width: min(580px, calc(100vw - 32px));
+  display: grid;
+  grid-template:
+    'art meta save' 1fr
+    'art seek seek'
+    'art transport volume'
+    / 140px minmax(0, 1fr) 136px;
+  column-gap: 18px;
+  padding: 14px 18px 14px 14px;
+  border-radius: 20px;
+  color: var(--esd-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background-secondary, #1c1a22) 55%, transparent) 0%,
+    color-mix(in srgb, var(--background, #141218) 62%, transparent) 100%
+  );
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--esd-text) 9%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--esd-text) 10%, transparent),
+    0 24px 50px -30px rgba(0, 0, 0, 0.9),
+    0 10px 32px rgba(0, 0, 0, 0.3);
+  transform: translateX(-50%);
+  transform-origin: 50% 0;
+  animation: esd-in 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+@keyframes esd-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.96);
+  }
+}
+
+.esd-player__art {
+  grid-area: art;
+  border-radius: 14px;
+  box-shadow: var(--esd-tile-edge);
+}
+
+.esd-player__meta {
+  grid-area: meta;
+  align-self: start;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.esd-player__meta strong,
+.esd-player__meta span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.esd-player__meta strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.01em;
+}
+
+.esd-player__meta span {
+  color: var(--esd-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.esd-player__save {
+  grid-area: save;
+  align-self: start;
+  justify-self: end;
+  margin: 2px -10px 0 0;
+  color: var(--esd-muted);
+}
+
+.esd-player__seek {
+  grid-area: seek;
+}
+
+.esd-player__times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -7px;
+  color: var(--esd-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.esd-player__transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0 0 0 -8px;
+}
+
+.esd-player__volume {
+  grid-area: volume;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.esd-player__volume .es {
+  flex: 1;
+}
+
+.esd-volume-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--esd-muted);
+  transition: color 0.2s;
+}
+
+.esd-volume-btn:hover {
+  color: var(--esd-text);
+}
+
+.esd-icon-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    transform 0.2s;
+}
+
+.esd-icon-button:hover {
+  background: var(--esd-hover);
+}
+
+.esd-icon-button:active {
+  transform: scale(0.94);
+}
+
+.esd-icon-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.esd-icon-button--raised {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--esd-tile);
+  box-shadow: var(--esd-tile-edge);
+}
+
+.esd-icon-button--raised:hover {
+  background: var(--esd-tile);
+  filter: brightness(1.06);
+}
+
+.esd-player .esd-icon-button--on {
+  color: var(--primary, #5865f2);
+}
+
+.esd-repeat-one {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Slider tuned to the demo: dimmed at rest, white fill, 34px hit area. */
+.esd-player .es {
+  gap: 12px;
+  opacity: 0.7;
+  color: var(--esd-text);
+  transition: opacity 0.25s ease;
+}
+
+.esd-player .es--active {
+  opacity: 1;
+}
+
+.esd-player .es__hit {
+  height: 28px;
+  cursor: grab;
+}
+
+.esd-player .es__hit:active {
+  cursor: grabbing;
+}
+
+.esd-player .es__track {
+  background: var(--esd-track);
+}
+
+.esd-player .es__range,
+.esd-player .es:hover .es__range,
+.esd-player .es__hit:focus-visible .es__range {
+  background: var(--esd-fill);
+}
+
+.esd-player .es__icon {
+  color: var(--esd-muted);
+}

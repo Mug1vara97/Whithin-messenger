@@ -1,9 +1,18 @@
 mod audio_capture;
+mod apple;
+mod deezer;
 mod desktop_parity;
 mod desktop_shell;
 mod display_capture;
+mod music;
+mod music_audio;
+mod music_library;
+mod music_window;
 mod screen_sources;
 mod shortcuts;
+mod soundcloud;
+mod local_music;
+mod yt_net;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -78,6 +87,7 @@ fn serve_embedded_asset(request: tauri::http::Request<Vec<u8>>) -> tauri::http::
     let path = request.uri().path().trim_start_matches('/');
     let (bytes, mime) = match path {
         "" | "shell.html" => (load_asset_html("shell.html"), "text/html; charset=utf-8"),
+        "music.html" => (load_asset_html("music.html"), "text/html; charset=utf-8"),
         "screen-picker.html" => (load_screen_picker_html(), "text/html; charset=utf-8"),
         "notification-host.html" => (load_asset_html("notification-host.html"), "text/html; charset=utf-8"),
         "call-overlay-host.html" => (load_asset_html("call-overlay-host.html"), "text/html; charset=utf-8"),
@@ -151,6 +161,8 @@ fn load_asset_html(file_name: &str) -> Vec<u8> {
     }
     match file_name {
         "shell.html" => include_str!("../assets/shell.html").as_bytes().to_vec(),
+        "music.html" => include_str!("../assets/music.html").as_bytes().to_vec(),
+        "titlebar-player.js" => include_str!("../assets/titlebar-player.js").as_bytes().to_vec(),
         "screen-picker.html" => include_str!("../assets/screen-picker.html")
             .as_bytes()
             .to_vec(),
@@ -219,7 +231,7 @@ fn shell_probe_client() -> ShellProbeResult {
 #[tauri::command]
 fn shell_open_client(app: tauri::AppHandle) -> Result<(), String> {
     let main = app
-        .get_webview_window("main")
+        .get_webview("main")
         .ok_or_else(|| "main window missing".to_string())?;
     let parsed = client_url()
         .parse::<url::Url>()
@@ -245,7 +257,7 @@ fn shell_page_url(offline: bool) -> Result<url::Url, String> {
 
 fn navigate_main_to_shell(app: &tauri::AppHandle, offline: bool) -> Result<(), String> {
     let main = app
-        .get_webview_window("main")
+        .get_webview("main")
         .ok_or_else(|| "main window missing".to_string())?;
     main.navigate(shell_page_url(offline)?).map_err(|e| e.to_string())
 }
@@ -578,6 +590,15 @@ async fn choose_screen_source(
     Ok(selection)
 }
 
+/// Runs a helper mode of the executable (e.g. the music audio host) if requested on the
+/// command line; returns its exit code, or `None` for a normal app start.
+pub fn run_helper() -> Option<i32> {
+    if std::env::args().nth(1).as_deref() == Some("--yt-net-selftest") {
+        return Some(yt_net::selftest());
+    }
+    music_audio::run_host_from_args()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = Arc::new(AppState {
@@ -587,6 +608,8 @@ pub fn run() {
         picker_tx: Mutex::new(None),
     });
     let desktop = desktop_shell::DesktopShellState::new();
+    let music_service = music::MusicService::new();
+    let music_for_protocol = music_service.clone();
 
     let mut builder = tauri::Builder::default();
 
@@ -608,8 +631,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state.clone())
         .manage(desktop.clone())
+        .manage(music_service)
+        .manage(music_audio::MusicAudio::new())
         .register_uri_scheme_protocol("whithin-asset", |_ctx, request| {
             serve_embedded_asset(request)
+        })
+        .register_asynchronous_uri_scheme_protocol(music::SCHEME, move |_ctx, request, responder| {
+            let service = music_for_protocol.clone();
+            tauri::async_runtime::spawn(async move {
+                responder.respond(service.serve(request).await);
+            });
         })
         .invoke_handler(tauri::generate_handler![
             audio_is_platform_supported,
@@ -670,9 +701,38 @@ pub fn run() {
             desktop_parity::load_background_image,
             desktop_parity::clear_background_image,
             desktop_parity::save_media_file,
+            music::music_search,
+            music::music_search_more,
+            music::music_prepare,
+            music::music_search_artists,
+            music::music_artist,
+            music::music_album,
+            music::music_radio,
+            music::music_home,
+            music_audio::music_audio_load,
+            music_audio::music_audio_command,
+            music_library::music_auth_from_site,
+            music_library::music_library_local,
+            local_music::music_local_tracks,
+            local_music::music_local_open,
+            local_music::music_downloads,
+            local_music::music_download,
+            local_music::music_download_delete,
+            music_library::music_library_sync,
+            music_library::music_library_toggle,
+            music_window::music_show,
+            music_window::music_set_theme,
+            music_window::music_get_theme,
+            music_window::music_set_wallpaper,
+            music_window::music_get_wallpaper,
         ])
         .setup(|app| {
             shortcuts::init(app.handle().clone());
+
+            if let Ok(dir) = app.path().app_data_dir() {
+                app.state::<Arc<music::MusicService>>().set_storage_dir(dir.join("music"));
+            }
+            music_library::start_keepalive(app.state::<Arc<music::MusicService>>().inner().clone());
 
             let desktop_state = app.state::<desktop_shell::DesktopShellState>().inner().clone();
             if let Err(err) = desktop_shell::setup_tray(app.handle(), &desktop_state) {
@@ -708,10 +768,11 @@ pub fn run() {
             }
 
             let bridge = include_str!("../assets/bridge.js");
+            let titlebar_player = String::from_utf8_lossy(&load_asset_html("titlebar-player.js")).into_owned();
             // Local shell first: titlebar + offline UI always available without the remote site.
             let shell = asset_url("shell.html")?;
 
-            if app.get_webview_window("main").is_none() {
+            if app.get_window("main").is_none() {
                 let main = WebviewWindowBuilder::new(app, "main", shell)
                     .title("Whithin")
                     .inner_size(1280.0, 800.0)
@@ -722,6 +783,7 @@ pub fn run() {
                     .decorations(false)
                     .background_color(tauri::window::Color(0x1e, 0x1f, 0x22, 0xff))
                     .initialization_script(bridge)
+                    .initialization_script(titlebar_player)
                     .build()?;
 
                 // So F-keys reach the page when Whithin is focused (WebView2 won't eat them).
@@ -740,6 +802,12 @@ pub fn run() {
         .on_window_event(move |window, event| {
             let label = window.label().to_string();
             if label == "main" {
+                if matches!(
+                    event,
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+                ) {
+                    music_window::relayout(window.app_handle());
+                }
                 if let Some(desktop_state) = window.try_state::<desktop_shell::DesktopShellState>() {
                     desktop_shell::handle_main_window_event(
                         window.app_handle(),

@@ -1,0 +1,53 @@
+.es {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text, #dcddde);
+  touch-action: none;
+}
+
+.es__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted, #8e9297);
+  will-change: transform;
+}
+
+.es__icon-inner {
+  display: grid;
+  place-items: center;
+}
+
+.es__hit {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+}
+
+.es__track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  will-change: transform, height;
+}
+
+.es__range {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+}
+
+.es:hover .es__range,
+.es__hit:focus-visible .es__range {
+  background: var(--primary, #5865f2);
+}

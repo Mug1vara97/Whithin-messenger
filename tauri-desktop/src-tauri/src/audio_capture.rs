@@ -65,6 +65,14 @@ impl AudioCaptureManager {
 
         self.stop();
 
+        // Call audio is played by the WebView2 browser process, which Windows does not count
+        // as part of this process's tree, so excluding our own pid would still capture it.
+        let pid = if exclude && pid == std::process::id() {
+            webview_browser_pid().unwrap_or(pid)
+        } else {
+            pid
+        };
+
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = Arc::clone(&stop);
 
@@ -84,6 +92,39 @@ impl AudioCaptureManager {
 
         Ok(true)
     }
+}
+
+/// The `msedgewebview2.exe` browser process started by this app (its child).
+#[cfg(windows)]
+fn webview_browser_pid() -> Option<u32> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    };
+
+    let own = std::process::id();
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?;
+        let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut found = None;
+        let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
+        while more {
+            let len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
+            let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
+            if entry.th32ParentProcessID == own && name.eq_ignore_ascii_case("msedgewebview2.exe") {
+                found = Some(entry.th32ProcessID);
+                break;
+            }
+            more = Process32NextW(snapshot, &mut entry).is_ok();
+        }
+        let _ = CloseHandle(snapshot);
+        found
+    }
+}
+
+#[cfg(not(windows))]
+fn webview_browser_pid() -> Option<u32> {
+    None
 }
 
 fn run_capture_loop(

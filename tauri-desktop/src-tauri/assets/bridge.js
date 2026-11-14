@@ -91,9 +91,308 @@
     }
   }
 
+  const PILL_NAV_ID = 'whithin-pill-nav';
+  const PILL_NAV_CSS = `
+#${PILL_NAV_ID} {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 24px;
+  margin-left: 12px;
+  padding: 2px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: transparent;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+#${PILL_NAV_ID} .wpn__pill {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  height: 20px;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), width 0.34s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+}
+#${PILL_NAV_ID}:not([data-ready]) .wpn__pill { transition: none; }
+#${PILL_NAV_ID} .wpn__pill--active {
+  background: color-mix(in srgb, var(--electron-titlebar-nav, #9aa1ac) 16%, transparent);
+}
+#${PILL_NAV_ID} .wpn__pill--hover {
+  background: color-mix(in srgb, var(--electron-titlebar-nav, #9aa1ac) 8%, transparent);
+  opacity: 0;
+}
+#${PILL_NAV_ID}[data-hover] .wpn__pill--hover { opacity: 1; }
+#${PILL_NAV_ID} .wpn__item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--electron-titlebar-nav, #9aa1ac);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+#${PILL_NAV_ID} .wpn__item:hover { color: var(--electron-titlebar-nav-hover, #d2d6de); }
+#${PILL_NAV_ID} .wpn__item[aria-current='page'] { color: var(--electron-titlebar-nav-hover, #d2d6de); }
+#${PILL_NAV_ID} .wpn__item:focus-visible { outline: 2px solid var(--primary, #5865f2); outline-offset: 1px; }
+#${PILL_NAV_ID} .wpn__item svg { display: block; flex-shrink: 0; pointer-events: none; }
+.electron-titlebar-app-name, .titlebar__brand { flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) {
+  #${PILL_NAV_ID} .wpn__pill, #${PILL_NAV_ID} .wpn__item { transition: none; }
+}`;
+  const PILL_NAV_HTML =
+    '<span class="wpn__pill wpn__pill--hover" aria-hidden="true"></span>' +
+    '<span class="wpn__pill wpn__pill--active" aria-hidden="true"></span>' +
+    '<button type="button" class="wpn__item" data-player="false">' +
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z"/></svg>Мессенджер</button>' +
+    '<button type="button" class="wpn__item" data-player="true">' +
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>Музыка</button>';
+
+  /** Titlebar switch between the site and the player: the active pill slides, a soft one follows the pointer. */
+  function createPillNav(onSelect) {
+    if (!document.getElementById(`${PILL_NAV_ID}-style`)) {
+      const style = document.createElement('style');
+      style.id = `${PILL_NAV_ID}-style`;
+      style.textContent = PILL_NAV_CSS;
+      document.head.appendChild(style);
+    }
+    const nav = document.createElement('nav');
+    nav.id = PILL_NAV_ID;
+    nav.setAttribute('aria-label', 'Раздел');
+    nav.innerHTML = PILL_NAV_HTML;
+    const [hoverPill, activePill] = nav.querySelectorAll('.wpn__pill');
+    const items = [...nav.querySelectorAll('.wpn__item')];
+    let playerOpen = false;
+    const place = (pill, item) => {
+      pill.style.width = `${item.offsetWidth}px`;
+      pill.style.transform = `translateX(${item.offsetLeft}px)`;
+    };
+    const activeItem = () => items[playerOpen ? 1 : 0];
+    items.forEach((item) => {
+      item.addEventListener('click', () => onSelect(item.dataset.player === 'true'));
+      item.addEventListener('pointerenter', () => {
+        place(hoverPill, item);
+        nav.toggleAttribute('data-hover', item !== activeItem());
+      });
+    });
+    nav.addEventListener('pointerleave', () => nav.removeAttribute('data-hover'));
+    const paint = () => {
+      items.forEach((item) => {
+        const active = item === activeItem();
+        if (active) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+      });
+      place(activePill, activeItem());
+      if (activeItem().matches(':hover')) nav.removeAttribute('data-hover');
+    };
+    return {
+      nav,
+      /** Positions the pills once the nav is in the document (offsets are 0 before that). */
+      mounted() {
+        paint();
+        new ResizeObserver(paint).observe(nav);
+        requestAnimationFrame(() => nav.setAttribute('data-ready', ''));
+      },
+      setPlayerOpen(open) {
+        playerOpen = open;
+        paint();
+      },
+    };
+  }
+
+  const MUSIC_THEME_VARS = [
+    '--background',
+    '--background-primary',
+    '--background-secondary',
+    '--surface',
+    '--surface-hover',
+    '--hover',
+    '--text',
+    '--text-muted',
+    '--text-secondary',
+    '--icon',
+    '--icon-hover',
+    '--primary',
+    '--primary-hover',
+    '--primary-rgb',
+    '--danger',
+    '--border',
+    '--server-list-background',
+  ];
+
+  const isTransparent = (value) =>
+    value === 'transparent' || /^rgba?\([^)]*[,/]\s*0(\.0+)?\s*\)$/.test(value);
+
+  const FROSTED_FILL_VARS = ['--fg-fill-serverlist', '--fg-fill-left', '--fg-fill-middle', '--fg-input'];
+
+  /**
+   * Mirrors the site's resolved theme into the player. Frosted glass blanks the base colors,
+   * so those fall back to the theme's `--x-rgb` triplets, and the panel fills travel separately.
+   */
+  function shareMusicTheme(invoke) {
+    let last = '';
+    const push = () => {
+      if (!document.body) return;
+      const style = getComputedStyle(document.body);
+      const vars = {};
+      MUSIC_THEME_VARS.forEach((name) => {
+        const value = style.getPropertyValue(name).trim();
+        if (value && !isTransparent(value)) {
+          vars[name] = value;
+          return;
+        }
+        const rgb = style.getPropertyValue(`${name}-rgb`).trim();
+        if (rgb) vars[name] = `rgb(${rgb})`;
+      });
+      let frosted = null;
+      if (document.documentElement.getAttribute('data-frosted-glass') === 'enabled') {
+        frosted = {};
+        FROSTED_FILL_VARS.forEach((name) => {
+          frosted[name] = style.getPropertyValue(name).trim();
+        });
+      }
+      const theme = { vars, fontFamily: style.fontFamily, frosted };
+      const json = JSON.stringify(theme);
+      if (json === last) return;
+      last = json;
+      invoke('music_set_theme', { theme }).catch(() => {});
+    };
+    let timer = null;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(push, 150);
+    };
+    // The bridge runs at document creation, before <html>/<body> exist.
+    const start = () => {
+      new MutationObserver(schedule).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['style', 'class', 'data-theme-preset', 'data-frosted-glass'],
+      });
+      new MutationObserver(schedule).observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+      setInterval(push, 5000);
+      schedule();
+    };
+    if (document.body) start();
+    else document.addEventListener('DOMContentLoaded', start, { once: true });
+  }
+
+  /** Must match the site's appBackgroundSettings.js (wallpaper lives in IndexedDB there). */
+  const WALLPAPER_DB = 'whithin-app-background';
+  const WALLPAPER_STORE = 'images';
+  const WALLPAPER_KEY = 'wallpaper';
+  const WALLPAPER_CHANGE_EVENT = 'appBackgroundSettingsChanged';
+
+  function readSiteWallpaper() {
+    return new Promise((resolve) => {
+      const open = indexedDB.open(WALLPAPER_DB, 1);
+      open.onupgradeneeded = () => open.result.createObjectStore(WALLPAPER_STORE);
+      open.onerror = () => resolve(null);
+      open.onsuccess = () => {
+        const db = open.result;
+        const request = db.transaction(WALLPAPER_STORE, 'readonly').objectStore(WALLPAPER_STORE).get(WALLPAPER_KEY);
+        request.onsuccess = () => {
+          db.close();
+          resolve(request.result instanceof Blob ? request.result : null);
+        };
+        request.onerror = () => {
+          db.close();
+          resolve(null);
+        };
+      };
+    });
+  }
+
+  /** Copies the site's wallpaper to the player; Rust skips writes when the bytes are unchanged. */
+  function shareMusicWallpaper(invoke) {
+    let timer = null;
+    const push = async () => {
+      const blob = await readSiteWallpaper();
+      const bytes = blob ? new Uint8Array(await blob.arrayBuffer()) : new Uint8Array(0);
+      invoke('music_set_wallpaper', bytes).catch(() => {});
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(push, 300);
+    };
+    window.addEventListener(WALLPAPER_CHANGE_EVENT, schedule);
+    schedule();
+  }
+
+  /** Site pages only: hands login + theme to the desktop player. */
+  function installMusicPlayerHooks(invoke, listen) {
+    if (!/^https?:$/.test(location.protocol) || location.hostname.endsWith('.localhost')) return;
+
+    // Resent until the player confirms it holds a session (server may be down or older).
+    let sharedToken = null;
+    const shareLogin = () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token || token === sharedToken) return;
+      invoke('music_auth_from_site', { accessToken: token })
+        .then((ok) => {
+          if (ok) sharedToken = token;
+        })
+        .catch(() => {});
+    };
+    shareLogin();
+    setInterval(shareLogin, 15000);
+    shareMusicTheme(invoke);
+    shareMusicWallpaper(invoke);
+  }
+
+  /** Site titlebar and the offline shell's titlebar alike: the switch sits right after the app name. */
+  function installPillNav(invoke, listen) {
+    let playerOpen = false;
+    let pillNav = null;
+    listen('music-visibility', (event) => {
+      playerOpen = Boolean(event.payload);
+      pillNav?.setPlayerOpen(playerOpen);
+    });
+
+    // The site re-renders its titlebar (login, logout), so the nav is re-attached when it goes missing.
+    const ensurePillNav = () => {
+      const bar = document.getElementById('electron-titlebar-drag-shim') || document.querySelector('.titlebar__drag');
+      if (!bar || document.getElementById(PILL_NAV_ID)) return;
+      pillNav = createPillNav((open) => invoke('music_show', { visible: open }).catch(() => {}));
+      const name = bar.querySelector('.electron-titlebar-app-name, .titlebar__brand');
+      bar.insertBefore(pillNav.nav, name ? name.nextSibling : null);
+      pillNav.setPlayerOpen(playerOpen);
+      pillNav.mounted();
+    };
+    const start = () => {
+      ensurePillNav();
+      new MutationObserver(ensurePillNav).observe(document.body, { childList: true, subtree: true });
+    };
+    if (document.body) start();
+    else document.addEventListener('DOMContentLoaded', start, { once: true });
+  }
+
   waitForTauri(() => {
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
+
+    // Must never break the rest of the bridge (electronAPI below drives the site's titlebar).
+    try {
+      installMusicPlayerHooks(invoke, listen);
+      installPillNav(invoke, listen);
+    } catch (err) {
+      console.warn('[whithin-tauri] music hooks failed', err);
+    }
 
     const audioListeners = new Map();
 

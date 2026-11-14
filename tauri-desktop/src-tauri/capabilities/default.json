@@ -3,6 +3,7 @@
   "identifier": "default",
   "description": "Default Whithin Tauri capabilities",
   "windows": ["main", "screen-picker", "desktop-notifications", "call-overlay", "active-call-overlay"],
+  "webviews": ["music"],
   "remote": {
     "urls": [
       "http://localhost:*",
