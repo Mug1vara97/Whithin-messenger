@@ -1,5 +1,6 @@
 mod audio_capture;
 mod apple;
+mod cinema;
 mod deezer;
 mod desktop_parity;
 mod desktop_shell;
@@ -91,6 +92,7 @@ fn serve_embedded_asset(request: tauri::http::Request<Vec<u8>>) -> tauri::http::
         "" | "shell.html" => (load_asset_html("shell.html"), "text/html; charset=utf-8"),
         "music.html" => (load_asset_html("music.html"), "text/html; charset=utf-8"),
         "mini-player.html" => (load_asset_html("mini-player.html"), "text/html; charset=utf-8"),
+        "cinema.html" => (load_asset_html("cinema.html"), "text/html; charset=utf-8"),
         "screen-picker.html" => (load_screen_picker_html(), "text/html; charset=utf-8"),
         "notification-host.html" => (load_asset_html("notification-host.html"), "text/html; charset=utf-8"),
         "call-overlay-host.html" => (load_asset_html("call-overlay-host.html"), "text/html; charset=utf-8"),
@@ -166,6 +168,7 @@ fn load_asset_html(file_name: &str) -> Vec<u8> {
         "shell.html" => include_str!("../assets/shell.html").as_bytes().to_vec(),
         "music.html" => include_str!("../assets/music.html").as_bytes().to_vec(),
         "mini-player.html" => include_str!("../assets/mini-player.html").as_bytes().to_vec(),
+        "cinema.html" => include_str!("../assets/cinema.html").as_bytes().to_vec(),
         "titlebar-player.js" => include_str!("../assets/titlebar-player.js").as_bytes().to_vec(),
         "boot-loader.js" => include_str!("../assets/boot-loader.js").as_bytes().to_vec(),
         "screen-picker.html" => include_str!("../assets/screen-picker.html")
@@ -652,7 +655,18 @@ pub fn run() {
                 responder.respond(service.serve(request).await);
             });
         })
+        .register_asynchronous_uri_scheme_protocol(cinema::proxy::SCHEME, |_ctx, request, responder| {
+            tauri::async_runtime::spawn(async move {
+                responder.respond(cinema::proxy::serve(request).await);
+            });
+        })
         .invoke_handler(tauri::generate_handler![
+            cinema::cinema_show,
+            cinema::cinema_fullscreen,
+            cinema::proxy::cinema_proxy_url,
+            cinema::anilibria::cinema_anilibria,
+            cinema::rezka::cinema_rezka,
+            cinema::rezka::cinema_rezka_account,
             audio_is_platform_supported,
             audio_check_permission,
             audio_request_permission,
@@ -825,6 +839,7 @@ pub fn run() {
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
                 ) {
                     music_window::relayout(window.app_handle());
+                    cinema::relayout(window.app_handle());
                 }
                 if let Some(desktop_state) = window.try_state::<desktop_shell::DesktopShellState>() {
                     desktop_shell::handle_main_window_event(

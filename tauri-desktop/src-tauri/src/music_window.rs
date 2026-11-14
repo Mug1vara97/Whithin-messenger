@@ -17,7 +17,7 @@ const WALLPAPER_FILE: &str = "wallpaper.bin";
 
 static THEME: Mutex<Option<serde_json::Value>> = Mutex::new(None);
 
-fn player_bounds<R: Runtime>(window: &tauri::Window<R>) -> Result<tauri::Rect, String> {
+pub(crate) fn panel_bounds<R: Runtime>(window: &tauri::Window<R>) -> Result<tauri::Rect, String> {
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let size = window.inner_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
     Ok(tauri::Rect {
@@ -31,7 +31,7 @@ pub fn relayout<R: Runtime>(app: &AppHandle<R>) {
     let (Some(window), Some(player)) = (app.get_window("main"), app.get_webview(LABEL)) else {
         return;
     };
-    if let Ok(bounds) = player_bounds(&window) {
+    if let Ok(bounds) = panel_bounds(&window) {
         let _ = player.set_bounds(bounds);
     }
 }
@@ -59,21 +59,35 @@ fn set_visible<R: Runtime>(app: &AppHandle<R>, player: &Webview<R>, visible: boo
     Ok(())
 }
 
+/// Hides the player without focusing the site (the caller is switching to another panel).
+pub(crate) fn hide(app: &AppHandle) {
+    if !VISIBLE.swap(false, Ordering::Relaxed) {
+        return;
+    }
+    if let Some(player) = app.get_webview(LABEL) {
+        let _ = player.hide();
+    }
+    emit_visibility(app, false);
+}
+
 /// `visible: None` toggles.
 #[tauri::command]
 pub async fn music_show(app: AppHandle, visible: Option<bool>) -> Result<bool, String> {
     let window = app
         .get_window("main")
         .ok_or_else(|| "main window missing".to_string())?;
+    let target = visible.unwrap_or(!VISIBLE.load(Ordering::Relaxed));
+    if target {
+        crate::cinema::hide(&app);
+    }
     if let Some(player) = app.get_webview(LABEL) {
-        let target = visible.unwrap_or(!VISIBLE.load(Ordering::Relaxed));
         set_visible(&app, &player, target)?;
         return Ok(target);
     }
-    if visible == Some(false) {
+    if !target {
         return Ok(false);
     }
-    let bounds = player_bounds(&window)?;
+    let bounds = panel_bounds(&window)?;
     let builder = tauri::webview::WebviewBuilder::new(LABEL, crate::asset_url("music.html")?)
         .background_color(tauri::window::Color(0x1e, 0x1f, 0x22, 0xff));
     let player = window
@@ -104,6 +118,7 @@ pub fn music_set_theme(app: AppHandle, theme: serde_json::Value) -> Result<(), S
         let _ = std::fs::write(path, theme.to_string());
     }
     let _ = app.emit_to(crate::mini_player::LABEL, "music-theme", theme.clone());
+    let _ = app.emit_to(crate::cinema::LABEL, "music-theme", theme.clone());
     let _ = app.emit_to(LABEL, "music-theme", theme);
     Ok(())
 }
@@ -129,6 +144,7 @@ pub fn music_set_wallpaper(app: AppHandle, request: tauri::ipc::Request<'_>) -> 
         std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     }
     let _ = app.emit_to(LABEL, "music-wallpaper", ());
+    let _ = app.emit_to(crate::cinema::LABEL, "music-wallpaper", ());
     Ok(())
 }
 

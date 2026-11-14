@@ -157,14 +157,17 @@
   const PILL_NAV_HTML =
     '<span class="wpn__pill wpn__pill--hover" aria-hidden="true"></span>' +
     '<span class="wpn__pill wpn__pill--active" aria-hidden="true"></span>' +
-    '<button type="button" class="wpn__item" data-player="false">' +
+    '<button type="button" class="wpn__item" data-section="site">' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
     '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z"/></svg>Мессенджер</button>' +
-    '<button type="button" class="wpn__item" data-player="true">' +
+    '<button type="button" class="wpn__item" data-section="music">' +
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-    '<path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>Музыка</button>';
+    '<path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>Музыка</button>' +
+    '<button type="button" class="wpn__item" data-section="cinema">' +
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 3v2h2V7zm14 0v2h2V7zM4 11v2h2v-2zm14 0v2h2v-2zM4 15v2h2v-2zm14 0v2h2v-2zM9.5 8.5v7l5.5-3.5z"/></svg>Кино</button>';
 
-  /** Titlebar switch between the site and the player: the active pill slides, a soft one follows the pointer. */
+  /** Titlebar switch between the site, music and cinema: the active pill slides, a soft one follows the pointer. */
   function createPillNav(onSelect) {
     if (!document.getElementById(`${PILL_NAV_ID}-style`)) {
       const style = document.createElement('style');
@@ -178,14 +181,14 @@
     nav.innerHTML = PILL_NAV_HTML;
     const [hoverPill, activePill] = nav.querySelectorAll('.wpn__pill');
     const items = [...nav.querySelectorAll('.wpn__item')];
-    let playerOpen = false;
+    let section = 'site';
     const place = (pill, item) => {
       pill.style.width = `${item.offsetWidth}px`;
       pill.style.transform = `translateX(${item.offsetLeft}px)`;
     };
-    const activeItem = () => items[playerOpen ? 1 : 0];
+    const activeItem = () => items.find((item) => item.dataset.section === section) || items[0];
     items.forEach((item) => {
-      item.addEventListener('click', () => onSelect(item.dataset.player === 'true'));
+      item.addEventListener('click', () => onSelect(item.dataset.section));
       item.addEventListener('pointerenter', () => {
         place(hoverPill, item);
         nav.toggleAttribute('data-hover', item !== activeItem());
@@ -209,8 +212,8 @@
         new ResizeObserver(paint).observe(nav);
         requestAnimationFrame(() => nav.setAttribute('data-ready', ''));
       },
-      setPlayerOpen(open) {
-        playerOpen = open;
+      setSection(next) {
+        section = next;
         paint();
       },
     };
@@ -357,21 +360,32 @@
 
   /** Site titlebar and the offline shell's titlebar alike: the switch sits right after the app name. */
   function installPillNav(invoke, listen) {
-    let playerOpen = false;
+    let section = 'site';
     let pillNav = null;
-    listen('music-visibility', (event) => {
-      playerOpen = Boolean(event.payload);
-      pillNav?.setPlayerOpen(playerOpen);
-    });
+    // Opening one panel hides the other, and the two events may arrive in either order.
+    const track = (name) => (event) => {
+      if (event.payload) section = name;
+      else if (section === name) section = 'site';
+      pillNav?.setSection(section);
+    };
+    listen('music-visibility', track('music'));
+    listen('cinema-visibility', track('cinema'));
+    const select = (target) => {
+      if (target === 'site') {
+        if (section !== 'site') invoke(`${section}_show`, { visible: false }).catch(() => {});
+        return;
+      }
+      invoke(`${target}_show`, { visible: true }).catch(() => {});
+    };
 
     // The site re-renders its titlebar (login, logout), so the nav is re-attached when it goes missing.
     const ensurePillNav = () => {
       const bar = document.getElementById('electron-titlebar-drag-shim') || document.querySelector('.titlebar__drag');
       if (!bar || document.getElementById(PILL_NAV_ID)) return;
-      pillNav = createPillNav((open) => invoke('music_show', { visible: open }).catch(() => {}));
+      pillNav = createPillNav(select);
       const name = bar.querySelector('.electron-titlebar-app-name, .titlebar__brand');
       bar.insertBefore(pillNav.nav, name ? name.nextSibling : null);
-      pillNav.setPlayerOpen(playerOpen);
+      pillNav.setSection(section);
       pillNav.mounted();
     };
     const start = () => {
