@@ -1004,14 +1004,15 @@ self.onmessage = (e) => {
       };
     }
 
-    function wireTrackLifecycle(track, stopPipeline) {
+    // `token` scopes the stop to this capture, so switching sources doesn't kill the new one.
+    function wireTrackLifecycle(track, stopPipeline, token) {
       let stopped = false;
       const nativeStop = track.stop.bind(track);
       const stopAll = () => {
         if (stopped) return;
         stopped = true;
         try { stopPipeline(); } catch (_) {}
-        invoke('display_capture_stop').catch(() => {});
+        invoke('display_capture_stop', { token: token || null }).catch(() => {});
       };
       track.stop = () => {
         stopAll();
@@ -1054,7 +1055,7 @@ self.onmessage = (e) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            endTrack = wireTrackLifecycle(generator, stopPipeline);
+            endTrack = wireTrackLifecycle(generator, stopPipeline, cfg.token);
             resolve({ track: generator, meta: msg.meta, mode: 'worker+generator' });
           } else if (msg.type === 'closed') {
             if (!settled) {
@@ -1110,7 +1111,7 @@ self.onmessage = (e) => {
             if (!settled) {
               settled = true;
               clearTimeout(timer);
-              endTrack = wireTrackLifecycle(generator, stopPipeline);
+              endTrack = wireTrackLifecycle(generator, stopPipeline, cfg.token);
               resolve({ track: generator, meta, mode: 'main+generator' });
             }
           },
@@ -1162,7 +1163,7 @@ self.onmessage = (e) => {
             if (!settled) {
               settled = true;
               clearTimeout(timer);
-              endTrack = wireTrackLifecycle(track, () => pump.stop());
+              endTrack = wireTrackLifecycle(track, () => pump.stop(), cfg.token);
               resolve({ track, meta, mode: 'canvas' });
             }
           },
@@ -1233,6 +1234,7 @@ self.onmessage = (e) => {
     async function buildNativeCaptureTrack(info, wanted) {
       const cfg = {
         wsUrl: info.wsUrl,
+        token: info.token,
         headerLength: info.headerLength || DEFAULT_HEADER_LEN,
         mode: 'videoframe',
       };
@@ -1310,7 +1312,7 @@ self.onmessage = (e) => {
         });
         return new MediaStream([track]);
       } catch (err) {
-        invoke('display_capture_stop').catch(() => {});
+        invoke('display_capture_stop', { token: info.token || null }).catch(() => {});
         throw new DOMException(
           'Screen capture failed: ' + ((err && err.message) || err),
           'NotReadableError',

@@ -4,6 +4,7 @@ import { ElasticSlider } from './ElasticSlider';
 import { Icon } from './Icon';
 import { Slider } from './Slider';
 import { formatTime } from '../lib/format';
+import { invoke } from '../lib/tauri';
 import { libraryIdFor, useLibrary } from '../store/library';
 import { usePlayer } from '../store/player';
 
@@ -100,6 +101,14 @@ export function NowPlayingBar({ queueOpen, onToggleQueue }) {
           title="Очередь"
         >
           <Icon name="queue" size={18} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => invoke('mini_player_show', { visible: true }).catch(() => {})}
+          title="Мини-плеер поверх окон"
+        >
+          <Icon name="pip" size={18} />
         </button>
         <button type="button" className="icon-btn" onClick={actions.toggleMute} title={volume > 0 ? 'Без звука' : 'Включить звук'}>
           <Icon name={volume > 0 ? 'volume' : 'mute'} size={18} />

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, State, WebviewUrl,
@@ -26,6 +26,8 @@ const NOTIF_DEDUPE_MS: u64 = 3000;
 const CALL_WIDTH: f64 = 320.0;
 const CALL_HEIGHT: f64 = 304.0;
 const CALL_AUTO_DISMISS_MS: u64 = 3 * 60 * 1000;
+
+pub const TRAY_ID: &str = "main-tray";
 
 const LABEL_NOTIFICATIONS: &str = "desktop-notifications";
 const LABEL_CALL_OVERLAY: &str = "call-overlay";
@@ -120,13 +122,41 @@ pub fn emit_main_visibility(app: &AppHandle) {
 }
 
 pub fn setup_tray(app: &AppHandle, state: &DesktopShellState) -> Result<(), String> {
-    let show_i = MenuItem::with_id(app, "show", "Показать", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let hide_i = MenuItem::with_id(app, "hide", "Скрыть", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let quit_i = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i]).map_err(|e| e.to_string())?;
+    let item = |id: &str, text: &str, enabled: bool| {
+        MenuItem::with_id(app, id, text, enabled, None::<&str>).map_err(|e| e.to_string())
+    };
+    let separator = || PredefinedMenuItem::separator(app).map_err(|e| e.to_string());
+
+    let now_i = item("music-now", "Ничего не играет", false)?;
+    let prev_i = item("music-prev", "Предыдущий", true)?;
+    let play_i = item("music-toggle", "Слушать", false)?;
+    let next_i = item("music-next", "Следующий", true)?;
+    let mini_i = item("music-mini", "Мини-плеер поверх окон", true)?;
+    let show_i = item("show", "Показать", true)?;
+    let hide_i = item("hide", "Скрыть", true)?;
+    let update_i = item("check-update", "Проверить обновления", true)?;
+    let quit_i = item("quit", "Выход", true)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &now_i,
+            &prev_i,
+            &play_i,
+            &next_i,
+            &mini_i,
+            &separator()?,
+            &show_i,
+            &hide_i,
+            &separator()?,
+            &update_i,
+            &quit_i,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    crate::mini_player::register_tray_items(crate::mini_player::TrayMusicItems {
+        toggle_play: play_i,
+        now: now_i,
+    });
 
     let icon = app
         .default_window_icon()
@@ -134,14 +164,21 @@ pub fn setup_tray(app: &AppHandle, state: &DesktopShellState) -> Result<(), Stri
         .ok_or_else(|| "No default window icon for tray".to_string())?;
 
     let handle = app.clone();
-    TrayIconBuilder::new()
+    TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .tooltip("Whithin")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| match event.id.as_ref() {
+            "music-prev" => crate::mini_player::remote(app, "previous"),
+            "music-toggle" => crate::mini_player::remote(app, "togglePlay"),
+            "music-next" => crate::mini_player::remote(app, "next"),
+            "music-mini" => {
+                let _ = crate::mini_player::set_visible(app, None);
+            }
             "show" => show_main_window(app),
             "hide" => hide_main_window(app),
+            "check-update" => crate::updater::check_now(app),
             "quit" => {
                 app.exit(0);
             }
@@ -187,7 +224,7 @@ pub fn handle_main_window_event(app: &AppHandle, state: &DesktopShellState, even
 }
 
 /// Logical work area (excludes taskbar). Falls back to full primary monitor.
-fn primary_work_area<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64, f64, f64)> {
+pub(crate) fn primary_work_area<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64, f64, f64)> {
     let monitor = app.primary_monitor().ok().flatten()?;
     let scale = monitor.scale_factor().max(0.5);
 

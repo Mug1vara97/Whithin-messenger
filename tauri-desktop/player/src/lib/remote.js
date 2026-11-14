@@ -3,10 +3,12 @@ import { usePlayer } from '../store/player';
 import { emitTo, listen } from './tauri';
 
 /**
- * Mirrors playback to the site's titlebar mini player (webview "main") and executes the
+ * Mirrors playback to the site's titlebar mini player (webview "main") and the floating
+ * mini player window, and executes the
  * commands it sends back, so the music can be controlled without opening the player.
  */
 const SITE = { kind: 'Webview', label: 'main' };
+const MINI = { kind: 'WebviewWindow', label: 'mini-player' };
 const MIN_INTERVAL_MS = 250;
 
 function snapshot() {
@@ -42,7 +44,9 @@ function publish() {
   timer = setTimeout(() => {
     timer = null;
     lastSent = Date.now();
-    emitTo(SITE, 'music-now', snapshot());
+    const now = snapshot();
+    emitTo(SITE, 'music-now', now);
+    emitTo(MINI, 'music-now', now);
   }, wait);
 }
 

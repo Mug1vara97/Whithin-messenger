@@ -12,6 +12,7 @@ import ImagePreview from '../../../shared/ui/molecules/ImagePreview/ImagePreview
 import { buildMediaUrl, downloadMediaFile } from '../../../shared/lib/utils/urlHelpers';
 import { appToast } from '../../../shared/lib/utils/appToast';
 import FeedCommentTree from './FeedCommentTree';
+import { FeedImage, FeedVideo } from './FeedMedia';
 import {
   buildShareUrl,
   formatFileSize,
@@ -216,19 +217,13 @@ const FeedPostThread = ({
                 className="feed-panel__media-item"
                 onClick={() => setPreviewMedia(item)}
               >
-                <img src={buildMediaUrl(item.filePath)} alt={item.originalFileName} />
+                <FeedImage src={buildMediaUrl(item.filePath)} alt={item.originalFileName} />
               </button>
             ))}
           </div>
         )}
         {videos.map((item) => (
-          <video
-            key={item.id}
-            className="feed-panel__video"
-            src={buildMediaUrl(item.filePath)}
-            controls
-            preload="metadata"
-          />
+          <FeedVideo key={item.id} item={item} />
         ))}
         {files.map((item) => {
           const displayName =

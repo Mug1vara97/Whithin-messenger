@@ -193,8 +193,8 @@
   justify-content: center;
   overflow: hidden;
   border-radius: 16px;
-  border: 1px solid var(--border);
-  background: #000;
+  border: none;
+  background: transparent;
   min-height: 0;
   padding: 0;
   margin: 0;
@@ -203,29 +203,59 @@
   color: inherit;
 }
 
-.feed-panel__media-item img {
+.feed-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  height: auto;
-  max-height: 520px;
-  object-fit: contain;
-  object-position: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.feed-media::before {
+  content: '';
+  position: absolute;
+  inset: -32px;
+  z-index: -1;
+  background: var(--feed-media-bg) center / cover no-repeat;
+  filter: blur(28px) saturate(1.3) brightness(0.75);
+}
+
+.feed-media__img {
   display: block;
-}
-
-.feed-panel__media-grid--2 .feed-panel__media-item img,
-.feed-panel__media-grid--3 .feed-panel__media-item img,
-.feed-panel__media-grid--4 .feed-panel__media-item img {
-  max-height: 280px;
-}
-
-.feed-panel__video {
-  width: 100%;
+  width: auto;
   height: auto;
+  max-width: 100%;
   max-height: 520px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: #000;
   object-fit: contain;
+}
+
+.feed-panel__media-grid--2 .feed-media,
+.feed-panel__media-grid--3 .feed-media,
+.feed-panel__media-grid--4 .feed-media {
+  height: 260px;
+}
+
+.feed-panel__media-grid--2 .feed-media__img,
+.feed-panel__media-grid--3 .feed-media__img,
+.feed-panel__media-grid--4 .feed-media__img {
+  max-height: 100%;
+}
+
+.video-player.feed-media-video {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 14px;
+  background: transparent;
+}
+
+.feed-media-video .video-player__media {
+  width: auto;
+  max-width: 100%;
+  max-height: 520px;
+  background: transparent;
 }
 
 .feed-panel__file {
@@ -595,17 +625,15 @@
 .feed-panel__card-thumb {
   margin: 0 0 10px;
   border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  max-height: 220px;
-  background: #000;
 }
 
-.feed-panel__card-thumb img {
-  width: 100%;
-  height: 220px;
-  object-fit: cover;
-  display: block;
+.feed-panel__card-thumb .feed-media__img {
+  max-height: 440px;
+}
+
+.feed-panel__card-video {
+  margin: 0 0 10px;
+  pointer-events: auto;
 }
 
 .feed-panel__card-files-hint {

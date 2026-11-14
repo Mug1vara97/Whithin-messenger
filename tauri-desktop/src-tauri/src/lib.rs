@@ -12,6 +12,8 @@ mod screen_sources;
 mod shortcuts;
 mod soundcloud;
 mod local_music;
+mod mini_player;
+mod updater;
 mod yt_net;
 
 use std::path::PathBuf;
@@ -88,6 +90,7 @@ fn serve_embedded_asset(request: tauri::http::Request<Vec<u8>>) -> tauri::http::
     let (bytes, mime) = match path {
         "" | "shell.html" => (load_asset_html("shell.html"), "text/html; charset=utf-8"),
         "music.html" => (load_asset_html("music.html"), "text/html; charset=utf-8"),
+        "mini-player.html" => (load_asset_html("mini-player.html"), "text/html; charset=utf-8"),
         "screen-picker.html" => (load_screen_picker_html(), "text/html; charset=utf-8"),
         "notification-host.html" => (load_asset_html("notification-host.html"), "text/html; charset=utf-8"),
         "call-overlay-host.html" => (load_asset_html("call-overlay-host.html"), "text/html; charset=utf-8"),
@@ -162,6 +165,7 @@ fn load_asset_html(file_name: &str) -> Vec<u8> {
     match file_name {
         "shell.html" => include_str!("../assets/shell.html").as_bytes().to_vec(),
         "music.html" => include_str!("../assets/music.html").as_bytes().to_vec(),
+        "mini-player.html" => include_str!("../assets/mini-player.html").as_bytes().to_vec(),
         "titlebar-player.js" => include_str!("../assets/titlebar-player.js").as_bytes().to_vec(),
         "boot-loader.js" => include_str!("../assets/boot-loader.js").as_bytes().to_vec(),
         "screen-picker.html" => include_str!("../assets/screen-picker.html")
@@ -419,14 +423,15 @@ fn display_capture_start(
         "height": info.out_height,
         "frameRate": info.fps,
         "format": info.format.as_str(),
+        "token": info.token,
         "headerLength": display_capture::FRAME_HEADER_LEN,
         "frameUrl": "http://whithin-asset.localhost/live-frame.jpg",
     }))
 }
 
 #[tauri::command]
-fn display_capture_stop(state: State<'_, Arc<AppState>>) -> bool {
-    state.display.stop()
+fn display_capture_stop(state: State<'_, Arc<AppState>>, token: Option<String>) -> bool {
+    state.display.stop_session(token.as_deref())
 }
 
 #[tauri::command]
@@ -633,6 +638,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
         .manage(desktop.clone())
         .manage(music_service)
@@ -725,6 +731,8 @@ pub fn run() {
             music_library::music_library_sync,
             music_library::music_library_toggle,
             music_window::music_show,
+            mini_player::mini_player_show,
+            mini_player::mini_player_open_full,
             music_window::music_set_theme,
             music_window::music_get_theme,
             music_window::music_set_wallpaper,
@@ -742,6 +750,8 @@ pub fn run() {
             if let Err(err) = desktop_shell::setup_tray(app.handle(), &desktop_state) {
                 eprintln!("[whithin-tauri] tray setup failed: {err}");
             }
+            mini_player::watch_now_playing(app.handle());
+            updater::spawn_periodic_check(app.handle());
 
             // Deep links: register schemes (Windows) + forward open-url to renderer.
             {

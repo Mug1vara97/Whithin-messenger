@@ -103,6 +103,7 @@ pub fn music_set_theme(app: AppHandle, theme: serde_json::Value) -> Result<(), S
     if let Some(path) = theme_path(&app) {
         let _ = std::fs::write(path, theme.to_string());
     }
+    let _ = app.emit_to(crate::mini_player::LABEL, "music-theme", theme.clone());
     let _ = app.emit_to(LABEL, "music-theme", theme);
     Ok(())
 }

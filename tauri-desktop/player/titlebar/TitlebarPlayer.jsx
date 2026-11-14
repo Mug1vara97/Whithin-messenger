@@ -172,6 +172,17 @@ export function TitlebarPlayer() {
               thickness={5}
               activeThickness={9}
             />
+            <button
+              type="button"
+              className="esd-volume-btn"
+              onClick={() => {
+                setOpen(false);
+                window.__TAURI__.core.invoke('mini_player_show', { visible: true }).catch(() => {});
+              }}
+              title="Мини-плеер поверх окон"
+            >
+              <Icon name="pip" size={18} />
+            </button>
           </div>
         </div>
       )}

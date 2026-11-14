@@ -386,8 +386,17 @@ impl DisplayCaptureManager {
     }
 
     pub fn stop(&self) -> bool {
+        self.stop_session(None)
+    }
+
+    /// With `Some(token)`, only stops the capture that was started with that token, so a track
+    /// left over from a previous source can't tear down the capture that replaced it.
+    pub fn stop_session(&self, token: Option<&str>) -> bool {
         let taken = match self.inner.lock() {
-            Ok(mut g) => g.take(),
+            Ok(mut g) => match (g.as_ref(), token) {
+                (Some(current), Some(token)) if current.session.token != token => return false,
+                _ => g.take(),
+            },
             Err(_) => return false,
         };
         let Some(inner) = taken else {

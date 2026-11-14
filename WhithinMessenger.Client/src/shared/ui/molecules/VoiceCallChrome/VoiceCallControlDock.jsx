@@ -53,6 +53,10 @@ export function VoiceCallControlDock({
   onToggleVideo,
   isScreenSharing,
   onToggleScreenShare,
+  onStopScreenShare,
+  onChangeScreenShareSource,
+  screenShareAudioEnabled,
+  onToggleScreenShareAudio,
   spatialAudioEnabled,
   showSpatialAudioStage,
   onToggleSpatialAudioStage,
@@ -64,8 +68,14 @@ export function VoiceCallControlDock({
   onPointerLeave,
 }) {
   const [noiseSuppressMenuAnchor, setNoiseSuppressMenuAnchor] = useState(null);
+  const [screenShareMenuAnchor, setScreenShareMenuAnchor] = useState(null);
 
   const closeNoiseMenu = () => setNoiseSuppressMenuAnchor(null);
+  const closeScreenShareMenu = () => setScreenShareMenuAnchor(null);
+  const runScreenShareAction = (action) => {
+    closeScreenShareMenu();
+    action?.();
+  };
 
   const handleNoiseModeSelect = async (mode) => {
     if (onNoiseSuppressionModeSelect) {
@@ -182,9 +192,11 @@ export function VoiceCallControlDock({
               </button>
             </div>
 
-            <div className="attached-button-container control-button">
+            <div
+              className={`${isScreenSharing && onChangeScreenShareSource ? 'attached-caret-button-container' : 'attached-button-container'} control-button`}
+            >
               <button
-                className={`center-button ${isScreenSharing ? 'active' : ''}`}
+                className={`center-button ${isScreenSharing && onChangeScreenShareSource ? 'attached-button' : ''} ${isScreenSharing ? 'active' : ''}`}
                 type="button"
                 aria-label={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Продемонстрируйте свой экран'}
                 title={isScreenSharing ? 'Остановить демонстрацию' : 'Демонстрация экрана'}
@@ -192,6 +204,16 @@ export function VoiceCallControlDock({
               >
                 <ScreenShareIcon sx={{ fontSize: 24 }} />
               </button>
+              {isScreenSharing && onChangeScreenShareSource && (
+                <div
+                  className="context-menu-caret active"
+                  onClick={(e) => setScreenShareMenuAnchor(e.currentTarget)}
+                  title="Настройки демонстрации"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                </div>
+              )}
             </div>
 
             {onToggleSpatialAudioStage && (
@@ -276,6 +298,32 @@ export function VoiceCallControlDock({
           </MenuItem>
         </Menu>
       )}
+
+      <Menu
+        anchorEl={screenShareMenuAnchor}
+        open={Boolean(screenShareMenuAnchor && isScreenSharing)}
+        onClose={closeScreenShareMenu}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        PaperProps={{ sx: noiseMenuPaperSx }}
+      >
+        <MenuItem onClick={() => runScreenShareAction(onChangeScreenShareSource)}>
+          <div style={{ fontWeight: 600 }}>Сменить источник</div>
+          <div style={{ fontSize: '12px', color: '#b5bac1', marginTop: '2px' }}>
+            Другое окно или экран без остановки демонстрации
+          </div>
+        </MenuItem>
+        {onToggleScreenShareAudio && (
+          <MenuItem onClick={() => runScreenShareAction(onToggleScreenShareAudio)}>
+            <div style={{ fontWeight: 600 }}>
+              {screenShareAudioEnabled ? 'Выключить звук демонстрации' : 'Включить звук демонстрации'}
+            </div>
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => runScreenShareAction(onStopScreenShare || onToggleScreenShare)}>
+          <div style={{ fontWeight: 600, color: '#f23f43' }}>Остановить демонстрацию</div>
+        </MenuItem>
+      </Menu>
     </>
   );
 }

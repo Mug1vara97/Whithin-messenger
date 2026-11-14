@@ -1,0 +1,244 @@
+:root {
+  --background-primary: #2f3136;
+  --server-list-background: #1e1f22;
+  --surface-hover: #40444b;
+  --text: #dcddde;
+  --text-muted: #8e9297;
+  --primary: #5865f2;
+  --primary-rgb: 88, 101, 242;
+  --font: 'gg sans', 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  background: var(--server-list-background);
+  font-family: var(--font);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 12px 14px 18px 12px;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--server-list-background);
+}
+
+/* Cover colours bleed in softly; a dark veil keeps text readable on any artwork. */
+.mini__backdrop {
+  position: absolute;
+  inset: -40px;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) saturate(1.6);
+  opacity: 0.32;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+
+.mini::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--server-list-background) 35%, transparent),
+    color-mix(in srgb, var(--server-list-background) 75%, transparent)
+  );
+}
+
+.mini--playing .mini__backdrop {
+  opacity: 0.42;
+}
+
+.mini__cover {
+  position: relative;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+}
+
+.mini__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.mini__body {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.mini__meta {
+  min-width: 0;
+  padding-right: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mini__meta strong,
+.mini__meta span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mini__meta strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.mini__meta span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mini__window {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.mini:hover .mini__window {
+  opacity: 1;
+}
+
+.mini__chip {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.mini__chip:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.mini__controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+}
+
+.mini__icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-muted);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.mini__icon:not(:disabled):hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.mini__icon--on {
+  color: var(--primary);
+}
+
+.mini__play {
+  width: 32px;
+  height: 32px;
+  margin: 0 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--server-list-background);
+  background: var(--text);
+  transition: transform 0.12s;
+}
+
+.mini__play:hover {
+  transform: scale(1.07);
+}
+
+.mini__play:active {
+  transform: scale(0.95);
+}
+
+.mini__time {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.mini__time i {
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+.mini__seek {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+}
+
+.mini__seek .es__hit {
+  height: 14px;
+}

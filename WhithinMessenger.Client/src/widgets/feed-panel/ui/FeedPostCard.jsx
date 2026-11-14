@@ -6,6 +6,7 @@ import IosShareIcon from '@mui/icons-material/IosShare';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import { UserAvatar } from '../../../shared/ui';
 import { buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
+import { FeedImage, FeedVideo } from './FeedMedia';
 import {
   formatFileSize,
   formatRelativeTime,
@@ -42,6 +43,7 @@ const FeedPostCard = ({
   const attachments = post.attachments || [];
   const images = attachments.filter((item) => item.contentType?.startsWith('image/'));
   const thumb = images[0];
+  const video = thumb ? null : attachments.find((item) => item.contentType?.startsWith('video/'));
 
   return (
     <article className="feed-panel__card feed-panel__card--thread">
@@ -87,8 +89,10 @@ const FeedPostCard = ({
         {preview ? <p className="feed-panel__post-preview">{preview}</p> : null}
 
         {thumb ? (
-          <div className="feed-panel__card-thumb">
-            <img src={buildMediaUrl(thumb.filePath)} alt="" />
+          <FeedImage src={buildMediaUrl(thumb.filePath)} className="feed-panel__card-thumb" />
+        ) : video ? (
+          <div className="feed-panel__card-video" onClick={(e) => e.stopPropagation()}>
+            <FeedVideo item={video} />
           </div>
         ) : attachments.length > 0 ? (
           <div className="feed-panel__card-files-hint">
