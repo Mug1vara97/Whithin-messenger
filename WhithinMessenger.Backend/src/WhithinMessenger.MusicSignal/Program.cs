@@ -24,6 +24,7 @@ var app = builder.Build();
 
 app.UseCors();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "music-signal" }));
+app.Map("/api/yt-tunnel", YouTubeTunnel.HandleAsync);
 app.MapControllers();
 app.MapHub<MusicSyncHub>("/musicsynchub");
 

@@ -113,6 +113,18 @@ services:
       - app-network
     restart: unless-stopped
 
+  # YouTube tunnel for desktop/Android music (YouTubeTunnel.cs). Host network: bridge
+  # containers often can't reach googlevideo (IPv6 / filtered IPv4 on the hoster).
+  yt-tunnel:
+    image: whithin-messenger-music-signal
+    network_mode: host
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:8083
+      - ASPNETCORE_ENVIRONMENT=Production
+    depends_on:
+      - music-signal
+    restart: unless-stopped
+
   client:
     build:
       context: ./WhithinMessenger.Client
