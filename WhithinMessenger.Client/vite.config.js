@@ -14,6 +14,18 @@ const crossOriginResourcePolicyPlugin = () => ({
   },
 })
 
+// DEV_PROXY_TARGET=https://whithin.ru runs the local client against a remote backend
+// (set VITE_API_BASE_URL / VITE_API_URL to the dev server's own origin).
+const devProxyTarget = process.env.DEV_PROXY_TARGET
+
+const remoteProxy = (ws = false) => ({
+  target: devProxyTarget,
+  changeOrigin: true,
+  secure: true,
+  ws,
+  cookieDomainRewrite: 'localhost',
+})
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), crossOriginResourcePolicyPlugin()],
@@ -51,14 +63,20 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5117',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api')
-      },
-    }
+    proxy: devProxyTarget
+      ? {
+          '/api': remoteProxy(),
+          '/hub': remoteProxy(true),
+          '/uploads': remoteProxy(),
+        }
+      : {
+          '/api': {
+            target: 'http://localhost:5117',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (path) => path.replace(/^\/api/, '/api')
+          },
+        }
   },
   worker: {
     format: 'es'
