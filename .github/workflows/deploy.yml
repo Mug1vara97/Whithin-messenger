@@ -5,6 +5,10 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+concurrency:
+  group: whithin-prod-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -28,8 +32,7 @@ jobs:
           echo "Stopping containers..."
           if [ -d "whithin-messenger" ]; then
             cd whithin-messenger
-            docker-compose down || true
-            docker rm -f whithin-messenger-db-1 whithin-messenger-backend-1 whithin-messenger-client-1 whithin-messenger-nginx-1 whithin-messenger-music-signal-1 2>/dev/null || true
+            docker compose down --remove-orphans -t 15 || docker-compose down --remove-orphans -t 15 || true
             cd ..
           fi
           
@@ -38,7 +41,7 @@ jobs:
           if [ -d "whithin-messenger" ]; then
             rm -rf whithin-messenger-backup.old
             mv whithin-messenger-backup whithin-messenger-backup.old 2>/dev/null || true
-            cp -r whithin-messenger whithin-messenger-backup || true
+            rsync -a --delete whithin-messenger/ whithin-messenger-backup/ || cp -a whithin-messenger/. whithin-messenger-backup/ || true
           fi
           
           # Очищаем старые образы
@@ -76,9 +79,14 @@ jobs:
           chmod +x docker-compose.yml
           chmod -R 755 /home/whithin-messenger
           
+          # Убираем зависшие контейнеры проекта (конфликт имён при параллельных деплоях)
+          docker ps -a --filter "name=^whithin-messenger-" -q | xargs -r docker rm -f || true
+          
           # Запускаем Docker контейнеры
           echo "Starting services..."
-          docker-compose up -d --build
+          if ! docker compose up -d --build 2>/dev/null; then
+            docker-compose up -d --build || { echo "FATAL: docker compose up failed"; exit 1; }
+          fi
           
           # Ждем запуска базы данных
           echo "Waiting for database to start..."
@@ -97,7 +105,20 @@ jobs:
           
           # Проверяем статус всех контейнеров
           echo "Container status:"
-          docker-compose ps
+          docker compose ps || docker-compose ps
+
+          if ! (docker compose ps nginx 2>/dev/null || docker-compose ps nginx 2>/dev/null) | grep -qE 'Up|running'; then
+            echo "FATAL: nginx is not running after deploy"
+            docker compose ps -a 2>/dev/null || docker-compose ps -a
+            exit 1
+          fi
+
+          if ! curl -sf --max-time 15 https://127.0.0.1/ -k >/dev/null 2>&1; then
+            if ! curl -sf --max-time 15 http://127.0.0.1:80/ >/dev/null; then
+              echo "FATAL: HTTP health check failed"
+              exit 1
+            fi
+          fi
 
           # Проверяем логи проблемных сервисов
           echo "Backend logs:"
