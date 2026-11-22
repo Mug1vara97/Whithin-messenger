@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowBack,
   Badge,
@@ -41,6 +41,7 @@ const TAB_META = {
 const ServerSettingsPage = () => {
   const { serverId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthContext();
   const connectionContext = useConnectionContext();
   const getSharedConnection = connectionContext?.getConnection;
@@ -277,6 +278,15 @@ const ServerSettingsPage = () => {
   }
 
   const handleBackToServer = () => {
+    const returnTo = location.state?.returnTo;
+    if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.includes('/settings')) {
+      navigate(returnTo);
+      return;
+    }
+    if (location.key !== 'default') {
+      navigate(-1);
+      return;
+    }
     navigate(`/server/${serverId}`);
   };
 
@@ -374,14 +384,12 @@ const ServerSettingsPage = () => {
       </aside>
 
       <div className="server-settings-main">
-        {activeTab !== 'roles' && (
         <header className="server-settings-page-header">
           <h1>{pageMeta.title}</h1>
         </header>
-        )}
 
         <div className={`server-settings-scroll${activeTab === 'roles' ? ' server-settings-scroll--roles' : ''}`}>
-        <div className={activeTab === 'roles' ? undefined : 'settings-content'}>
+        <div className={activeTab === 'roles' ? undefined : activeTab === 'profile' ? 'settings-content settings-content--profile' : 'settings-content'}>
         {activeTab === 'profile' && userCanManageServer && (
           <ServerSettings
             connection={connectionRef.current}

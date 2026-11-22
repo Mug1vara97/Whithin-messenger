@@ -8,7 +8,9 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useVideoHls } from '../../../lib/hooks/useVideoHls';
 import {
+  clearVideoFit,
   exitDocumentFullscreen,
+  fitVideoInBox,
   isElementFullscreen,
   requestElementFullscreen,
   subscribeFullscreenChange,
@@ -194,6 +196,30 @@ const VideoPlayer = ({
       setIsFullscreen(isElementFullscreen(playerRef.current));
     });
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+
+    if (!isFullscreen) {
+      clearVideoFit(video);
+      return undefined;
+    }
+
+    const fitToScreen = () => {
+      fitVideoInBox(video, video.parentElement);
+    };
+
+    fitToScreen();
+    video.addEventListener('loadedmetadata', fitToScreen);
+    window.addEventListener('resize', fitToScreen);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', fitToScreen);
+      window.removeEventListener('resize', fitToScreen);
+      clearVideoFit(video);
+    };
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!isFullscreen) return undefined;

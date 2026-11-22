@@ -1,4 +1,5 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { clearVideoFit, fitVideoInBox } from '../../../lib/utils/videoFullscreen';
 import { useCallStore } from '../../../lib/stores/callStore';
 import {
   findChannelParticipant,
@@ -103,11 +104,19 @@ const ScreenShareElement = React.memo(({ stream, participantId }) => {
       videoElement.srcObject = null;
     }
     
-    // Cleanup при размонтировании
+    const fit = () => fitVideoInBox(videoElement, videoElement.parentElement);
+    fit();
+    videoElement.addEventListener('loadedmetadata', fit);
+    videoElement.addEventListener('resize', fit);
+    const observer = new ResizeObserver(fit);
+    if (videoElement.parentElement) observer.observe(videoElement.parentElement);
+
     return () => {
-      if (videoElement) {
-        videoElement.srcObject = null;
-      }
+      videoElement.removeEventListener('loadedmetadata', fit);
+      videoElement.removeEventListener('resize', fit);
+      observer.disconnect();
+      clearVideoFit(videoElement);
+      videoElement.srcObject = null;
     };
   }, [stream, participantId]);
   
@@ -647,28 +656,24 @@ const VideoCallGrid = ({
 
   const handleScreenShareFullscreen = useCallback((participantId, e) => {
     e?.stopPropagation?.();
-    const tile = e?.target?.closest?.('.video-tile');
+    e?.preventDefault?.();
+    const tile = e?.currentTarget?.closest?.('.video-tile');
     if (!tile) return;
-    if (fullscreenScreenShareId === participantId) {
+    if (document.fullscreenElement || fullscreenScreenShareId === participantId) {
       document.exitFullscreen?.();
       setFullscreenScreenShareId(null);
       setFullscreenUiVisible(false);
       clearFullscreenUiTimer();
-    } else {
-      if (focusedParticipantId !== null) {
-        setFocusedParticipantId(null);
-        setBottomPage(0);
-      }
-      setFullscreenUiVisible(false);
-      clearFullscreenUiTimer();
-      setFullscreenScreenShareId(participantId);
-      requestAnimationFrame(() => {
-        tile.requestFullscreen?.().catch(() => {
-          setFullscreenScreenShareId(null);
-        });
-      });
+      return;
     }
-  }, [clearFullscreenUiTimer, fullscreenScreenShareId, focusedParticipantId]);
+    setFullscreenUiVisible(true);
+    setFullscreenScreenShareId(participantId);
+    const request = tile.requestFullscreen?.();
+    request?.catch?.(() => {
+      setFullscreenScreenShareId(null);
+      setFullscreenUiVisible(false);
+    });
+  }, [clearFullscreenUiTimer, fullscreenScreenShareId]);
 
   const renderTileAvatar = (
     participant,

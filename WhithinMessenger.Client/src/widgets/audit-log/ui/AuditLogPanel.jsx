@@ -137,27 +137,26 @@ const AuditLogPanel = ({ connection, serverId }) => {
 
   return (
     <div className="audit-log-panel">
-      <div className="audit-log-toolbar">
-        <p className="audit-log-toolbar__hint">
-          Отображаются действия, которые поддерживаются в Whithin: каналы, категории, роли, участники, сервер и удаление сообщений.
-        </p>
-        <label className="audit-log-filter">
-          <FilterList fontSize="small" />
-          <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            className="audit-log-filter__select"
-          >
-            {ACTION_FILTER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       <div className="audit-log-card">
+        <div className="audit-log-card__bar">
+          <p className="audit-log-toolbar__hint">
+            Каналы, категории, роли, участники, сервер и удалённые сообщения.
+          </p>
+          <label className="audit-log-filter">
+            <FilterList fontSize="small" />
+            <select
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+              className="audit-log-filter__select"
+            >
+              {ACTION_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="audit-log-table">
           <div className="audit-log-table-head">
             <div className="audit-log-cell audit-log-cell--user">Пользователь</div>

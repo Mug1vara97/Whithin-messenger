@@ -668,6 +668,108 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   font-weight: 700;
 }
 
+/* ---------- Discovery ---------- */
+
+[data-interface-skin='player'] .discovery-sidebar,
+[data-interface-skin='player'] .discovery-main {
+  background: transparent;
+  border: none;
+}
+
+[data-interface-skin='player'] .discovery-sidebar__header,
+[data-interface-skin='player'] .discovery-main__header {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  background: transparent;
+  border: none;
+}
+
+[data-interface-skin='player'] .discovery-sidebar__header h3,
+[data-interface-skin='player'] .discovery-main__title {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav {
+  gap: 6px;
+  padding: 4px 10px 12px;
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav-item {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  gap: 10px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text, #dcddde) 62%, transparent);
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--player-field);
+  color: color-mix(in srgb, var(--text, #dcddde) 80%, transparent);
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav-item:hover {
+  background: var(--player-item-hover);
+  color: var(--text, #dcddde);
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav-item.is-active {
+  background: color-mix(in srgb, var(--primary, #5865f2) 24%, transparent);
+  color: var(--text, #dcddde);
+}
+
+[data-interface-skin='player'] .discovery-sidebar__nav-item.is-active .discovery-sidebar__nav-icon {
+  background: var(--primary, #5865f2);
+  color: #fff;
+}
+
+[data-interface-skin='player'] .discovery-main__search {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-field);
+  box-shadow: none;
+}
+
+[data-interface-skin='player'] .discovery-main__content {
+  margin-top: 8px;
+  border-radius: 8px;
+  background: var(--player-panel);
+}
+
+[data-interface-skin='player'] .server-studio-hero,
+[data-interface-skin='player'] .server-studio-card,
+[data-interface-skin='player'] .members-table-card,
+[data-interface-skin='player'] .audit-log-card {
+  border: none;
+  border-radius: 8px;
+}
+
+[data-interface-skin='player'] .server-studio-card {
+  background: color-mix(in srgb, var(--player-backdrop) 55%, var(--player-panel));
+}
+
+[data-interface-skin='player'] .server-studio-card input[type='text'],
+[data-interface-skin='player'] .server-studio-card textarea {
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .role-item {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-backdrop) 40%, transparent);
+}
+
+[data-interface-skin='player'] .server-settings-page .form-section,
+[data-interface-skin='player'] .server-settings-page .empty-form-state {
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-backdrop) 45%, var(--player-panel));
+}
+
 /* ---------- Server settings («Новое») ---------- */
 
 [data-interface-skin='player'] .server-settings-page {
@@ -677,8 +779,7 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   background: var(--player-backdrop);
 }
 
-[data-interface-skin='player'] .server-settings-sidebar,
-[data-interface-skin='player'] .server-settings-main {
+[data-interface-skin='player'] .server-settings-sidebar {
   background: var(--player-panel);
   border: none;
   border-radius: 8px;
@@ -686,26 +787,41 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   box-shadow: none;
 }
 
-[data-interface-skin='player'] .server-settings-page-header {
-  height: auto;
-  min-height: 0;
-  padding: 22px 28px 8px;
-  border-bottom: none;
-  background: transparent;
-}
-
-[data-interface-skin='player'] .server-settings-page-header h1 {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-[data-interface-skin='player'] .server-settings-scroll {
+[data-interface-skin='player'] .server-settings-main {
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 8px 28px 28px;
+  overflow: hidden;
+  box-shadow: none;
+  gap: 8px;
+}
+
+[data-interface-skin='player'] .server-settings-page-header {
+  height: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 9px 0 4px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+[data-interface-skin='player'] .server-settings-page-header h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.2;
+}
+
+[data-interface-skin='player'] .server-settings-scroll {
+  background: var(--player-panel);
+  border: none;
+  border-radius: 8px;
+  padding: 16px 20px 24px;
 }
 
 [data-interface-skin='player'] .server-settings-page .server-header {
@@ -761,86 +877,29 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   max-width: 760px;
 }
 
+[data-interface-skin='player'] .server-settings-page .settings-content--profile,
 [data-interface-skin='player'] .server-settings-page .server-settings-scroll:has(.member-management) .settings-content,
 [data-interface-skin='player'] .server-settings-page .server-settings-scroll:has(.audit-log-panel) .settings-content {
   max-width: none;
 }
 
-/* Members: list, not a spreadsheet */
-[data-interface-skin='player'] .server-settings-page .member-management {
-  max-width: none;
-}
-
+/* Members stay a table: header, columns, row borders */
 [data-interface-skin='player'] .server-settings-page .members-table-card {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  overflow: visible;
-}
-
-[data-interface-skin='player'] .server-settings-page .members-table-toolbar {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  padding: 0 4px 8px;
-  border-bottom: none;
-  background: transparent;
-}
-
-[data-interface-skin='player'] .server-settings-page .members-table-toolbar__title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-[data-interface-skin='player'] .server-settings-page .members-table-toolbar__actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 8px;
-  width: 100%;
-}
-
-[data-interface-skin='player'] .server-settings-page .members-search {
-  min-width: 0;
-  width: 100%;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--player-field);
-}
-
-[data-interface-skin='player'] .server-settings-page .members-toolbar-btn {
-  height: 40px;
-  padding: 0 14px;
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-[data-interface-skin='player'] .server-settings-page .members-toolbar-btn:hover {
-  background: var(--player-item-hover);
-  color: var(--text);
-}
-
-[data-interface-skin='player'] .server-settings-page .members-toolbar-btn--muted {
-  color: var(--text-muted);
-  background: transparent;
-}
-
-[data-interface-skin='player'] .server-settings-page .members-toolbar-btn--muted:hover {
-  background: var(--player-item-hover);
-  color: var(--text);
-}
-
-[data-interface-skin='player'] .server-settings-page .members-table-head {
-  display: none;
-}
-
-[data-interface-skin='player'] .server-settings-page .members-table-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 12px;
-  margin: 2px 0;
-  padding: 8px 10px;
   border: none;
   border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--player-backdrop) 55%, var(--player-panel));
+}
+
+[data-interface-skin='player'] .server-settings-page .members-table-toolbar,
+[data-interface-skin='player'] .server-settings-page .members-table-head,
+[data-interface-skin='player'] .server-settings-page .members-table-row,
+[data-interface-skin='player'] .server-settings-page .members-table-footer {
+  border-color: color-mix(in srgb, var(--text, #dcddde) 10%, transparent);
+}
+
+[data-interface-skin='player'] .server-settings-page .members-table-head,
+[data-interface-skin='player'] .server-settings-page .members-table-footer {
   background: transparent;
 }
 
@@ -848,17 +907,21 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   background: var(--player-item-hover);
 }
 
-[data-interface-skin='player'] .server-settings-page .members-table-footer {
-  margin-top: 8px;
-  padding: 8px 10px 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-weight: 600;
+[data-interface-skin='player'] .server-settings-page .members-search {
+  flex: 1;
+  min-width: 180px;
+  background: var(--player-field);
 }
 
-[data-interface-skin='player'] .server-settings-page .member-action-btn:hover {
-  background: var(--player-item-active);
+[data-interface-skin='player'] .server-settings-page .members-toolbar-btn {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+[data-interface-skin='player'] .server-settings-page .members-toolbar-btn:hover,
+[data-interface-skin='player'] .server-settings-page .members-toolbar-btn--muted:hover {
+  background: var(--player-item-hover);
+  color: var(--text);
 }
 
 [data-interface-skin='player'] .server-settings-page .settings-panel__title {
@@ -911,13 +974,187 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   font-weight: 700;
 }
 
+[data-interface-skin='player'] .server-settings-scroll--roles {
+  padding: 0;
+}
+
+[data-interface-skin='player'] .server-settings-page .role-management,
 [data-interface-skin='player'] .server-settings-page .role-management-content,
-[data-interface-skin='player'] .server-settings-page .roles-sidebar {
+[data-interface-skin='player'] .server-settings-page .roles-sidebar,
+[data-interface-skin='player'] .server-settings-page .role-form-section,
+[data-interface-skin='player'] .server-settings-page .role-form {
   background: transparent;
-  border-color: color-mix(in srgb, var(--text, #dcddde) 8%, transparent);
+}
+
+[data-interface-skin='player'] .server-settings-page .roles-sidebar,
+[data-interface-skin='player'] .server-settings-page .search-section,
+[data-interface-skin='player'] .server-settings-page .form-header {
+  border-color: color-mix(in srgb, var(--text, #dcddde) 10%, transparent);
+}
+
+[data-interface-skin='player'] .server-settings-page .search-input {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .role-item {
+  border-radius: 6px;
+  margin: 1px 8px;
+}
+
+[data-interface-skin='player'] .server-settings-page .role-item.selected,
+[data-interface-skin='player'] .server-settings-page .role-item:hover {
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .server-settings-page .role-item.selected {
+  background: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .server-settings-page .form-header h2 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-panel {
+  max-width: none;
+  margin: 0;
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-toolbar {
+  margin-bottom: 12px;
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-table-head,
+[data-interface-skin='player'] .server-settings-page .audit-log-row,
+[data-interface-skin='player'] .server-settings-page .audit-log-footer {
+  border-color: color-mix(in srgb, var(--text, #dcddde) 10%, transparent);
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-table-head,
+[data-interface-skin='player'] .server-settings-page .audit-log-footer {
+  background: transparent;
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-row:hover {
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-load-more {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .server-settings-profile {
+  max-width: 760px;
+}
+
+[data-interface-skin='player'] .server-settings-page .server-profile-preview__banner {
+  height: 168px;
+}
+
+[data-interface-skin='player'] .server-settings-page .server-profile-preview__name {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-panel {
+  margin-bottom: 18px;
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-field label,
+[data-interface-skin='player'] .server-settings-page .settings-field__label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+[data-interface-skin='player'] .server-settings-page .roles-list-header {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+[data-interface-skin='player'] .server-settings-page .form-header {
+  height: auto;
+  min-height: 0;
+  padding: 16px 20px 4px;
+  background: transparent;
+  border-bottom: none;
+}
+
+[data-interface-skin='player'] .server-settings-page .form-content {
+  padding: 12px 20px 24px;
+  gap: 12px;
+}
+
+[data-interface-skin='player'] .server-settings-page .form-section {
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--player-backdrop) 55%, var(--player-panel));
+}
+
+[data-interface-skin='player'] .server-settings-page .form-section h3 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+
+[data-interface-skin='player'] .server-settings-page .role-name-input,
+[data-interface-skin='player'] .server-settings-page .permission-search,
+[data-interface-skin='player'] .server-settings-page .color-input {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .save-btn,
+[data-interface-skin='player'] .server-settings-page .cancel-btn,
+[data-interface-skin='player'] .server-settings-page .delete-btn,
+[data-interface-skin='player'] .server-settings-page .create-role-button-bottom {
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+[data-interface-skin='player'] .server-settings-page .create-role-button-bottom {
+  margin: 8px;
+  border: none;
+  background: var(--player-field);
+  color: var(--text);
+}
+
+[data-interface-skin='player'] .server-settings-page .audit-log-table-head .audit-log-cell {
+  letter-spacing: 0.02em;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .discovery-main__header,
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .discovery-sidebar__header {
+  background: transparent !important;
+  border: none !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .discovery-main__content {
+  background: var(--fg-fill-middle) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-settings-page-header {
+  background: transparent !important;
+  border: none !important;
 }
 
 html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-settings-main {
+  background: transparent !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-settings-scroll {
   background: var(--fg-fill-middle) !important;
 }
 
@@ -940,6 +1177,20 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-setting
 
 [data-interface-skin='player'] .server-button {
   transition: border-radius 0.2s ease, transform 0.1s ease;
+}
+
+[data-interface-skin='player'] {
+  --avatar-presence-ring: var(--player-panel);
+}
+
+[data-interface-skin='player'] .user-panel .user-avatar-presence-dot,
+[data-interface-skin='player'] .sidebar-panel-layout .user-panel .user-avatar-presence-dot {
+  border-color: var(--player-dock);
+}
+
+[data-interface-skin='player'] .user-panel .user-avatar-presence-dot--offline,
+[data-interface-skin='player'] .sidebar-panel-layout .user-panel .user-avatar-presence-dot--offline {
+  background-color: var(--player-dock);
 }
 
 [data-interface-skin='player'] .server-button:hover {

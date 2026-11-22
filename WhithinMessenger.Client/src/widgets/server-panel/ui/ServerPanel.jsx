@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../../shared/lib/contexts/AuthContext';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
@@ -110,6 +110,7 @@ const ServerPanel = ({
   onOpenEventHandled,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthContext();
   const connectionContext = useConnectionContext();
   const getSharedConnection = connectionContext?.getConnection;
@@ -1203,7 +1204,10 @@ const ServerPanel = ({
               className="dropdown-item"
               onClick={() => {
                 setShowDropdown(false);
-                navigate(`/server/${currentServer?.serverId || currentServer?.ServerId}/settings`);
+                const serverId = currentServer?.serverId || currentServer?.ServerId;
+                navigate(`/server/${serverId}/settings`, {
+                  state: { returnTo: `${location.pathname}${location.search}${location.hash}` },
+                });
               }}
             >
               <Settings sx={{ fontSize: 16, marginRight: '8px' }} />
@@ -1214,7 +1218,10 @@ const ServerPanel = ({
               className="dropdown-item"
               onClick={() => {
                 setShowDropdown(false);
-                navigate(`/server/${currentServer?.serverId || currentServer?.ServerId}/settings`);
+                const serverId = currentServer?.serverId || currentServer?.ServerId;
+                navigate(`/server/${serverId}/settings`, {
+                  state: { returnTo: `${location.pathname}${location.search}${location.hash}` },
+                });
               }}
             >
               <Group sx={{ fontSize: 16, marginRight: '8px' }} />

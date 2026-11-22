@@ -1,3 +1,22 @@
+.server-settings-overlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  background: var(--background, #1e1f22);
+}
+
+body.electron-titlebar-chrome .server-settings-overlay {
+  top: var(--electron-titlebar-height, 32px);
+}
+
+.server-settings-overlay .server-settings-page {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
 .server-settings-page {
   min-height: 100vh;
   height: 100vh;
@@ -293,6 +312,12 @@
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
+}
+
+.settings-content--profile,
+.settings-content:has(.member-management),
+.settings-content:has(.audit-log-panel) {
+  max-width: none;
 }
 
 .settings-panel {

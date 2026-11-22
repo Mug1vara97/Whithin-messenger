@@ -18,6 +18,7 @@ import { ServerPanel } from '../../../widgets/server-panel';
 import { FriendsPanel } from '../../../widgets/friends-panel';
 import { FeedPanel } from '../../../widgets/feed-panel';
 import { VoiceCallView } from '../../../widgets/voice-call';
+import { ServerSettingsPage } from '../../server-settings/ui';
 import IdeasBoardView from '../../../widgets/ideas-board/ui/IdeasBoardView';
 import NewsChannelView from '../../../widgets/news-channel/ui/NewsChannelView';
 import { isVoiceChannel, isIdeasBoardChannel, isNewsChannel } from '../../../shared/lib/constants/chatChannelTypes';
@@ -76,6 +77,7 @@ const HomePage = () => {
     location.pathname.startsWith('/channels/@me/feed/') ||
     location.pathname === '/channels/@me';
   const showDiscovery = isDiscoveryPath(location.pathname);
+  const showServerSettings = /^\/server\/[^/]+\/settings\/?$/.test(location.pathname);
   const discoveryTab = parseDiscoveryTab(location.pathname) ?? DISCOVERY_TAB.SERVERS;
 
   useEffect(() => {
@@ -98,7 +100,7 @@ const HomePage = () => {
     }
   }, [location.pathname, navigate]);
 
-  const { server: serverData, accessDenied: serverAccessDenied } = useServer(serverId);
+  const { server: serverData, isLoading: serverLoading, accessDenied: serverAccessDenied } = useServer(serverId);
   // const [createdServerData, setCreatedServerData] = useState(null); // Не используется
   const handleChatCreatedNavigate = useCallback((createdChatId) => {
     navigate(`/channels/@me/${createdChatId}`);
@@ -109,7 +111,7 @@ const HomePage = () => {
     () => chats.find((chat) => chat.isSavedMessages)?.chatId ?? null,
     [chats],
   );
-  const { createServer, fetchServers, servers, createConnection } = useServerContext();
+  const { createServer, fetchServers, servers, serversListReady, createConnection } = useServerContext();
   const {
     notifications,
     unreadCount,
@@ -718,42 +720,36 @@ const HomePage = () => {
   }, [serverId, serverData]);
 
   useEffect(() => {
-    if (selectedServer && servers && serverId) {
-      console.log('HomePage: Checking if selectedServer is in servers list');
-      console.log('HomePage: selectedServer.serverId:', selectedServer.serverId);
-      console.log('HomePage: current serverId:', serverId);
-      console.log('HomePage: servers list:', servers.map(s => s.serverId));
-      
-      if (selectedServer.serverId !== serverId) {
-        console.log('HomePage: selectedServer does not match current serverId, skipping check');
-        return;
-      }
-      
-      const isServerInList = servers.some(server => server.serverId === selectedServer.serverId);
-      if (!isServerInList) {
-        console.log('HomePage: Selected server no longer in user servers, checking again in 1 second...');
-        setTimeout(() => {
-          const isServerInListAfterDelay = servers.some(server => server.serverId === selectedServer.serverId);
-          if (!isServerInListAfterDelay) {
-            console.log('HomePage: Selected server still not in user servers after delay, clearing selection');
-            setSelectedServer(null);
-            setSelectedChat(null);
-            navigate('/channels/@me');
-          } else {
-            console.log('HomePage: Server found in list after delay, keeping selection');
-          }
-        }, 1000);
-      } else {
-        console.log('HomePage: Selected server is in servers list, keeping selection');
-      }
+    if (!serversListReady || !selectedServer || !serverId) {
+      return undefined;
     }
-  }, [selectedServer, servers, serverId, navigate]);
+    if (String(selectedServer.serverId) !== String(serverId)) {
+      return undefined;
+    }
+
+    const isServerInList = servers.some(
+      (server) => String(server.serverId) === String(selectedServer.serverId),
+    );
+    if (isServerInList) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSelectedServer(null);
+      setSelectedChat(null);
+      navigate('/channels/@me');
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedServer, servers, serverId, navigate, serversListReady]);
 
   useEffect(() => {
-    if (serverId && channelId) {
-      // Добавляем небольшую задержку, чтобы дать время обновиться данным сервера
+    if (serverId && channelId && !serverLoading) {
       const timeoutId = setTimeout(() => {
         const currentServerData = serverDataFromPanel || serverData;
+        if (!currentServerData?.categories) {
+          return;
+        }
         console.log('HomePage: Using serverDataFromPanel:', !!serverDataFromPanel);
         console.log('HomePage: Using serverData:', !!serverData);
         console.log('HomePage: Current server data source:', serverDataFromPanel ? 'serverDataFromPanel' : 'serverData');
@@ -761,7 +757,7 @@ const HomePage = () => {
         if (currentServerData) {
           const foundChannel = currentServerData.categories
             ?.flatMap(category => category.chats || category.Chats || [])
-            .find(chat => (chat.chatId || chat.ChatId || chat.chat_id) === channelId);
+            .find(chat => String(chat.chatId || chat.ChatId || chat.chat_id) === String(channelId));
           
           const allChannels = currentServerData.categories?.flatMap(category => category.chats || category.Chats || []);
           console.log('All channels in server:', allChannels);
@@ -782,18 +778,25 @@ const HomePage = () => {
               username: foundChannel.name || foundChannel.Name || foundChannel.username
             };
             console.log('HomePage: Setting selectedChat to:', channelData);
-            setSelectedChat(channelData);
+            setSelectedChat((prev) => {
+              const prevId = prev?.chatId || prev?.ChatId || prev?.chat_id;
+              if (prevId != null && String(prevId) === String(channelData.chatId)) {
+                return prev;
+              }
+              return channelData;
+            });
           } else {
             console.log('HomePage: Channel not found, setting selectedChat to null');
             setSelectedChat(null);
             navigate(`/server/${serverId}`, { replace: true });
           }
         }
-      }, 200); // Задержка 200мс для обновления данных
+      }, 200);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [serverId, channelId, serverData, serverDataFromPanel, navigate]);
+    return undefined;
+  }, [serverId, channelId, serverData, serverDataFromPanel, serverLoading, navigate]);
 
   // Слушаем событие переключения канала для обновления интерфейса
   useEffect(() => {
@@ -1396,6 +1399,12 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+
+      {showServerSettings && (
+        <div className="server-settings-overlay">
+          <ServerSettingsPage />
+        </div>
+      )}
 
       <CreateServerModal
         isOpen={showCreateServerModal}

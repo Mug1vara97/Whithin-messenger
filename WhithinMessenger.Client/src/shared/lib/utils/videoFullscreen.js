@@ -5,6 +5,39 @@ const FULLSCREEN_EVENTS = [
   'MSFullscreenChange',
 ];
 
+const FIT_PROPS = ['position', 'top', 'left', 'right', 'bottom', 'transform', 'width', 'height', 'max-width', 'max-height', 'margin'];
+
+export const clearVideoFit = (video) => {
+  if (!video) return;
+  FIT_PROPS.forEach((prop) => video.style.removeProperty(prop));
+};
+
+/** Size the element to the frame and center it. object-fit on a full-size video sticks to the top. */
+export const fitVideoInBox = (video, box) => {
+  if (!video || !box) return;
+  const frameWidth = video.videoWidth;
+  const frameHeight = video.videoHeight;
+  const boxWidth = box.clientWidth;
+  const boxHeight = box.clientHeight;
+  if (!frameWidth || !frameHeight || !boxWidth || !boxHeight) return;
+
+  const scale = Math.min(boxWidth / frameWidth, boxHeight / frameHeight);
+  const width = Math.max(1, Math.floor(frameWidth * scale));
+  const height = Math.max(1, Math.floor(frameHeight * scale));
+
+  video.style.setProperty('position', 'absolute', 'important');
+  video.style.setProperty('top', '50%', 'important');
+  video.style.setProperty('left', '50%', 'important');
+  video.style.setProperty('right', 'auto', 'important');
+  video.style.setProperty('bottom', 'auto', 'important');
+  video.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+  video.style.setProperty('width', `${width}px`, 'important');
+  video.style.setProperty('height', `${height}px`, 'important');
+  video.style.setProperty('max-width', 'none', 'important');
+  video.style.setProperty('max-height', 'none', 'important');
+  video.style.setProperty('margin', '0', 'important');
+};
+
 export const getFullscreenElement = () =>
   document.fullscreenElement ||
   document.webkitFullscreenElement ||

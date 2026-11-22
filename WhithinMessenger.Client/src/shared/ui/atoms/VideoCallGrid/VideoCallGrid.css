@@ -1005,6 +1005,32 @@
 .video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile .tile-video,
 .video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile video {
   object-fit: contain;
+  object-position: center center;
+}
+
+.focused-view:has(.screen-share-tile),
+.focused-user-wrapper:has(.screen-share-tile) {
+  background: #000;
+}
+
+.video-tile.focused-tile.screen-share-tile,
+.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile.screen-share-tile {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: auto;
+  background: #000;
+}
+
+.video-tile.focused-tile.screen-share-tile .tile-content,
+.video-tile.focused-tile.screen-share-tile .tile-video,
+.video-tile.focused-tile.screen-share-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  background: #000;
 }
 
 .video-call-container.dm-grid-fit.focused-mode .bottom-users-container {
@@ -1060,6 +1086,12 @@
   height: 100%;
   object-fit: contain;
   border-radius: inherit;
+}
+
+.video-tile.focused-tile.screen-share-tile .tile-volume-controls,
+.video-tile.focused-tile.screen-share-tile .screen-share-fullscreen-btn {
+  pointer-events: auto;
+  z-index: 6;
 }
 
 /* Bottom users container in focused mode */
@@ -1253,6 +1285,14 @@
   align-items: center;
   justify-content: center;
   background: #000000;
+}
+
+.screen-share-tile .tile-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
 }
 
 .screen-share-tile .tile-video {
@@ -1500,8 +1540,12 @@
 .video-tile.screen-share-tile:fullscreen .tile-content,
 .video-tile.screen-share-tile:-webkit-full-screen .tile-content,
 .video-tile.screen-share-tile:-moz-full-screen .tile-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
+  background: #000;
 }
 
 .video-tile.screen-share-tile:fullscreen .tile-video,
@@ -1509,7 +1553,11 @@
 .video-tile.screen-share-tile:-moz-full-screen .tile-video {
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
+  object-position: center center;
+  background: #000;
 }
 
 /* ===== АДАПТИВНЫЕ СТИЛИ (Container Queries) ===== */

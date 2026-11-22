@@ -13,7 +13,6 @@ import { ResetPasswordPage } from '../../pages/reset-password/ui';
 import { QrLoginPage } from '../../pages/qr-login/ui';
 import { BirthdayCardPage } from '../../pages/birthday-card/ui';
 import { HomePage } from '../../pages/home/ui';
-import { ServerSettingsPage } from '../../pages/server-settings/ui';
 import StartupPreloader from '../../shared/ui/organisms/StartupPreloader/StartupPreloader';
 import SeoRouteSync from '../../shared/lib/seo/SeoRouteSync';
 import { DesktopNotificationSync } from '../../shared/lib/hooks/DesktopNotificationSync';
@@ -27,6 +26,18 @@ const MIN_BOOT_DISPLAY_MS = 380;
 const DeepLinkBridge = () => {
   useDeepLinkNavigation();
   return null;
+};
+
+/** Одно дерево HomePage на все экраны мессенджера, включая настройки сервера. */
+const AppShell = () => {
+  const { isAuthenticated, isLoading } = useAuthContext();
+  if (isLoading) {
+    return null;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <HomePage />;
 };
 
 const AppRouter = () => {
@@ -127,84 +138,21 @@ const AppRouter = () => {
             path="/birthday"
             element={<BirthdayCardPage />}
           />
-          <Route 
-            path="/" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route 
-            path="/server/:serverId" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route
-            path="/server/:serverId/event/:eventId"
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route 
-            path="/server/:serverId/channel/:channelId" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route 
-            path="/chat/:chatId" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route 
-            path="/channels/@me" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route 
-            path="/channels/@me/friends" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route
-            path="/channels/@me/feed"
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/channels/@me/feed/:postId"
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route 
-            path="/channels/@me/:chatId" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route
-            path="/discovery"
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/discovery/:section"
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route 
-            path="/server/:serverId/settings" 
-            element={
-              isAuthenticated ? <ServerSettingsPage /> : <Navigate to="/login" replace />
-            } 
-          />
+          <Route element={<AppShell />}>
+            <Route path="/" element={null} />
+            <Route path="/server/:serverId" element={null} />
+            <Route path="/server/:serverId/event/:eventId" element={null} />
+            <Route path="/server/:serverId/channel/:channelId" element={null} />
+            <Route path="/server/:serverId/settings" element={null} />
+            <Route path="/chat/:chatId" element={null} />
+            <Route path="/channels/@me" element={null} />
+            <Route path="/channels/@me/friends" element={null} />
+            <Route path="/channels/@me/feed" element={null} />
+            <Route path="/channels/@me/feed/:postId" element={null} />
+            <Route path="/channels/@me/:chatId" element={null} />
+            <Route path="/discovery" element={null} />
+            <Route path="/discovery/:section" element={null} />
+          </Route>
           <Route 
             path="*" 
             element={

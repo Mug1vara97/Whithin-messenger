@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { PhotoCamera, Upload } from '@mui/icons-material';
 import { BASE_URL } from '../../../shared/lib/constants/apiEndpoints';
 import tokenManager from '../../../shared/lib/services/tokenManager';
@@ -7,14 +7,25 @@ import { appToast } from '../../../shared/lib/utils/appToast';
 
 const BANNER_PRESET_COLORS = [
   { value: '#000000', title: 'Чёрный' },
+  { value: '#2b2d31', title: 'Графит' },
+  { value: '#ffffff', title: 'Белый' },
+  { value: '#8e9297', title: 'Серый' },
+  { value: '#f44336', title: 'Красный' },
+  { value: '#e91e63', title: 'Малиновый' },
   { value: '#ff73b3', title: 'Розовый' },
   { value: '#ff6b35', title: 'Оранжевый' },
   { value: '#ffa500', title: 'Янтарный' },
   { value: '#ffff00', title: 'Жёлтый' },
-  { value: '#9c27b0', title: 'Фиолетовый' },
+  { value: '#cddc39', title: 'Лайм' },
   { value: '#4caf50', title: 'Зелёный' },
+  { value: '#009688', title: 'Бирюзовый' },
+  { value: '#00bcd4', title: 'Голубой' },
   { value: '#2196f3', title: 'Синий' },
-  { value: '#f44336', title: 'Красный' },
+  { value: '#3f51b5', title: 'Индиго' },
+  { value: '#9c27b0', title: 'Фиолетовый' },
+  { value: '#673ab7', title: 'Пурпурный' },
+  { value: '#795548', title: 'Коричневый' },
+  { value: '#5d4037', title: 'Шоколад' },
 ];
 
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -257,194 +268,116 @@ const ServerSettings = ({
   };
 
   return (
-    <div className="server-settings-profile">
-      <div className="server-profile-preview">
-        <div className="server-profile-preview__banner" style={bannerStyle} />
-        <div className="server-profile-preview__body">
-          <div className="server-profile-preview__avatar" style={avatarStyle}>
+    <div className="server-studio">
+      <section className="server-studio-hero" style={bannerStyle}>
+        <div className="server-studio-hero__shade" />
+        <div className="server-studio-hero__main">
+          <button
+            type="button"
+            className="server-studio-hero__avatar"
+            style={avatarStyle}
+            onClick={() => avatarInputRef.current?.click()}
+            aria-label="Загрузить значок"
+          >
             {!server?.avatar && avatarLetter}
+          </button>
+          <div className="server-studio-hero__copy">
+            <h2>{displayName}</h2>
+            <p>{serverDescription.trim() || 'Описание ещё не задано'}</p>
+            <span>{isPrivate ? 'Только по приглашению' : 'Открыт в обнаружении'}</span>
           </div>
-          <div className="server-profile-preview__name">{displayName}</div>
-          {serverDescription.trim() && (
-            <p className="server-profile-preview__desc">{serverDescription.trim()}</p>
+        </div>
+        <div className="server-studio-hero__tools">
+          <button type="button" onClick={() => bannerInputRef.current?.click()}>
+            <Upload fontSize="small" />
+            Баннер
+          </button>
+          {server?.avatar && (
+            <button type="button" onClick={handleAvatarRemove}>Убрать значок</button>
           )}
-        </div>
-      </div>
-
-      <section className="settings-panel">
-        <h3 className="settings-panel__title">Название сервера</h3>
-        <p className="settings-panel__desc">
-          Отображается в списке серверов, каналах и настройках.
-        </p>
-        <div className="settings-panel__card">
-          <div className="settings-field">
-            <label htmlFor="server-profile-name">Название</label>
-            <input
-              id="server-profile-name"
-              type="text"
-              value={serverName}
-              onChange={(e) => setServerName(e.target.value)}
-              placeholder="Введите название сервера"
-              maxLength={100}
-            />
-          </div>
-          <div className="settings-form-actions">
-            <button
-              type="button"
-              className="settings-btn settings-btn--primary"
-              onClick={handleServerNameUpdate}
-              disabled={isSaving || !nameChanged || !serverName.trim()}
-            >
-              {isSaving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-panel">
-        <h3 className="settings-panel__title">Описание</h3>
-        <p className="settings-panel__desc">
-          Расскажите, о чём этот сервер. Видно в обзоре и профиле сервера.
-        </p>
-        <div className="settings-panel__card">
-          <div className="settings-field server-settings-profile__description">
-            <label htmlFor="server-profile-description">Текст</label>
-            <textarea
-              id="server-profile-description"
-              value={serverDescription}
-              onChange={(e) => setServerDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
-              placeholder="Добавьте описание сервера"
-              rows={4}
-              maxLength={MAX_DESCRIPTION_LENGTH}
-            />
-            <span className="server-settings-profile__counter">
-              {serverDescription.length}/{MAX_DESCRIPTION_LENGTH}
-            </span>
-          </div>
-          <div className="settings-form-actions">
-            <button
-              type="button"
-              className="settings-btn settings-btn--primary"
-              onClick={handleServerDescriptionUpdate}
-              disabled={isSavingDescription || !descriptionChanged}
-            >
-              {isSavingDescription ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-panel">
-        <h3 className="settings-panel__title">Приватность</h3>
-        <p className="settings-panel__desc">
-          {isPrivate
-            ? 'Сервер скрыт из обнаружения. Новые участники могут попасть только по приглашению.'
-            : 'Сервер виден в обнаружении — любой пользователь может найти и присоединиться к нему.'}
-        </p>
-        <div className="settings-panel__card">
-          <div className="settings-row">
-            <div className="settings-row__info">
-              <span className="settings-row__title">Приватный сервер</span>
-              <p className="settings-row__desc">
-                {isSavingPrivacy ? 'Сохранение…' : isPrivate ? 'Сейчас: приватный' : 'Сейчас: публичный'}
-              </p>
-            </div>
-            <label className={`settings-switch${isSavingPrivacy ? ' settings-switch--disabled' : ''}`}>
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => handlePrivacyChange(e.target.checked)}
-                disabled={isSavingPrivacy}
-              />
-              <span className="settings-switch__slider" />
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-panel">
-        <h3 className="settings-panel__title">Значок сервера</h3>
-        <p className="settings-panel__desc">Рекомендуемый размер — 512×512 px. PNG или JPG.</p>
-        <div className="settings-panel__card settings-panel__card--flush">
-          <div className="server-profile-icon-row">
-            <button
-              type="button"
-              className="server-profile-icon-preview"
-              style={avatarStyle}
-              onClick={() => avatarInputRef.current?.click()}
-              aria-label="Загрузить значок"
-            >
-              {!server?.avatar && avatarLetter}
-            </button>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              hidden
-            />
-            <div className="server-profile-icon-actions">
-              <button
-                type="button"
-                className="settings-btn settings-btn--primary"
-                onClick={() => avatarInputRef.current?.click()}
-              >
-                <PhotoCamera fontSize="small" />
-                Загрузить
-              </button>
-              {server?.avatar && (
-                <button
-                  type="button"
-                  className="settings-btn settings-btn--danger"
-                  onClick={handleAvatarRemove}
-                >
-                  Удалить
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-panel">
-        <h3 className="settings-panel__title">Баннер</h3>
-        <p className="settings-panel__desc">
-          Фон профиля сервера. Можно загрузить изображение или выбрать цвет.
-        </p>
-        <div className="settings-panel__card settings-panel__card--flush">
-          <label className="server-profile-banner-upload" style={bannerStyle}>
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleBannerFileUpload}
-              hidden
-            />
-            {!server?.banner ? (
-              <div className="server-profile-banner-upload__placeholder">
-                <Upload sx={{ fontSize: 22 }} />
-                <span>Нажмите, чтобы загрузить баннер</span>
-              </div>
-            ) : (
-              <div className="server-profile-banner-upload__overlay" aria-hidden="true">
-                <Upload sx={{ fontSize: 18 }} />
-                <span>Изменить баннер</span>
-              </div>
-            )}
-          </label>
-
           {server?.banner && (
-            <div className="server-profile-banner-tools">
-              <button
-                type="button"
-                className="settings-btn settings-btn--danger"
-                onClick={handleBannerRemove}
-              >
-                Удалить баннер
-              </button>
-            </div>
+            <button type="button" onClick={handleBannerRemove}>Убрать баннер</button>
           )}
+        </div>
+        <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} hidden />
+        <input ref={bannerInputRef} type="file" accept="image/*" onChange={handleBannerFileUpload} hidden />
+      </section>
 
+      <div className="server-studio-grid">
+        <article className="server-studio-card">
+          <h3>Название</h3>
+          <input
+            id="server-profile-name"
+            type="text"
+            value={serverName}
+            onChange={(e) => setServerName(e.target.value)}
+            placeholder="Название сервера"
+            maxLength={100}
+          />
+          <button
+            type="button"
+            className="settings-btn settings-btn--primary"
+            onClick={handleServerNameUpdate}
+            disabled={isSaving || !nameChanged || !serverName.trim()}
+          >
+            {isSaving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </article>
+
+        <article className="server-studio-card server-studio-card--switch">
+          <div>
+            <h3>Приватность</h3>
+            <p>{isPrivate ? 'Сервер скрыт из обнаружения' : 'Сервер можно найти и вступить'}</p>
+          </div>
+          <label className={`settings-switch${isSavingPrivacy ? ' settings-switch--disabled' : ''}`}>
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => handlePrivacyChange(e.target.checked)}
+              disabled={isSavingPrivacy}
+            />
+            <span className="settings-switch__slider" />
+          </label>
+        </article>
+
+        <article className="server-studio-card server-studio-card--wide">
+          <div className="server-studio-card__head">
+            <h3>Описание</h3>
+            <span>{serverDescription.length}/{MAX_DESCRIPTION_LENGTH}</span>
+          </div>
+          <textarea
+            id="server-profile-description"
+            value={serverDescription}
+            onChange={(e) => setServerDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
+            placeholder="О чём этот сервер"
+            rows={4}
+            maxLength={MAX_DESCRIPTION_LENGTH}
+          />
+          <button
+            type="button"
+            className="settings-btn settings-btn--primary"
+            onClick={handleServerDescriptionUpdate}
+            disabled={isSavingDescription || !descriptionChanged}
+          >
+            {isSavingDescription ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </article>
+
+        <article className="server-studio-card">
+          <h3>Значок</h3>
+          <p>512×512, PNG или JPG. Нажмите на значок в баннере, чтобы заменить.</p>
+          <button
+            type="button"
+            className="settings-btn settings-btn--primary"
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            <PhotoCamera fontSize="small" />
+            Загрузить значок
+          </button>
+        </article>
+
+        <article className="server-studio-card server-studio-card--wide">
+          <h3>Цвет баннера</h3>
           <div className="server-profile-colors">
             {BANNER_PRESET_COLORS.map(({ value, title }) => (
               <button
@@ -460,40 +393,30 @@ const ServerSettings = ({
               />
             ))}
           </div>
-
-          <div className="server-profile-color-custom">
-            <input
-              type="color"
-              value={bannerColor || '#3f3f3f'}
-              onChange={(e) => {
-                setBannerColor(e.target.value);
-                setIsDefaultColor(false);
-              }}
-              aria-label="Свой цвет баннера"
-            />
-            <button
-              type="button"
-              className="settings-btn settings-btn--ghost"
-              onClick={handleResetToDefault}
-            >
-              Сбросить цвет
+          <div className="server-studio-card__row">
+            <label className="server-rgb-picker">
+              <input
+                type="color"
+                value={bannerColor || '#3f3f3f'}
+                onChange={(e) => {
+                  setBannerColor(e.target.value);
+                  setIsDefaultColor(false);
+                }}
+                aria-label="Свой цвет баннера"
+              />
+              <span className="server-rgb-picker__swatch" style={{ background: bannerColor || '#3f3f3f' }} />
+              <span className="server-rgb-picker__label">Свой цвет</span>
+            </label>
+            <button type="button" className="settings-btn settings-btn--ghost" onClick={handleResetToDefault}>
+              Сбросить
             </button>
-          </div>
-
-          <div className="server-profile-banner-footer">
-            <button
-              type="button"
-              className="settings-btn settings-btn--primary"
-              onClick={handleBannerColorUpdate}
-            >
+            <button type="button" className="settings-btn settings-btn--primary" onClick={handleBannerColorUpdate}>
               Сохранить цвет
             </button>
-            {isDefaultColor && (
-              <span className="server-profile-status">Используется цвет по умолчанию</span>
-            )}
           </div>
-        </div>
-      </section>
+          {isDefaultColor && <p>Сейчас цвет по умолчанию</p>}
+        </article>
+      </div>
     </div>
   );
 };

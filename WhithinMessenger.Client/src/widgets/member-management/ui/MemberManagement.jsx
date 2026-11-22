@@ -449,9 +449,7 @@ const MemberManagement = ({
     <div className="member-management">
       <div className="members-table-card">
         <div className="members-table-toolbar">
-          <h3 className="members-table-toolbar__title">Участники сервера</h3>
-          <div className="members-table-toolbar__actions">
-            <label className="members-search">
+          <label className="members-search">
               <Search className="members-search__icon" />
               <input
                 type="text"
@@ -461,6 +459,7 @@ const MemberManagement = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </label>
+            <div className="members-table-toolbar__actions">
             <button
               type="button"
               className="members-toolbar-btn"
@@ -472,7 +471,7 @@ const MemberManagement = ({
             <button type="button" className="members-toolbar-btn members-toolbar-btn--muted" onClick={handleClearFilters}>
               Очистить
             </button>
-          </div>
+            </div>
         </div>
 
         <div className="members-table">

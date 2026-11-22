@@ -2,9 +2,8 @@ import React from 'react';
 import VideoPlayer from '../../../shared/ui/molecules/MediaFile/VideoPlayer';
 import { buildMediaUrl } from '../../../shared/lib/utils/urlHelpers';
 
-/** Full, uncropped image; the empty sides are filled with a blurred copy instead of black bars. */
 export const FeedImage = ({ src, alt = '', className = '' }) => (
-  <div className={`feed-media ${className}`} style={{ '--feed-media-bg': `url("${src}")` }}>
+  <div className={`feed-media ${className}`}>
     <img className="feed-media__img" src={src} alt={alt} loading="lazy" draggable={false} />
   </div>
 );

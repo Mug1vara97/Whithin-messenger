@@ -15,6 +15,7 @@ export const ServerProvider = ({ children }) => {
   const [servers, setServers] = useState([]);
   const [publicServers, setPublicServers] = useState([]);
   const [initialServersLoaded, setInitialServersLoaded] = useState(() => hasStartupBootCompleted());
+  const [serversListReady, setServersListReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [connection, setConnection] = useState(null);
@@ -43,6 +44,7 @@ export const ServerProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
       setInitialServersLoaded(true);
+      setServersListReady(true);
     }
   }, []);
 
@@ -158,6 +160,7 @@ export const ServerProvider = ({ children }) => {
       setError(err.message);
       setIsConnected(false);
       setInitialServersLoaded(true);
+      setServersListReady(true);
     } finally {
       isConnectingRef.current = false;
     }
@@ -319,6 +322,7 @@ export const ServerProvider = ({ children }) => {
     servers,
     publicServers,
     initialServersLoaded,
+    serversListReady,
     isLoading,
     error,
     connection,
