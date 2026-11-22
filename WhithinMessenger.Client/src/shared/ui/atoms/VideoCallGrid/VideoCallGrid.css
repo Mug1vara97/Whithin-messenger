@@ -1008,31 +1008,6 @@
   object-position: center center;
 }
 
-.focused-view:has(.screen-share-tile),
-.focused-user-wrapper:has(.screen-share-tile) {
-  background: #000;
-}
-
-.video-tile.focused-tile.screen-share-tile,
-.video-call-container.dm-grid-fit.focused-mode .video-tile.focused-tile.screen-share-tile {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  aspect-ratio: auto;
-  background: #000;
-}
-
-.video-tile.focused-tile.screen-share-tile .tile-content,
-.video-tile.focused-tile.screen-share-tile .tile-video,
-.video-tile.focused-tile.screen-share-tile video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center center;
-  background: #000;
-}
-
 .video-call-container.dm-grid-fit.focused-mode .bottom-users-container {
   display: none !important;
 }
