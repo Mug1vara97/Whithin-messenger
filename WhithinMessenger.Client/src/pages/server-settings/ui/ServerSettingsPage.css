@@ -259,6 +259,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.server-settings-scroll--roles,
 .server-settings-scroll:has(.role-management) {
   display: flex;
   flex-direction: column;
@@ -266,7 +267,14 @@
   overflow: hidden;
 }
 
-.server-settings-scroll:has(.server-profile),
+.server-settings-scroll--roles > * {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.server-settings-scroll:has(.server-settings-profile),
 .server-settings-scroll:has(.member-management) {
   padding-top: 16px;
 }

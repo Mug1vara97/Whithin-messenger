@@ -67,7 +67,10 @@ body.electron-titlebar-chrome .role-management-content {
 body.electron-titlebar-chrome .server-settings-page,
 body.electron-titlebar-chrome .server-settings-loading,
 body.electron-titlebar-chrome .server-settings-error {
-  min-height: 100% !important;
+  height: calc(100vh - var(--electron-titlebar-height, 32px)) !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - var(--electron-titlebar-height, 32px)) !important;
+  overflow: hidden !important;
 }
 
 body.electron-titlebar-chrome .theme-colors-page {

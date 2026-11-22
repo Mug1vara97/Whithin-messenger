@@ -257,7 +257,7 @@ const ServerSettings = ({
   };
 
   return (
-    <div className="server-profile">
+    <div className="server-settings-profile">
       <div className="server-profile-preview">
         <div className="server-profile-preview__banner" style={bannerStyle} />
         <div className="server-profile-preview__body">
@@ -271,100 +271,101 @@ const ServerSettings = ({
         </div>
       </div>
 
-      <div className="server-profile-card">
-        <section className="server-profile-section">
-          <div className="server-profile-section__head">
-            <span className="server-profile-section__title">Название сервера</span>
-            <p className="server-profile-section__desc">
-              Отображается в списке серверов, каналах и настройках.
-            </p>
-          </div>
-          <div className="server-profile-name-field">
+      <section className="settings-panel">
+        <h3 className="settings-panel__title">Название сервера</h3>
+        <p className="settings-panel__desc">
+          Отображается в списке серверов, каналах и настройках.
+        </p>
+        <div className="settings-panel__card">
+          <div className="settings-field">
+            <label htmlFor="server-profile-name">Название</label>
             <input
+              id="server-profile-name"
               type="text"
               value={serverName}
               onChange={(e) => setServerName(e.target.value)}
               placeholder="Введите название сервера"
               maxLength={100}
             />
+          </div>
+          <div className="settings-form-actions">
             <button
               type="button"
-              className="server-profile-btn server-profile-btn--primary"
+              className="settings-btn settings-btn--primary"
               onClick={handleServerNameUpdate}
               disabled={isSaving || !nameChanged || !serverName.trim()}
             >
               {isSaving ? 'Сохранение…' : 'Сохранить'}
             </button>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="server-profile-section">
-          <div className="server-profile-section__head">
-            <span className="server-profile-section__title">Описание</span>
-            <p className="server-profile-section__desc">
-              Расскажите, о чём этот сервер. Видно в обзоре и профиле сервера.
-            </p>
-          </div>
-          <div className="server-profile-description-field">
+      <section className="settings-panel">
+        <h3 className="settings-panel__title">Описание</h3>
+        <p className="settings-panel__desc">
+          Расскажите, о чём этот сервер. Видно в обзоре и профиле сервера.
+        </p>
+        <div className="settings-panel__card">
+          <div className="settings-field server-settings-profile__description">
+            <label htmlFor="server-profile-description">Текст</label>
             <textarea
-              className="server-profile-description-input"
+              id="server-profile-description"
               value={serverDescription}
               onChange={(e) => setServerDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
               placeholder="Добавьте описание сервера"
               rows={4}
               maxLength={MAX_DESCRIPTION_LENGTH}
             />
-            <div className="server-profile-description-footer">
-              <span className="server-profile-description-counter">
-                {serverDescription.length}/{MAX_DESCRIPTION_LENGTH}
-              </span>
-              <button
-                type="button"
-                className="server-profile-btn server-profile-btn--primary"
-                onClick={handleServerDescriptionUpdate}
-                disabled={isSavingDescription || !descriptionChanged}
-              >
-                {isSavingDescription ? 'Сохранение…' : 'Сохранить'}
-              </button>
-            </div>
+            <span className="server-settings-profile__counter">
+              {serverDescription.length}/{MAX_DESCRIPTION_LENGTH}
+            </span>
           </div>
-        </section>
+          <div className="settings-form-actions">
+            <button
+              type="button"
+              className="settings-btn settings-btn--primary"
+              onClick={handleServerDescriptionUpdate}
+              disabled={isSavingDescription || !descriptionChanged}
+            >
+              {isSavingDescription ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      </section>
 
-        <section className="server-profile-section">
-          <div className="server-profile-section__head">
-            <span className="server-profile-section__title">Приватность сервера</span>
-            <p className="server-profile-section__desc">
-              {isPrivate
-                ? 'Сервер скрыт из обнаружения. Новые участники могут попасть только по приглашению.'
-                : 'Сервер виден в обнаружении — любой пользователь может найти и присоединиться к нему.'}
-            </p>
-          </div>
-          <div className="server-profile-privacy-row">
-            <div className="server-profile-privacy-row__info">
-              <span className="server-profile-privacy-row__title">Приватный сервер</span>
-              <p className="server-profile-privacy-row__hint">
+      <section className="settings-panel">
+        <h3 className="settings-panel__title">Приватность</h3>
+        <p className="settings-panel__desc">
+          {isPrivate
+            ? 'Сервер скрыт из обнаружения. Новые участники могут попасть только по приглашению.'
+            : 'Сервер виден в обнаружении — любой пользователь может найти и присоединиться к нему.'}
+        </p>
+        <div className="settings-panel__card">
+          <div className="settings-row">
+            <div className="settings-row__info">
+              <span className="settings-row__title">Приватный сервер</span>
+              <p className="settings-row__desc">
                 {isSavingPrivacy ? 'Сохранение…' : isPrivate ? 'Сейчас: приватный' : 'Сейчас: публичный'}
               </p>
             </div>
-            <label className="server-profile-switch">
+            <label className={`settings-switch${isSavingPrivacy ? ' settings-switch--disabled' : ''}`}>
               <input
                 type="checkbox"
                 checked={isPrivate}
                 onChange={(e) => handlePrivacyChange(e.target.checked)}
                 disabled={isSavingPrivacy}
               />
-              <span className="server-profile-switch__slider" />
+              <span className="settings-switch__slider" />
             </label>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="server-profile-section">
-          <div className="server-profile-section__head">
-            <span className="server-profile-section__title">Значок сервера</span>
-            <p className="server-profile-section__desc">
-              Рекомендуемый размер — 512×512 px. PNG или JPG.
-            </p>
-          </div>
+      <section className="settings-panel">
+        <h3 className="settings-panel__title">Значок сервера</h3>
+        <p className="settings-panel__desc">Рекомендуемый размер — 512×512 px. PNG или JPG.</p>
+        <div className="settings-panel__card settings-panel__card--flush">
           <div className="server-profile-icon-row">
             <button
               type="button"
@@ -385,7 +386,7 @@ const ServerSettings = ({
             <div className="server-profile-icon-actions">
               <button
                 type="button"
-                className="server-profile-btn server-profile-btn--primary server-profile-btn--with-icon"
+                className="settings-btn settings-btn--primary"
                 onClick={() => avatarInputRef.current?.click()}
               >
                 <PhotoCamera fontSize="small" />
@@ -394,7 +395,7 @@ const ServerSettings = ({
               {server?.avatar && (
                 <button
                   type="button"
-                  className="server-profile-btn server-profile-btn--danger"
+                  className="settings-btn settings-btn--danger"
                   onClick={handleAvatarRemove}
                 >
                   Удалить
@@ -402,20 +403,16 @@ const ServerSettings = ({
               )}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="server-profile-section">
-          <div className="server-profile-section__head">
-            <span className="server-profile-section__title">Баннер</span>
-            <p className="server-profile-section__desc">
-              Фон профиля сервера. Можно загрузить изображение или выбрать цвет.
-            </p>
-          </div>
-
-          <label
-            className="server-profile-banner-upload"
-            style={bannerStyle}
-          >
+      <section className="settings-panel">
+        <h3 className="settings-panel__title">Баннер</h3>
+        <p className="settings-panel__desc">
+          Фон профиля сервера. Можно загрузить изображение или выбрать цвет.
+        </p>
+        <div className="settings-panel__card settings-panel__card--flush">
+          <label className="server-profile-banner-upload" style={bannerStyle}>
             <input
               ref={bannerInputRef}
               type="file"
@@ -440,7 +437,7 @@ const ServerSettings = ({
             <div className="server-profile-banner-tools">
               <button
                 type="button"
-                className="server-profile-btn server-profile-btn--danger"
+                className="settings-btn settings-btn--danger"
                 onClick={handleBannerRemove}
               >
                 Удалить баннер
@@ -476,7 +473,7 @@ const ServerSettings = ({
             />
             <button
               type="button"
-              className="server-profile-btn server-profile-btn--ghost"
+              className="settings-btn settings-btn--ghost"
               onClick={handleResetToDefault}
             >
               Сбросить цвет
@@ -486,7 +483,7 @@ const ServerSettings = ({
           <div className="server-profile-banner-footer">
             <button
               type="button"
-              className="server-profile-btn server-profile-btn--primary"
+              className="settings-btn settings-btn--primary"
               onClick={handleBannerColorUpdate}
             >
               Сохранить цвет
@@ -495,8 +492,8 @@ const ServerSettings = ({
               <span className="server-profile-status">Используется цвет по умолчанию</span>
             )}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 };

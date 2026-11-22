@@ -81,8 +81,7 @@
 [data-interface-design='rounded'] .member-list-sidebar,
 [data-interface-design='rounded'] .friends-panel,
 [data-interface-design='rounded'] .server-settings-sidebar,
-[data-interface-design='rounded'] .server-settings-page-header,
-[data-interface-design='rounded'] .server-settings-scroll {
+[data-interface-design='rounded'] .server-settings-page-header {
   position: relative;
   overflow: hidden;
   border: var(--midnight-panel-border);
@@ -102,8 +101,7 @@
 [data-interface-design='rounded'] .member-list-sidebar:hover,
 [data-interface-design='rounded'] .friends-panel:hover,
 [data-interface-design='rounded'] .server-settings-sidebar:hover,
-[data-interface-design='rounded'] .server-settings-page-header:hover,
-[data-interface-design='rounded'] .server-settings-scroll:hover {
+[data-interface-design='rounded'] .server-settings-page-header:hover {
   border-color: var(--midnight-border-hover);
 }
 
@@ -326,7 +324,7 @@
   padding: var(--midnight-gap);
   gap: var(--midnight-gap);
   background: var(--background);
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -337,7 +335,8 @@
 [data-interface-design='rounded'] .server-settings-main {
   gap: var(--midnight-gap);
   background: transparent;
-  overflow: visible;
+  overflow: hidden;
+  min-height: 0;
 }
 
 [data-interface-design='rounded'] .server-settings-page-header {
@@ -345,7 +344,15 @@
 }
 
 [data-interface-design='rounded'] .server-settings-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--surface);
+  border: var(--midnight-panel-border);
+  border-radius: var(--midnight-radius-lg);
+  box-sizing: border-box;
 }
 
 [data-interface-design='rounded'] .settings-modal .settings-panel__card {

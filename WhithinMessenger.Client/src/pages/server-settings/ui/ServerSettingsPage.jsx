@@ -16,6 +16,7 @@ import { ServerSettings } from '../../../widgets/server-settings';
 import { AuditLogPanel } from '../../../widgets/audit-log';
 import { Button } from '../../../shared/ui/atoms/Button';
 import { canManageRoles, canManageServer } from '../../../entities/role/lib/serverPermissions';
+import '../../../shared/ui/organisms/SettingsModal/SettingsModal.css';
 import './ServerSettingsPage.css';
 
 const TAB_META = {
@@ -379,7 +380,8 @@ const ServerSettingsPage = () => {
         </header>
         )}
 
-        <div className="server-settings-scroll">
+        <div className={`server-settings-scroll${activeTab === 'roles' ? ' server-settings-scroll--roles' : ''}`}>
+        <div className={activeTab === 'roles' ? undefined : 'settings-content'}>
         {activeTab === 'profile' && userCanManageServer && (
           <ServerSettings
             connection={connectionRef.current}
@@ -416,6 +418,7 @@ const ServerSettingsPage = () => {
         {activeTab === 'audit-log' && userCanManageServer && connectionRef.current && (
           <AuditLogPanel connection={connectionRef.current} serverId={serverId} />
         )}
+        </div>
         </div>
       </div>
     </div>
