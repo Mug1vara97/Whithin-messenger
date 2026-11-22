@@ -1379,6 +1379,7 @@ const HomePage = () => {
                       onEndChatCall={handleEndChatCall}
                       onMessagesActivity={scheduleMarkChatNotificationsRead}
                       isPinned={Boolean(selectedChat.isPinned ?? selectedChat.IsPinned)}
+                      peerAvatarDecoration={selectedChat.avatarDecoration ?? selectedChat.AvatarDecoration ?? null}
                       pinChat={pinChat}
                       unpinChat={unpinChat}
                     />

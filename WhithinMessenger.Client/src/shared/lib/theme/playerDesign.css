@@ -1179,18 +1179,22 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-setting
   transition: border-radius 0.2s ease, transform 0.1s ease;
 }
 
-[data-interface-skin='player'] {
-  --avatar-presence-ring: var(--player-panel);
+[data-interface-skin='player'] .user-avatar-frame--decorated .user-avatar--has-media,
+[data-interface-skin='player'] .chat-info-hero__avatar--private .user-avatar-frame--decorated .user-avatar {
+  border: none !important;
+  box-shadow: none !important;
 }
 
-[data-interface-skin='player'] .user-panel .user-avatar-presence-dot,
-[data-interface-skin='player'] .sidebar-panel-layout .user-panel .user-avatar-presence-dot {
-  border-color: var(--player-dock);
+[data-interface-skin='player'] .profile-hero__chip::before,
+[data-interface-skin='player'] .profile-hero__chip::after,
+[data-interface-skin='player'] .profile-hero__bio-dock::before,
+[data-interface-skin='player'] .profile-hero__bio-dock::after {
+  content: none;
 }
 
-[data-interface-skin='player'] .user-panel .user-avatar-presence-dot--offline,
-[data-interface-skin='player'] .sidebar-panel-layout .user-panel .user-avatar-presence-dot--offline {
-  background-color: var(--player-dock);
+[data-interface-skin='player'] .user-avatar-presence-dot,
+[data-interface-skin='player'] .profile-modal__avatar-status {
+  border-color: #1a1b1e;
 }
 
 [data-interface-skin='player'] .server-button:hover {

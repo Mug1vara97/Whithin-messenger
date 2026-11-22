@@ -545,6 +545,7 @@ namespace WhithinMessenger.Infrastructure.Repositories
                             Type = "private",
                             Avatar = otherMember.User.UserProfile?.Avatar,
                             AvatarColor = otherMember.User.UserProfile?.AvatarColor,
+                            AvatarDecoration = otherMember.User.UserProfile?.AvatarDecoration,
                             Banner = otherMember.User.UserProfile?.Banner,
                             OtherUserId = otherMember.UserId
                         };

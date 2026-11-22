@@ -15,7 +15,8 @@
 
 .user-avatar-frame--decorated-media .user-avatar--has-media {
   background-color: transparent;
-  border: 2px solid var(--avatar-cutout-ring, var(--background-secondary, var(--background, #1e1f22)));
+  border: none;
+  box-shadow: none;
   box-sizing: border-box;
 }
 

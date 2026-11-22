@@ -448,14 +448,6 @@ const ChatInfoModal = ({
                       avatarColor={isGroup ? chatAvatarColor : chatInfo?.avatarColor}
                       avatarDecoration={isGroup ? null : chatInfo?.avatarDecoration}
                       size={isGroup ? 72 : 88}
-                      statusIndicator={
-                        isPrivate ? (
-                          <UserAvatarPresenceDot
-                            userId={chatInfo?.userId}
-                            status={privatePresence.normalized ?? chatInfo?.status}
-                          />
-                        ) : null
-                      }
                     />
                   </div>
 

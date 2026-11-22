@@ -171,6 +171,7 @@ const ChatRoom = ({
   /** When messages load/update; parent debounces the server «mark chat read» call */
   onMessagesActivity,
   isPinned = false,
+  peerAvatarDecoration = null,
   pinChat,
   unpinChat,
 }) => {
@@ -3097,7 +3098,7 @@ const ChatRoom = ({
           type: isPrivateChat ? 'private' : 'group',
           avatar: chatUserProfile?.avatar,
           avatarColor: chatUserProfile?.avatarColor,
-          avatarDecoration: chatUserProfile?.avatarDecoration,
+          avatarDecoration: chatUserProfile?.avatarDecoration || peerAvatarDecoration || null,
           status: chatUserProfile?.status,
           banner: chatUserProfile?.banner ?? null,
           chatAvatar: chatUserProfile?.avatar,
