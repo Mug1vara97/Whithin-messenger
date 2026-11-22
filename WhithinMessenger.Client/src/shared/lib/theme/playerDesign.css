@@ -668,14 +668,114 @@ html[data-frosted-glass='enabled'][data-interface-skin='player'] .main-layout > 
   font-weight: 700;
 }
 
-/* ---------- Server settings ---------- */
+/* ---------- Server settings (mirror settings modal in «Новое») ---------- */
 
-[data-interface-skin='player'] .server-settings-sidebar,
-[data-interface-skin='player'] .server-settings-page-header,
-[data-interface-skin='player'] .server-settings-scroll {
-  background: var(--player-panel);
+[data-interface-skin='player'] .server-settings-page {
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+[data-interface-skin='player'] .server-settings-sidebar {
+  background: transparent;
   border: none;
   border-radius: 8px;
+}
+
+[data-interface-skin='player'] .server-settings-main {
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--player-wash) 0, var(--player-panel) 220px), var(--player-panel);
+}
+
+[data-interface-skin='player'] .server-settings-page-header {
+  border-bottom: none;
+  background: transparent;
+}
+
+[data-interface-skin='player'] .server-settings-page-header h1 {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+[data-interface-skin='player'] .server-settings-scroll {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+[data-interface-skin='player'] .server-header {
+  border-bottom: none;
+}
+
+[data-interface-skin='player'] .back-to-server-btn {
+  border: none;
+  border-radius: 999px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .back-to-server-btn:hover {
+  background: var(--player-item-active);
+}
+
+[data-interface-skin='player'] .settings-nav-item {
+  border-radius: 999px;
+}
+
+[data-interface-skin='player'] .settings-nav-item.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-panel__card,
+[data-interface-skin='player'] .server-settings-page .members-table-card,
+[data-interface-skin='player'] .server-settings-page .audit-log-card,
+[data-interface-skin='player'] .server-settings-page .server-profile-preview {
+  border: none;
+  border-radius: 8px;
+  background: var(--player-item-hover);
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-row,
+[data-interface-skin='player'] .server-settings-page .settings-form-actions,
+[data-interface-skin='player'] .server-settings-page .settings-field + .settings-field,
+[data-interface-skin='player'] .server-settings-page .members-table-toolbar {
+  border-color: transparent;
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-field input,
+[data-interface-skin='player'] .server-settings-page .settings-field select {
+  border: none;
+  border-radius: 999px;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .server-settings-profile__description textarea,
+[data-interface-skin='player'] .server-settings-page .members-search {
+  border: none;
+  border-radius: 12px;
+  background: var(--player-field);
+}
+
+[data-interface-skin='player'] .server-settings-page .members-search__input {
+  background: transparent;
+}
+
+[data-interface-skin='player'] .server-settings-page .settings-btn,
+[data-interface-skin='player'] .server-settings-page .members-toolbar-btn {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-settings-main {
+  background: var(--fg-fill-middle) !important;
+}
+
+html[data-frosted-glass='enabled'][data-interface-skin='player'] .server-settings-sidebar {
+  background: var(--fg-fill-left) !important;
 }
 
 /* ---------- Fields and buttons ---------- */
